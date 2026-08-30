@@ -11,7 +11,11 @@
 # RapfiDroid/tools/build_engine_android.sh 의 구조를 그대로 따른다 — 특히
 # "빌드가 됐다"와 "엔진이 맞다"를 가르는 [5/6] 검증 게이트가 같은 이유로 여기 있다.
 #
-set -euo pipefail
+# pipefail 은 일부러 빼 둔다. 이 스크립트에는 `… | head -1` 과 `… | grep -q` 가
+# 여럿인데, 오른쪽이 먼저 끝나면 왼쪽이 SIGPIPE(141)로 죽고 pipefail 이 그것을
+# 빌드 실패로 바꾼다. 진짜 오류가 아니라 파이프 관용구가 실패로 둔갑하는 것이라,
+# 잡고 싶은 것(명령 자체의 실패)은 set -e 가 이미 잡는다.
+set -eu
 
 # 앱(RapfiDroid)에 실린 것과 **같은 커밋**에서 출발한다. 그래야 웹과 폰의
 # 탐색 결과가 같다고 주장할 근거가 생긴다.
@@ -29,22 +33,34 @@ JOBS="$(nproc)"
 echo ">>> [1/6] 도구"
 mkdir -p "$WORK"
 cd "$WORK"
-if [ ! -d emsdk ]; then
-  git clone -q --depth 1 https://github.com/emscripten-core/emsdk.git
+# 캐시 액션이 미스에도 빈 디렉터리를 남길 수 있으므로 "있다"가 아니라
+# "쓸 수 있다"로 판단한다.
+if [ ! -x emsdk/emsdk ]; then
+  rm -rf emsdk
+  git clone --depth 1 https://github.com/emscripten-core/emsdk.git
 fi
 cd emsdk
-./emsdk install "$EMSDK_VERSION" > /dev/null
-./emsdk activate "$EMSDK_VERSION" > /dev/null
+# 출력을 버리지 않는다. 첫 시도에서 이 단계가 조용히 죽었고, 로그를 /dev/null 로
+# 보낸 탓에 원인을 볼 수 없었다. 한 번 시끄러운 편이 낫다.
+./emsdk install "$EMSDK_VERSION"
+./emsdk activate "$EMSDK_VERSION"
+# emsdk_env.sh 는 미설정 변수를 건드리고 0 이 아닌 값을 돌려줄 수 있다.
+# set -eu 아래에서 그대로 source 하면 스크립트가 여기서 끝난다.
+set +eu
 # shellcheck disable=SC1091
-source ./emsdk_env.sh > /dev/null 2>&1
-EMSDK_RESOLVED="$(emcc -v 2>&1 | head -1)"
+source ./emsdk_env.sh
+set -eu
+command -v emcc > /dev/null || { echo "emcc 가 PATH 에 없습니다 — emsdk 활성화 실패"; exit 1; }
+EMSDK_RESOLVED="$(emcc -v 2>&1 | sed -n 1p)"
 echo "  . $EMSDK_RESOLVED"
-echo "  . cmake $(cmake --version | head -1)"
+echo "  . cmake $(cmake --version | sed -n 1p)"
 echo "  . node  $(node --version)"
+echo "  . emcc  $(command -v emcc)"
 
 echo ">>> [2/6] Rapfi 소스 + 가중치"
 cd "$WORK"
-if [ ! -d rapfi ]; then
+if [ ! -d rapfi/.git ]; then
+  rm -rf rapfi
   git clone -q https://github.com/dhbloo/rapfi.git
 fi
 cd rapfi
