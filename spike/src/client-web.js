@@ -164,7 +164,7 @@ export async function runW0(variant, log = () => {}) {
   const steps = await runSteps({ send: (text) => stdinWrite(channel, text), waitFor, sleep });
   const { maxLagMs, fps } = lag.stop();
 
-  stdinWrite(channel, END_COMMAND + "\n");
+  await stdinWrite(channel, END_COMMAND + "\n");
   for (let i = 0; exited === null && i < 100; i++) await sleep(100);
   worker.terminate();
 

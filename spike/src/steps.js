@@ -48,7 +48,7 @@ export const END_COMMAND = "END";
 
 /**
  * 목록을 순서대로 돌린다.
- * @param {(text: string) => void} send            stdin 에 한 덩어리 쓰기(개행 포함해서 부름)
+ * @param {(text: string) => Promise<void>} send   stdin 에 한 덩어리 쓰기(백프레셔 때문에 비동기)
  * @param {(m, ms, label) => Promise<string>} waitFor  조건에 맞는 줄 기다리기
  * @param {(ms: number) => Promise<void>} sleep
  */
@@ -56,7 +56,7 @@ export async function runSteps({ send, waitFor, sleep }) {
   const results = [];
   for (const s of STEPS) {
     const t0 = nowMs();
-    send(s.send + "\n");
+    await send(s.send + "\n");
     if (s.match === null) {
       await sleep(150);
       results.push({ step: s.label, ok: true, ms: round(nowMs() - t0), got: "(응답 없음 — 정상)" });

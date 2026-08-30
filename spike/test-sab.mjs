@@ -38,7 +38,7 @@ const lagTimer = setInterval(() => {
 
 const t0 = performance.now();
 for (let i = 0; i < CHUNKS; i++) {
-  stdinWrite(channel, CHUNK);
+  await stdinWrite(channel, CHUNK);
   // 소비자가 따라잡아 비어 있는 상태를 만들도록 일부러 쉰다 — 그래야
   // Atomics.wait 가 실제로 걸린다.
   if (i % 4 === 3) await sleep(12);

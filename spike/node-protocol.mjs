@@ -117,7 +117,7 @@ const results = await runSteps({
 });
 
 const maxLagMs = +lag.stop().toFixed(1);
-stdinWrite(channel, END_COMMAND + "\n");
+await stdinWrite(channel, END_COMMAND + "\n");
 for (let i = 0; exited === null && i < 100; i++) await sleep(100);
 
 const passed = results.every((r) => r.ok) && exited !== null;

@@ -45,26 +45,59 @@ export function sabAvailable() {
 const encoder = new TextEncoder();
 
 /**
- * 생산자 쪽(메인 스레드). 메인 스레드는 `Atomics.wait` 가 금지지만 `notify` 는 된다.
- *
- * 버퍼가 가득 차면 던진다. 덮어쓰기로 조용히 명령을 잃느니 여기서 죽는 편이 낫다 —
- * 잃어버린 한 줄은 나중에 "엔진이 가끔 응답하지 않는다"로 나타나고, 그건 못 잡는다.
+ * 들어가는 만큼만 쓰고, 다음에 쓸 인덱스를 돌려준다. 진전이 없으면 인자로 받은
+ * `from` 을 그대로 돌려준다(= 버퍼가 가득).
  */
-export function stdinWrite(channel, text) {
+export function stdinWriteSome(channel, bytes, from = 0) {
   const { ctl, data } = channel;
-  const bytes = encoder.encode(text);
   const cap = data.length;
   let w = Atomics.load(ctl, CTL_WRITE);
-  for (let i = 0; i < bytes.length; i++) {
+  let i = from;
+  for (; i < bytes.length; i++) {
     const next = (w + 1) % cap;
-    if (next === Atomics.load(ctl, CTL_READ)) {
-      throw new Error(`stdin 링버퍼가 가득 찼습니다 (용량 ${cap}B)`);
-    }
+    if (next === Atomics.load(ctl, CTL_READ)) break;
     data[w] = bytes[i];
     w = next;
   }
-  Atomics.store(ctl, CTL_WRITE, w);
-  Atomics.notify(ctl, CTL_WRITE);
+  if (i > from) {
+    Atomics.store(ctl, CTL_WRITE, w);
+    Atomics.notify(ctl, CTL_WRITE);
+  }
+  return i;
+}
+
+/**
+ * 생산자 쪽(메인 스레드). **비동기다.**
+ *
+ * 처음에는 동기 함수였고 버퍼가 차면 던졌다. 그게 틀렸다는 것을 링버퍼 단위
+ * 시험이 바로 잡아냈고, 이유는 스파이크가 아니라 설계에 있다:
+ *
+ *   - 메인 스레드는 `Atomics.wait` 가 금지라 자리가 날 때까지 **블로킹할 수 없다**
+ *   - 그런데 엔진은 **탐색 중에 stdin 을 읽지 않는다**. 그동안 쌓이는 명령은
+ *     소비되지 않으므로 버퍼는 실제로 찰 수 있다
+ *
+ * 즉 "가득 참"은 예외 상황이 아니라 정상 동작의 일부다. 던지는 대신 들어가는
+ * 만큼 쓰고 이벤트 루프에 양보한 뒤 이어 쓴다 — UI 스레드를 막지 않는 유일한
+ * 백프레셔다. 덮어쓰기는 하지 않는다: 잃어버린 한 줄은 나중에 "엔진이 가끔
+ * 응답하지 않는다"로 나타나고, 그건 못 잡는다.
+ */
+export async function stdinWrite(channel, text, { timeoutMs = 30000 } = {}) {
+  const bytes = encoder.encode(text);
+  const deadline = Date.now() + timeoutMs;
+  let i = 0;
+  while (i < bytes.length) {
+    const next = stdinWriteSome(channel, bytes, i);
+    if (next === i) {
+      if (Date.now() > deadline) {
+        throw new Error(
+          `stdin 링버퍼가 ${timeoutMs}ms 동안 비지 않았습니다 ` +
+            `(용량 ${channel.data.length}B, 남은 ${bytes.length - i}B) — 소비자가 멈춘 것 같습니다`,
+        );
+      }
+      await new Promise((r) => setTimeout(r, 1));
+    }
+    i = next;
+  }
 }
 
 /** 남은 것을 다 읽은 뒤 EOF 를 주도록 표시한다. 엔진은 그때 프로토콜 루프를 끝낸다. */
