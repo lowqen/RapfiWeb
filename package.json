@@ -1,0 +1,19 @@
+{
+  "name": "rapfiweb",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "RapfiDroid 웹 이식 — W0 스파이크 단계",
+  "license": "GPL-3.0-or-later",
+  "scripts": {
+    "engine:build": "bash tools/build_engine_wasm.sh",
+    "serve": "node spike/serve.mjs",
+    "w0:bench": "node spike/node-bench.mjs",
+    "w0:node": "node spike/node-protocol.mjs",
+    "w0:browser": "node spike/browser-test.mjs",
+    "w0:summary": "node spike/summarize.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  }
+}

@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RapfiWeb W0 스파이크</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #fbfaf8; --fg: #201f1c; --dim: #6c6a63; --line: #dcd9d1;
+    --ok: #2f6b3d; --bad: #a2321f; --card: #ffffff;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#1c1b19; --fg:#e8e6e0; --dim:#9d9a92; --line:#3a3835; --card:#232220; --ok:#7cc08d; --bad:#e08a76; }
+  }
+  body { margin: 0; background: var(--bg); color: var(--fg); padding: 24px; }
+  h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.2px; margin: 0 0 4px; }
+  p.sub { color: var(--dim); font-size: 13px; margin: 0 0 20px; }
+  .caps { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .chip { border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; font-size: 12px; background: var(--card); }
+  .chip.on { border-color: var(--ok); color: var(--ok); }
+  .chip.off { border-color: var(--bad); color: var(--bad); }
+  button { font: inherit; font-size: 13px; padding: 7px 14px; border-radius: 8px;
+           border: 1px solid var(--line); background: var(--card); color: var(--fg); cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  pre { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+        padding: 12px; font-size: 12px; line-height: 1.5; overflow: auto; max-height: 46vh;
+        font-family: ui-monospace, SFMono-Regular, Consolas, monospace; margin: 0 0 16px; }
+  .spinner { display: inline-block; width: 200px; height: 4px; background: var(--line);
+             border-radius: 2px; overflow: hidden; vertical-align: middle; margin-left: 10px; }
+  .spinner i { display: block; height: 100%; width: 40%; background: var(--ok);
+               animation: slide 1.1s ease-in-out infinite; }
+  @keyframes slide { 0% { transform: translateX(-100%);} 100% { transform: translateX(250%);} }
+</style>
+</head>
+<body>
+  <h1>RapfiWeb W0 스파이크</h1>
+  <p class="sub">
+    Rapfi WASM 을 워커에서 띄우고 piskvork 프로토콜을 왕복시킨다.
+    아래 «막대»가 계속 매끄럽게 움직이면 메인 스레드가 막히지 않은 것이다.
+    <span class="spinner"><i></i></span>
+  </p>
+
+  <div class="caps" id="caps"></div>
+  <div class="row" id="buttons"></div>
+  <pre id="log">준비됨.</pre>
+  <pre id="result" hidden></pre>
+
+<script type="module">
+import { runW0, detectCapabilities } from "./src/client-web.js";
+
+const caps = detectCapabilities();
+const capsEl = document.getElementById("caps");
+const logEl = document.getElementById("log");
+const resEl = document.getElementById("result");
+
+const chip = (label, state) => {
+  const d = document.createElement("span");
+  d.className = "chip " + (state === true ? "on" : state === false ? "off" : "");
+  d.textContent = label;
+  capsEl.append(d);
+};
+chip(`crossOriginIsolated: ${caps.crossOriginIsolated}`, caps.crossOriginIsolated === true);
+chip(`SharedArrayBuffer: ${caps.threads}`, caps.threads);
+chip(`WASM SIMD: ${caps.simd}`, caps.simd);
+chip(`코어 ${caps.hardwareConcurrency}`);
+chip(`자동 선택 → ${caps.pick}`);
+
+const log = (s) => { logEl.textContent += "\n" + s; logEl.scrollTop = logEl.scrollHeight; };
+
+const VARIANTS = ["single", "single-simd128", "multi", "multi-simd128"];
+for (const v of VARIANTS) {
+  const b = document.createElement("button");
+  b.textContent = v;
+  b.onclick = () => go(v);
+  document.getElementById("buttons").append(b);
+}
+
+async function go(variant) {
+  document.querySelectorAll("button").forEach((b) => (b.disabled = true));
+  logEl.textContent = `[${variant}] 시작`;
+  resEl.hidden = true;
+  try {
+    const report = await runW0(variant, log);
+    window.__W0_RESULT__ = report;
+    resEl.hidden = false;
+    resEl.textContent = JSON.stringify(report, null, 2);
+    log(report.pass ? "통과" : "실패");
+  } catch (e) {
+    window.__W0_RESULT__ = { variant, pass: false, fatal: String(e && e.stack || e) };
+    resEl.hidden = false;
+    resEl.textContent = JSON.stringify(window.__W0_RESULT__, null, 2);
+  } finally {
+    document.querySelectorAll("button").forEach((b) => (b.disabled = false));
+  }
+}
+
+// Playwright(browser-test.mjs)가 부르는 진입점.
+window.runW0 = (v) => go(v).then(() => window.__W0_RESULT__);
+window.__W0_CAPS__ = caps;
+</script>
+</body>
+</html>

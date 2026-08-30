@@ -1,0 +1,169 @@
+name: W0 spike
+
+# 이 워크플로가 W0 스파이크 전부다. 로컬에 emsdk 를 깔지 않는 이유는 최종
+# tools/build_engine_wasm.sh 가 어차피 리눅스 bash 스크립트이기 때문이다
+# (RapfiDroid/tools/build_engine_android.sh 와 같은 규율).
+on:
+  workflow_dispatch:
+    inputs:
+      lto:
+        description: "ENABLE_LTO (ON 이면 배포본과 같은 빌드, 대신 느리다)"
+        default: "ON"
+        type: choice
+        options: ["ON", "OFF"]
+  push:
+    paths:
+      - "tools/**"
+      - "spike/**"
+      - ".github/workflows/w0-spike.yml"
+
+jobs:
+  # 30초짜리 관문. 스파이크 잡은 빌드에만 40분을 쓰므로, 하네스의 문법 오류나
+  # 링버퍼 버그를 그 뒤에 발견하면 한 번에 40분을 버린다. 여기서 먼저 잡는다.
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: 셸 스크립트 문법
+        run: bash -n tools/build_engine_wasm.sh
+
+      - name: JS 문법
+        run: |
+          fail=0
+          while IFS= read -r f; do
+            node --check "$f" || { echo "::error file=$f::문법 오류"; fail=1; }
+          done < <(find spike -name '*.mjs' -o -name '*.js')
+          exit $fail
+
+      # 엔진 없이 도는 유일한 실제 시험. W0-1 이 실패했을 때 "우리 채널이 틀렸나,
+      # 엔진 쪽인가"를 가르는 근거가 된다.
+      - name: SAB 링버퍼 단위 시험
+        run: node spike/test-sab.mjs
+
+  spike:
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    env:
+      ENABLE_LTO: ${{ github.event.inputs.lto || 'ON' }}
+      WORK: ${{ github.workspace }}/../rapfi-wasm-work
+      EXPECT_HASH: e240ab16
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: 시스템 도구
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ninja-build ccache file
+          cmake --version | head -1
+          nproc
+
+      # emsdk 는 2GB 가까이 된다. 스파이크를 여러 번 돌릴 것이므로 캐시한다.
+      - name: emsdk 캐시
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.WORK }}/emsdk
+          key: emsdk-latest-v1
+
+      - name: rapfi 소스 캐시
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.WORK }}/rapfi
+          key: rapfi-8d16fc2c-v1
+
+      # ─────────────────────────── W0-2 ───────────────────────────
+      - name: "W0-2 — 4종 빌드 + 검증 게이트"
+        run: bash tools/build_engine_wasm.sh
+
+      - name: 산출물 크기
+        run: |
+          echo "| 변형 | .js | .wasm |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|---|" >> $GITHUB_STEP_SUMMARY
+          for v in single single-simd128 multi multi-simd128; do
+            js=$(stat -c%s "out/engine/rapfi-$v.js")
+            wasm=$(stat -c%s "out/engine/rapfi-$v.wasm")
+            echo "| \`$v\` | $((js/1024)) KB | $((wasm/1024)) KB |" >> $GITHUB_STEP_SUMMARY
+          done
+
+      - name: 엔진 아티팩트 업로드
+        uses: actions/upload-artifact@v4
+        with:
+          name: rapfi-wasm
+          path: |
+            out/engine/
+          if-no-files-found: error
+
+      - run: mkdir -p results
+
+      # ─────────────────────────── W0-3 ───────────────────────────
+      # 4종 모두에서 BENCH 해시가 e240ab16 이어야 한다. config 의
+      # default_thread_num = 1 때문에 멀티 변형도 1스레드로 벤치한다 —
+      # 그게 x86·폰과 대조가 성립하는 조건이다.
+      - name: "W0-3 — BENCH 해시 대조 (4종)"
+        continue-on-error: true
+        run: |
+          for v in single single-simd128 multi multi-simd128; do
+            echo "::group::BENCH $v"
+            node spike/node-bench.mjs "$v" > "results/bench-$v.json" || true
+            cat "results/bench-$v.json"
+            echo "::endgroup::"
+          done
+
+      # ────────────────────────── W0-1 (node) ──────────────────────
+      # 브라우저보다 싸게 도는 1차 관문. node 의 worker_threads 는 SAB/Atomics
+      # 의미가 브라우저 워커와 같으므로, 여기서 깨지면 브라우저에서도 깨진다.
+      - name: "W0-1 — stdin 왕복 (node worker_threads, 4종)"
+        continue-on-error: true
+        run: |
+          for v in single single-simd128 multi multi-simd128; do
+            echo "::group::node protocol $v"
+            node spike/node-protocol.mjs "$v" > "results/node-$v.json" || true
+            cat "results/node-$v.json"
+            echo "::endgroup::"
+          done
+
+      # ──────────────────────── W0-1 (browser) ─────────────────────
+      # node 가 통과해도 여기서만 드러나는 것들이 있다: 모듈 워커 안의 동적
+      # import, Emscripten 이 pthread 용으로 스스로 띄우는 중첩 워커, COOP/COEP.
+      - name: Playwright 설치
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: "W0-1 — stdin 왕복 (헤드리스 Chromium, 4종)"
+        continue-on-error: true
+        run: |
+          node spike/serve.mjs 8787 &
+          SERVER=$!
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8787/bench-manifest.json > /dev/null && break
+            sleep 1
+          done
+          for v in single single-simd128 multi multi-simd128; do
+            echo "::group::browser $v"
+            node spike/browser-test.mjs "$v" 8787 > "results/browser-$v.json" || true
+            cat "results/browser-$v.json"
+            echo "::endgroup::"
+          done
+          kill $SERVER || true
+
+      # ─────────────────────────── 요약 ────────────────────────────
+      - name: 결과 업로드
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: w0-results
+          path: results/
+
+      - name: 요약
+        if: always()
+        run: node spike/summarize.mjs results

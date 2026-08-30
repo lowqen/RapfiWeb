@@ -1,0 +1,28 @@
+# 빌드 산출물 — 엔진은 W0 통과 후에야 public/engine/ 으로 커밋한다(계획서 §8).
+/out/
+/dist/
+/node_modules/
+/results/
+
+# 가중치. CC0 이지만 40MB 라 릴리스 자산으로 나른다.
+*.bin.lz4
+
+# RenjuNet 파생 자료 — 어떤 이유로도 커밋 금지 (라이선스: 비상업·오프라인 전용,
+# 재배포 금지). 웹에서는 커밋이 곧 «온라인 시스템 게시»라 앱보다 더 위험하다.
+*.rif
+*.pack
+freq_data.json
+renju*.sqlite
+
+# 서명·비밀
+*.jks
+*.keystore
+.env
+.env.*
+
+# 편집기/OS
+.DS_Store
+desktop.ini
+.idea/
+.vscode/
+*.log
