@@ -17,9 +17,23 @@
 # 잡고 싶은 것(명령 자체의 실패)은 set -e 가 이미 잡는다.
 set -eu
 
-# 앱(RapfiDroid)에 실린 것과 **같은 커밋**에서 출발한다. 그래야 웹과 폰의
+# 앱(RapfiDroid)에 실린 것과 **같은 소스**에서 출발한다. 그래야 웹과 폰의
 # 탐색 결과가 같다고 주장할 근거가 생긴다.
-RAPFI_COMMIT="${RAPFI_COMMIT:-8d16fc2cee9cfdec7ac007b24a7325c221aecb86}"
+#
+# ⚠ 처음에는 RapfiDroid/app/src/main/jniLibs/ENGINE_VERSION.txt 의
+#   `upstream : 8d16fc2c…` 를 그대로 썼는데 그 커밋은 dhbloo/rapfi 에 없다(HTTP 422).
+#   build_engine_android.sh 가 CMakeLists 를 패치하고 **로컬 커밋을 만든 뒤**
+#   `rev-parse HEAD` 를 기록하기 때문이다 — 그래서 그 필드는 upstream 커밋이 아니라
+#   패치된 커밋(lowqen/rapfi 의 android 브랜치)이다. 진짜 베이스는 그 부모다:
+#
+#     lowqen/rapfi  8d16fc2c  "build: Android(arm64-v8a) 크로스 컴파일 지원"
+#       └ parent    3c94c2a9  dhbloo/rapfi "chore: finish module hygiene …" (2026-07-23)
+#
+#   안드로이드 패치 두 개는 출력 이름(libengine.so)과 bionic 의 libpthread 부재를
+#   다루는 것이라 wasm 에는 해당이 없다. 그래서 패치 없이 베이스에서 바로 빌드한다.
+RAPFI_COMMIT="${RAPFI_COMMIT:-3c94c2a976f24a0dd1c5517623e9ab6fffe66bd7}"
+# 가중치가 바뀌면 BENCH 해시 대조가 무의미해진다. 폰이 쓴 것과 같아야 한다.
+NETWORKS_COMMIT="${NETWORKS_COMMIT:-e32ad77a5364363b3e3a02b3f9e8610ade19ea98}"
 # 스파이크에서는 latest 를 쓰고 결과를 ENGINE_VERSION.txt 에 기록한다.
 # W0 가 통과하면 그때 나온 버전을 여기 고정한다(안드로이드가 NDK r27c 를 박아둔 것과 같은 이유).
 EMSDK_VERSION="${EMSDK_VERSION:-latest}"
@@ -64,10 +78,27 @@ if [ ! -d rapfi/.git ]; then
   git clone -q https://github.com/dhbloo/rapfi.git
 fi
 cd rapfi
+git fetch -q --all --tags
+# 없는 커밋을 checkout 하면 git 은 "unable to read tree" 로 죽는데, 그 메시지만
+# 보고는 얕은 클론 문제인지 커밋이 없는 건지 알 수 없다. 먼저 확인하고 말해 준다.
+if ! git cat-file -e "${RAPFI_COMMIT}^{commit}" 2> /dev/null; then
+  echo "  X 커밋 $RAPFI_COMMIT 가 dhbloo/rapfi 에 없습니다."
+  echo "    (RapfiDroid 의 ENGINE_VERSION.txt 'upstream' 필드는 패치된 로컬 커밋입니다 — 그 부모를 쓰세요)"
+  exit 1
+fi
 git checkout -q "$RAPFI_COMMIT"
 git submodule update -q --init --depth 1 Networks
+
+NET_ACTUAL="$(git -C Networks rev-parse HEAD)"
 echo "  . rapfi    $(git rev-parse --short HEAD)"
 echo "  . networks $(git -C Networks rev-parse --short HEAD)"
+if [ "$NET_ACTUAL" != "$NETWORKS_COMMIT" ]; then
+  # 가중치가 다르면 BENCH 해시가 달라지는 게 당연하고, 그러면 W0-3 은 엔진이
+  # 아니라 입력이 다른 것을 재게 된다. 조용히 넘어가면 안 되는 종류의 차이다.
+  echo "  X Networks 커밋이 폰이 쓴 것과 다릅니다: $NET_ACTUAL != $NETWORKS_COMMIT"
+  echo "    가중치가 다르면 BENCH 해시 대조가 성립하지 않습니다."
+  exit 1
+fi
 
 # 스파이크의 절반은 "upstream 이 실제로 무엇을 하는가"를 알아내는 것이다.
 # 이 덤프가 링크 플래그·타깃 이름·emscripten 분기를 CI 로그에 남긴다.
@@ -135,7 +166,10 @@ collect () {
   # "이 빌드 디렉터리에 .js 와 .wasm 이 하나씩 나왔다"뿐이므로 그렇게 찾는다.
   local js
   local wasm
-  js="$(find "$dir" -maxdepth 2 -name "*.js" ! -name "*.worker.js" | head -1)"
+  # 확장자는 upstream 과 emscripten 이 정한다(.js 일 수도 .mjs 일 수도 있다).
+  # 어느 쪽이든 out/engine 에서는 rapfi-<변형>.js 로 통일하고, 같은 폴더의
+  # package.json 이 그것을 ESM 으로 읽게 만든다.
+  js="$(find "$dir" -maxdepth 2 \( -name "*.js" -o -name "*.mjs" \) ! -name "*.worker.js" | head -1)"
   wasm="$(find "$dir" -maxdepth 2 -name "*.wasm" | head -1)"
   if [ -z "$js" ] || [ -z "$wasm" ]; then
     echo "  X $name: 산출물을 찾지 못했습니다"
@@ -231,7 +265,7 @@ ls -l "$OUT/bench" | sed "s/^/  . /"
 
 {
   echo "engine     : Rapfi WebAssembly (4종)"
-  echo "upstream   : $(git -C "$WORK/rapfi" rev-parse HEAD)"
+  echo "upstream   : $(git -C "$WORK/rapfi" rev-parse HEAD)  (dhbloo/rapfi, 패치 없음)"
   echo "networks   : $(git -C "$WORK/rapfi/Networks" rev-parse HEAD)"
   echo "emscripten : $EMSDK_RESOLVED"
   echo "cmake opts : -DNO_COMMAND_MODULES=ON -DUSE_WASM_SIMD_RELAXED=OFF -DENABLE_LTO=$ENABLE_LTO -DCMAKE_BUILD_TYPE=Release"

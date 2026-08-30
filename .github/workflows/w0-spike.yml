@@ -78,7 +78,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.WORK }}/rapfi
-          key: rapfi-8d16fc2c-v1
+          key: rapfi-3c94c2a9-v1
 
       # ─────────────────────────── W0-2 ───────────────────────────
       - name: "W0-2 — 4종 빌드 + 검증 게이트"
