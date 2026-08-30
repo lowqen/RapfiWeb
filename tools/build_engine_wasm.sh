@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# Rapfi -> WebAssembly 4종 빌드 (RapfiWeb W0 스파이크).
+# Rapfi -> WebAssembly 빌드 (RapfiWeb W0 스파이크).
 #
 # 이 스크립트가 만드는 것:
-#   out/engine/rapfi-{single,single-simd128,multi,multi-simd128}.{js,wasm}
+#   out/engine/rapfi-{single-simd128,multi-simd128}.{js,wasm,data}
 #   out/engine/ENGINE_VERSION.txt
 #   out/bench/{config.toml,*.bin.lz4,model210901.bin}   <- BENCH 대조 묶음
 #
@@ -107,53 +107,50 @@ grep -n -iE "emscripten|wasm|pthread|MODULARIZE|EXPORT_NAME|ASYNCIFY|ALLOW_MEMOR
      Rapfi/CMakeLists.txt | sed "s/^/  | /" || echo "  (해당 줄 없음)"
 echo "--- 끝 ---"
 
-echo ">>> [3/6] 빌드 (4종)"
+echo ">>> [3/6] 빌드 (SIMD 2종)"
 cd "$WORK/rapfi/Rapfi"
 
-# 우리가 반드시 필요로 하는 모듈 형태. 브라우저와 node 에서 **같은 산출물**을
-# 같은 방식으로 띄울 수 있어야 스파이크가 의미를 갖는다:
-#   MODULARIZE/EXPORT_NAME  import 시점에 main() 이 돌지 않게
-#   INVOKE_RUN=0 + callMain 언제 시작할지 우리가 정한다(가중치 주입 후)
-#   FORCE_FILESYSTEM        엔진이 cwd 에서 config.toml/가중치를 fopen 한다
-#   FS/callMain export      가중치를 FS.writeFile 로 넣는다
-#   ALLOW_MEMORY_GROWTH     해시 테이블 크기를 런타임에 고른다
-#   EXPORT_ES6              node 의 import() 와 모듈 워커에서 같은 파일을 그대로 쓴다
-LINK_COMMON="-sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createRapfi -sINVOKE_RUN=0"
-LINK_COMMON="$LINK_COMMON -sFORCE_FILESYSTEM=1 -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1"
-LINK_COMMON="$LINK_COMMON -sEXPORTED_RUNTIME_METHODS=FS,callMain"
-LINK_COMMON="$LINK_COMMON -sENVIRONMENT=web,worker,node"
+# 링크 플래그는 **우리가 정하지 않는다.** upstream 의 CMakeLists 가 EMSCRIPTEN
+# 블록에서 통째로 정해 둔다:
+#
+#   --pre-js emscripten/preamble.js   sendCommand / onReceiveStdout 펌프
+#   -s MODULARIZE=1 -s EXPORT_NAME=Rapfi
+#   -s EXPORTED_FUNCTIONS=['_main','_gomocupLoopOnce','_emscripten_force_exit']
+#   -s EXPORTED_RUNTIME_METHODS=['cwrap']
+#   -s EXIT_RUNTIME=1 -s ALLOW_MEMORY_GROWTH=1 -s IMPORTED_MEMORY=1 -s STACK_SIZE=2MB
+#   --preload-file …                  Networks/wasm_preloads.txt 의 가중치
+#   (멀티) -pthread -s PROXY_TO_PTHREAD=1
+#   (SIMD) -msimd128 + USE_WASM_SIMD 정의
+#
+# 처음에는 여기에 우리 -s 플래그를 얹었는데 그건 틀린 접근이었다. CMake 는
+# CMAKE_EXE_LINKER_FLAGS 를 타깃의 LINK_FLAGS **앞에** 놓고 emcc 는 뒤에 오는
+# -s 가 이긴다 — 즉 우리 설정은 조용히 덮인다. 게다가 덮을 이유도 없었다:
+# 우리가 만들려던 stdin 배관을 preamble.js 가 이미 제공한다.
 
 build_variant () {
-  local name=$1 simd=$2 threads=$3
+  local name=$1 threads=$2
   local dir="build-$name"
-  local link="$LINK_COMMON"
   local extra=()
+  [ "$threads" = "ON" ] || extra+=(-DNO_MULTI_THREADING=ON)
 
-  if [ "$threads" = "ON" ]; then
-    # 풀을 미리 띄운다. 워커의 main 스레드가 stdin 에서 Atomics.wait 로 잠든
-    # 사이에는 이벤트 루프가 돌지 않아 새 pthread 를 만들 수 없기 때문이다 —
-    # W0-1 이 확인하려는 바로 그 지점이다.
-    link="$link -sPTHREAD_POOL_SIZE=8 -sPTHREAD_POOL_SIZE_STRICT=0"
-  else
-    extra+=(-DNO_MULTI_THREADING=ON)
-  fi
-
-  echo "--- build: $name (SIMD=$simd, threads=$threads, LTO=$ENABLE_LTO) ---"
+  echo "--- build: $name (threads=$threads) ---"
   emcmake cmake -S . -B "$dir" -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DNO_COMMAND_MODULES=ON \
-    -DUSE_WASM_SIMD="$simd" \
+    -DUSE_WASM_SIMD=ON \
     -DUSE_WASM_SIMD_RELAXED=OFF \
-    -DENABLE_LTO="$ENABLE_LTO" \
-    -DCMAKE_EXE_LINKER_FLAGS="$link" \
     "${extra[@]}"
   cmake --build "$dir" -j"$JOBS"
 }
 
-build_variant single         OFF OFF
-build_variant single-simd128 ON  OFF
-build_variant multi          OFF ON
-build_variant multi-simd128  ON  ON
+# **SIMD 없는 변형은 이 커밋에서 빌드되지 않는다.** eval/mix10nnue.cpp 가
+#   static_assert(InstType != simd::InstructionType::SCALAR)
+# 로 스칼라 백엔드를 거부하는데, 그 파일은 CORE_SOURCES 에 무조건 들어가고
+# 빼는 CMake 옵션이 없다. upstream README 의 4종 안내는 mix10 이전 것이다.
+# 그래서 SIMD 두 종만 만든다 — 지원 범위는 Chrome/Edge 91+, Firefox 89+,
+# Safari 16.4+ 이고, 빠지는 것은 사실상 iOS 16.4 미만이다.
+build_variant single-simd128 OFF
+build_variant multi-simd128  ON
 
 echo ">>> [4/6] 수집"
 rm -rf "$OUT"
@@ -166,10 +163,7 @@ collect () {
   # "이 빌드 디렉터리에 .js 와 .wasm 이 하나씩 나왔다"뿐이므로 그렇게 찾는다.
   local js
   local wasm
-  # 확장자는 upstream 과 emscripten 이 정한다(.js 일 수도 .mjs 일 수도 있다).
-  # 어느 쪽이든 out/engine 에서는 rapfi-<변형>.js 로 통일하고, 같은 폴더의
-  # package.json 이 그것을 ESM 으로 읽게 만든다.
-  js="$(find "$dir" -maxdepth 2 \( -name "*.js" -o -name "*.mjs" \) ! -name "*.worker.js" | head -1)"
+  js="$(find "$dir" -maxdepth 2 -name "*.js" ! -name "*.worker.js" | head -1)"
   wasm="$(find "$dir" -maxdepth 2 -name "*.wasm" | head -1)"
   if [ -z "$js" ] || [ -z "$wasm" ]; then
     echo "  X $name: 산출물을 찾지 못했습니다"
@@ -178,22 +172,27 @@ collect () {
   fi
   cp "$js"   "$OUT/engine/rapfi-$name.js"
   cp "$wasm" "$OUT/engine/rapfi-$name.wasm"
+  # .data 는 --preload-file 로 구워진 가중치다. 없으면 엔진이 config.toml 을
+  # 못 찾아 뜨자마자 죽으므로, 없는 것은 실패로 다룬다.
+  local data
+  data="$(find "$dir" -maxdepth 2 -name "*.data" | head -1)"
+  if [ -z "$data" ]; then
+    echo "  X $name: .data(가중치 프리로드)가 없습니다"
+    exit 1
+  fi
+  cp "$data" "$OUT/engine/rapfi-$name.data"
   # pthread 빌드는 emscripten 버전에 따라 별도 워커 스크립트를 낼 수 있다.
   find "$dir" -maxdepth 2 -name "*.worker.js" -exec cp {} "$OUT/engine/rapfi-$name.worker.js" \; || true
-  find "$dir" -maxdepth 2 -name "*.data"      -exec cp {} "$OUT/engine/rapfi-$name.data" \; || true
 }
-for n in single single-simd128 multi multi-simd128; do collect "$n"; done
-# EXPORT_ES6 산출물은 ESM 이다. node 는 가장 가까운 package.json 으로 모듈 종류를
-# 정하므로, 확장자를 .mjs 로 바꾸는 대신 이 한 줄로 .js 를 ESM 으로 읽게 한다.
-echo '{ "type": "module" }' > "$OUT/engine/package.json"
+for n in single-simd128 multi-simd128; do collect "$n"; done
 ls -l "$OUT/engine" | sed "s/^/  . /"
 
 echo ">>> [5/6] 검증 게이트 — 조용한 잘못된 빌드를 여기서 잡는다"
-# 안드로이드와 같은 발상: 두 옵션 모두 조용히 무시되는 경로가 있다.
-# USE_WASM_SIMD 가 안 먹으면 스칼라 빌드가 나오고, ENABLE_LTO 는 실패해도
-# 경고만 찍는다. 둘 다 "빌드 성공, 엔진은 느림/다름"으로 끝난다.
+# 안드로이드와 같은 발상: 조용히 무시되는 경로가 있는 옵션들을 여기서 확인한다.
+# 특히 -ffp-contract=off 는 x86·폰과 탐색 결과가 같다는 주장의 근거이고,
+# --pre-js preamble.js 는 sendCommand 펌프가 들어왔다는 유일한 증거다.
 verify () {
-  local name=$1 simd=$2 threads=$3
+  local name=$1 threads=$2
   local dir="build-$name"
   local nj="$dir/build.ninja"
   local fail=0
@@ -203,57 +202,36 @@ verify () {
     echo "  X WebAssembly 바이너리가 아님: $(file -b "$OUT/engine/rapfi-$name.wasm")"
     fail=1
   fi
-  # 이 플래그가 해시 동일성의 근거다. 없으면 x86/폰과 탐색 결과가 갈릴 수 있다.
   if ! grep -q -- "-ffp-contract=off" "$nj"; then
     echo "  X -ffp-contract=off 없음 — x86/폰과 탐색 결과가 갈릴 수 있다"
     fail=1
   fi
-  if [ "$ENABLE_LTO" = "ON" ] && ! grep -q -- "-flto" "$nj"; then
-    echo "  X LTO 미적용 — check_ipo_supported 가 실패했는데 경고만 찍고 넘어갔다"
+  if ! grep -q -- "-msimd128" "$nj"; then
+    echo "  X -msimd128 없음 — 스칼라 빌드다(이 커밋에서는 링크도 안 된다)"
     fail=1
   fi
-  if [ "$simd" = "ON" ]; then
-    if ! grep -q -- "-msimd128" "$nj"; then
-      echo "  X -msimd128 없음 — 스칼라 빌드다"
-      fail=1
-    fi
-  else
-    if grep -q -- "-msimd128" "$nj"; then
-      echo "  X SIMD 없는 변형인데 -msimd128 이 있다"
-      fail=1
-    fi
+  if ! grep -q -- "preamble.js" "$nj"; then
+    echo "  X --pre-js preamble.js 가 없다 — sendCommand 펌프 없이 나온 빌드다"
+    fail=1
   fi
   if [ "$threads" = "ON" ]; then
-    if ! grep -q -- "-pthread" "$nj"; then
-      echo "  X -pthread 없음 — 멀티스레드 변형이 아니다"
-      fail=1
-    fi
+    grep -q -- "-pthread" "$nj" || { echo "  X -pthread 없음"; fail=1; }
+    grep -q -- "PROXY_TO_PTHREAD" "$nj" || { echo "  X PROXY_TO_PTHREAD 없음"; fail=1; }
   else
-    if grep -q -- "-pthread" "$nj"; then
-      echo "  X 단일 스레드 변형인데 -pthread 가 있다"
-      fail=1
-    fi
+    grep -q -- "-pthread" "$nj" && { echo "  X 단일 스레드 변형인데 -pthread 가 있다"; fail=1; }
   fi
-  # 우리가 넣은 링크 설정이 upstream 것에 밀리지 않았는지. 밀렸다면 하네스가
-  # 통째로 못 뜨므로, 실패시키기 전에 로그로 알아야 한다.
-  for s in MODULARIZE EXPORT_NAME INVOKE_RUN FORCE_FILESYSTEM; do
-    if ! grep -q -- "-s$s" "$nj"; then
-      echo "  ! 링크 플래그 -s$s 가 링크 줄에 안 보인다 (하네스에서 확인 필요)"
-    fi
-  done
 
   echo "  . js   $(stat -c%s "$OUT/engine/rapfi-$name.js") bytes"
   echo "  . wasm $(stat -c%s "$OUT/engine/rapfi-$name.wasm") bytes"
+  echo "  . data $(stat -c%s "$OUT/engine/rapfi-$name.data") bytes"
   if [ "$fail" -ne 0 ]; then
     echo "검증 실패: $name"
     exit 1
   fi
   echo "  OK $name"
 }
-verify single         OFF OFF
-verify single-simd128 ON  OFF
-verify multi          OFF ON
-verify multi-simd128  ON  ON
+verify single-simd128 OFF
+verify multi-simd128  ON
 
 echo ">>> [6/6] BENCH 대조 묶음 + 버전 기록"
 # 안드로이드 스크립트와 **같은 파일들**이어야 대조가 성립한다.
