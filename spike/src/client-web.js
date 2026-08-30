@@ -4,9 +4,19 @@
  */
 import { runSteps, END_COMMAND } from "./steps.js";
 
+/**
+ * SIMD 프로브. 처음 쓴 바이트열은 함수 타입이 v128 을 **반환**한다고 선언해 놓고
+ * 본문에서 drop 해 버려서, SIMD 를 지원하는 브라우저에서도 검증에 실패했다
+ * (실제로 헤드리스 Chromium 이 `simd: false` 를 보고했는데 엔진은 그 자리에서
+ * `WASM_SIMD` 로 잘 돌았다). 타입을 `() -> ()` 로 맞춘 것이 아래다:
+ *   type   () -> ()
+ *   code   i32.const 0 ; i8x16.splat ; drop ; end
+ */
 const SIMD_PROBE = new Uint8Array([
-  0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253,
-  15, 26, 11,
+  0, 97, 115, 109, 1, 0, 0, 0, // magic + version
+  1, 4, 1, 96, 0, 0, // type section: 1 type, func () -> ()
+  3, 2, 1, 0, // function section: 1 func, type 0
+  10, 9, 1, 7, 0, 65, 0, 253, 15, 26, 11, // code: i32.const 0, i8x16.splat, drop, end
 ]);
 
 export function detectCapabilities() {

@@ -185,6 +185,10 @@ collect () {
   find "$dir" -maxdepth 2 -name "*.worker.js" -exec cp {} "$OUT/engine/rapfi-$name.worker.js" \; || true
 }
 for n in single-simd128 multi-simd128; do collect "$n"; done
+# upstream 은 EXPORT_ES6 를 쓰지 않는다 — 글루는 CommonJS 다. 그런데 저장소 루트
+# package.json 에 "type": "module" 이 있어 node 가 이 .js 를 ESM 으로 읽고
+# "require is not defined" 로 죽는다. 이 한 줄이 그 폴더만 예외로 돌린다.
+echo '{ "type": "commonjs" }' > "$OUT/engine/package.json"
 ls -l "$OUT/engine" | sed "s/^/  . /"
 
 echo ">>> [5/6] 검증 게이트 — 조용한 잘못된 빌드를 여기서 잡는다"
