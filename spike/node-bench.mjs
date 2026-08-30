@@ -17,12 +17,31 @@
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { startEngine } from "./src/engine-core.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE_DIR = resolve(process.env.ENGINE_DIR ?? resolve(HERE, "../out/engine"));
-const EXPECT = (process.env.EXPECT_HASH ?? "e240ab16").toLowerCase();
+const BENCH_DIR = resolve(process.env.BENCH_DIR ?? resolve(HERE, "../out/bench"));
+
+/**
+ * 무엇과 비교할 것인가. 빌드 스크립트가 호스트 기준선을 남겼으면 **그것**이
+ * 정답이다 — wasm 과 같은 config(gomocalc-mix9svq.toml)로 잰 네이티브 해시이므로
+ * 설정 차이가 제거된 비교가 된다. 없으면 폰의 값으로 떨어진다.
+ */
+function expectedHash() {
+  const f = resolve(BENCH_DIR, "host-wasmcfg.hash");
+  if (existsSync(f)) {
+    const h = readFileSync(f, "utf8").trim().toLowerCase();
+    if (h && h !== "none") return { hash: h, source: "host(wasmcfg) — 같은 config 의 네이티브 기준선" };
+  }
+  return {
+    hash: (process.env.EXPECT_HASH ?? "e240ab16").toLowerCase(),
+    source: "폰/x86 기준선(config-example/config.toml) — config 가 달라 직접 비교는 성립하지 않는다",
+  };
+}
+const EXPECTED = expectedHash();
+const EXPECT = EXPECTED.hash;
 const variant = process.argv[2] ?? "single-simd128";
 
 const js = resolve(ENGINE_DIR, `rapfi-${variant}.js`);
@@ -49,7 +68,12 @@ try {
   Module.sendCommand("BENCH");
   Module.sendCommand("END");
 } catch (e) {
-  error = String((e && e.stack) || e);
+  // END 를 보내면 엔진이 정상 종료하면서 ExitStatus 를 던진다. 오류가 아니다.
+  if (e && (e.name === "ExitStatus" || typeof e.status === "number")) {
+    exitCode = e.status ?? 0;
+  } else {
+    error = String((e && e.stack) || (e && e.message) || e);
+  }
 }
 
 const text = out.join("\n");
@@ -61,6 +85,7 @@ const report = {
   pass: hash === EXPECT,
   hash,
   expected: EXPECT,
+  expectedFrom: EXPECTED.source,
   nodes: (text.match(/Nodes:\s*([\d,]+)/i) ?? [])[1] ?? null,
   nodesPerSec: (text.match(/Nodes\/s:\s*([\d,]+)/i) ?? [])[1] ?? null,
   wallSec: +((Date.now() - t0) / 1000).toFixed(1),
@@ -68,9 +93,7 @@ const report = {
   error,
   note:
     hash && hash !== EXPECT
-      ? "해시 불일치. wasm 빌드는 gomocalc-mix9svq.toml 을 /config.toml 로 구워 넣으므로, " +
-        "안드로이드 벤치가 쓴 config-example/config.toml 과 설정이 다를 수 있다. " +
-        "엔진 차이인지 설정 차이인지 먼저 가려야 한다."
+      ? "해시 불일치. 기준선 출처: " + EXPECTED.source
       : null,
   tail: out.slice(-20),
 };

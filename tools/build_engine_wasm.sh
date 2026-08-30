@@ -263,6 +263,45 @@ ls -l "$OUT/bench" | sed "s/^/  . /"
 } > "$OUT/engine/ENGINE_VERSION.txt"
 sed "s/^/  . /" "$OUT/engine/ENGINE_VERSION.txt"
 
+echo ">>> [7/7] 호스트 기준선 — wasm 해시를 **무엇과** 비교할 것인가"
+#
+# 첫 측정에서 wasm 해시가 e240ab16 과 달랐다(4100a973). 원인 후보가 둘인데
+# 그대로는 가릴 수 없다:
+#
+#   (a) 설정이 다르다. 안드로이드 벤치는 config-example/config.toml 로 돌렸고,
+#       wasm 빌드는 wasm_preloads.txt 에 따라 gomocalc-mix9svq.toml 을
+#       /config.toml 로 굽는다. 설정이 다르면 해시는 당연히 다르다.
+#   (b) wasm 엔진의 탐색이 네이티브와 실제로 다르다.
+#
+# 그래서 **같은 커밋의 호스트 바이너리로 두 config 를 각각** 돌린다:
+#   host(android) == e240ab16  이면 우리 툴체인이 폰의 기준선을 재현한다는 뜻이고,
+#   host(wasmcfg) == wasm 해시 이면 (a) 가 원인 — wasm 엔진은 네이티브와 같다.
+# 둘째가 어긋나야만 (b) 를 의심할 근거가 생긴다.
+cd "$WORK/rapfi/Rapfi"
+cmake -S . -B build-host -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release -DNO_COMMAND_MODULES=ON -DENABLE_LTO=ON > /dev/null
+cmake --build build-host -j"$JOBS" > /dev/null
+echo "  . 호스트 바이너리 빌드 완료"
+
+run_host_bench () {
+  local label=$1 cfg=$2
+  local dir="$WORK/hostbench-$label"
+  rm -rf "$dir"
+  mkdir -p "$dir"
+  # 엔진은 cwd 에서 config 와 가중치를 찾는다(--config 인자가 없다).
+  cp "$cfg" "$dir/config.toml"
+  cp "$WORK/rapfi/Networks/mix9svq/"*.bin.lz4 "$dir/"
+  cp "$WORK/rapfi/Networks/classical/"*.bin   "$dir/"
+  ( cd "$dir" && printf 'BENCH\nEND\n' | "$WORK/rapfi/Rapfi/build-host/pbrain-rapfi" > bench.txt 2>&1 ) || true
+  local h
+  h="$(grep -oE "Hash: [0-9a-f]+" "$dir/bench.txt" | tail -1 | awk '{print $2}')"
+  echo "${h:-none}" > "$OUT/bench/host-$label.hash"
+  echo "  . host($label): ${h:-없음}   config=$(basename "$cfg")"
+  grep -E "Nodes:|Nodes/s:|Total Time" "$dir/bench.txt" | sed "s/^/      /" || true
+}
+run_host_bench android "$WORK/rapfi/Networks/config-example/config.toml"
+run_host_bench wasmcfg "$WORK/rapfi/Networks/config-example/gomocalc-mix9svq.toml"
+
 echo "=========================================================="
 echo "완료: $OUT"
 echo "=========================================================="
