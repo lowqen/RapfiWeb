@@ -242,16 +242,20 @@ cp "$WORK/rapfi/Networks/classical/model210901.bin"  "$OUT/bench/"
 ls -l "$OUT/bench" | sed "s/^/  . /"
 
 {
-  echo "engine     : Rapfi WebAssembly (4종)"
+  # 여기서 upstream 은 **패치되지 않은 dhbloo/rapfi 커밋**이다. 안드로이드의
+  # 같은 이름 필드가 패치된 로컬 커밋을 가리켜 혼동을 부른 적이 있으므로
+  # (이 파일 상단 주석 참고) 무엇인지 함께 적는다.
+  echo "engine     : Rapfi WebAssembly (SIMD 2종)"
   echo "upstream   : $(git -C "$WORK/rapfi" rev-parse HEAD)  (dhbloo/rapfi, 패치 없음)"
   echo "networks   : $(git -C "$WORK/rapfi/Networks" rev-parse HEAD)"
   echo "emscripten : $EMSDK_RESOLVED"
-  echo "cmake opts : -DNO_COMMAND_MODULES=ON -DUSE_WASM_SIMD_RELAXED=OFF -DENABLE_LTO=$ENABLE_LTO -DCMAKE_BUILD_TYPE=Release"
-  echo "link opts  : $LINK_COMMON"
-  echo "variants   : single / single-simd128 / multi / multi-simd128"
+  echo "cmake opts : -DNO_COMMAND_MODULES=ON -DUSE_WASM_SIMD=ON -DUSE_WASM_SIMD_RELAXED=OFF -DCMAKE_BUILD_TYPE=Release"
+  echo "link opts  : (upstream CMakeLists 의 EMSCRIPTEN 블록이 전부 정한다 — 우리는 얹지 않는다)"
+  echo "variants   : single-simd128 / multi-simd128"
+  echo "note       : SIMD 없는 변형은 eval/mix10nnue.cpp 의 static_assert 때문에 이 커밋에서 빌드되지 않는다"
   echo "built_at   : $(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "build_by   : RapfiWeb/tools/build_engine_wasm.sh"
-  echo "bench      : spike/node-bench.mjs 가 4종 모두에서 Hash 를 뽑아 e240ab16 과 대조한다"
+  echo "bench      : spike/node-bench.mjs 가 두 변형에서 Hash 를 뽑아 e240ab16 과 대조한다"
 } > "$OUT/engine/ENGINE_VERSION.txt"
 sed "s/^/  . /" "$OUT/engine/ENGINE_VERSION.txt"
 
