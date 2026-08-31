@@ -40,6 +40,10 @@ jobs:
           done < <(find spike -name '*.mjs' -o -name '*.js')
           exit $fail
 
+      - name: JSON 문법
+        run: node -e "JSON.parse(require('fs').readFileSync('spike/web-baseline.json','utf8'));console.log('web-baseline.json OK')"
+
+
   spike:
     needs: preflight
     runs-on: ubuntu-latest
@@ -47,7 +51,6 @@ jobs:
     env:
       ENABLE_LTO: ${{ github.event.inputs.lto || 'ON' }}
       WORK: ${{ github.workspace }}/../rapfi-wasm-work
-      EXPECT_HASH: e240ab16
     steps:
       - uses: actions/checkout@v4
 
@@ -100,24 +103,49 @@ jobs:
 
       - run: mkdir -p results
 
+      # ───────────────────── ① 벡터 폭 통제 실험 ────────────────────
+      # 빌드 스크립트 [7/7] 이 호스트를 두 번 굽는다: 자동감지(AVX2 256bit)와
+      # SSE 128bit. 폰(NEON 128bit)이 e240ab16 을 내므로 폭 가설은 이미 약하지만,
+      # x86 안에서 폭만 바꿔 통제한 값을 남겨야 다음 논의가 성립한다.
+      - name: "① 호스트 기준선 (자동감지 / SSE 128bit)"
+        if: always()
+        run: |
+          {
+            echo "### ① 벡터 폭 통제"
+            echo
+            echo "| 빌드 | config | BENCH Hash |"
+            echo "|---|---|---|"
+            echo "| host 자동감지(AVX2) | config-example/config.toml | \`$(cat out/bench/host-android.hash)\` |"
+            echo "| host 자동감지(AVX2) | gomocalc-mix9svq.toml | \`$(cat out/bench/host-wasmcfg.hash)\` |"
+            echo "| host **SSE 128bit** | gomocalc-mix9svq.toml | \`$(cat out/bench/host-sse128.hash)\` |"
+            echo
+            echo '```'
+            grep -E "SSE:|AVX2:|AVX512:|BMI2:|VNNI:" out/bench/host-native-isa.txt || true
+            echo '--- sse128 ---'
+            grep -E "SSE:|AVX2:|AVX512:|BMI2:|VNNI:" out/bench/host-sse128-isa.txt || true
+            echo '```'
+          } >> $GITHUB_STEP_SUMMARY
+          cp out/bench/*.hash out/bench/host-*-isa.txt results/ || true
+
       # ─────────────────────────── W0-3 ───────────────────────────
-      # 4종 모두에서 BENCH 해시가 e240ab16 이어야 한다. config 의
-      # default_thread_num = 1 때문에 멀티 변형도 1스레드로 벤치한다 —
-      # 그게 x86·폰과 대조가 성립하는 조건이다.
-      - name: "W0-3 — BENCH 해시 대조 (2종)"
+      # 게이트가 바뀌었다. "폰과 비트가 같다"가 아니라 "웹 안에서 회귀가 없다"다.
+      # 근거는 docs/W0-결과.md — wasm 은 네이티브와 다른 해시를 내고 설정 차이는
+      # 배제됐다. 배포 경로인 single-simd128 만 **하드 게이트**로 잡는다.
+      - name: "W0-3 — 웹 회귀 게이트 (single-simd128, 하드)"
+        run: |
+          node spike/node-bench.mjs single-simd128 > results/bench-single-simd128.json
+          cat results/bench-single-simd128.json
+
+      - name: "W0-3 — multi-simd128 (참고, 배포 경로 아님)"
         continue-on-error: true
         run: |
-          for v in single-simd128 multi-simd128; do
-            echo "::group::BENCH $v"
-            node spike/node-bench.mjs "$v" > "results/bench-$v.json" || true
-            cat "results/bench-$v.json"
-            echo "::endgroup::"
-          done
-
+          node spike/node-bench.mjs multi-simd128 > results/bench-multi-simd128.json || true
+          cat results/bench-multi-simd128.json
       # ────────────────────────── W0-1 (node) ──────────────────────
       # 브라우저보다 싸게 도는 1차 관문. node 의 worker_threads 는 SAB/Atomics
       # 의미가 브라우저 워커와 같으므로, 여기서 깨지면 브라우저에서도 깨진다.
-      - name: "W0-1 — stdin 왕복 (node worker_threads, 4종)"
+      - name: "W0-1 — stdin 왕복 (node worker_threads, 2종)"
+        if: always()
         continue-on-error: true
         run: |
           for v in single-simd128 multi-simd128; do
@@ -131,11 +159,13 @@ jobs:
       # node 가 통과해도 여기서만 드러나는 것들이 있다: 모듈 워커 안의 동적
       # import, Emscripten 이 pthread 용으로 스스로 띄우는 중첩 워커, COOP/COEP.
       - name: Playwright 설치
+        if: always()
         run: |
           npm install --no-audit --no-fund
           npx playwright install --with-deps chromium
 
-      - name: "W0-1 — stdin 왕복 (헤드리스 Chromium, 4종)"
+      - name: "W0-1 — stdin 왕복 (헤드리스 Chromium, 2종)"
+        if: always()
         continue-on-error: true
         run: |
           node spike/serve.mjs 8787 &

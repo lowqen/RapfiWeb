@@ -265,26 +265,46 @@ sed "s/^/  . /" "$OUT/engine/ENGINE_VERSION.txt"
 
 echo ">>> [7/7] 호스트 기준선 — wasm 해시를 **무엇과** 비교할 것인가"
 #
-# 첫 측정에서 wasm 해시가 e240ab16 과 달랐다(4100a973). 원인 후보가 둘인데
-# 그대로는 가릴 수 없다:
+# 1차 측정에서 wasm 해시가 e240ab16 과 달랐다(4100a973). 원인 후보가 둘이었다:
 #
 #   (a) 설정이 다르다. 안드로이드 벤치는 config-example/config.toml 로 돌렸고,
 #       wasm 빌드는 wasm_preloads.txt 에 따라 gomocalc-mix9svq.toml 을
 #       /config.toml 로 굽는다. 설정이 다르면 해시는 당연히 다르다.
 #   (b) wasm 엔진의 탐색이 네이티브와 실제로 다르다.
 #
-# 그래서 **같은 커밋의 호스트 바이너리로 두 config 를 각각** 돌린다:
-#   host(android) == e240ab16  이면 우리 툴체인이 폰의 기준선을 재현한다는 뜻이고,
-#   host(wasmcfg) == wasm 해시 이면 (a) 가 원인 — wasm 엔진은 네이티브와 같다.
-# 둘째가 어긋나야만 (b) 를 의심할 근거가 생긴다.
+# 같은 커밋의 호스트 바이너리로 **두 config 를 각각** 돌려 (a) 를 배제했다 —
+# 둘 다 e240ab16 이 나왔다. 남은 것은 (b) 다.
+#
+# 이제 (b) 를 다시 둘로 가른다:
+#
+#   (b1) 벡터 폭. 호스트는 AVX2(256bit) 로 자동 감지되고 wasm 은 128bit 다.
+#        폰의 NEON 도 128bit 인데 e240ab16 이 나왔으므로 이미 약한 가설이지만,
+#        x86 안에서 폭만 바꿔 직접 통제한다: -DUSE_SSE=ON -DUSE_AVX2=OFF.
+#   (b2) wasm 전용 코드 경로(eval/simd/ 의 WASM 분기).
+#
+#   host(sse128) == e240ab16  이면 폭은 원인이 아니다 -> (b2) 로 좁혀진다.
+#   host(sse128) == 4100a973  이면 폭이 원인이다 -> wasm 은 "128bit 결과"를 낼 뿐이고
+#                                                  네이티브 128bit 도 같은 값을 낸다.
 cd "$WORK/rapfi/Rapfi"
+
+# 호스트가 무엇으로 잡혔는지 남긴다. 자동 감지라 러너에 따라 AVX2/AVX512 가 갈린다 —
+# 기록이 없으면 나중에 이 숫자를 재현할 수 없다.
 cmake -S . -B build-host -G Ninja \
-  -DCMAKE_BUILD_TYPE=Release -DNO_COMMAND_MODULES=ON -DENABLE_LTO=ON > /dev/null
+  -DCMAKE_BUILD_TYPE=Release -DNO_COMMAND_MODULES=ON -DENABLE_LTO=ON \
+  2>&1 | tee "$OUT/bench/host-native-isa.txt" | grep -E "SSE:|AVX2:|AVX512:|BMI2:|VNNI:|NEON" | sed "s/^/  . 자동감지 /" || true
 cmake --build build-host -j"$JOBS" > /dev/null
-echo "  . 호스트 바이너리 빌드 완료"
+echo "  . 호스트 바이너리(자동 감지) 빌드 완료"
+
+# (b1) 통제군: x86 을 128bit 로 묶는다. AVX2/AVX512/BMI2/VNNI 를 전부 끄고 SSE 만 켠다.
+cmake -S . -B build-host-sse128 -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release -DNO_COMMAND_MODULES=ON -DENABLE_LTO=ON \
+  -DUSE_SSE=ON -DUSE_AVX2=OFF -DUSE_AVX512=OFF -DUSE_BMI2=OFF -DUSE_VNNI=OFF \
+  2>&1 | tee "$OUT/bench/host-sse128-isa.txt" | grep -E "SSE:|AVX2:|AVX512:|BMI2:|VNNI:" | sed "s/^/  . sse128 /" || true
+cmake --build build-host-sse128 -j"$JOBS" > /dev/null
+echo "  . 호스트 바이너리(SSE 128bit) 빌드 완료"
 
 run_host_bench () {
-  local label=$1 cfg=$2
+  local label=$1 cfg=$2 bin=$3
   local dir="$WORK/hostbench-$label"
   rm -rf "$dir"
   mkdir -p "$dir"
@@ -292,15 +312,26 @@ run_host_bench () {
   cp "$cfg" "$dir/config.toml"
   cp "$WORK/rapfi/Networks/mix9svq/"*.bin.lz4 "$dir/"
   cp "$WORK/rapfi/Networks/classical/"*.bin   "$dir/"
-  ( cd "$dir" && printf 'BENCH\nEND\n' | "$WORK/rapfi/Rapfi/build-host/pbrain-rapfi" > bench.txt 2>&1 ) || true
+  ( cd "$dir" && printf 'BENCH\nEND\n' | "$bin" > bench.txt 2>&1 ) || true
   local h
   h="$(grep -oE "Hash: [0-9a-f]+" "$dir/bench.txt" | tail -1 | awk '{print $2}')"
   echo "${h:-none}" > "$OUT/bench/host-$label.hash"
   echo "  . host($label): ${h:-없음}   config=$(basename "$cfg")"
   grep -E "Nodes:|Nodes/s:|Total Time" "$dir/bench.txt" | sed "s/^/      /" || true
 }
-run_host_bench android "$WORK/rapfi/Networks/config-example/config.toml"
-run_host_bench wasmcfg "$WORK/rapfi/Networks/config-example/gomocalc-mix9svq.toml"
+HOST_BIN="$WORK/rapfi/Rapfi/build-host/pbrain-rapfi"
+HOST_BIN_SSE="$WORK/rapfi/Rapfi/build-host-sse128/pbrain-rapfi"
+run_host_bench android "$WORK/rapfi/Networks/config-example/config.toml"          "$HOST_BIN"
+run_host_bench wasmcfg "$WORK/rapfi/Networks/config-example/gomocalc-mix9svq.toml" "$HOST_BIN"
+run_host_bench sse128  "$WORK/rapfi/Networks/config-example/gomocalc-mix9svq.toml" "$HOST_BIN_SSE"
+
+echo "----------------------------------------------------------"
+echo "  기준선 요약 (wasm 해시는 spike/node-bench.mjs 가 잰다)"
+for l in android wasmcfg sse128; do
+  printf "    host(%-8s) = %s\n" "$l" "$(cat "$OUT/bench/host-$l.hash")"
+done
+echo "    web baseline  = $(sed -n 's/.*"single-simd128"[^\"]*"\([0-9a-f]*\)".*/\1/p' "$ROOT/spike/web-baseline.json")  (웹 전용 회귀 기준)"
+echo "----------------------------------------------------------"
 
 echo "=========================================================="
 echo "완료: $OUT"

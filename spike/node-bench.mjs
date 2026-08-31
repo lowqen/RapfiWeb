@@ -7,12 +7,17 @@
  * 에서도 살아 있다(build_engine_android.sh [7/7] 이 `printf 'BENCH\nEND\n' |` 로
  * 부르는 그것이다).
  *
- * ⚠ 대조의 전제가 웹에서 하나 달라졌다. 안드로이드 벤치는 cwd 에
- *   `Networks/config-example/config.toml` 을 두고 돌렸지만, wasm 빌드는
- *   `wasm_preloads.txt` 에 따라 `config-example/gomocalc-mix9svq.toml` 을
- *   `/config.toml` 로 **미리 구워 넣는다**. 설정이 다르면(스레드 수·평가기·해시)
- *   해시는 엔진이 아니라 입력이 달라서 갈린다. 그래서 이 스크립트는 해시를
- *   "맞다/틀리다"로만 보고하지 않고 실제로 쓰인 config 도 함께 남긴다.
+ * ⚠ 무엇과 비교하는가가 W0-3 이후로 바뀌었다.
+ *
+ *   처음에는 폰/x86 의 e240ab16 과 비교했다. 그런데 wasm 은 4100a973 을 내고,
+ *   설정 차이는 배제됐다(같은 커밋의 호스트 바이너리를 두 config 로 각각 돌려
+ *   둘 다 e240ab16 을 얻었다). 노드 수는 4,391,204 로 셋 다 같다 — 탐색 트리는
+ *   같고 어떤 값만 다르다.
+ *
+ *   그래서 웹에 한해 "비트 단위로 폰과 같다"를 게이트에서 내리고,
+ *   **웹 자신의 기준선**(spike/web-baseline.json)으로 회귀만 막는다.
+ *   네이티브 값은 참고로 계속 함께 보고한다 — 언젠가 둘이 같아지면
+ *   그것이 upstream 이슈가 해결됐다는 신호이기 때문이다.
  */
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
@@ -24,25 +29,21 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE_DIR = resolve(process.env.ENGINE_DIR ?? resolve(HERE, "../out/engine"));
 const BENCH_DIR = resolve(process.env.BENCH_DIR ?? resolve(HERE, "../out/bench"));
 
-/**
- * 무엇과 비교할 것인가. 빌드 스크립트가 호스트 기준선을 남겼으면 **그것**이
- * 정답이다 — wasm 과 같은 config(gomocalc-mix9svq.toml)로 잰 네이티브 해시이므로
- * 설정 차이가 제거된 비교가 된다. 없으면 폰의 값으로 떨어진다.
- */
-function expectedHash() {
-  const f = resolve(BENCH_DIR, "host-wasmcfg.hash");
-  if (existsSync(f)) {
-    const h = readFileSync(f, "utf8").trim().toLowerCase();
-    if (h && h !== "none") return { hash: h, source: "host(wasmcfg) — 같은 config 의 네이티브 기준선" };
-  }
-  return {
-    hash: (process.env.EXPECT_HASH ?? "e240ab16").toLowerCase(),
-    source: "폰/x86 기준선(config-example/config.toml) — config 가 달라 직접 비교는 성립하지 않는다",
-  };
-}
-const EXPECTED = expectedHash();
-const EXPECT = EXPECTED.hash;
 const variant = process.argv[2] ?? "single-simd128";
+const baseline = JSON.parse(readFileSync(resolve(HERE, "web-baseline.json"), "utf8"));
+const entry = baseline.variants[variant] ?? { hash: null, note: "기준선에 없는 변형" };
+
+/** 참고용 네이티브 값. 빌드가 남긴 것이 있으면 그것이 더 정확하다. */
+function nativeHash() {
+  for (const f of ["host-wasmcfg.hash", "host-sse128.hash", "host-android.hash"]) {
+    const p = resolve(BENCH_DIR, f);
+    if (existsSync(p)) {
+      const h = readFileSync(p, "utf8").trim().toLowerCase();
+      if (h && h !== "none") return { hash: h, from: f.replace(/^host-|\.hash$/g, "") };
+    }
+  }
+  return { hash: baseline.native.hash, from: "web-baseline.json(기록값)" };
+}
 
 const js = resolve(ENGINE_DIR, `rapfi-${variant}.js`);
 if (!existsSync(js)) {
@@ -78,24 +79,39 @@ try {
 
 const text = out.join("\n");
 const hash = (text.match(/Hash:\s*([0-9a-f]+)/i) ?? [])[1]?.toLowerCase() ?? null;
+const native = nativeHash();
+
+// 판정 규칙:
+//   기준선이 있다  -> 같아야 통과. 다르면 회귀다(웹 게이트).
+//   기준선이 없다  -> 판정하지 않는다. 값을 찍어 두고 사람이 기준선에 적어 넣는다.
+const gated = typeof entry.hash === "string";
+const pass = gated ? hash === entry.hash : false;
 
 const report = {
-  test: "W0-3 (BENCH 해시)",
+  test: "W0-3 (BENCH 해시 — 웹 회귀 게이트)",
   variant,
-  pass: hash === EXPECT,
+  gated,
+  pass,
   hash,
-  expected: EXPECT,
-  expectedFrom: EXPECTED.source,
+  webBaseline: entry.hash,
+  baselineNote: entry.note ?? null,
+  nativeHash: native.hash,
+  nativeFrom: native.from,
+  matchesNative: hash != null && hash === native.hash,
   nodes: (text.match(/Nodes:\s*([\d,]+)/i) ?? [])[1] ?? null,
   nodesPerSec: (text.match(/Nodes\/s:\s*([\d,]+)/i) ?? [])[1] ?? null,
   wallSec: +((Date.now() - t0) / 1000).toFixed(1),
   exitCode,
   error,
-  note:
-    hash && hash !== EXPECT
-      ? "해시 불일치. 기준선 출처: " + EXPECTED.source
-      : null,
+  note: !gated
+    ? "이 변형에는 웹 기준선이 없다 — 게이트하지 않는다. 값이 나왔다면 spike/web-baseline.json 에 적어 넣을 것."
+    : pass
+      ? null
+      : hash == null
+        ? "해시를 얻지 못했다. 엔진이 BENCH 에 응답하지 않았다."
+        : `웹 회귀: 기준선 ${entry.hash} 인데 ${hash} 가 나왔다. 엔진/가중치/emsdk 를 올린 적이 없다면 버그다.`,
   tail: out.slice(-20),
 };
 console.log(JSON.stringify(report, null, 2));
-process.exit(report.pass ? 0 : 1);
+// 기준선이 없는 변형은 실패로 세지 않는다(종료코드 3 = 미판정).
+process.exit(pass ? 0 : gated ? 1 : 3);

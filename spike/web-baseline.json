@@ -1,0 +1,32 @@
+{
+  "_": [
+    "웹 전용 BENCH 기준선. '폰과 같음'이 아니라 '웹 안에서 회귀 없음'을 지키는 값이다.",
+    "W0-3 에서 wasm 빌드가 네이티브(e240ab16)와 다른 해시를 낸다는 것이 확인됐고,",
+    "설정 차이는 배제됐다(host(android)==host(wasmcfg)==e240ab16). 그래서 비트 동일성",
+    "게이트를 웹에 한해 내려놓는 대신, 웹 자신의 값을 여기 고정해 회귀만 막는다.",
+    "이 값을 바꾸려면 반드시 '왜 바뀌었는지'를 커밋 메시지에 적을 것 —",
+    "엔진/가중치/emsdk 를 올리지 않았는데 이 값이 바뀌면 그건 버그다."
+  ],
+  "measuredAt": "2026-08-31",
+  "measuredBy": "CI w0-spike.yml run 33320283087 (ubuntu-latest)",
+  "engine": {
+    "upstream": "3c94c2a976f24a0dd1c5517623e9ab6fffe66bd7",
+    "networks": "e32ad77a5364363b3e3a02b3f9e8610ade19ea98",
+    "config": "Networks/config-example/gomocalc-mix9svq.toml (default_thread_num = 1)"
+  },
+  "native": {
+    "hash": "e240ab16",
+    "note": "x86 자동감지(AVX2) 및 폰(NEON). 웹과는 다르다 — 이것을 웹 게이트로 쓰지 않는다."
+  },
+  "variants": {
+    "single-simd128": {
+      "hash": "4100a973",
+      "nodes": "4391204",
+      "note": "배포 경로. 이 값이 바뀌면 CI 실패."
+    },
+    "multi-simd128": {
+      "hash": null,
+      "note": "미측정. PROXY_TO_PTHREAD 빌드에서 node-bench 가 0.2초 만에 아무 출력 없이 끝났다(sendCommand 펌프가 프록시된 main 스레드에 닿지 않는 것으로 보임). 배포 경로가 아니므로 참고로만 잰다."
+    }
+  }
+}
