@@ -20,8 +20,21 @@ import { writeFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { toHex, type Rgb } from "../src/core/design/oklch.ts";
-import { LightScheme, DarkScheme, type Scheme, type TokenValue } from "../src/core/design/scheme.ts";
-import { FONT_STACKS, TYPE, MONO, SPACE, RADIUS, MOTION, LAYOUT } from "../src/core/design/tokens.ts";
+import {
+  LightScheme,
+  DarkScheme,
+  type Scheme,
+  type TokenValue,
+} from "../src/core/design/scheme.ts";
+import {
+  FONT_STACKS,
+  TYPE,
+  MONO,
+  SPACE,
+  RADIUS,
+  MOTION,
+  LAYOUT,
+} from "../src/core/design/tokens.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(HERE, "../src/styles/tokens.css");
@@ -43,10 +56,7 @@ function colorBlock(s: Scheme, indent: string): string {
 }
 
 function typeBlock(): string {
-  const lines = [
-    `  --font-sans: ${FONT_STACKS.sans};`,
-    `  --font-mono: ${FONT_STACKS.mono};`,
-  ];
+  const lines = [`  --font-sans: ${FONT_STACKS.sans};`, `  --font-mono: ${FONT_STACKS.mono};`];
   for (const [name, s] of Object.entries(TYPE)) {
     lines.push(`  --type-${name}: ${s.weight} ${s.size}px/${s.line}px var(--font-sans);`);
     lines.push(`  --track-${name}: ${s.tracking ?? 0}px;`);

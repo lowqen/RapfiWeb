@@ -10,7 +10,17 @@
  * 발명하게 된다.
  */
 import type { Rgb } from "./oklch";
-import { Ink, Neutral, NeutralVariant, Sage, Clay, WoodNight, Signal, ResultBlue, ResultGreen } from "./ramps";
+import {
+  Ink,
+  Neutral,
+  NeutralVariant,
+  Sage,
+  Clay,
+  WoodNight,
+  Signal,
+  ResultBlue,
+  ResultGreen,
+} from "./ramps";
 
 /** 토큰 하나: 램프의 톤이거나, 알파가 있는 순수 검정(보드 그림자·후광뿐). */
 export type TokenValue = Rgb | { black: number };

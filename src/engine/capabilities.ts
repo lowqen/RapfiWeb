@@ -44,7 +44,8 @@ export function detectCapabilities(): Capabilities {
     simd,
     crossOriginIsolated: isolated,
     // 브라우저 밖(테스트·SSR)에서도 부를 수 있어야 한다 — navigator 는 Node 20 에 없다.
-    hardwareConcurrency: typeof navigator === "undefined" ? null : (navigator.hardwareConcurrency ?? null),
+    hardwareConcurrency:
+      typeof navigator === "undefined" ? null : (navigator.hardwareConcurrency ?? null),
     // 멀티 변형은 브라우저 워커에서 동작을 확인하지 못했다(W0-1). 살아나면(W0c)
     // 여기서 isolated 를 보고 고르게 된다. 그때까지는 단일 스레드가 유일한 경로다.
     variant: simd ? "single-simd128" : null,

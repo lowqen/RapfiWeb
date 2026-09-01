@@ -73,8 +73,7 @@ function oklabToLinear(l: number, a: number, b: number): [number, number, number
   ];
 }
 
-const inGamut = (rgb: [number, number, number]) =>
-  rgb.every((v) => v >= -0.0005 && v <= 1.0005);
+const inGamut = (rgb: [number, number, number]) => rgb.every((v) => v >= -0.0005 && v <= 1.0005);
 
 const linearToColor = (rgb: [number, number, number]): Rgb => ({
   r: linearToSrgb(rgb[0]),

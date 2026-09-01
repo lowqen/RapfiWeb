@@ -23,9 +23,7 @@ export function Placeholder({
         <h2 className="placeholder__title">{title}</h2>
         <p className="placeholder__what">{what}</p>
         {needs && needs.length > 0 && (
-          <p className="placeholder__needs">
-            먼저 필요한 것: {needs.join(" · ")}
-          </p>
+          <p className="placeholder__needs">먼저 필요한 것: {needs.join(" · ")}</p>
         )}
       </div>
     </section>
