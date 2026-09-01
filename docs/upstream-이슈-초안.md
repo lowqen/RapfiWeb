@@ -13,7 +13,7 @@
 WASM SIMD build produces different BENCH hash than native on same commit/config/node count
 ```
 
-**대안 제목** — 진단(`tools/diag_hash_width.sh`)이 가설을 확정하면 이쪽이 더 정확하다:
+**대안 제목** — 진단이 가설을 확정했으므로 이쪽이 더 정확하다. 이쪽을 권한다:
 
 ```
 BENCH hash is not comparable across 32-bit and 64-bit targets (size_t hashed by object representation)
@@ -28,7 +28,7 @@ BENCH hash is not comparable across 32-bit and 64-bit targets (size_t hashed by 
 even though both are built from the same commit, use the same config and the same network
 weights, and search **exactly the same number of nodes**.
 
-I believe the cause is not the engine at all, but how the benchmark hash is constructed:
+The cause is not the engine at all, but how the benchmark hash is constructed:
 `size_t` is hashed by object representation, and `sizeof(size_t)` is 4 on `wasm32` but 8 on
 x86-64/arm64. If that is right, the hash cannot be compared across targets of different
 pointer width by construction, and the values below are expected rather than a bug in the
@@ -159,19 +159,32 @@ release gate, on the reasoning that `-ffp-contract=off` makes search results ind
 the instruction set. That gate works between arm64 and x86-64 (both LP64) but silently
 cannot work for wasm32.
 
-## Verification
+## Verification — confirmed
 
-I can confirm or refute this locally: patch the single line above, rebuild both native and
-wasm from the same tree, and compare. I will post the result here.
+I patched the single line above, rebuilt both native and WASM from the same tree, and ran
+`BENCH` on both with the same config:
+
+```
+host  hash=e240ab16   nodes=4391204
+wasm  hash=e240ab16   nodes=4391204
+```
+
+With the width pinned, **the two agree exactly** — and on the same value the arm64 build
+produces. So the WASM build was giving identical search results all along; only the
+benchmark digest differed, and only because of `sizeof(size_t)`.
+
+Script used: <https://github.com/lowqen/RapfiWeb/blob/main/tools/diag_hash_width.sh>
 ````
 
-### 제출 후 확인할 것
+### 상태 — 제출 준비 완료
 
-- 진단이 **확정**이면: 위 본문의 «Verification» 자리에 결과를 붙이고, 우리 문서에서
-  «부동소수점 구현 차이» 라는 설명을 **전부 걷어낸다** — 사실이 아니게 되기 때문이다.
-  사용자 고지 문구도 함께 고쳐야 한다(§8).
-- 진단이 **기각**이면: 이 이슈는 그대로 유효하되 원인 분석 문단을 «가설이었으나 기각됨»
-  으로 바꾸고 `eval/simd/` 의 WASM 분기 조사를 이어간다.
+진단이 **확정**됐다(2026-09-01, CI run 33469545091). 그래서:
+
+- 위 본문의 «Verification» 에 결과를 채웠다. 이제 이 이슈는 «무언가 다르다» 가 아니라
+  «원인은 이것이고 한 줄이면 고쳐진다» 이다.
+- 우리 문서에서 «부동소수점 구현 차이» 라는 설명을 걷어냈다 — 사실이 아니다.
+  계획서 §8 의 사용자 고지 문구도 바꿨다.
+- `eval/simd/` 의 WASM 분기 조사는 취소했다. 팔 이유가 없어졌다.
 
 ---
 
