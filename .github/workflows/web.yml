@@ -26,17 +26,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: pnpm
 
-      # 아직 pnpm-lock.yaml 이 없다. 이 저장소를 만든 기계에 Node 툴체인이 없어서
-      # 잠금 파일을 낼 수 없었다 — 첫 성공 런이 만들어 준 것을 커밋하면 그때
-      # --frozen-lockfile 로 바꾸고 setup-node 에 cache: pnpm 을 켠다.
+      # 잠금 파일은 CI 가 만들어 준 것을 커밋해 두었다(이 저장소를 만든 기계에
+      # Node 툴체인이 없어 직접 낼 수 없었다). --frozen-lockfile 로 조이는 것은
+      # package.json 을 고칠 때 잠금 파일을 함께 갱신할 수 있게 된 다음이다.
       - run: pnpm install --no-frozen-lockfile
 
       - name: 잠금 파일 업로드 (커밋용)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: pnpm-lock
+          name: pnpm-lock-generated
           path: pnpm-lock.yaml
           if-no-files-found: warn
 
@@ -90,6 +91,9 @@ jobs:
           if ! git diff --quiet; then
             git diff > prettier.patch
             git diff --stat
+            echo "----- 패치 전문 (아티팩트가 비어 나올 때를 대비해 로그에도 남긴다) -----"
+            cat prettier.patch
+            echo "----- 끝 -----"
             echo '::error::Prettier 가 고칠 것이 있습니다 — prettier-patch 아티팩트를 내려받아 git apply 하세요.'
             exit 1
           fi
