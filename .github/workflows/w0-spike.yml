@@ -66,14 +66,18 @@ jobs:
           nproc
 
       # emsdk 는 2GB 가까이 된다. 스파이크를 여러 번 돌릴 것이므로 캐시한다.
-      - name: emsdk 캐시
-        uses: actions/cache@v4
+      #
+      # restore/save 를 **따로** 쓴다. actions/cache 한 덩어리는 잡이 실패하면
+      # 저장을 건너뛰는데, 이 잡은 요약 단계 하나 때문에 세 번 빨갛게 됐고 그때마다
+      # 2GB 를 다시 받았다(그리고 진단 워크플로는 캐시가 없어 그대로 죽었다).
+      - name: emsdk 캐시 복원
+        uses: actions/cache/restore@v4
         with:
           path: ${{ env.WORK }}/emsdk
           key: emsdk-latest-v1
 
-      - name: rapfi 소스 캐시
-        uses: actions/cache@v4
+      - name: rapfi 소스 캐시 복원
+        uses: actions/cache/restore@v4
         with:
           path: ${{ env.WORK }}/rapfi
           key: rapfi-3c94c2a9-v1
@@ -189,6 +193,21 @@ jobs:
         with:
           name: w0-results
           path: results/
+
+      # 잡의 성패와 무관하게 저장한다 — 위 주석 참고.
+      - name: emsdk 캐시 저장
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.WORK }}/emsdk
+          key: emsdk-latest-v1
+
+      - name: rapfi 소스 캐시 저장
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.WORK }}/rapfi
+          key: rapfi-3c94c2a9-v1
 
       - name: 요약
         if: always()

@@ -26,21 +26,35 @@ jobs:
       - name: 시스템 도구
         run: sudo apt-get update -qq && sudo apt-get install -y ninja-build ccache file
 
-      # w0-spike.yml 과 **같은 키**를 쓴다. 이미 채워져 있으므로 여기서는 복원만 된다.
-      - name: emsdk 캐시
-        uses: actions/cache@v4
+      # w0-spike.yml 과 **같은 키**. 있으면 쓰고, 없어도 스크립트가 스스로 갖춘다.
+      - name: emsdk 캐시 복원
+        uses: actions/cache/restore@v4
         with:
           path: ${{ env.WORK }}/emsdk
           key: emsdk-latest-v1
 
-      - name: rapfi 소스 캐시
-        uses: actions/cache@v4
+      - name: rapfi 소스 캐시 복원
+        uses: actions/cache/restore@v4
         with:
           path: ${{ env.WORK }}/rapfi
           key: rapfi-3c94c2a9-v1
 
       - name: 진단 실행
         run: bash tools/diag_hash_width.sh
+
+      - name: emsdk 캐시 저장
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.WORK }}/emsdk
+          key: emsdk-latest-v1
+
+      - name: rapfi 소스 캐시 저장
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.WORK }}/rapfi
+          key: rapfi-3c94c2a9-v1
 
       - name: 결과 업로드
         if: always()

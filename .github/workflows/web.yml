@@ -33,6 +33,7 @@ jobs:
       - run: pnpm install --no-frozen-lockfile
 
       - name: 잠금 파일 업로드 (커밋용)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: pnpm-lock
@@ -45,17 +46,14 @@ jobs:
       - name: 린트
         run: pnpm lint
 
-      - name: 서식
-        run: pnpm format:check
-
       - name: 단위 시험 (팔레트 골든 앵커 · 프로토콜)
         run: pnpm test
 
       - name: 프로덕션 빌드
         run: pnpm build
 
-      # 「빌드가 됐다」와 「화면이 뜬다」는 다르다. 빈 화면으로 초록이 되는 CI 는
-      # 아무것도 지키지 않으므로, 실제로 렌더된 것을 확인한다.
+      # 「빌드가 됐다」와 「화면이 뜬다」는 다르다. 라우터 설정 오류, CSS 변수 오타,
+      # 워커 URL 실수는 전부 빌드를 통과하고 빈 화면으로 끝난다. 그래서 이 단계가 있다.
       - name: Playwright(Chromium) 설치
         run: pnpm exec playwright install --with-deps chromium
 
@@ -80,3 +78,27 @@ jobs:
           name: dist
           path: dist/
           if-no-files-found: error
+
+      # 서식은 **맨 뒤**다. 들여쓰기 한 칸 때문에 진짜 고장(타입·시험·스모크)이
+      # 가려지면 안 된다. 그리고 «틀렸다»고만 말하지 않고 고칠 패치까지 준다 —
+      # 로컬에 Node 툴체인이 없는 환경에서도 받아서 그대로 적용할 수 있게.
+      - name: 서식
+        id: fmt
+        if: always()
+        run: |
+          pnpm exec prettier --write . > /dev/null
+          if ! git diff --quiet; then
+            git diff > prettier.patch
+            git diff --stat
+            echo '::error::Prettier 가 고칠 것이 있습니다 — prettier-patch 아티팩트를 내려받아 git apply 하세요.'
+            exit 1
+          fi
+          echo "서식 깨끗합니다."
+
+      - name: 서식 패치 업로드
+        if: always() && steps.fmt.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: prettier-patch
+          path: prettier.patch
+          if-no-files-found: ignore

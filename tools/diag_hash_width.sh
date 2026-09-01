@@ -37,8 +37,21 @@ JOBS="$(nproc)"
 TARGET="Rapfi/command/benchmark.cpp"
 
 echo ">>> [1/5] 도구"
-[ -x "$WORK/emsdk/emsdk" ] || { echo "emsdk 가 없습니다: $WORK/emsdk (build_engine_wasm.sh 를 먼저 돌리세요)"; exit 1; }
-[ -d "$WORK/rapfi/.git" ] || { echo "rapfi 소스가 없습니다: $WORK/rapfi"; exit 1; }
+# 캐시가 있으면 그것을 쓰고, 없으면 스스로 갖춘다. 처음에는 build_engine_wasm.sh 가
+# 먼저 돌았다고 가정했는데, 그 잡이 실패하면 캐시가 저장되지 않아 여기가 그대로
+# 죽었다 — 진단이 남의 잡의 성패에 매달릴 이유가 없다.
+mkdir -p "$WORK"
+if [ ! -x "$WORK/emsdk/emsdk" ]; then
+  echo "  . emsdk 가 없어 새로 받습니다"
+  rm -rf "$WORK/emsdk"
+  git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$WORK/emsdk"
+  ( cd "$WORK/emsdk" && ./emsdk install latest && ./emsdk activate latest )
+fi
+if [ ! -d "$WORK/rapfi/.git" ]; then
+  echo "  . rapfi 소스가 없어 새로 받습니다"
+  rm -rf "$WORK/rapfi"
+  git clone -q https://github.com/dhbloo/rapfi.git "$WORK/rapfi"
+fi
 cd "$WORK/emsdk"
 set +eu
 # shellcheck disable=SC1091

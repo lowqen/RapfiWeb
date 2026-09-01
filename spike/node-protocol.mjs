@@ -104,17 +104,12 @@ const results = await runSteps({
 });
 
 const maxLagMs = +lag.stop().toFixed(1);
-// 단일 스레드 빌드에서 END 는 그 자리에서 runProtocol() 을 돌려 emscripten_force_exit(0)
-// 까지 가고, 그게 ExitStatus 를 **던진다**. 정상 종료인데 잡지 않으면 node 가 여기서
-// 죽어 결과 JSON 이 한 줄도 나오지 않는다 (실제로 두 런 동안 node-single 이 빈 파일이었다).
-try {
-  Module.sendCommand(END_COMMAND);
-} catch (e) {
-  if (e && (e.name === "ExitStatus" || typeof e.status === "number")) exitCode = e.status ?? 0;
-  else throw e;
-}
-await sleep(300);
 
+// **결과를 먼저 찍고 그 다음에 END 를 보낸다.**
+// 단일 스레드 빌드에서 END 는 그 자리에서 runProtocol() 을 돌려
+// emscripten_force_exit(0) 까지 가고, Emscripten 은 다음 이벤트 루프 회전에서
+// process.exit() 를 부른다. END 뒤에 await 이 하나라도 있으면 그 사이에 프로세스가
+// 죽어 결과 JSON 이 한 줄도 나오지 않는다 — 세 런 동안 node-single 이 빈 파일이었다.
 const passed = results.every((r) => r.ok);
 console.log(
   JSON.stringify(
@@ -132,4 +127,11 @@ console.log(
     2,
   ),
 );
+
+try {
+  Module.sendCommand(END_COMMAND);
+} catch (e) {
+  // 멀티 빌드에서는 process.exit 대신 ExitStatus 를 던진다. 정상 종료다.
+  if (!(e && (e.name === "ExitStatus" || typeof e.status === "number"))) throw e;
+}
 process.exit(passed ? 0 : 1);
