@@ -1,56 +1,97 @@
 # RapfiWeb
 
-**[RapfiDroid](https://github.com/lowqen/RapfiDroid) 의 웹 이식.** 서버 없이 브라우저
-안에서 Rapfi 엔진을 돌리고, 앱의 분석·연구 기능과 새 «오프닝 정석» 기능을 얹는다.
+RapfiDroid(안드로이드 오목·렌주 분석반)의 **웹 이식**. Rapfi 엔진을 WebAssembly 로
+브라우저 안에서 돌린다. 서버에 붙지 않는다 — 대국·채팅·랭킹 서버 연동은 범위 밖이다.
 
-> **현재 상태: W0 스파이크.** 나머지 설계 전체가 딛고 선 전제 셋을 실측으로
-> 확인하는 중이며, 앱 코드는 아직 없다. 계획서는
-> [`gomoku-dev/test-yixin/docs/웹_이식_계획.md`](https://github.com/lowqen/gomoku-dev/blob/main/test-yixin/docs/%EC%9B%B9_%EC%9D%B4%EC%8B%9D_%EA%B3%84%ED%9A%8D.md).
+- 설계: [`../test-yixin/docs/웹_이식_계획.md`](../test-yixin/docs/웹_이식_계획.md)
+- W0 스파이크 결과: [`docs/W0-결과.md`](docs/W0-결과.md)
+- upstream 이슈 초안: [`docs/upstream-이슈-초안.md`](docs/upstream-이슈-초안.md)
 
-## W0 스파이크가 확인하는 것
+## 지금 어디까지 와 있나
 
-| # | 질문 | 통과 기준 |
+| 단계 | 내용 | 상태 |
 |---|---|---|
-| **W0-1** | 브라우저에서 Rapfi 에 **stdin 을 줄 수 있는가** | SAB + `Atomics.wait` 또는 폴백 중 하나로 piskvork 양방향 통신 성공 |
-| **W0-2** | Emscripten 4종 빌드가 되는가 | single / single-simd128 / multi / multi-simd128 전부 산출물 생성 |
-| **W0-3** | 웹 엔진이 **같은 답**을 내는가 | 4종 모두 `BENCH` 해시 = `e240ab16` (x86 호스트 · 안드로이드 검증값) |
+| **W0** | stdin·빌드·BENCH 스파이크 | 완료 (원인 규명까지) |
+| **W1** | 스캐폴딩 — Vite·React·라우팅·AppShell·디자인 토큰·엔진 골격·CI | **여기** |
+| W2 | 보드 렌더링 (Canvas 2D 2레이어) | |
+| W3 | 엔진 워커 + 프로토콜 + 집계 + 가중치 로더 | |
+| W4~ | 보드 화면 · 설정 · 연구 · 정석 | |
 
-W0-1 이 가장 불확실하다. Rapfi 는 piskvork 프로토콜을 stdin **블로킹 읽기**로
-소비하는데 브라우저에는 stdin 이 없고, Emscripten 이 주는 훅은 동기 함수라
-"아직 입력이 없다"를 표현할 방법이 없다(null 은 EOF 다). 워커 스레드에서
-`Atomics.wait` 로 소비자를 진짜로 재우는 것이 주 경로다.
+화면 아홉 개는 라우팅과 셸이 다 연결돼 있고, 내용은 각 화면이 «무엇이 될 자리인지»를
+적은 자리표시자다. 엔진은 아직 자동으로 뜨지 않는다(`public/engine/` 이 비어 있다).
 
-## 돌리는 법
+## 로컬 개발 환경
 
-전부 리눅스에서 돈다. 이 저장소의 CI(`.github/workflows/w0-spike.yml`)가 하는 일이
-곧 아래 그대로다.
+필요한 것은 **Node 20.11 이상**과 **pnpm 9** 둘뿐이다.
 
 ```bash
-# 1) 엔진 4종 빌드 + 검증 게이트 (emsdk 를 알아서 받는다)
-bash tools/build_engine_wasm.sh
+# 1. Node 20 LTS
+#    Windows:  winget install OpenJS.NodeJS.LTS
+#    macOS:    brew install node@20
+#    Linux:    https://github.com/nodesource/distributions
 
-# 2) W0-3 — BENCH 해시
-node spike/node-bench.mjs multi-simd128
+# 2. pnpm (Node 에 딸려 오는 corepack 이 가장 간단하다)
+corepack enable
+corepack prepare pnpm@9 --activate
 
-# 3) W0-1 — node worker_threads 로 먼저(싸다)
-node spike/node-protocol.mjs multi-simd128
+# 3. 의존성
+pnpm install
 
-# 4) W0-1 — 진짜 브라우저로
-npm install && npx playwright install chromium
-node spike/serve.mjs 8787 &
-node spike/browser-test.mjs multi-simd128 8787
+# 4. 개발 서버 — http://localhost:5173
+pnpm dev
 ```
 
-손으로 눈으로 보려면 `node spike/serve.mjs` 후
-<http://localhost:8787/spike/harness.html>. 페이지 위쪽 막대가 탐색 중에도
-매끄럽게 움직이면 메인 스레드가 막히지 않은 것이다.
+`pnpm dev` 는 먼저 `scripts/gen-tokens.ts` 로 `src/styles/tokens.css` 를 굽고 Vite 를 띄운다.
+그 CSS 는 **생성물이라 커밋하지 않는다** — 원본은 `src/core/design/` 의 TS 다.
+
+### 자주 쓰는 명령
+
+| 명령 | 하는 일 |
+|---|---|
+| `pnpm dev` | 토큰 생성 + 개발 서버 |
+| `pnpm build` | 토큰 생성 + 타입 검사 + 프로덕션 빌드 (`dist/`) |
+| `pnpm preview` | 빌드 결과를 그대로 띄워 본다 |
+| `pnpm test` | 단위 시험 (팔레트 골든 앵커, 프로토콜 직렬화) |
+| `pnpm lint` / `pnpm format` | ESLint / Prettier |
+| `pnpm check` | 위 전부를 CI 와 같은 순서로 |
+| `pnpm gen:tokens` | 토큰만 다시 굽기 |
+
+### 엔진(WASM)을 직접 빌드하려면
+
+리눅스 x86_64 가 필요하다(GitHub Actions `ubuntu-latest` 에서 그대로 돈다).
+
+```bash
+pnpm engine:build          # tools/build_engine_wasm.sh
+```
+
+`out/engine/` 에 나온 것을 `public/engine/` 으로 옮기면 앱이 그걸 쓴다.
+`.env` 의 `VITE_ENGINE_BASE_URL` 로 다른 경로를 가리킬 수도 있다.
+
+## 이 저장소에서 절대 하지 말 것
+
+**RenjuNet 파생 자료(`.rif`, `*.pack`, `freq_data.json`, `renju*.sqlite`)를 커밋하지 않는다.**
+라이선스가 «비상업·오프라인 전용, 재배포 금지»를 명시하고, 웹에서는 커밋이 곧
+«온라인 시스템에 게시»라 앱보다 더 위험하다. `.gitignore` 와 CI 게이트가 둘 다 막고 있지만,
+막는 장치가 있다는 것이 해도 된다는 뜻은 아니다.
+
+가중치(`*.bin.lz4`)는 CC0 라 재배포는 자유롭지만 40MB 라 릴리스 자산으로 나른다.
+
+## 브라우저 요구사항
+
+**WebAssembly SIMD 가 하한선이다.** 비SIMD 변형은 이 엔진 커밋에서 빌드되지 않는다
+(`eval/mix10nnue.cpp` 의 `static_assert`). 하향할 변형이 없으므로 미달 브라우저는
+안내 화면으로 끝난다.
+
+| | 최소 |
+|---|---|
+| Chrome / Edge | 91 |
+| Firefox | 89 |
+| Safari | **16.4** (iOS 16.4 미만은 지원하지 않는다) |
+
+COOP/COEP 헤더는 **필요 없다** — 배포 경로가 단일 스레드라서다. 그래서 GitHub Pages 를
+포함해 정적 파일을 얹을 수 있는 곳이면 어디든 올라간다.
 
 ## 라이선스
 
-이 저장소의 코드는 **BSD-2-Clause**. 배포물에 Rapfi 엔진(**GPL-3.0-or-later**)이
-포함되므로 배포되는 웹앱 전체는 GPL-3.0-or-later 다 — RapfiDroid 와 같은 구조다.
-
-**RenjuNet 파생 자료는 어떤 이유로도 이 저장소에 들어오지 않는다.** 라이선스가
-그 내용물 또는 파생물을 웹사이트·온라인 시스템에 올리는 것을 금지하고, 웹앱에서는
-커밋이 곧 게시다. 실전 통계는 사용자가 자기 `.rif` 를 브라우저에 넣어 **브라우저
-안에서** 만들고, 결과는 그 기기를 벗어나지 않는다.
+배포물에 Rapfi(GPL-3.0-or-later)가 포함되므로 **전체가 GPL-3.0-or-later** 로 배포된다.
+이 저장소가 직접 쓴 코드는 BSD-2-Clause 로도 쓸 수 있다.

@@ -1,0 +1,2 @@
+# SPA 폴백. 딥링크(/research/review, /joseki/:id)가 새로고침에서 404 가 되지 않게 한다.
+/*  /index.html  200

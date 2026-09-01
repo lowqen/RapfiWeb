@@ -1,0 +1,82 @@
+name: web
+
+# W1 스캐폴딩부터 이 워크플로가 «빌드된다»를 지킨다.
+# 엔진(WASM) 쪽 게이트는 w0-spike.yml 이 따로 본다 — 주기가 다르기 때문이다
+# (웹은 매 푸시, 엔진은 커밋을 올릴 때).
+on:
+  push:
+    paths-ignore:
+      - "docs/**"
+      - "spike/**"
+      - "tools/**"
+      - ".github/workflows/w0-*.yml"
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # 버전은 package.json 의 packageManager 필드에서 온다 — 여기 또 적으면 충돌한다.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # 아직 pnpm-lock.yaml 이 없다. 이 저장소를 만든 기계에 Node 툴체인이 없어서
+      # 잠금 파일을 낼 수 없었다 — 첫 성공 런이 만들어 준 것을 커밋하면 그때
+      # --frozen-lockfile 로 바꾸고 setup-node 에 cache: pnpm 을 켠다.
+      - run: pnpm install --no-frozen-lockfile
+
+      - name: 잠금 파일 업로드 (커밋용)
+        uses: actions/upload-artifact@v4
+        with:
+          name: pnpm-lock
+          path: pnpm-lock.yaml
+          if-no-files-found: warn
+
+      - name: 타입
+        run: pnpm typecheck
+
+      - name: 린트
+        run: pnpm lint
+
+      - name: 서식
+        run: pnpm format:check
+
+      - name: 단위 시험 (팔레트 골든 앵커 · 프로토콜)
+        run: pnpm test
+
+      - name: 프로덕션 빌드
+        run: pnpm build
+
+      # 「빌드가 됐다」와 「화면이 뜬다」는 다르다. 빈 화면으로 초록이 되는 CI 는
+      # 아무것도 지키지 않으므로, 실제로 렌더된 것을 확인한다.
+      - name: Playwright(Chromium) 설치
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: 스모크 — AppShell 이 실제로 렌더되는가
+        run: pnpm exec tsx scripts/smoke.ts
+
+      # RenjuNet 오염 게이트. 이 저장소에서 가장 중요한 CI 단계다 —
+      # 앱은 실수로 포함해도 기기에 머물지만, 웹은 그 순간 «온라인 시스템에 게시»가
+      # 되어 라이선스를 바로 위반한다.
+      - name: RenjuNet 오염 게이트
+        run: |
+          if find dist -iname '*.rif' -o -iname '*.pack' -o -iname 'freq_data.json' \
+                       -o -iname 'renju*.sqlite' | grep -q .; then
+            echo "::error::RenjuNet 파생 자료가 배포물에 있습니다 — 라이선스 위반. 중단."
+            exit 1
+          fi
+          echo "깨끗합니다."
+
+      - name: dist 업로드
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error

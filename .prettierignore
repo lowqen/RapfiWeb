@@ -1,0 +1,16 @@
+dist
+out
+out-diag
+results
+node_modules
+spike
+public/engine
+public/weights
+src/styles/tokens.css
+pnpm-lock.yaml
+
+# 마크다운과 워크플로는 손으로 쓴 문서다. Prettier 가 한글 표를 다시 접으면
+# 읽기가 나빠지고, 이 저장소의 문서는 읽히려고 있는 것이다.
+*.md
+docs
+.github

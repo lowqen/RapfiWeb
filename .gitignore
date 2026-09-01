@@ -1,8 +1,13 @@
 # 빌드 산출물 — 엔진은 W0 통과 후에야 public/engine/ 으로 커밋한다(계획서 §8).
 /out/
+/out-diag/
 /dist/
 /node_modules/
 /results/
+
+# 생성물. src/core/design/{ramps,scheme,tokens}.ts 가 원본이고 dev·build 가 매번 굽는다 —
+# 커밋해 두면 «램프를 고치고 CSS 를 잊는» 어긋남이 생길 수 있어 아예 두지 않는다.
+src/styles/tokens.css
 
 # 가중치. CC0 이지만 40MB 라 릴리스 자산으로 나른다.
 *.bin.lz4
@@ -19,6 +24,7 @@ renju*.sqlite
 *.keystore
 .env
 .env.*
+!.env.example
 
 # 편집기/OS
 .DS_Store

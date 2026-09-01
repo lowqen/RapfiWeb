@@ -1,0 +1,313 @@
+/* 리셋 · 레이아웃 · 모션 유틸. 색과 치수 토큰은 tokens.css(생성물)에서 온다. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font: var(--type-body-medium);
+  letter-spacing: var(--track-body-medium);
+  color: var(--c-on-background);
+  background: var(--c-background);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+p,
+ul {
+  margin: 0;
+}
+ul {
+  padding: 0;
+  list-style: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* 변하는 숫자는 폭이 고정돼야 한다. 비례 글꼴의 1 은 0 보다 좁아서, 초당 몇 번씩
+   바뀌는 노드 수·깊이·속도가 줄 전체를 좌우로 끌고 다닌다(앱의 `tabular()`). */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 모션 ────────────────────────────────────────────────────────────
+   네 규칙(Motion.kt): 미끄러지지 않는다 / 200ms 를 넘지 않는다 /
+   실시간 숫자는 보간하지 않는다 / 증명 하트비트 500ms 는 그대로.
+   CSS 로 강제할 수 있는 것은 앞의 둘뿐이라, 유틸 두 개만 두고 나머지는 리뷰 규칙이다. */
+.quiet-switch {
+  animation: fade-in var(--motion-quick) ease-out;
+}
+.panel-enter {
+  animation: fade-in var(--motion-panel) ease-out;
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 앱에 없던 추가지만 웹 접근성의 기본이고, «미끄러지지 않는다» 정신과 어긋나지 않는다. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── 셸 ─────────────────────────────────────────────────────────── */
+.shell {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+}
+.shell__main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+.shell__content {
+  flex: 1;
+  padding: var(--space-xl);
+  overflow: auto;
+}
+.shell[data-compact] {
+  flex-direction: column;
+}
+
+/* ── 좌측 레일 ──────────────────────────────────────────────────── */
+.rail {
+  flex: 0 0 auto;
+  width: 88px;
+  padding: var(--space-m) var(--space-s);
+  background: var(--c-surface-container-low);
+  border-right: 1px solid var(--c-outline-variant);
+}
+.rail__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.rail__item {
+  position: relative;
+}
+.rail__link {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  align-items: center;
+  padding: var(--space-m) var(--space-s);
+  color: var(--c-on-surface-variant);
+  border-radius: var(--radius-m);
+  transition: background var(--motion-quick) ease-out;
+}
+.rail__link:hover {
+  background: var(--c-surface-container);
+}
+.rail__link.is-active {
+  font-weight: 600;
+  color: var(--c-on-secondary-container);
+  background: var(--c-secondary-container);
+}
+.rail__icon {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+.rail__label {
+  font: var(--type-label-medium);
+}
+.rail__dot {
+  position: absolute;
+  top: 10px;
+  right: 18px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c-outline);
+}
+.rail__dot[data-status="ready"] {
+  background: var(--c-positive);
+}
+.rail__dot[data-status="searching"] {
+  background: var(--c-caution);
+}
+.rail__dot[data-status="starting"] {
+  background: var(--c-caution);
+}
+.rail__dot[data-status="error"] {
+  background: var(--c-error);
+}
+
+/* 연구 hover 서브메뉴 — 다른 화면에서도 네 탭에 1클릭으로 닿게 한다.
+   터치에는 hover 가 없으므로 hover 가 있는 환경에서만 존재한다. */
+.rail__submenu {
+  display: none;
+}
+@media (hover: hover) {
+  .rail__item:hover .rail__submenu,
+  .rail__item:focus-within .rail__submenu {
+    position: absolute;
+    top: 0;
+    left: 100%;
+    z-index: 10;
+    display: block;
+    min-width: 160px;
+    padding: var(--space-s);
+    background: var(--c-surface-container-high);
+    border: 1px solid var(--c-outline-variant);
+    border-radius: var(--radius-m);
+    box-shadow: 0 4px 16px rgb(0 0 0 / 0.18);
+  }
+}
+.rail__sublink {
+  display: block;
+  padding: var(--space-m) var(--space-l);
+  font: var(--type-body-medium);
+  border-radius: var(--radius-s);
+}
+.rail__sublink:hover,
+.rail__sublink.is-active {
+  background: var(--c-surface-container-highest);
+}
+
+/* ── 하단 탭(좁은 폭) ───────────────────────────────────────────── */
+.tabs {
+  display: flex;
+  flex: 0 0 auto;
+  background: var(--c-surface-container-low);
+  border-top: 1px solid var(--c-outline-variant);
+}
+.tabs__link {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+  padding: var(--space-m) 0 calc(var(--space-m) + env(safe-area-inset-bottom, 0px));
+  color: var(--c-on-surface-variant);
+}
+.tabs__link.is-active {
+  font-weight: 600;
+  color: var(--c-on-secondary-container);
+}
+.tabs__icon {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+}
+.tabs__label {
+  font: var(--type-label-small);
+}
+
+/* ── 상단 바 ────────────────────────────────────────────────────── */
+.topbar {
+  display: flex;
+  gap: var(--space-l);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-l) var(--space-xl);
+  background: var(--c-surface);
+  border-bottom: 1px solid var(--c-outline-variant);
+}
+.topbar__title {
+  font: var(--type-title-large);
+  letter-spacing: var(--track-title-large);
+}
+.topbar__subtitle {
+  font: var(--type-body-small);
+  color: var(--c-on-surface-variant);
+}
+.themetoggle {
+  padding: var(--space-s) var(--space-l);
+  font: var(--type-label-large);
+  color: var(--c-on-surface-variant);
+  border: 1px solid var(--c-outline-variant);
+  border-radius: var(--radius-s);
+}
+.themetoggle:hover {
+  background: var(--c-surface-container);
+}
+
+/* ── 연구 탭 ────────────────────────────────────────────────────── */
+.rtabs {
+  display: flex;
+  gap: var(--space-xs);
+  padding: var(--space-m) var(--space-xl);
+  background: var(--c-surface);
+  border-bottom: 1px solid var(--c-outline-variant);
+}
+.rtabs__tab {
+  padding: var(--space-m) var(--space-l);
+  font: var(--type-label-large);
+  color: var(--c-on-surface-variant);
+  border-radius: var(--radius-s);
+}
+.rtabs__tab.is-active {
+  color: var(--c-on-secondary-container);
+  background: var(--c-secondary-container);
+}
+
+/* ── 자리표시자 (W1 한정) ───────────────────────────────────────── */
+.placeholder {
+  display: flex;
+  justify-content: center;
+}
+.placeholder__card {
+  width: 100%;
+  max-width: var(--reading-width);
+  padding: var(--space-xxl);
+  background: var(--c-surface-container-low);
+  border: 1px solid var(--c-outline-variant);
+  border-radius: var(--radius-l);
+}
+.placeholder__stage {
+  display: inline-block;
+  padding: 2px var(--space-m);
+  font: var(--type-label-small);
+  color: var(--c-on-tertiary-container);
+  background: var(--c-tertiary-container);
+  border-radius: var(--radius-xs);
+}
+.placeholder__title {
+  margin-top: var(--space-m);
+  font: var(--type-headline-small);
+  letter-spacing: var(--track-headline-small);
+}
+.placeholder__what {
+  margin-top: var(--space-m);
+  font: var(--type-body-large);
+  color: var(--c-on-surface-variant);
+}
+.placeholder__needs {
+  margin-top: var(--space-l);
+  font: var(--type-body-small);
+  color: var(--c-outline);
+}
