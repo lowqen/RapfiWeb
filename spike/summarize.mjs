@@ -29,12 +29,14 @@ out.push("## W0 스파이크 결과", "");
 
 const bench = reports.filter((r) => r.test?.startsWith("W0-3"));
 if (bench.length) {
-  out.push("### W0-3 — BENCH 해시 대조", "");
-  out.push("| 변형 | 결과 | Hash | 기대값 | Nodes/s | 소요 |");
-  out.push("|---|---|---|---|---|---|");
+  out.push("### W0-3 — BENCH 해시 (웹 회귀 게이트)", "");
+  out.push("| 변형 | 결과 | Hash | 웹 기준선 | 네이티브 | Nodes/s | 소요 |");
+  out.push("|---|---|---|---|---|---|---|");
   for (const r of bench) {
+    // 기준선이 없는 변형은 통과/실패가 아니라 "미판정"이다.
+    const verdict = r.gated === false ? "➖" : mark(r.pass);
     out.push(
-      `| \`${r.variant}\` | ${mark(r.pass)} | \`${r.hash ?? "—"}\` | \`${r.expected}\` | ${r.nodesPerSec ?? "—"} | ${r.wallSec ?? "—"}s |`,
+      `| \`${r.variant}\` | ${verdict} | \`${r.hash ?? "—"}\` | \`${r.webBaseline ?? "미기록"}\` | \`${r.nativeHash ?? "—"}\` | ${r.nodesPerSec ?? "—"} | ${r.wallSec ?? "—"}s |`,
     );
   }
   out.push("");
@@ -42,7 +44,7 @@ if (bench.length) {
 
 const proto = reports.filter((r) => r.test?.startsWith("W0-1"));
 if (proto.length) {
-  out.push("### W0-1 — stdin 왕복 (SAB + Atomics.wait)", "");
+  out.push("### W0-1 — stdin 왕복 (upstream sendCommand 펌프)", "");
   out.push("| 환경 | 변형 | 결과 | 기동 | 최대 지연 | stdin 블록 | 단계 |");
   out.push("|---|---|---|---|---|---|---|");
   for (const r of proto) {
@@ -56,7 +58,11 @@ if (proto.length) {
   out.push("");
 }
 
+// 배포 경로만 잡의 성패를 정한다. multi-simd128 은 참고 측정이라 실패해도
+// 잡을 빨갛게 만들지 않는다 — 그러면 진짜 회귀와 구분이 안 된다.
+const isBlocking = (r) => !r.pass && r.gated !== false && !/multi-simd128/.test(r.file ?? "");
 const failed = reports.filter((r) => !r.pass);
+const blocking = reports.filter(isBlocking);
 if (failed.length) {
   out.push("### 실패 상세", "");
   for (const r of failed) {
@@ -76,4 +82,7 @@ if (process.env.GITHUB_STEP_SUMMARY) {
   const { appendFileSync } = await import("node:fs");
   appendFileSync(process.env.GITHUB_STEP_SUMMARY, text + "\n");
 }
-process.exit(failed.length ? 1 : 0);
+if (failed.length > blocking.length) {
+  console.log("참고: multi-simd128 의 실패는 잡을 실패시키지 않는다(배포 경로 아님).");
+}
+process.exit(blocking.length ? 1 : 0);

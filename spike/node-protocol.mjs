@@ -104,7 +104,15 @@ const results = await runSteps({
 });
 
 const maxLagMs = +lag.stop().toFixed(1);
-Module.sendCommand(END_COMMAND);
+// 단일 스레드 빌드에서 END 는 그 자리에서 runProtocol() 을 돌려 emscripten_force_exit(0)
+// 까지 가고, 그게 ExitStatus 를 **던진다**. 정상 종료인데 잡지 않으면 node 가 여기서
+// 죽어 결과 JSON 이 한 줄도 나오지 않는다 (실제로 두 런 동안 node-single 이 빈 파일이었다).
+try {
+  Module.sendCommand(END_COMMAND);
+} catch (e) {
+  if (e && (e.name === "ExitStatus" || typeof e.status === "number")) exitCode = e.status ?? 0;
+  else throw e;
+}
 await sleep(300);
 
 const passed = results.every((r) => r.ok);
