@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { DEFAULT_SIZE, moveKey, sameMove, type Move } from "../../core/model/move";
 import { emptyRender, type BoardRender } from "../../core/board/board-renderer";
+import type { Placement } from "../../engine/engine-types";
+import type { AnalysisSnapshot } from "../../engine/engine-types";
 
 /**
  * 보드 화면의 상태. W2 에서는 **돌을 놓고 무르는 것**까지다 — 규칙 판정도,
@@ -18,16 +20,44 @@ interface BoardState {
   toggleNumbers: () => void;
   /** 롱프레스 자리 — W6 의 «보드 텍스트» 진입점이 될 곳. 지금은 표시만 한다. */
   markBlocked: (m: Move) => void;
+
+  /**
+   * 지금 국면을 엔진이 받는 모양으로. `own` 은 «엔진이 둘 색»이라 **다음 차례**가
+   * 기준이다 — 돌 수가 짝수면 흑 차례이고, 그때 흑돌이 own 이다.
+   */
+  placements: () => Placement[];
+
+  /** 엔진 스냅샷을 보드에 얹는다. 값 칩·후보·최선수 링·고스트가 여기서 온다. */
+  applyAnalysis: (s: AnalysisSnapshot) => void;
+
+  /** 분석 오버레이만 걷어낸다(돌은 그대로). 착수하거나 무를 때 부른다. */
+  clearAnalysis: () => void;
 }
 
-export const useBoardStore = create<BoardState>((set) => ({
+/** 분석 오버레이를 비운 상태. 국면이 바뀌는 모든 곳이 이걸 얹는다. */
+const CLEARED = {
+  tags: new Map(),
+  candidates: new Map(),
+  loseCells: new Set<number>(),
+  bestMark: null,
+  ghosts: [],
+} as const;
+
+export const useBoardStore = create<BoardState>((set, get) => ({
   render: emptyRender(DEFAULT_SIZE),
 
   place: (m) =>
     set((s) => {
       if (s.render.stones.some((p) => sameMove(p, m))) return s;
+      // 국면이 바뀌면 앞선 분석은 그 국면의 것이 아니다. 남겨 두면 값 칩이
+      // 한 수 전 판을 말하게 된다 — 조용히 틀린 화면이라 제일 나쁘다.
       return {
-        render: { ...s.render, stones: [...s.render.stones, m], lastMove: m },
+        render: {
+          ...s.render,
+          stones: [...s.render.stones, m],
+          lastMove: m,
+          ...CLEARED,
+        },
       };
     }),
 
@@ -35,7 +65,9 @@ export const useBoardStore = create<BoardState>((set) => ({
     set((s) => {
       if (s.render.stones.length === 0) return s;
       const stones = s.render.stones.slice(0, -1);
-      return { render: { ...s.render, stones, lastMove: stones.at(-1) ?? null } };
+      return {
+        render: { ...s.render, stones, lastMove: stones.at(-1) ?? null, ...CLEARED },
+      };
     }),
 
   clear: () => set((s) => ({ render: { ...emptyRender(s.render.size) } })),
@@ -51,4 +83,26 @@ export const useBoardStore = create<BoardState>((set) => ({
       else blocked.add(key);
       return { render: { ...s.render, blocked } };
     }),
+
+  placements: () => {
+    const { stones } = get().render;
+    // own = «엔진이 둘 색». 다음 차례가 흑이면(짝수 개) 짝수 인덱스 돌이 own 이다.
+    const blackToMove = stones.length % 2 === 0;
+    return stones.map((move, i) => ({ move, own: (i % 2 === 0) === blackToMove }));
+  },
+
+  applyAnalysis: (a) =>
+    set((s) => ({
+      render: {
+        ...s.render,
+        tags: a.tags,
+        candidates: a.candidates,
+        loseCells: a.loseCells,
+        bestMark: a.bestMove,
+        // 고스트는 최선 수순의 **머리를 뺀** 나머지다 — 머리는 최선수 링이 이미 말한다.
+        ghosts: a.bestLine.slice(1),
+      },
+    })),
+
+  clearAnalysis: () => set((s) => ({ render: { ...s.render, ...CLEARED } })),
 }));

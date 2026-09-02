@@ -1,14 +1,17 @@
+import { useEffect } from "react";
 import { BoardCanvas } from "../../core/board/BoardCanvas";
 import { useBoardStore } from "./boardStore";
 import { LadderStrip } from "./LadderStrip";
+import { AnalysisPanel } from "./AnalysisPanel";
+import { EngineConsole } from "./EngineConsole";
+import { useEngineStore } from "../../engine/engine-state";
 import { label } from "../../core/model/move";
 
 /**
- * 보드 화면 — W2 판.
+ * 보드 화면 — W3 판.
  *
- * 지금 있는 것은 **보드와 그것을 확인할 최소한**이다: 두기·무르기·번호 토글,
- * 그리고 값 사다리 견본. 대국 규칙도 시계도 오프닝 협상도 없다 — W4 가 이 위에
- * 얹힌다. 분석 pane 자리는 아직 비워 둔다(W3 의 엔진이 들어올 곳).
+ * 보드 pane + 분석 pane 2열. 대국 규칙·시계·오프닝 협상은 아직 없다(W4).
+ * 지금 있는 것은 「돌을 놓고, 엔진에 물어보고, 답을 보드에서 읽는다」까지다.
  */
 export function BoardScreen() {
   const render = useBoardStore((s) => s.render);
@@ -17,6 +20,15 @@ export function BoardScreen() {
   const clear = useBoardStore((s) => s.clear);
   const toggleNumbers = useBoardStore((s) => s.toggleNumbers);
   const markBlocked = useBoardStore((s) => s.markBlocked);
+  const applyAnalysis = useBoardStore((s) => s.applyAnalysis);
+
+  const snapshot = useEngineStore((s) => s.snapshot);
+
+  // 엔진 스냅샷 → 보드. 스토어를 둘로 나눠 두고 여기서 잇는 이유는, 보드가 엔진을
+  // **모르는 채로** 그려질 수 있어야 하기 때문이다(내보내기·정석 미리보기 등).
+  useEffect(() => {
+    applyAnalysis(snapshot);
+  }, [snapshot, applyAnalysis]);
 
   const last = render.lastMove;
   const turn = render.stones.length % 2 === 0 ? "흑" : "백";
@@ -55,14 +67,9 @@ export function BoardScreen() {
           </p>
         </section>
 
+        <AnalysisPanel />
         <LadderStrip />
-
-        <section className="panel panel--muted">
-          <h2 className="panel__title">분석</h2>
-          <p className="panel__hint">
-            엔진은 W3 에서 붙습니다. 이 자리에 승률·최선수·PV·콘솔이 들어옵니다.
-          </p>
-        </section>
+        <EngineConsole />
       </aside>
     </div>
   );

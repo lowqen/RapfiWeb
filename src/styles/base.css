@@ -465,3 +465,85 @@ a {
   font: var(--type-label-medium);
   border-radius: var(--radius-xl);
 }
+
+/* ── 분석 pane (W3) ─────────────────────────────────────────────── */
+.panel__title {
+  display: flex;
+  gap: var(--space-m);
+  align-items: center;
+}
+.panel__badge {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c-outline);
+}
+.panel__badge[data-status="ready"] {
+  background: var(--c-positive);
+}
+.panel__badge[data-status="starting"],
+.panel__badge[data-status="searching"] {
+  background: var(--c-caution);
+}
+.panel__badge[data-status="error"] {
+  background: var(--c-error);
+}
+.panel__status {
+  font: var(--type-label-medium);
+  color: var(--c-on-surface-variant);
+}
+.panel__link {
+  margin-left: auto;
+  font: var(--type-label-medium);
+  color: var(--c-on-surface-variant);
+  text-decoration: underline;
+}
+.panel__error {
+  margin-top: var(--space-m);
+  padding: var(--space-m);
+  font: var(--type-body-small);
+  color: var(--c-on-error-container);
+  background: var(--c-error-container);
+  border-radius: var(--radius-s);
+}
+
+.pvlist {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s);
+  margin-top: var(--space-l);
+  padding: 0;
+  list-style: none;
+}
+.pvlist__row {
+  display: flex;
+  gap: var(--space-m);
+  align-items: baseline;
+}
+.pvlist__chip {
+  flex: 0 0 auto;
+  padding: 1px var(--space-m);
+  font: var(--type-label-small);
+  border-radius: var(--radius-xl);
+}
+.pvlist__line {
+  overflow: hidden;
+  font: var(--type-body-small);
+  color: var(--c-on-surface-variant);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 콘솔은 원시 줄이다 — 줄바꿈하지 않고 가로로 스크롤한다. 접히면 프로토콜을
+   눈으로 좇을 수 없게 된다. */
+.console {
+  max-height: 220px;
+  margin-top: var(--space-m);
+  padding: var(--space-m);
+  overflow: auto;
+  font: var(--type-mono);
+  color: var(--c-on-surface-variant);
+  background: var(--c-surface-container-lowest);
+  border-radius: var(--radius-xs);
+  white-space: pre;
+}

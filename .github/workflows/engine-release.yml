@@ -1,0 +1,119 @@
+name: 엔진 릴리스 (WASM 산출물)
+
+# 계획서 §8 의 산출물 정책을 실행하는 워크플로.
+#
+#   .js / .wasm   ~1.3MB   저장소에 커밋한다(클론 직후 바로 실행). 여기서는 아티팩트로도 낸다.
+#   .data         ~40MB    커밋 금지. **릴리스 자산**으로 낸다.
+#
+# .data 는 가중치 프리로드다. 이게 없으면 엔진이 config.toml 을 못 찾아 뜨자마자
+# 죽으므로, 웹 CI 와 배포는 여기서 만든 릴리스에서 받아 조립한다.
+#
+# 수동 실행이다 — 엔진 커밋이나 가중치가 바뀔 때만 다시 돌린다.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "릴리스 태그"
+        default: "engine-3c94c2a9"
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    env:
+      WORK: ${{ github.workspace }}/../rapfi-wasm-work
+      ENABLE_LTO: "ON"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: 시스템 도구
+        run: sudo apt-get update -qq && sudo apt-get install -y ninja-build ccache file
+
+      # w0-spike.yml 과 같은 키. restore/save 를 따로 쓰는 이유는 그쪽 주석에 있다
+      # (한 덩어리 actions/cache 는 잡이 실패하면 저장을 건너뛴다).
+      - name: emsdk 캐시 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.WORK }}/emsdk
+          key: emsdk-latest-v1
+
+      - name: rapfi 소스 캐시 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.WORK }}/rapfi
+          key: rapfi-3c94c2a9-v1
+
+      - name: 빌드 + 검증 게이트
+        run: bash tools/build_engine_wasm.sh
+
+      # 배포 경로만 낸다. 멀티 변형은 브라우저에서 동작을 확인하지 못했으므로
+      # 릴리스에 넣지 않는다 — 받을 수 있으면 누군가 쓰게 된다.
+      - name: 웹 회귀 게이트 (single-simd128)
+        run: node spike/node-bench.mjs single-simd128
+
+      - name: emsdk 캐시 저장
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.WORK }}/emsdk
+          key: emsdk-latest-v1
+
+      - name: rapfi 소스 캐시 저장
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.WORK }}/rapfi
+          key: rapfi-3c94c2a9-v1
+
+      - name: 릴리스 본문
+        run: |
+          {
+            echo "Rapfi WebAssembly 산출물 (배포 경로: single-simd128)."
+            echo
+            echo '```'
+            cat out/engine/ENGINE_VERSION.txt
+            echo '```'
+            echo
+            echo "## 라이선스"
+            echo
+            echo "Rapfi 는 GPL-3.0-or-later 입니다. 이 자산은 그 엔진을 WebAssembly 로"
+            echo "컴파일한 것이므로 같은 라이선스로 배포됩니다. 대응 소스는 upstream"
+            echo "커밋 <https://github.com/dhbloo/rapfi/tree/3c94c2a9> 이고, 빌드에 쓴"
+            echo "스크립트는 이 저장소의 \`tools/build_engine_wasm.sh\` 입니다 —"
+            echo "엔진 소스에는 어떤 패치도 넣지 않았습니다."
+            echo
+            echo "가중치(\`.data\` 안에 구워짐)는 dhbloo/rapfi-networks 의 CC0 자료입니다."
+          } > RELEASE_NOTES.md
+          cat RELEASE_NOTES.md
+
+      - name: 릴리스 발행
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ inputs.tag }}"
+          gh release delete "$TAG" --yes --cleanup-tag 2> /dev/null || true
+          gh release create "$TAG" \
+            --title "엔진 $TAG" \
+            --notes-file RELEASE_NOTES.md \
+            out/engine/rapfi-single-simd128.js \
+            out/engine/rapfi-single-simd128.wasm \
+            out/engine/rapfi-single-simd128.data \
+            out/engine/ENGINE_VERSION.txt
+          gh release view "$TAG" --json assets -q '.assets[] | "\(.name)  \(.size)"'
+
+      # .js/.wasm 은 커밋 대상이라 따로 꺼내 둔다 — 사람이 받아서 public/engine/ 에 넣는다.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: engine-committable
+          path: |
+            out/engine/rapfi-single-simd128.js
+            out/engine/rapfi-single-simd128.wasm
+            out/engine/ENGINE_VERSION.txt
+          if-no-files-found: error
