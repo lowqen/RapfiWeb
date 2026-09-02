@@ -69,7 +69,7 @@ jobs:
         run: |
           mkdir -p dist/engine
           if gh release view engine-3c94c2a9 > /dev/null 2>&1; then
-            gh release download engine-3c94c2a9 --dir dist/engine \n              --pattern 'rapfi-single-simd128.*' --clobber
+            gh release download engine-3c94c2a9 --dir dist/engine --pattern 'rapfi-single-simd128.*' --clobber
             echo '{ "type": "commonjs" }' > dist/engine/package.json
             ls -la dist/engine | sed 's/^/  /'
           else
