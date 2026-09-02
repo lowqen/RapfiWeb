@@ -90,15 +90,18 @@ try {
   await page.waitForTimeout(120);
 
   // 3. 분석. 그동안 메인 스레드가 살아 있는지 rAF 로 잰다.
-  await page.evaluate(() => {
-    const w = window as unknown as { __frames: number; __stop?: () => void };
-    w.__frames = 0;
-    let id = requestAnimationFrame(function tick() {
-      w.__frames++;
-      id = requestAnimationFrame(tick);
-    });
-    w.__stop = () => cancelAnimationFrame(id);
-  });
+  //
+  // **문자열로 넘긴다.** 이 스크립트는 tsx(esbuild)로 도는데, esbuild 가
+  // keep-names 로 이름 있는 함수에 `__name(...)` 헬퍼를 끼워 넣는다. 그 헬퍼는
+  // 브라우저 쪽에 없으므로 페이지 안에서 ReferenceError 로 죽는다.
+  // 문자열은 변환을 거치지 않는다.
+  await page.evaluate(`(() => {
+    window.__frames = 0;
+    let id = 0;
+    const tick = () => { window.__frames++; id = requestAnimationFrame(tick); };
+    id = requestAnimationFrame(tick);
+    window.__stop = () => cancelAnimationFrame(id);
+  })()`);
 
   const tAnalyze = Date.now();
   await page.getByRole("button", { name: "분석", exact: true }).click();
@@ -114,11 +117,9 @@ try {
     .waitFor({ timeout: 30_000 });
   await page.waitForTimeout(2000);
 
-  const frames = await page.evaluate(() => {
-    const w = window as unknown as { __frames: number; __stop?: () => void };
-    w.__stop?.();
-    return w.__frames;
-  });
+  const frames = (await page.evaluate(
+    `(() => { window.__stop && window.__stop(); return window.__frames; })()`,
+  )) as number;
   const elapsedSec = (Date.now() - tAnalyze) / 1000;
   const fps = frames / elapsedSec;
   console.log(`탐색 중 ${fps.toFixed(1)}fps (${frames} 프레임 / ${elapsedSec.toFixed(1)}초)`);
