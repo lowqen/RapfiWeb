@@ -31,10 +31,12 @@ const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi 
 export function clampTransform(t: ViewTransform, side: number): ViewTransform {
   const scale = clamp(t.scale, MIN_SCALE, MAX_SCALE);
   const slack = (side * (scale - 1)) / 2;
+  // `+ 0` 은 -0 을 지운다. 배율 1에서 여유가 -0 이라 음수 이동이 -0 으로 잘리는데,
+  // -0 은 화면에서는 같아도 Object.is/toEqual 에서는 다른 값이라 나중에 헷갈린다.
   return {
     scale,
-    panX: clamp(t.panX, -slack, slack),
-    panY: clamp(t.panY, -slack, slack),
+    panX: clamp(t.panX, -slack, slack) + 0,
+    panY: clamp(t.panY, -slack, slack) + 0,
   };
 }
 

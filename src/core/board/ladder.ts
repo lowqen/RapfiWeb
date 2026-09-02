@@ -1,4 +1,11 @@
-import { mixColors, srgbToLinear, linearToSrgb, toHex, contrastRatio, type Rgb } from "../design/oklch";
+import {
+  mixColors,
+  srgbToLinear,
+  linearToSrgb,
+  toHex,
+  contrastRatio,
+  type Rgb,
+} from "../design/oklch";
 
 /**
  * 보드 위 값 라벨의 색 규칙 — `TagPalette` / `LadderStops` 의 이식본.

@@ -14,3 +14,6 @@ pnpm-lock.yaml
 *.md
 docs
 .github
+
+# 생성물 — java tools/tone-dump/ToneDump.java 가 낸 그대로 두어야 재생성 diff 가 깨끗하다.
+src/core/design/tokens.golden.json

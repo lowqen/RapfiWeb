@@ -50,8 +50,8 @@ export function BoardScreen() {
             </button>
           </div>
           <p className="panel__hint">
-            길게 누르면 그 점을 차단 표시합니다 — 데스크톱의 Ctrl+클릭 자리입니다.
-            휠이나 두 손가락으로 확대할 수 있습니다.
+            길게 누르면 그 점을 차단 표시합니다 — 데스크톱의 Ctrl+클릭 자리입니다. 휠이나 두
+            손가락으로 확대할 수 있습니다.
           </p>
         </section>
 

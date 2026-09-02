@@ -19,21 +19,24 @@ describe("기하", () => {
   const side = 600;
   const g = boardGeometry(side, 15);
 
-  it("여백은 0.75칸, 반지름은 0.45step, 선폭은 step/45", () => {
+  it("여백은 0.75칸, 반지름은 0.45step", () => {
     expect(g.step).toBeCloseTo(side / (14 + 2 * MARGIN), 10);
     expect(g.origin).toBeCloseTo(g.step * MARGIN, 10);
     expect(g.radius).toBeCloseTo(g.step * 0.45, 10);
-    expect(g.hair).toBeCloseTo(g.step / 45, 10);
+  });
+
+  it("선폭은 step/45 — 단, 1px 아래로는 안 내려간다", () => {
+    // 600px 보드에서는 step/45 = 0.86 이라 바닥값 1 이 이긴다. 큰 보드에서 비율이 산다.
+    expect(g.hair).toBe(1);
+    const big = boardGeometry(1200, 15);
+    expect(big.hair).toBeCloseTo(big.step / 45, 10);
+    expect(big.hair).toBeGreaterThan(1);
   });
 
   it("격자가 보드 안에 들어간다 — 여백이 양쪽에 남는다", () => {
     expect(g.cx(0)).toBeGreaterThan(0);
     expect(g.cx(14)).toBeLessThan(side);
     expect(side - g.cx(14)).toBeCloseTo(g.cx(0), 6);
-  });
-
-  it("선폭은 1px 아래로 내려가지 않는다 — 작은 보드에서 격자가 사라지면 안 된다", () => {
-    expect(boardGeometry(80, 15).hair).toBe(1);
   });
 
   it("cellAt 은 그린 자리를 되돌려 준다 (모든 교점에서)", () => {

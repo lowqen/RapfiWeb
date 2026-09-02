@@ -2,7 +2,13 @@ import type { Move } from "../model/move";
 import { moveKey } from "../model/move";
 import { boardGeometry, starPoints, type BoardGeometry } from "./board-geometry";
 import type { BoardSkin } from "./board-skin";
-import { colorsForTag, DEFAULT_PALETTE, type TagColors, type TagKind, type TagPalette } from "./ladder";
+import {
+  colorsForTag,
+  DEFAULT_PALETTE,
+  type TagColors,
+  type TagKind,
+  type TagPalette,
+} from "./ladder";
 
 /**
  * 한 프레임에 필요한 전부 — 순수 데이터. `BoardRender` 의 이식본이다.
@@ -82,11 +88,7 @@ function drawLabels(ctx: CanvasRenderingContext2D, g: BoardGeometry, skin: Board
 }
 
 /** 레이어 1 전체. `(geometry, skin) => void` — 국면을 보지 않는다. */
-export function drawStatic(
-  ctx: CanvasRenderingContext2D,
-  g: BoardGeometry,
-  skin: BoardSkin,
-): void {
+export function drawStatic(ctx: CanvasRenderingContext2D, g: BoardGeometry, skin: BoardSkin): void {
   ctx.clearRect(0, 0, g.side, g.side);
   drawWood(ctx, g, skin);
 

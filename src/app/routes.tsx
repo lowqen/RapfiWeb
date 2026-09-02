@@ -20,108 +20,108 @@ const basename = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 export const router = createBrowserRouter(
   [
-  {
-    path: "/",
-    element: <AppShell />,
-    children: [
-      { index: true, element: <Navigate to="/board" replace /> },
+    {
+      path: "/",
+      element: <AppShell />,
+      children: [
+        { index: true, element: <Navigate to="/board" replace /> },
 
-      // W2 에서 실물이 들어왔다. 대국 규칙·시계·오프닝 협상은 W4 가 이 위에 얹는다.
-      { path: "board", element: <BoardScreen /> },
+        // W2 에서 실물이 들어왔다. 대국 규칙·시계·오프닝 협상은 W4 가 이 위에 얹는다.
+        { path: "board", element: <BoardScreen /> },
 
-      { path: "research", element: <Navigate to="/research/review" replace /> },
-      {
-        path: "research/review",
-        element: (
-          <Placeholder
-            stage="W6"
-            title="리뷰·증명"
-            what="대국 전체를 엔진으로 되짚고, 한 수를 증명 트리로 파고든다. 진행 큐는 워커에 있고 체크포인트는 IndexedDB 에 남는다."
-            needs={["W3 엔진 워커", "W4 보드 화면"]}
-          />
-        ),
-      },
-      {
-        path: "research/explorer",
-        element: (
-          <Placeholder
-            stage="W6"
-            title="오프닝"
-            what="주형 이름 249개와 흑5수 유불리 1,889모양은 기본 내장이라 팩 없이 동작한다. 빈도 통계는 사용자가 .rif 를 올렸을 때만."
-            needs={["W2 보드 렌더링"]}
-          />
-        ),
-      },
-      {
-        path: "research/sequence",
-        element: (
-          <Placeholder
-            stage="W6"
-            title="수순"
-            what="같은 국면에 이르는 다른 수순을 찾는다. 정규 키(PosKey, 8대칭)를 쓰므로 팩 없이도 동작한다."
-            needs={["W2 보드 렌더링"]}
-          />
-        ),
-      },
-      {
-        path: "research/ranking",
-        element: (
-          <Placeholder
-            stage="W6"
-            title="랭킹"
-            what="기록과 순위. RenjuNet 팩이 있어야 의미가 있는 화면이라, 팩이 없으면 «.rif 를 올리세요» 안내로 끝난다."
-            needs={["W7 .rif 변환 파이프라인"]}
-          />
-        ),
-      },
+        { path: "research", element: <Navigate to="/research/review" replace /> },
+        {
+          path: "research/review",
+          element: (
+            <Placeholder
+              stage="W6"
+              title="리뷰·증명"
+              what="대국 전체를 엔진으로 되짚고, 한 수를 증명 트리로 파고든다. 진행 큐는 워커에 있고 체크포인트는 IndexedDB 에 남는다."
+              needs={["W3 엔진 워커", "W4 보드 화면"]}
+            />
+          ),
+        },
+        {
+          path: "research/explorer",
+          element: (
+            <Placeholder
+              stage="W6"
+              title="오프닝"
+              what="주형 이름 249개와 흑5수 유불리 1,889모양은 기본 내장이라 팩 없이 동작한다. 빈도 통계는 사용자가 .rif 를 올렸을 때만."
+              needs={["W2 보드 렌더링"]}
+            />
+          ),
+        },
+        {
+          path: "research/sequence",
+          element: (
+            <Placeholder
+              stage="W6"
+              title="수순"
+              what="같은 국면에 이르는 다른 수순을 찾는다. 정규 키(PosKey, 8대칭)를 쓰므로 팩 없이도 동작한다."
+              needs={["W2 보드 렌더링"]}
+            />
+          ),
+        },
+        {
+          path: "research/ranking",
+          element: (
+            <Placeholder
+              stage="W6"
+              title="랭킹"
+              what="기록과 순위. RenjuNet 팩이 있어야 의미가 있는 화면이라, 팩이 없으면 «.rif 를 올리세요» 안내로 끝난다."
+              needs={["W7 .rif 변환 파이프라인"]}
+            />
+          ),
+        },
 
-      {
-        path: "database",
-        element: (
-          <Placeholder
-            stage="W6"
-            title="데이터베이스"
-            what="yixindb 국면 저장소. Emscripten IDBFS 에 올리고, .db 파일 업로드/다운로드. 파일이 없으면 읽기 전용 + 보드 텍스트만."
-            needs={["W3 엔진 워커"]}
-          />
-        ),
-      },
+        {
+          path: "database",
+          element: (
+            <Placeholder
+              stage="W6"
+              title="데이터베이스"
+              what="yixindb 국면 저장소. Emscripten IDBFS 에 올리고, .db 파일 업로드/다운로드. 파일이 없으면 읽기 전용 + 보드 텍스트만."
+              needs={["W3 엔진 워커"]}
+            />
+          ),
+        },
 
-      {
-        path: "engine",
-        element: (
-          <Placeholder
-            stage="W3"
-            title="엔진"
-            what="변형(single-simd128)·스레드·해시 크기·국면 슬롯 10칸·유지보수·piskvork 콘솔. 앱의 «연결» 탭에서 서버를 걷어낸 자리에 도구가 남는다."
-            needs={["W3 엔진 워커"]}
-          />
-        ),
-      },
+        {
+          path: "engine",
+          element: (
+            <Placeholder
+              stage="W3"
+              title="엔진"
+              what="변형(single-simd128)·스레드·해시 크기·국면 슬롯 10칸·유지보수·piskvork 콘솔. 앱의 «연결» 탭에서 서버를 걷어낸 자리에 도구가 남는다."
+              needs={["W3 엔진 워커"]}
+            />
+          ),
+        },
 
-      {
-        path: "joseki",
-        element: (
-          <Placeholder
-            stage="W8"
-            title="정석"
-            what="신규 기능. 수순 입력(보드 클릭 또는 좌표 텍스트), 분기, 수마다 서식 있는 메모, 저장·검색·분류, 단계별 재생."
-            needs={["W2 보드 렌더링", "W4 보드 화면"]}
-          />
-        ),
-      },
+        {
+          path: "joseki",
+          element: (
+            <Placeholder
+              stage="W8"
+              title="정석"
+              what="신규 기능. 수순 입력(보드 클릭 또는 좌표 텍스트), 분기, 수마다 서식 있는 메모, 저장·검색·분류, 단계별 재생."
+              needs={["W2 보드 렌더링", "W4 보드 화면"]}
+            />
+          ),
+        },
 
-      {
-        path: "settings",
-        element: (
-          <Placeholder
-            stage="W5"
-            title="설정"
-            what="데스크톱 settings.txt 67항목 왕복. 27행이 다크 모드의 오라클이다 — 불러오면 시스템 설정을 이긴다."
-            needs={["W3 엔진 워커"]}
-          />
-        ),
-      },
+        {
+          path: "settings",
+          element: (
+            <Placeholder
+              stage="W5"
+              title="설정"
+              what="데스크톱 settings.txt 67항목 왕복. 27행이 다크 모드의 오라클이다 — 불러오면 시스템 설정을 이긴다."
+              needs={["W3 엔진 워커"]}
+            />
+          ),
+        },
 
         { path: "*", element: <Navigate to="/board" replace /> },
       ],

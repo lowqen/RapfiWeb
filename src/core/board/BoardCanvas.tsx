@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from "react";
 import type { Move } from "../model/move";
 import { boardGeometry } from "./board-geometry";
 import { drawStatic, drawDynamic, type BoardRender } from "./board-renderer";
@@ -142,7 +143,7 @@ export function BoardCanvas({
     }
   };
 
-  const onPointerDown = (e: React.PointerEvent) => {
+  const onPointerDown = (e: ReactPointerEvent) => {
     (e.target as Element).setPointerCapture?.(e.pointerId);
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const p = localPoint(e);
@@ -180,11 +181,11 @@ export function BoardCanvas({
             g.moved = true; // 롱프레스가 났으면 탭은 나지 않는다
             onLongPress(moveAt(p.x, p.y, side, render.size, view));
           }, LONG_PRESS_MS)
-      : null,
+        : null,
     };
   };
 
-  const onPointerMove = (e: React.PointerEvent) => {
+  const onPointerMove = (e: ReactPointerEvent) => {
     if (!pointers.current.has(e.pointerId)) return;
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const g = gesture.current;
@@ -221,7 +222,7 @@ export function BoardCanvas({
     }
   };
 
-  const onPointerUp = (e: React.PointerEvent) => {
+  const onPointerUp = (e: ReactPointerEvent) => {
     pointers.current.delete(e.pointerId);
     const g = gesture.current;
     cancelLongPress();
@@ -237,7 +238,7 @@ export function BoardCanvas({
     onTap(moveAt(p.x, p.y, side, render.size, view));
   };
 
-  const onWheel = (e: React.WheelEvent) => {
+  const onWheel = (e: ReactWheelEvent) => {
     if (!zoomable) return;
     const p = localPoint(e);
     setView((v) => zoomAt(v, side, e.deltaY < 0 ? 1.12 : 1 / 1.12, p.x, p.y));

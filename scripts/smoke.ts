@@ -136,7 +136,32 @@ try {
     await page.waitForTimeout(80);
     const again = await page.locator("canvas[role=img]").getAttribute("aria-label");
     if (!again?.includes("돌 1개")) fail(`같은 점에 두 번 놓였습니다: ${again}`);
+
+    // 두 번째 돌은 백. 한 칸 옆(= step 만큼)을 누른다 — 15×15 에서 한 칸은
+    // 보드 한 변의 1/15.5 다.
+    const step = view.width / 15.5;
+    await page.mouse.click(view.x + view.width / 2 + step, view.y + view.height / 2);
+    await page.waitForTimeout(80);
+    const two = await page.locator("canvas[role=img]").getAttribute("aria-label");
+    if (!two?.includes("돌 2개")) fail(`둘째 돌이 놓이지 않았습니다: ${two}`);
+    const turn = (await page.locator(".kv dd").first().innerText()).trim();
+    if (turn !== "흑") fail(`두 수 뒤 차례가 흑이 아닙니다: ${turn}`);
   }
+
+  // 리사이즈 → 캔버스 실제 픽셀이 따라오는가 (DPR 포함)
+  const widthBefore = await page.evaluate(
+    () => (document.querySelector("canvas.board__layer") as HTMLCanvasElement).width,
+  );
+  await page.setViewportSize({ width: 1100, height: 700 });
+  await page.waitForTimeout(200);
+  const widthAfter = await page.evaluate(
+    () => (document.querySelector("canvas.board__layer") as HTMLCanvasElement).width,
+  );
+  if (widthAfter === widthBefore) {
+    fail(`리사이즈에도 캔버스 해상도가 그대로입니다: ${widthBefore}`);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.waitForTimeout(200);
 
   // 다크에서 나무가 바뀌어야 한다 — 스킨을 CSS 변수에서 다시 읽는지 보는 자리다.
   await page.evaluate(() => (document.documentElement.dataset.theme = "dark"));
