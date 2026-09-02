@@ -59,9 +59,40 @@ const fail = (m: string) => {
 
 await new Promise<void>((r) => server.listen(PORT, r));
 const browser = await chromium.launch();
+let page: import("playwright").Page | null = null;
+
+/**
+ * 실패했을 때 **엔진이 뭐라고 했는지** 찍는다.
+ *
+ * 처음엔 이게 없어서 「30초 안에 값이 안 채워짐」만 보였다. 그건 증상이지
+ * 원인이 아니다 — 프로토콜 이식을 검증하는 시험에서 정작 엔진의 말은 로그에
+ * 한 줄도 없었다.
+ */
+async function dumpState(why: string) {
+  console.error(`\n──── 실패 지점: ${why} ────`);
+  if (!page) return;
+  try {
+    const console_ = await page.locator(".console").innerText({ timeout: 2000 });
+    const lines = console_.split("\n");
+    console.error(`엔진 콘솔 (마지막 ${Math.min(60, lines.length)}줄):`);
+    console.error(lines.slice(-60).join("\n"));
+  } catch {
+    console.error("엔진 콘솔이 화면에 없습니다 — 엔진이 한 줄도 뱉지 않았습니다.");
+  }
+  try {
+    const panel = await page
+      .locator(".panel")
+      .filter({ has: page.locator(".panel__badge") })
+      .innerText({ timeout: 2000 });
+    console.error(`\n분석 패널:\n${panel}`);
+  } catch {
+    console.error("분석 패널을 읽지 못했습니다.");
+  }
+  console.error("────────────────────────────\n");
+}
 
 try {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   page.on("console", (m) => {
@@ -159,6 +190,11 @@ try {
 
   if (errors.length) fail(`콘솔 오류 ${errors.length}건:\n  ${errors.join("\n  ")}`);
   if (!process.exitCode) console.log("엔진 스모크 통과");
+} catch (e) {
+  // 예외로 죽어도 **엔진이 뭐라고 했는지**는 남긴다.
+  const first = e instanceof Error ? (e.message.split("\n")[0] ?? "") : String(e);
+  await dumpState(first);
+  fail(first);
 } finally {
   await browser.close();
   server.close();
