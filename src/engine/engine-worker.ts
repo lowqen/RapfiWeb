@@ -94,13 +94,24 @@ function maybeEmitSnapshot(force = false) {
   post({ type: "snapshot", snapshot: toSerializable(agg.snapshot()) });
 }
 
-/** 줄 조립. `onReceiveStdout` 은 줄 단위를 보장하지 않는다. */
-let pending = "";
+/**
+ * 엔진이 뱉은 줄 하나를 처리한다.
+ *
+ * **`onReceiveStdout` 은 이미 완성된 줄을 준다.** `preamble.js` 의 `stdout(char)`
+ * 이 개행에서 끊어 버퍼를 넘기고, 넘기는 문자열에는 개행이 없다:
+ *
+ *     function stdout(char) {
+ *       if (!char || char == newline_charcode) { stdout_fn(stdout_buffer); stdout_buffer = ""; }
+ *       else stdout_buffer += String.fromCharCode(char);
+ *     }
+ *
+ * 처음에는 이것을 «청크»로 보고 `split("\n")` 뒤 마지막 조각을 다음 호출까지
+ * 붙들어 뒀다. 개행이 없으니 조각이 언제나 하나였고, 그 하나가 매번 보류돼
+ * **한 줄도 나가지 않았다** — 엔진은 392ms 만에 잘 떴는데 콘솔이 영원히 비었다.
+ * 만약을 위해 split 은 남기되 보류는 하지 않는다.
+ */
 function drain(chunk: string) {
-  pending += chunk;
-  const parts = pending.split("\n");
-  pending = parts.pop() ?? "";
-  for (const part of parts) {
+  for (const part of chunk.split("\n")) {
     const line = part.replace(/\r$/, "");
     if (!line) continue;
     pushConsole(line);
