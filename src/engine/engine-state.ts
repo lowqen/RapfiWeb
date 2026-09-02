@@ -41,6 +41,20 @@ interface EngineState {
 
 let client: EngineClient | null = null;
 
+/**
+ * 예외를 사람이 읽을 문장으로. `String(e)` 만 쓰면 평범한 객체가
+ * «[object Object]» 로 화면에 뜬다 — 실제로 그렇게 나와서 한 런을 헤맸다.
+ */
+function describe(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (typeof e === "string") return e;
+  try {
+    return JSON.stringify(e) ?? String(e);
+  } catch {
+    return String(e);
+  }
+}
+
 export const useEngineStore = create<EngineState>((set) => {
   const ensure = (): EngineClient => {
     if (client) return client;
@@ -73,7 +87,7 @@ export const useEngineStore = create<EngineState>((set) => {
       try {
         await ensure().start();
       } catch (e) {
-        set({ error: e instanceof Error ? e.message : String(e), status: "error" });
+        set({ error: describe(e), status: "error" });
       }
     },
 
@@ -86,7 +100,7 @@ export const useEngineStore = create<EngineState>((set) => {
         // 기본값이 안 먹는다. 있을 때만 넣는다.
         c.analyze(stones, totalMs === undefined ? {} : { totalMs });
       } catch (e) {
-        set({ error: e instanceof Error ? e.message : String(e), status: "error" });
+        set({ error: describe(e), status: "error" });
       }
     },
 

@@ -60,6 +60,7 @@ const fail = (m: string) => {
 await new Promise<void>((r) => server.listen(PORT, r));
 const browser = await chromium.launch();
 let page: import("playwright").Page | null = null;
+const pageErrors: string[] = [];
 
 /**
  * 실패했을 때 **엔진이 뭐라고 했는지** 찍는다.
@@ -88,15 +89,21 @@ async function dumpState(why: string) {
   } catch {
     console.error("분석 패널을 읽지 못했습니다.");
   }
+  if (pageErrors.length) {
+    console.error(`\n페이지 오류 ${pageErrors.length}건:`);
+    console.error(pageErrors.slice(-20).join("\n"));
+  } else {
+    console.error("\n페이지 오류는 없습니다.");
+  }
   console.error("────────────────────────────\n");
 }
 
 try {
   page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-  const errors: string[] = [];
-  page.on("pageerror", (e) => errors.push(String(e)));
+  const errors = pageErrors;
+  page.on("pageerror", (e) => errors.push("[pageerror] " + (e.stack ?? String(e))));
   page.on("console", (m) => {
-    if (m.type() === "error") errors.push(m.text());
+    if (m.type() === "error") errors.push("[console] " + m.text());
   });
 
   await page.goto(`http://localhost:${PORT}/board`, { waitUntil: "networkidle" });

@@ -169,8 +169,16 @@ export class EngineClient {
           break;
       }
     };
+    // `String(e)` 로 뭉개면 화면에 «[object Object]» 가 뜬다 — 실제로 그렇게 나와서
+    // 한 런을 통째로 헤맸다. 워커 오류 이벤트가 들고 있는 것을 전부 풀어 적는다.
     worker.onerror = (e) => {
-      this.events.onError?.(String(e.message ?? e));
+      const where = e.filename ? ` (${e.filename}:${e.lineno}:${e.colno})` : "";
+      const what = e.message || e.type || "알 수 없는 워커 오류";
+      this.events.onError?.(`워커 오류: ${what}${where}`);
+      this.setStatus("error");
+    };
+    worker.onmessageerror = () => {
+      this.events.onError?.("워커 메시지를 복제하지 못했습니다(구조화 복제 실패)");
       this.setStatus("error");
     };
 
