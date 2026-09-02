@@ -106,6 +106,8 @@ try {
 
   // 승률이나 최선수 중 하나라도 채워지면 스트림이 도착한 것이다.
   await page
+    .locator(".panel")
+    .filter({ has: page.locator(".panel__badge") })
     .locator(".kv dd.tnum")
     .filter({ hasNotText: "—" })
     .first()
@@ -125,7 +127,9 @@ try {
   if (fps < 30) fail(`탐색 중 메인 스레드가 막힙니다: ${fps.toFixed(1)}fps`);
 
   // 4. 분석 결과가 화면에 있는가
-  const bestCell = (await page.locator(".kv dd").last().innerText()).trim();
+  // 분석 패널은 상태 점(.panel__badge)을 가진 패널이다.
+  const analysisPanel = page.locator(".panel").filter({ has: page.locator(".panel__badge") });
+  const bestCell = (await analysisPanel.locator(".kv dd").last().innerText()).trim();
   if (bestCell === "—") fail("최선수가 비어 있습니다 — INFO 스트림이 오지 않았습니다");
   else console.log(`최선수 ${bestCell}`);
 
