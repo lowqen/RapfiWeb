@@ -252,7 +252,10 @@ function parseThinking(body: string, raw: string): EngineResponse | null {
       default: {
         // 키가 없는 조각 = PV. 토큰이 **전부** 좌표 라벨일 때만 PV 로 본다.
         const tokens = seg.split(WHITESPACE).filter(Boolean);
-        const moves = tokens.map(labelToMove).filter((m): m is Move => m !== null);
+        // `map(labelToMove)` 로 쓰면 안 된다 — Array.map 이 인덱스를 두 번째 인자로
+        // 넘겨 `size` 가 0 이 되고, 모든 라벨이 조용히 null 이 된다. PV 가 통째로
+        // 사라지는데 예외는 나지 않아서, 시험이 아니었으면 못 잡았을 종류의 버그다.
+        const moves = tokens.map((t) => labelToMove(t)).filter((m): m is Move => m !== null);
         if (moves.length > 0 && moves.length === tokens.length) line = moves;
       }
     }
@@ -273,7 +276,10 @@ export function labelToMove(token: string, size = DEFAULT_SIZE): Move | null {
 /** `MESSAGE REALTIME <sub>` — 탐색 중 보드 오버레이. */
 function parseRealtime(rest: string, coord: CoordMapper, raw: string): EngineResponse {
   const upper = rest.toUpperCase();
-  const one = (skip: number, kind: "realtimeBest" | "realtimeLose" | "realtimePos" | "realtimeDone"): EngineResponse => {
+  const one = (
+    skip: number,
+    kind: "realtimeBest" | "realtimeLose" | "realtimePos" | "realtimeDone",
+  ): EngineResponse => {
     const move = coord.parsePair(rest.slice(skip).trim().split(" ")[0] ?? "");
     return move ? ({ kind, move, raw } as EngineResponse) : { kind: "unknown", raw };
   };
@@ -293,7 +299,9 @@ function parseRealtime(rest: string, coord: CoordMapper, raw: string): EngineRes
 
 /** `FORBID` + `"yyxx"` 묶음이 `.` 까지. 두 자리 행, 두 자리 열이다. */
 function parseForbid(line: string, coord: CoordMapper, raw: string): EngineResponse {
-  const body = line.slice(6);
+  // 접두사 뒤 공백을 떼고 시작한다. 공백이 남으면 첫 묶음이 " 07" 로 읽혀
+  // 행과 열이 한 칸씩 밀린다(70,7 같은 좌표가 나온다).
+  const body = line.slice(6).trim();
   const cells: Move[] = [];
   let i = 0;
   while (i + 4 <= body.length && body[i] !== ".") {
@@ -316,8 +324,7 @@ function parseMoveList(value: string, coord: CoordMapper): Move[] {
     .filter((m): m is Move => m !== null);
 }
 
-const looksLikeAbout = (line: string) =>
-  /name\s*=/i.test(line) && /version\s*=/i.test(line);
+const looksLikeAbout = (line: string) => /name\s*=/i.test(line) && /version\s*=/i.test(line);
 
 function parseAboutFields(line: string): Record<string, string> {
   const out: Record<string, string> = {};

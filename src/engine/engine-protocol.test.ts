@@ -59,7 +59,10 @@ describe("직렬화", () => {
   });
 
   it("YXBOARD 는 같은 모양이되 착수가 아니다", () => {
-    const lines = serialize({ kind: "yxboard", stones: [{ move: { x: 1, y: 2 }, own: true }] }, coord);
+    const lines = serialize(
+      { kind: "yxboard", stones: [{ move: { x: 1, y: 2 }, own: true }] },
+      coord,
+    );
     expect(lines[0]).toBe("YXBOARD");
     expect(lines).toContain("2,1,1");
   });
@@ -203,7 +206,10 @@ describe("파싱 — 사람이 읽는 한 줄", () => {
 
 describe("파싱 — REALTIME 오버레이", () => {
   it("BEST / POS / DONE / LOSE", () => {
-    expect(p("MESSAGE REALTIME BEST 7,8")).toMatchObject({ kind: "realtimeBest", move: { x: 8, y: 7 } });
+    expect(p("MESSAGE REALTIME BEST 7,8")).toMatchObject({
+      kind: "realtimeBest",
+      move: { x: 8, y: 7 },
+    });
     expect(p("MESSAGE REALTIME POS 3,4").kind).toBe("realtimePos");
     expect(p("MESSAGE REALTIME DONE 3,4").kind).toBe("realtimeDone");
     expect(p("MESSAGE REALTIME LOSE 3,4").kind).toBe("realtimeLose");
@@ -292,12 +298,7 @@ describe("집계 — INFO 블록이 스냅샷이 된다", () => {
 
   it("REALTIME BEST 가 PV 머리를 이긴다 — 더 최신이다", () => {
     const agg = new SearchAggregator(15);
-    feed(agg, [
-      "INFO PV 0",
-      "INFO BESTLINE 7,7",
-      "INFO PV DONE",
-      "MESSAGE REALTIME BEST 9,9",
-    ]);
+    feed(agg, ["INFO PV 0", "INFO BESTLINE 7,7", "INFO PV DONE", "MESSAGE REALTIME BEST 9,9"]);
     expect(agg.snapshot().bestMove).toEqual({ x: 9, y: 9 });
   });
 

@@ -111,8 +111,8 @@ export function AnalysisPanel() {
       )}
 
       <p className="panel__hint">
-        정지는 <strong>조각 경계</strong>에서 듣습니다 — 단일 스레드 빌드에서는 탐색 중
-        워커가 통째로 막히므로, 최대 한 조각(기본 500ms) 뒤에 멈춥니다.
+        정지는 <strong>조각 경계</strong>에서 듣습니다 — 단일 스레드 빌드에서는 탐색 중 워커가
+        통째로 막히므로, 최대 한 조각(기본 500ms) 뒤에 멈춥니다.
       </p>
     </section>
   );

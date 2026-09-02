@@ -1,7 +1,12 @@
 import { create } from "zustand";
 import type { Move } from "../core/model/move";
 import { EngineClient, detectCapabilities, type Capabilities } from "./engine-client";
-import { EMPTY_SNAPSHOT, type AnalysisSnapshot, type EngineStatus, type Placement } from "./engine-types";
+import {
+  EMPTY_SNAPSHOT,
+  type AnalysisSnapshot,
+  type EngineStatus,
+  type Placement,
+} from "./engine-types";
 
 /**
  * 엔진의 화면쪽 그림자.

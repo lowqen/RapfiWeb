@@ -178,20 +178,22 @@ async function boot(msg: Extract<ToWorker, { type: "boot" }>) {
 /** 이벤트 루프에 한 번 양보한다 — 이 틈에만 `stop` 이 도착할 수 있다. */
 const yieldToLoop = () => new Promise<void>((r) => setTimeout(r, 0));
 
-async function search(
-  commands: Extract<ToWorker, { type: "search" }>["commands"],
-  totalMs: number,
-) {
+async function search(msg: Extract<ToWorker, { type: "search" }>) {
   if (!mod) return;
   searching = true;
   stopRequested = false;
   agg.reset();
   const t0 = performance.now();
-  const lines = commands.flatMap((c) => serialize(c, coord));
+
+  // 국면은 **한 번만** 세운다. 데스크톱도 분석마다 `yxboard` 를 한 번 보내고
+  // START 는 세션 내내 보내지 않는다 — START 는 엔진을 리셋한다
+  // (EngineRepositoryImpl.analyze 의 주석이 그 이유를 적어 두었다).
+  send(msg.setup.flatMap((c) => serialize(c, coord)));
+  const repeat = msg.repeat.flatMap((c) => serialize(c, coord));
 
   // sliceMs = 0 은 「분할하지 않는다」 — 멀티스레드 변형이 살아난 뒤의 설정이다.
   if (sliceMs <= 0) {
-    send(lines);
+    send(repeat);
     searching = false;
     maybeEmitSnapshot(true);
     post({ type: "searchDone", reason: "finished", elapsedMs: Math.round(performance.now() - t0) });
@@ -200,13 +202,19 @@ async function search(
 
   let reason: "finished" | "stopped" | "timeout" = "timeout";
   while (!stopRequested) {
-    const left = totalMs - (performance.now() - t0);
+    const left = msg.totalMs - (performance.now() - t0);
     if (left <= 0) break;
-    send([`INFO timeout_turn ${Math.min(sliceMs, Math.ceil(left))}`, ...lines]);
+    // 조각 하나: 이만큼만 생각하고 돌아온다. 해시 테이블이 남아 있으므로 다음
+    // 조각은 이어서 깊어진다 — 매번 처음부터 다시 세는 것이 아니다.
+    send([`INFO timeout_turn ${Math.min(sliceMs, Math.ceil(left))}`, ...repeat]);
     maybeEmitSnapshot(true);
     await yieldToLoop(); // ← 정지 요청이 들어올 수 있는 유일한 지점
   }
   if (stopRequested) reason = "stopped";
+
+  // 조각 사이에는 엔진이 놀고 있으므로 여기서 YXSTOP 은 무해하다.
+  // 앱도 분석 흐름을 닫을 때 같은 것을 보낸다(awaitClose).
+  send(serialize({ kind: "stop" }, coord));
 
   searching = false;
   maybeEmitSnapshot(true);
@@ -226,7 +234,7 @@ self.onmessage = async (ev: MessageEvent<ToWorker>) => {
         maybeEmitSnapshot(true);
         break;
       case "search":
-        await search(msg.commands, msg.totalMs);
+        await search(msg);
         break;
       case "stop":
         stopRequested = true;

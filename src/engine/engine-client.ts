@@ -57,7 +57,8 @@ export function detectCapabilities(): Capabilities {
   return {
     simd,
     crossOriginIsolated: isolated,
-    hardwareConcurrency: typeof navigator === "undefined" ? null : (navigator.hardwareConcurrency ?? null),
+    hardwareConcurrency:
+      typeof navigator === "undefined" ? null : (navigator.hardwareConcurrency ?? null),
     // 멀티 변형은 브라우저 워커에서 동작을 확인하지 못했다(W0-1). 살아나면(W0c)
     // 여기서 isolated 를 보고 고르게 된다. 그때까지는 단일 스레드가 유일한 경로다.
     variant: simd ? "single-simd128" : null,
@@ -209,10 +210,9 @@ export class EngineClient {
     this.setStatus("searching");
     this.post({
       type: "search",
-      commands: [
-        { kind: "yxboard", stones },
-        { kind: "yxnbest", n: opts.nbest ?? 5 },
-      ],
+      // 국면은 한 번, 탐색은 조각마다.
+      setup: [{ kind: "yxboard", stones }],
+      repeat: [{ kind: "yxnbest", n: opts.nbest ?? 5 }],
       totalMs: opts.totalMs ?? 5000,
     });
   }

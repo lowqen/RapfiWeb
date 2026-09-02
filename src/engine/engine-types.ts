@@ -164,8 +164,19 @@ export type EngineStatus = "idle" | "starting" | "ready" | "searching" | "error"
 export type ToWorker =
   | { type: "boot"; engineBaseUrl: string; variant: string; sliceMs: number; size: number }
   | { type: "send"; commands: readonly EngineCommand[] }
-  /** 시간 분할 탐색. 조각 사이에 워커의 이벤트 루프가 돌아온다. */
-  | { type: "search"; commands: readonly EngineCommand[]; totalMs: number }
+  /**
+   * 시간 분할 탐색. 조각 사이에 워커의 이벤트 루프가 돌아온다.
+   *
+   * `setup` 은 **한 번만** 보낸다(국면 세우기). `repeat` 은 조각마다 다시 보낸다
+   * (탐색 시작). 데스크톱의 흐름이 그렇다: `yxboard` 로 국면을 세우고 `yxnbest` 가
+   * 탐색을 연다. 조각마다 국면을 다시 세우면 증분 상태를 매번 버리게 된다.
+   */
+  | {
+      type: "search";
+      setup: readonly EngineCommand[];
+      repeat: readonly EngineCommand[];
+      totalMs: number;
+    }
   | { type: "stop" }
   | { type: "shutdown" };
 
