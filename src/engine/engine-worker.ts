@@ -178,7 +178,10 @@ async function boot(msg: Extract<ToWorker, { type: "boot" }>) {
 /** 이벤트 루프에 한 번 양보한다 — 이 틈에만 `stop` 이 도착할 수 있다. */
 const yieldToLoop = () => new Promise<void>((r) => setTimeout(r, 0));
 
-async function search(commands: readonly Extract<ToWorker, { type: "search" }>["commands"], totalMs: number) {
+async function search(
+  commands: Extract<ToWorker, { type: "search" }>["commands"],
+  totalMs: number,
+) {
   if (!mod) return;
   searching = true;
   stopRequested = false;

@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { RAIL, RESEARCH_TABS } from "./destinations";
-import { useEngineStore } from "../engine/engineStore";
+import { useEngineStore } from "../engine/engine-state";
 
 /**
  * 좌측 아이콘 레일 여섯 항목.
