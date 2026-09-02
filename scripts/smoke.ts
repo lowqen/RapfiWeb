@@ -98,10 +98,62 @@ try {
   if (bottom !== 6) fail(`좁은 폭에서 하단 탭이 6개가 아닙니다: ${bottom}`);
   if ((await page.locator(".rail").count()) !== 0) fail("좁은 폭인데 레일이 남아 있습니다");
 
+  // ── 8. 보드 (W2) ────────────────────────────────────────────────
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.evaluate(() => (document.documentElement.dataset.theme = "light"));
+  await page.goto(`http://localhost:${PORT}/board`, { waitUntil: "networkidle" });
+
+  const layers = await page.locator(".board__layer").count();
+  if (layers !== 2) fail(`보드 캔버스가 2장이 아닙니다: ${layers}`);
+
+  // 캔버스가 「있다」와 「그려졌다」는 다르다. 정적 레이어 한가운데 픽셀을 읽어
+  // 나무가 실제로 칠해졌는지 본다 — 투명하면 그리기가 아예 돌지 않은 것이다.
+  const pixel = () =>
+    page.evaluate(() => {
+      const c = document.querySelectorAll("canvas.board__layer")[0] as HTMLCanvasElement;
+      const ctx = c.getContext("2d")!;
+      const d = ctx.getImageData(Math.floor(c.width / 2), Math.floor(c.height / 2), 1, 1).data;
+      return [d[0], d[1], d[2], d[3]].join(",");
+    });
+
+  const woodLight = await pixel();
+  if (woodLight.endsWith(",0")) fail(`정적 레이어가 비어 있습니다(투명): ${woodLight}`);
+
+  // 보드 한가운데는 15×15 에서 정확히 H8 이다 — 여백이 양쪽 0.75칸이라 대칭이므로
+  // 판의 중심(7.75 step)이 cx(7) 과 같은 자리다.
+  const view = await page.locator(".board__view").boundingBox();
+  if (!view) {
+    fail("보드가 화면에 없습니다");
+  } else {
+    await page.mouse.click(view.x + view.width / 2, view.y + view.height / 2);
+    await page.waitForTimeout(120);
+    const aria = await page.locator("canvas[role=img]").getAttribute("aria-label");
+    if (!aria?.includes("돌 1개")) fail(`돌이 놓이지 않았습니다: ${aria}`);
+    const lastCell = (await page.locator(".kv dd").last().innerText()).trim();
+    if (lastCell !== "H8") fail(`가운데를 눌렀는데 H8 이 아닙니다: ${lastCell}`);
+
+    await page.mouse.click(view.x + view.width / 2, view.y + view.height / 2);
+    await page.waitForTimeout(80);
+    const again = await page.locator("canvas[role=img]").getAttribute("aria-label");
+    if (!again?.includes("돌 1개")) fail(`같은 점에 두 번 놓였습니다: ${again}`);
+  }
+
+  // 다크에서 나무가 바뀌어야 한다 — 스킨을 CSS 변수에서 다시 읽는지 보는 자리다.
+  await page.evaluate(() => (document.documentElement.dataset.theme = "dark"));
+  await page.waitForTimeout(200);
+  const woodDark = await pixel();
+  if (woodDark === woodLight) fail(`다크에서 나무 색이 그대로입니다: ${woodDark}`);
+
+  const ladder = await page.locator(".ladder__cell").count();
+  if (ladder !== 5) fail(`값 사다리 견본이 5칸이 아닙니다: ${ladder}`);
+
   if (errors.length) fail(`콘솔 오류 ${errors.length}건:\n  ${errors.join("\n  ")}`);
 
   if (!process.exitCode) {
-    console.log("스모크 통과 — 레일 6, 연구 탭 4, 라우팅, 토큰(라이트/다크), 좁은 폭 전환");
+    console.log(
+      "스모크 통과 — 레일 6 · 연구 탭 4 · 라우팅 · 토큰(라이트/다크) · 좁은 폭 전환\n" +
+        "             보드 2레이어 · 나무 렌더 · H8 착수 · 중복 착수 무시 · 다크 나무 · 사다리 5칸",
+    );
   }
 } finally {
   await browser.close();

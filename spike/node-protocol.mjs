@@ -17,6 +17,35 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE_DIR = resolve(process.env.ENGINE_DIR ?? resolve(HERE, "../out/engine"));
 const variant = process.argv[2] ?? "single-simd128";
 
+// 이 하네스가 세 런 동안 단일 변형에서 **빈 파일**을 냈다. 원인을 찾기 전에 먼저
+// «원인을 말하게» 만든다: 어떤 경로로 죽든 결과 JSON 한 덩어리는 stdout 으로 나간다.
+// (워크플로가 stdout 만 파일로 받으므로, stderr 로 죽으면 파일이 비어 버린다.)
+let reported = false;
+function bail(why, err) {
+  if (reported) return;
+  reported = true;
+  const detail = err && (err.stack ?? err.message) ? (err.stack ?? err.message) : String(err);
+  console.log(
+    JSON.stringify(
+      { test: "W0-1 (node, upstream sendCommand 펌프)", variant, pass: false, fatal: why + ": " + detail },
+      null,
+      2,
+    ),
+  );
+}
+process.on("uncaughtException", (e) => {
+  bail("uncaughtException", e);
+  process.exit(1);
+});
+process.on("unhandledRejection", (e) => {
+  bail("unhandledRejection", e);
+  process.exit(1);
+});
+process.on("exit", (code) => {
+  // Emscripten 의 force_exit 는 process.exit 를 그대로 부른다 — 여기가 마지막 기회다.
+  if (!reported) bail("결과를 찍기 전에 프로세스가 끝남", "exit code " + code);
+});
+
 const js = resolve(ENGINE_DIR, `rapfi-${variant}.js`);
 if (!existsSync(js)) {
   console.error(`없음: ${js}`);
@@ -111,6 +140,7 @@ const maxLagMs = +lag.stop().toFixed(1);
 // process.exit() 를 부른다. END 뒤에 await 이 하나라도 있으면 그 사이에 프로세스가
 // 죽어 결과 JSON 이 한 줄도 나오지 않는다 — 세 런 동안 node-single 이 빈 파일이었다.
 const passed = results.every((r) => r.ok);
+reported = true;
 console.log(
   JSON.stringify(
     {

@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import { AppShell } from "./AppShell";
 import { Placeholder } from "./Placeholder";
+import { BoardScreen } from "../features/board/BoardScreen";
 
 /**
  * 아홉 화면. 계획서 §6 의 라우트 표를 그대로 옮긴 것이다.
@@ -13,24 +14,20 @@ import { Placeholder } from "./Placeholder";
  * 어느 단계에서 채워지는지를 적어 둔다 — 빈 div 는 다음 사람에게 아무 말도 하지
  * 않는다.
  */
-export const router = createBrowserRouter([
+// Pages 배포에서는 앱이 /RapfiWeb/ 아래 산다. BASE_URL 이 그 값을 들고 있으므로
+// 라우터도 같은 것을 봐야 딥링크와 새로고침이 맞는다.
+const basename = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+export const router = createBrowserRouter(
+  [
   {
     path: "/",
     element: <AppShell />,
     children: [
       { index: true, element: <Navigate to="/board" replace /> },
 
-      {
-        path: "board",
-        element: (
-          <Placeholder
-            stage="W4"
-            title="보드"
-            what="대국·분석 화면. 보드 pane + 분석 pane 2열, 규칙 7종, 오프닝 협상(swap2·soosorv), 시계, 툴바."
-            needs={["W2 보드 렌더링", "W3 엔진 워커"]}
-          />
-        ),
-      },
+      // W2 에서 실물이 들어왔다. 대국 규칙·시계·오프닝 협상은 W4 가 이 위에 얹는다.
+      { path: "board", element: <BoardScreen /> },
 
       { path: "research", element: <Navigate to="/research/review" replace /> },
       {
@@ -126,7 +123,9 @@ export const router = createBrowserRouter([
         ),
       },
 
-      { path: "*", element: <Navigate to="/board" replace /> },
-    ],
-  },
-]);
+        { path: "*", element: <Navigate to="/board" replace /> },
+      ],
+    },
+  ],
+  { basename },
+);

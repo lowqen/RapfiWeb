@@ -9,10 +9,10 @@
  * 보는 회색. Oklab 자신의 L 과는 다른 곡선이라 가정하지 않고 변환한다 —
  * 중성색에서 Oklab L 은 상대 휘도의 세제곱근이라는 항등식 하나에 기댄다.
  *
- * **Kotlin 은 Float(32비트)로 계산하고 여기는 double 이다.** 채널당 ±1 차이가 날 수
- * 있어서 골든 대조는 그만큼을 허용한다(`ramps.test.ts`). 다만 `toHex` 의 **버림**
- * (Kotlin 의 `Float.toInt()`)만은 그대로 옮긴다 — 반올림으로 바꾸면 경계에서
- * 체계적으로 어긋난다.
+ * **Kotlin 은 Float(32비트)로 계산하고 여기는 double 이다.** 그런데 출력이 8비트라
+ * 그 차이는 «정수 경계의 0.5/255 안쪽»에서만 드러날 수 있고, 아홉 램프 × 톤 101개
+ * 전부에서 실제로 드러나지 않는다 — `ramps.test.ts` 가 Kotlin 덤프와 **정확히**
+ * 대조한다. 대신 반올림 규칙은 Compose 를 따라야 한다(`toHex` 주석 참고).
  */
 
 /** 0..1 의 sRGB 세 채널. 알파는 따로 다룬다(보드 스킨의 그림자만 알파를 쓴다). */
@@ -150,14 +150,25 @@ export class TonalRamp {
 export const ramp = (hue: number, chroma: number) => new TonalRamp(hue, chroma);
 
 /**
- * `#RRGGBB`.
+ * `#RRGGBB` — **반올림이다.**
  *
- * Kotlin 의 `(v * 255f).toInt()` 는 **버림**이다. 반올림으로 바꾸면 앱과 값이
- * 어긋나므로 `Math.trunc` 를 쓴다 — 이 한 줄이 골든 대조의 전제다.
+ * 처음에는 Kotlin `toHex()` 안의 `(v * 255f).toInt()` 만 보고 버림으로 옮겼는데,
+ * 그 시점에 값은 **이미 8비트**다. Compose 의 `Color(red, green, blue)` 가 sRGB
+ * 색공간에서 채널을
+ *
+ *     ((red * 255.0f + 0.5f).toInt() shl 16) or …
+ *
+ * 로 패킹하기 때문이다. 실효 반올림은 거기서 일어나고, `toHex` 의 버림은 이미
+ * k/255 인 값을 다시 자르는 것이라 아무 일도 하지 않는다.
+ *
+ * 이 한 줄 때문에 W1 의 골든 앵커가 `#DAB572` 로 나왔다(정답 `#DAB673`).
+ * 181.83 과 114.87 이 둘 다 «정수 바로 아래»여서 Float/double 차이처럼 보였지만
+ * 아니었다 — 반올림 규칙을 잘못 옮긴 것이다.
+ * 자세히: `docs/design-token-reconciliation.md`
  */
 export function toHex(c: Rgb): string {
   const ch = (v: number) =>
-    Math.min(255, Math.max(0, Math.trunc(v * 255)))
+    Math.min(255, Math.max(0, Math.floor(v * 255 + 0.5)))
       .toString(16)
       .padStart(2, "0");
   return `#${ch(c.r)}${ch(c.g)}${ch(c.b)}`.toUpperCase();

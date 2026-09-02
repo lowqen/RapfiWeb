@@ -19,6 +19,9 @@ import { fileURLToPath, URL } from "node:url";
  *   } },
  */
 export default defineConfig({
+  // GitHub Pages 는 저장소 이름이 경로에 붙는다(https://lowqen.github.io/RapfiWeb/).
+  // 기본값은 "/" 로 두어 로컬 개발·스모크가 그대로 돌고, 배포 잡만 이 값을 준다.
+  base: process.env.RAPFIWEB_BASE ?? "/",
   plugins: [react()],
   resolve: {
     alias: {

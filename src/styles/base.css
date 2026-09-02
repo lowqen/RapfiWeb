@@ -311,3 +311,157 @@ a {
   font: var(--type-body-small);
   color: var(--c-outline);
 }
+
+/* ── 보드 ───────────────────────────────────────────────────────────
+   캔버스 두 장을 겹친다. 아래가 정적(나무·격자·좌표), 위가 동적(돌·링·칩).
+   확대/이동은 CSS transform 이 지고 캔버스는 다시 그리지 않는다 — 확대하면서
+   매 프레임 재렌더하면 탐색 중인 워커의 결과보다 이쪽이 먼저 버벅인다. */
+.board {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  user-select: none;
+}
+.board__view {
+  position: relative;
+  transform-origin: center;
+  /* 확대는 즉시 따라와야 한다 — 여기서 트랜지션을 주면 손가락과 어긋난다. */
+  will-change: transform;
+}
+.board__layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+}
+.board__reset {
+  position: absolute;
+  right: var(--space-l);
+  bottom: var(--space-l);
+  padding: var(--space-s) var(--space-l);
+  font: var(--type-label-medium);
+  color: var(--c-on-surface);
+  background: var(--c-surface-container-high);
+  border: 1px solid var(--c-outline-variant);
+  border-radius: var(--radius-s);
+}
+
+/* ── 보드 화면 ──────────────────────────────────────────────────── */
+.boardscreen {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: var(--space-xl);
+  align-items: start;
+  height: 100%;
+}
+.boardscreen__board {
+  /* 보드는 정사각이고, 세로가 모자라면 세로가 이긴다. */
+  aspect-ratio: 1;
+  max-height: 100%;
+  min-height: 0;
+}
+.boardscreen__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-l);
+  min-width: 0;
+}
+@media (max-width: 1024px) {
+  .boardscreen {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.panel {
+  padding: var(--space-l);
+  background: var(--c-surface-container-low);
+  border: 1px solid var(--c-outline-variant);
+  border-radius: var(--radius-m);
+}
+.panel--muted {
+  background: transparent;
+  border-style: dashed;
+}
+.panel__title {
+  font: var(--type-title-small);
+  color: var(--c-on-surface-variant);
+}
+.panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-m);
+  margin-top: var(--space-l);
+}
+.panel__actions button {
+  padding: var(--space-s) var(--space-l);
+  font: var(--type-label-large);
+  border: 1px solid var(--c-outline-variant);
+  border-radius: var(--radius-s);
+}
+.panel__actions button:hover:not(:disabled) {
+  background: var(--c-surface-container-high);
+}
+.panel__actions button:disabled {
+  color: var(--c-outline);
+  cursor: default;
+}
+.panel__hint {
+  margin-top: var(--space-l);
+  font: var(--type-body-small);
+  color: var(--c-on-surface-variant);
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-s) var(--space-l);
+  margin-top: var(--space-m);
+  font: var(--type-body-medium);
+}
+.kv dt {
+  color: var(--c-on-surface-variant);
+}
+.kv dd {
+  margin: 0;
+  text-align: right;
+}
+
+/* ── 값 사다리 견본 ─────────────────────────────────────────────── */
+.ladder {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 2px;
+  margin-top: var(--space-m);
+  overflow: hidden;
+  border-radius: var(--radius-xs);
+}
+.ladder__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  align-items: center;
+  padding: var(--space-m) 2px;
+  /* 칩 위 글자는 언제나 흰색이다 — 사다리 전 구간에서 4.5:1 이 보장된다. */
+  color: #fff;
+}
+.ladder__pos {
+  font: var(--type-label-medium);
+}
+.ladder__hex,
+.ladder__ratio {
+  font-size: 10px;
+  opacity: 0.85;
+}
+.ladder--chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s);
+}
+.ladder__chip {
+  padding: var(--space-xs) var(--space-m);
+  font: var(--type-label-medium);
+  border-radius: var(--radius-xl);
+}
