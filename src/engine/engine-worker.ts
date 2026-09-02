@@ -123,11 +123,11 @@ function drain(chunk: string) {
  * upstream 규약을 그대로 둬야 하고, 40MB 짜리 `.data` 를 번들에 넣을 일도 없다.
  */
 function loadFactory(baseUrl: string, variant: string): ModuleFactory {
-  const url = `rapfi-.js`;
+  const url = `${baseUrl}rapfi-${variant}.js`;
   importScripts(url);
   const factory = (self as unknown as Record<string, unknown>)["Rapfi"];
   if (typeof factory !== "function") {
-    throw new Error(`엔진 글루가 전역 Rapfi 를 정의하지 않았습니다: `);
+    throw new Error(`엔진 글루가 전역 Rapfi 를 정의하지 않았습니다: ${url}`);
   }
   return factory as ModuleFactory;
 }
