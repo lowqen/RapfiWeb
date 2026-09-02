@@ -113,23 +113,23 @@ function drain(chunk: string) {
 }
 
 /**
- * upstream 글루는 CommonJS 다(`EXPORT_ES6` 를 쓰지 않는다). ES 모듈 워커에는
- * `importScripts` 가 없으므로 소스를 받아 CommonJS 껍데기 안에서 평가한다.
- * 번들러에 태우지 않는 것은 의도다 — `locateFile` 로 `.wasm`/`.data` 를 찾는
- * upstream 규약을 그대로 두어야 한다.
+ * upstream 글루를 읽어 팩토리를 꺼낸다.
+ *
+ * `-sMODULARIZE=1 -sEXPORT_NAME=Rapfi` 만 쓰고 `EXPORT_ES6` 는 쓰지 않으므로,
+ * 산출물은 ESM 이 아니라 **전역 `Rapfi` 를 정의하는 스크립트**다. 그래서
+ * `importScripts` 로 읽는다 — 이것이 W0-1 이 브라우저에서 통과시킨 구성이다.
+ *
+ * 번들러에 태우지 않는 것은 의도다: `locateFile` 로 `.wasm`/`.data` 를 찾는
+ * upstream 규약을 그대로 둬야 하고, 40MB 짜리 `.data` 를 번들에 넣을 일도 없다.
  */
-async function loadFactory(baseUrl: string, variant: string): Promise<ModuleFactory> {
-  const url = `${baseUrl}rapfi-${variant}.js`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`엔진 글루를 받지 못했습니다: ${url} (${res.status})`);
-  const src = await res.text();
-  const shim = { exports: {} as unknown };
-  new Function("module", "exports", "self", src)(shim, shim.exports, self);
-  const factory = shim.exports as ModuleFactory;
+function loadFactory(baseUrl: string, variant: string): ModuleFactory {
+  const url = `rapfi-.js`;
+  importScripts(url);
+  const factory = (self as unknown as Record<string, unknown>)["Rapfi"];
   if (typeof factory !== "function") {
-    throw new Error("엔진 글루가 팩토리를 내보내지 않았습니다 (MODULARIZE 빌드가 맞습니까?)");
+    throw new Error(`엔진 글루가 전역 Rapfi 를 정의하지 않았습니다: `);
   }
-  return factory;
+  return factory as ModuleFactory;
 }
 
 const send = (lines: readonly string[]) => {
@@ -142,7 +142,7 @@ async function boot(msg: Extract<ToWorker, { type: "boot" }>) {
   coord = new CoordMapper(msg.size);
   agg = new SearchAggregator(msg.size);
 
-  const factory = await loadFactory(msg.engineBaseUrl, msg.variant);
+  const factory = loadFactory(msg.engineBaseUrl, msg.variant);
   mod = await factory({
     locateFile: (p: string) => msg.engineBaseUrl + p,
     onReceiveStdout: drain,

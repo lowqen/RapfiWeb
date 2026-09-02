@@ -130,8 +130,10 @@ export class EngineClient {
     if (this.worker) return this.whenReady();
 
     this.setStatus("starting");
+    // **클래식 워커다.** 이유는 vite.config.ts 의 worker.format 주석에 있다 —
+    // upstream 글루를 읽는 유일한 방법인 importScripts 가 모듈 워커에는 없다.
     const worker = new Worker(new URL("./engine-worker.ts", import.meta.url), {
-      type: "module",
+      type: "classic",
       name: "rapfi-engine",
     });
     this.worker = worker;

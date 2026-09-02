@@ -29,9 +29,14 @@ export default defineConfig({
     },
   },
   worker: {
-    // 엔진 워커는 upstream 글루(CommonJS)를 importScripts 로 읽으므로 클래식이다.
-    // Vite 가 만드는 우리 워커는 ES 모듈로 두고, 엔진만 그 안에서 따로 싣는다.
-    format: "es",
+    // **클래식(IIFE)이다.** upstream 글루는 `-sMODULARIZE=1 -sEXPORT_NAME=Rapfi` 만
+    // 쓰고 EXPORT_ES6 는 쓰지 않아 ESM 이 아니라 전역을 정의하는 스크립트다.
+    // 그것을 읽는 방법은 `importScripts` 뿐이고, `importScripts` 는 **클래식
+    // 워커에만** 있다. 모듈 워커에서는 Emscripten 의 환경 감지가
+    // `typeof importScripts == "function"` 으로 워커임을 판별하지 못해
+    // `.data` 로딩 경로부터 어긋난다. W0-1 이 통과시킨 구성이 클래식이었고,
+    // 검증된 쪽을 따른다.
+    format: "iife",
   },
   build: {
     target: "es2022",
