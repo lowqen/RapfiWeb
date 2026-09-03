@@ -80,14 +80,19 @@ page.on("console", (m) => {
 /** 보드는 15×15 에 여백 0.75칸이라 한 변이 15.5 step 이다. */
 const STEP_DIV = 15.5;
 
-/** 교점 (x, y) 를 누른다. 좌상단이 (0, 14) — 화면 y 는 아래로 간다. */
+/**
+ * 보드 좌표 (x, y) 를 누른다.
+ *
+ * **y 를 뒤집지 않는다.** `board-geometry` 의 `cy(y) = origin + y*step` 이라
+ * 보드 y 는 화면에서 아래로 자란다 — 뒤집히는 것은 **사람이 읽는 표기**뿐이다
+ * (`label` 이 `size - y` 로 센다). 처음에 여기서 14-y 를 쓴 탓에 둘째 수가
+ * 엔진이 방금 둔 자리를 눌러 조용히 무시됐다.
+ */
 async function tap(x: number, y: number) {
   const view = await page.locator(".board__view").boundingBox();
   if (!view) throw new Error("보드가 화면에 없습니다");
   const step = view.width / STEP_DIV;
-  const px = view.x + step * (0.75 + x);
-  const py = view.y + step * (0.75 + (14 - y));
-  await page.mouse.click(px, py);
+  await page.mouse.click(view.x + step * (0.75 + x), view.y + step * (0.75 + y));
   await page.waitForTimeout(120);
 }
 
@@ -139,17 +144,38 @@ async function prompt(): Promise<string | null> {
   return (await el.count()) ? el.first().getAttribute("data-prompt") : null;
 }
 
-/** 협상 중 5수 후보를 놓을 자리들. 개시에서 떨어져 있고 서로 겹치지 않는다. */
+/**
+ * 5수 후보를 놓을 후보 자리들 — **넉넉히 둔다.**
+ *
+ * 엔진의 4수가 어디에 놓일지는 모르고, 하필 우리가 고른 자리면 그 탭은 「이미
+ * 돌이 있음」으로 조용히 무시된다. 그래서 개시에서 먼 자리를 여덟 개보다 많이
+ * 준비하고, **놓인 것을 세어 가며** 다음 자리로 넘어간다.
+ */
 const FIFTH_SPOTS: readonly [number, number][] = [
-  [5, 5],
-  [5, 6],
-  [6, 5],
-  [4, 6],
-  [6, 4],
-  [4, 4],
-  [10, 10],
-  [10, 9],
+  [1, 1],
+  [1, 3],
+  [1, 5],
+  [3, 1],
+  [5, 1],
+  [13, 13],
+  [13, 11],
+  [11, 13],
+  [1, 13],
+  [13, 1],
+  [1, 7],
+  [13, 7],
 ];
+
+/** `need` 개가 실제로 놓일 때까지 자리 목록을 훑는다. */
+async function placeFifths(need: number): Promise<void> {
+  const base = await stoneCount();
+  for (const [x, y] of FIFTH_SPOTS) {
+    if ((await stoneCount()) >= base + need) return;
+    await tap(x, y);
+  }
+  const placed = (await stoneCount()) - base;
+  if (placed < need) throw new Error(`5수 후보 ${need}개 중 ${placed}개만 놓였습니다`);
+}
 
 /**
  * 협상을 끝까지 몬다 — **묻는 것에 답할 뿐, 수순을 기대하지 않는다.**
@@ -170,12 +196,7 @@ async function negotiate(maxRounds = 12): Promise<string[]> {
       const need = await fifthCountAsked(2_000);
       if (need === 0) return seen; // 협상 끝
       seen.push(`5수 후보 ${need}개`);
-      const base = await stoneCount();
-      for (let i = 0; i < need; i++) await tap(...FIFTH_SPOTS[i]!);
-      const placed = await stoneCount();
-      if (placed !== base + need) {
-        throw new Error(`5수 후보 ${placed}개 (${base}+${need} 기대)`);
-      }
+      await placeFifths(need);
       // 엔진이 하나를 고르면 판이 **넷으로 되감기고** 그 하나가 5수가 된다.
       await waitStones(5, 150_000, "(엔진의 5수 선택)");
       seen.push("엔진이 5수 선택");
@@ -282,7 +303,9 @@ try {
   else ok("두 수 뒤 흑 차례");
 
   // 사람이 한 수 더 두고 엔진이 또 답하는지 — 한 번은 우연일 수 있다.
-  await tap(8, 8);
+  // **구석에 둔다.** 가운데 근처를 고르면 엔진이 방금 둔 자리와 부딪혀
+  // 「무시」로 떨어지고, 시험은 그것을 회귀로 읽는다(실제로 한 번 겪었다).
+  await tap(1, 1);
   await waitStones(4, 60_000, "(둘째 왕복)");
   ok("두 번째 왕복도 정상");
 
@@ -380,7 +403,8 @@ try {
   // 협상이 끝났으면 그 뒤로는 평범한 대국이어야 한다. 몇 수째인지는 위
   // 갈래에 따라 다르므로 **자라는지**만 본다 — 엔진 차례면 저절로, 사람
   // 차례면 한 번 눌러서.
-  if (settled % 2 === 0) await tap(1, 1);
+  // 협상에서 구석을 여럿 썼을 수 있으니 아직 비어 있을 자리를 고른다.
+  if (settled % 2 === 0) await tap(7, 12);
   await waitGrew(settled, 150_000);
   ok(`협상 뒤 평범한 대국으로 이어진다 (돌 ${await stoneCount()}개)`);
 
