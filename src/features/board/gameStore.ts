@@ -261,6 +261,24 @@ export const useGameStore = create<GameState>((set, get) => {
     runClock("human");
   };
 
+  // 엔진 쪽에 처리기를 걸어 둔다. `engine-state` 는 「대국」을 모르고, 대국이
+  // 자기 손잡이를 등록한다 — 두 모듈이 서로를 import 하지 않게 하는 방향이다.
+  //
+  // **`return` 앞이어야 한다.** 아래쪽 함수 선언들 뒤(= `return` 다음)에 두면
+  // 한 번도 실행되지 않는다 — 함수 **선언**은 끌어올려지지만 호출문은 아니다.
+  // 이 자리를 두 번 틀렸다. 그때마다 엔진의 답이 대국에 닿지 않아 화면에서는
+  // 「엔진이 영원히 생각 중」으로 보였다.
+  setGameHandlers({
+    onEngineMove,
+    onOpening: (r) => {
+      // 이 빌드는 협상을 걸지 않는다(파일 머리 주석). 그래도 오면 **삼키지
+      // 않는다** — 「모르는 줄도 버리지 않는다」가 이 저장소의 규칙이다.
+      disarmWatchdog();
+      log(`예상치 못한 협상 응답: ${r.kind}`);
+    },
+    onForbid: (cells) => board().setForbidden(get().showForbidden ? cells : []),
+  });
+
   return {
     computerSide: "none",
     opening: "none",
@@ -525,20 +543,4 @@ export const useGameStore = create<GameState>((set, get) => {
       engineTurn();
     }
   }
-
-  // 엔진 쪽에 처리기를 걸어 둔다. `engine-state` 는 「대국」을 모르고, 대국이
-  // 자기 손잡이를 등록한다 — 두 모듈이 서로를 import 하지 않게 하는 방향이다.
-  //
-  // **`return` 앞이어야 한다.** 아래쪽 함수 선언들 뒤(= `return` 다음)에 두었다가
-  // 한 번도 실행되지 않은 적이 있다 — 선언은 끌어올려지지만 호출문은 아니다.
-  setGameHandlers({
-    onEngineMove,
-    onOpening: (r) => {
-      // 이 빌드는 협상을 걸지 않는다(파일 머리 주석). 그래도 오면 **삼키지
-      // 않는다** — 「모르는 줄도 버리지 않는다」가 이 저장소의 규칙이다.
-      disarmWatchdog();
-      log(`예상치 못한 협상 응답: ${r.kind}`);
-    },
-    onForbid: (cells) => board().setForbidden(get().showForbidden ? cells : []),
-  });
 });
