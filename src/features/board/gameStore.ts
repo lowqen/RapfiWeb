@@ -798,5 +798,4 @@ export const useGameStore = create<GameState>((set, get) => {
     // offer
     if (r.move) place(r.move);
   }
-
 });
