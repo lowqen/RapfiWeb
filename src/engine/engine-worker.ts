@@ -163,7 +163,7 @@ function drain(chunk: string) {
  * `importScripts` 로 읽는다 — 이것이 W0-1 이 브라우저에서 통과시킨 구성이다.
  *
  * 번들러에 태우지 않는 것은 의도다: `locateFile` 로 `.wasm`/`.data` 를 찾는
- * upstream 규약을 그대로 둬야 하고, 40MB 짜리 `.data` 를 번들에 넣을 일도 없다.
+ * upstream 규약을 그대로 둬야 하고, 20MB 짜리 `.data` 를 번들에 넣을 일도 없다.
  */
 function loadFactory(baseUrl: string, variant: string): ModuleFactory {
   const url = `${baseUrl}rapfi-${variant}.js`;
