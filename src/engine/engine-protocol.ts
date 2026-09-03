@@ -73,6 +73,8 @@ export function serialize(cmd: EngineCommand, coord: CoordMapper): string[] {
       return [`YXNBEST ${cmd.n}`];
     case "info":
       return [`INFO ${cmd.key} ${cmd.value}`];
+    case "rule":
+      return [`INFO RULE ${cmd.id}`];
     case "showDetail":
       // 소문자 `info` 다 — 데스크톱이 보내는 철자를 그대로 옮긴다.
       return [`info show_detail ${cmd.level}`];

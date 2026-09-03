@@ -29,6 +29,15 @@ export type EngineCommand =
   | { kind: "yxnbest"; n: number }
   | { kind: "info"; key: string; value: string | number }
   /**
+   * 규칙. gomocup 의 `INFO RULE <id>` 이고 id 는 엔진이 정한다
+   * (`command/gomocup.cpp`): 0 = 프리스타일, 1 = 스탠다드, **4 = 렌주**,
+   * 5 = swap1, 6 = swap2.
+   *
+   * **START 보다 먼저 보낸다.** 보드가 이미 있으면 규칙 변경이 `board->newGame()`
+   * 을 불러 판을 리셋하고 TT 도 비운다. 기동 순서에서는 그럴 이유가 없다.
+   */
+  | { kind: "rule"; id: 0 | 1 | 4 | 5 | 6 }
+  /**
    * Rapfi 를 **상세(Yixin) 출력 모드**로 바꾼다.
    *
    * 이걸 보내지 않으면 엔진은 사람이 읽는 `MESSAGE Depth 2-3 | Eval 814 | …` 만

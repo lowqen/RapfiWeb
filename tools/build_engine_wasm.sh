@@ -107,6 +107,63 @@ grep -n -iE "emscripten|wasm|pthread|MODULARIZE|EXPORT_NAME|ASYNCIFY|ALLOW_MEMOR
      Rapfi/CMakeLists.txt | sed "s/^/  | /" || echo "  (해당 줄 없음)"
 echo "--- 끝 ---"
 
+echo ">>> [2.5/6] 프리로드 축소 — **렌주 전용**"
+#
+# upstream 은 mix9svq 가중치 4종(프리스타일·스탠다드·렌주 흑/백)을 전부 .data 에 굽는다.
+# 40.3MB 다. Cloudflare Pages 는 **파일 하나가 25MB 를 넘으면 거부**하므로 그대로는
+# 배포가 안 된다.
+#
+# 이 웹앱은 렌주 전용이라 렌주 가중치만 남긴다:
+#
+#   mix9svqrenju_bs15_black.bin.lz4    9,984,172
+#   mix9svqrenju_bs15_white.bin.lz4    9,844,944
+#   classical/model210901.bin             30,109   <- 아래 참고. 빼면 안 된다.
+#   config.toml                            6,713
+#                                     ─────────────
+#                                       ~19.9MB
+#
+# **model210901.bin 은 남긴다.** 「classical 은 렌주와 무관하니 빼라」가 자연스러운
+# 판단이지만, config 최상단이 이 파일을 이름으로 가리킨다:
+#
+#     [model]
+#     binary_file = "model210901.bin"
+#
+# 빼면 config 로드에서 걸린다. 30KB 라 크기에도 영향이 없다.
+# 안 쓰이는 model220723.bin(77KB)과 classical 전용 config 두 개는 뺀다.
+#
+# 프리로드 목록이 CMakeLists 가 아니라 **Networks 의 데이터 파일**이라는 점이
+# 이걸 값싸게 만든다 — 엔진 소스에는 손대지 않는다.
+cd "$WORK/rapfi"
+cat > Networks/wasm_preloads.txt << 'PRELOADS'
+config-example/rapfiweb-renju.toml@config.toml
+classical/model210901.bin@/
+mix9svq/mix9svqrenju_bs15_black.bin.lz4@/
+mix9svq/mix9svqrenju_bs15_white.bin.lz4@/
+PRELOADS
+
+# 렌주 전용 config. upstream 것에서 **프리스타일·스탠다드 가중치 항목만** 지운다.
+#
+# 항목을 남겨 두고 파일만 빼도 되지 않겠느냐 — 아마 그럴 것이다(엔진이 규칙에 맞는
+# 항목을 고르므로). 하지만 "아마"로 40분짜리 빌드를 돌릴 이유가 없다. 없는 파일을
+# 가리키는 줄은 남기지 않는다.
+python3 - << 'PY'
+import re, pathlib
+src = pathlib.Path("Networks/config-example/gomocalc-mix9svq.toml").read_text(encoding="utf-8")
+before = src
+# weight_file = "…freestyle…" / "…standard…" 를 담은 [[…weights]] 블록만 제거
+src = re.sub(
+    r'\[\[model\.evaluator\.weights\]\]\s*\nweight_file = "mix9svq(?:freestyle_bsmix|standard_bs15)\.bin\.lz4"\s*\n',
+    "",
+    src,
+)
+assert src != before, "가중치 항목을 못 찾았습니다 — upstream config 가 바뀌었습니다"
+assert "renju_bs15_black" in src, "렌주 항목이 사라졌습니다"
+assert "freestyle" not in src.split("[search]")[0], "프리스타일 항목이 남아 있습니다"
+pathlib.Path("Networks/config-example/rapfiweb-renju.toml").write_text(src, encoding="utf-8")
+print("  . rapfiweb-renju.toml 생성 — 가중치 항목 1개(렌주 흑/백)만 남음")
+PY
+grep -A3 "model.evaluator.weights" Networks/config-example/rapfiweb-renju.toml | sed "s/^/  . /"
+
 echo ">>> [3/6] 빌드 (SIMD 2종)"
 cd "$WORK/rapfi/Rapfi"
 

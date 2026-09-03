@@ -56,6 +56,14 @@ type ModuleFactory = (opts: Partial<EmscriptenModule>) => Promise<EmscriptenModu
 const post = (m: FromWorker) => self.postMessage(m);
 
 /**
+ * 이 웹앱은 **렌주 전용**이다. `.data` 에 렌주 가중치만 구워져 있고
+ * (Cloudflare 의 파일당 25MB 상한 — 4종 전부면 40.3MB), 화면도 그렇게 안내한다.
+ *
+ * 4 는 엔진이 정한 id 다(`command/gomocup.cpp` 의 RULE 처리).
+ */
+const RENJU_RULE_ID = 4 as const;
+
+/**
  * 예외를 사람이 읽을 문장으로.
  *
  * `String(e)` 만 쓰면 안 된다. Emscripten 이 던지는 `ExitStatus` 는 Error 가 아니라
@@ -217,6 +225,11 @@ async function boot(msg: Extract<ToWorker, { type: "boot" }>) {
   sendAll([
     { kind: "showDetail", level: 3 },
     { kind: "yxshowinfo" },
+    // **규칙을 START 보다 먼저.** 이 빌드의 `.data` 에는 렌주 가중치만 구워져 있어서
+    // (Cloudflare 25MB 상한 — `tools/build_engine_wasm.sh` [2.5/6] 참고), 기본 규칙인
+    // 프리스타일로 START 하면 없는 가중치를 찾게 된다.
+    // 보드가 생기기 전에 보내야 규칙 변경이 newGame()/TT 비우기를 유발하지 않는다.
+    { kind: "rule", id: RENJU_RULE_ID },
     { kind: "start", size: msg.size },
     { kind: "about" },
   ]);

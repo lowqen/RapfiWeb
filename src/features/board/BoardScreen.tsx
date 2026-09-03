@@ -6,6 +6,7 @@ import { AnalysisPanel } from "./AnalysisPanel";
 import { EngineConsole } from "./EngineConsole";
 import { useEngineStore } from "../../engine/engine-state";
 import { label } from "../../core/model/move";
+import { RULE_LABEL } from "../../core/model/rules";
 
 /**
  * 보드 화면 — W3 판.
@@ -43,12 +44,20 @@ export function BoardScreen() {
         <section className="panel">
           <h2 className="panel__title">국면</h2>
           <dl className="kv">
+            <dt>규칙</dt>
+            <dd className="tnum">{RULE_LABEL.renju}</dd>
             <dt>둘 차례</dt>
-            <dd className="tnum">{turn}</dd>
+            <dd className="tnum" data-k="turn">
+              {turn}
+            </dd>
             <dt>수</dt>
             <dd className="tnum">{render.stones.length}</dd>
             <dt>마지막</dt>
-            <dd className="tnum">{last ? label(last, render.size) : "—"}</dd>
+            {/* 스모크가 순서가 아니라 이름으로 집게 한다 — kv 에 줄이 하나 늘 때마다
+                시험이 헛짚는 것을 W3 에서 한 번 겪었다. */}
+            <dd className="tnum" data-k="last">
+              {last ? label(last, render.size) : "—"}
+            </dd>
           </dl>
           <div className="panel__actions">
             <button type="button" onClick={undo} disabled={render.stones.length === 0}>

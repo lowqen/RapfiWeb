@@ -129,10 +129,10 @@ try {
     await page.waitForTimeout(120);
     const aria = await page.locator("canvas[role=img]").getAttribute("aria-label");
     if (!aria?.includes("돌 1개")) fail(`돌이 놓이지 않았습니다: ${aria}`);
-    // 「국면」 패널을 콕 집는다 — 분석 패널에도 .kv 가 있어서 last() 가 최선수를
-    // 집었고, 그게 «—» 라 이 시험이 처음에 헛짚었다.
-    const posPanel = page.locator(".boardscreen__side .panel").first();
-    const lastCell = (await posPanel.locator(".kv dd").last().innerText()).trim();
+    // 순서가 아니라 **이름**으로 집는다. 처음엔 `.kv dd` 의 last() 를 썼는데,
+    // 분석 패널에도 .kv 가 생기면서 최선수를 집었고, 규칙 줄이 하나 더 늘자
+    // first() 도 어긋났다. data-k 는 줄이 늘어도 흔들리지 않는다.
+    const lastCell = (await page.locator("dd[data-k=last]").innerText()).trim();
     if (lastCell !== "H8") fail(`가운데를 눌렀는데 H8 이 아닙니다: ${lastCell}`);
 
     await page.mouse.click(view.x + view.width / 2, view.y + view.height / 2);
@@ -147,7 +147,7 @@ try {
     await page.waitForTimeout(80);
     const two = await page.locator("canvas[role=img]").getAttribute("aria-label");
     if (!two?.includes("돌 2개")) fail(`둘째 돌이 놓이지 않았습니다: ${two}`);
-    const turn = (await posPanel.locator(".kv dd").first().innerText()).trim();
+    const turn = (await page.locator("dd[data-k=turn]").innerText()).trim();
     if (turn !== "흑") fail(`두 수 뒤 차례가 흑이 아닙니다: ${turn}`);
   }
 

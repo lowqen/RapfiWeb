@@ -79,6 +79,13 @@ describe("직렬화", () => {
     expect(serialize({ kind: "showDetail", level: 3 }, coord)).toEqual(["info show_detail 3"]);
   });
 
+  it("규칙은 INFO RULE — 렌주는 4 다", () => {
+    // id 는 엔진이 정한다(command/gomocup.cpp 의 RULE 처리):
+    // 0 프리스타일 · 1 스탠다드 · 4 렌주 · 5 swap1 · 6 swap2.
+    expect(serialize({ kind: "rule", id: 4 }, coord)).toEqual(["INFO RULE 4"]);
+    expect(serialize({ kind: "rule", id: 0 }, coord)).toEqual(["INFO RULE 0"]);
+  });
+
   it("정지는 YXSTOP 이다", () => {
     expect(serialize({ kind: "stop" }, coord)).toEqual(["YXSTOP"]);
   });
