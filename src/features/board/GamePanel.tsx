@@ -72,8 +72,7 @@ export function GamePanel() {
             key={p.label}
             on={
               g.clock.limited === p.limited &&
-              (!p.limited ||
-                (g.clock.turnLimitMs === p.turn && g.clock.matchLimitMs === p.match))
+              (!p.limited || (g.clock.turnLimitMs === p.turn && g.clock.matchLimitMs === p.match))
             }
             onClick={() =>
               g.setClockLimits({

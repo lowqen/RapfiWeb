@@ -61,8 +61,20 @@ export function withLimits(
  */
 export function start(c: GameClock, side: ClockSide): GameClock {
   return side === "computer"
-    ? { ...c, running: side, humanMatchMs: c.humanMatchMs + c.humanTurnMs, humanTurnMs: 0, computerTurnMs: 0 }
-    : { ...c, running: side, computerMatchMs: c.computerMatchMs + c.computerTurnMs, computerTurnMs: 0, humanTurnMs: 0 };
+    ? {
+        ...c,
+        running: side,
+        humanMatchMs: c.humanMatchMs + c.humanTurnMs,
+        humanTurnMs: 0,
+        computerTurnMs: 0,
+      }
+    : {
+        ...c,
+        running: side,
+        computerMatchMs: c.computerMatchMs + c.computerTurnMs,
+        computerTurnMs: 0,
+        humanTurnMs: 0,
+      };
 }
 
 export const stop = (c: GameClock): GameClock => ({ ...c, running: null });
@@ -133,7 +145,9 @@ export function formatShort(ms: number): string {
 
 /** 「남은 차례 / 남은 대국」. 제한이 없으면 둘 다 무한 표시. */
 export const leftLabel = (c: GameClock, s: ClockSide): string =>
-  c.limited ? `${format(leftTurnMs(c, s))} / ${format(leftMatchMs(c, s))}` : `${UNLIMITED} / ${UNLIMITED}`;
+  c.limited
+    ? `${format(leftTurnMs(c, s))} / ${format(leftMatchMs(c, s))}`
+    : `${UNLIMITED} / ${UNLIMITED}`;
 
 export const usedLabel = (c: GameClock, s: ClockSide): string =>
   `${format(usedTurnMs(c, s))} / ${format(usedMatchMs(c, s))}`;

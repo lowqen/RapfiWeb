@@ -31,8 +31,8 @@ export function OpeningPanel() {
 
       {g.offeringFifth && !g.prompt && (
         <p className="panel__hint">
-          5수 후보를 <strong>{g.fifthCount}개</strong> 놓으세요. 지금까지{" "}
-          {Math.max(0, stones - 4)}개 — 다 놓으면 상대가 그중 하나를 고릅니다.
+          5수 후보를 <strong>{g.fifthCount}개</strong> 놓으세요. 지금까지 {Math.max(0, stones - 4)}
+          개 — 다 놓으면 상대가 그중 하나를 고릅니다.
         </p>
       )}
     </section>

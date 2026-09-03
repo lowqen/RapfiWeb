@@ -134,7 +134,8 @@ export function parse(rawLine: string, coord: CoordMapper): EngineResponse {
   const upper = line.toUpperCase();
 
   if (upper.startsWith("MESSAGE REALTIME")) return parseRealtime(line.slice(16).trim(), coord, raw);
-  if (upper.startsWith("MESSAGE SWAP2")) return parseOpening(line.slice(13).trim(), true, coord, raw);
+  if (upper.startsWith("MESSAGE SWAP2"))
+    return parseOpening(line.slice(13).trim(), true, coord, raw);
   if (upper.startsWith("MESSAGE SOOSORV")) {
     return parseOpening(line.slice(15).trim(), false, coord, raw);
   }

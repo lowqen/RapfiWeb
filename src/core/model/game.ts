@@ -85,8 +85,7 @@ export const OPENING_HINT: Record<OpeningProtocol, string> = {
 };
 
 /** 첫 세 수를 손으로 놓는 협상 — 그 안에서는 엔진에게 두라고 하지 않는다. */
-export const handEnteredOpening = (o: OpeningProtocol): boolean =>
-  o === "rif" || o === "soosorv";
+export const handEnteredOpening = (o: OpeningProtocol): boolean => o === "rif" || o === "soosorv";
 
 /** 협상이 있는가. 없으면 협상 pane 을 아예 그리지 않는다. */
 export const negotiates = (o: OpeningProtocol): boolean => o !== "none";
@@ -149,6 +148,4 @@ export type GamePrompt =
 
 /** 보드를 눌렀을 때 무슨 일이 있었나. */
 export type TapResult =
-  | { kind: "placed" }
-  | { kind: "ignored" }
-  | { kind: "rejected"; reason: string };
+  { kind: "placed" } | { kind: "ignored" } | { kind: "rejected"; reason: string };

@@ -354,7 +354,14 @@ describe("협상 명령 직렬화", () => {
   it("Soosorv 단계는 수 목록을 스스로 들고 간다", () => {
     expect(
       serialize(
-        { kind: "yxsoosorvstep", step: 2, moves: [{ x: 7, y: 7 }, { x: 8, y: 7 }] },
+        {
+          kind: "yxsoosorvstep",
+          step: 2,
+          moves: [
+            { x: 7, y: 7 },
+            { x: 8, y: 7 },
+          ],
+        },
         coord,
       ),
     ).toEqual(["yxsoosorvstep2", "7,7", "7,8", "done"]);

@@ -89,10 +89,7 @@ export interface EngineOptions extends EngineEvents {
 }
 
 /** 협상 응답 세 갈래만 골라 낸 것 — 화면과 상태 기계가 이 타입으로 받는다. */
-export type OpeningResponse = Extract<
-  FromWorker,
-  { type: "opening" }
->["response"];
+export type OpeningResponse = Extract<FromWorker, { type: "opening" }>["response"];
 
 const env = import.meta.env;
 

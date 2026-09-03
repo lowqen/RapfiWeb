@@ -71,11 +71,7 @@ export function result(
 }
 
 /** 5목을 만든 돌들 — 승리 강조에 쓴다. */
-export function winningLine(
-  moves: readonly Move[],
-  size: number,
-  allowOverline: boolean,
-): Move[] {
+export function winningLine(moves: readonly Move[], size: number, allowOverline: boolean): Move[] {
   const last = moves.at(-1);
   if (!last) return [];
   const mover = colorAt(moves.length - 1);
@@ -84,12 +80,14 @@ export function winningLine(
     const line: Move[] = [last];
     for (let step = 1; step <= 5; step++) {
       const m = { x: last.x + dx * step, y: last.y + dy * step };
-      if (!has(own, m)) break;
+      // `isWin` 과 같은 걸음이어야 한다 — 판 밖에서 멈추는 것까지 같아야
+      // 「이겼다」와 「이긴 줄」이 서로 다른 답을 내지 않는다.
+      if (!inBoard(m, size) || !has(own, m)) break;
       line.push(m);
     }
     for (let step = 1; step <= 5; step++) {
       const m = { x: last.x - dx * step, y: last.y - dy * step };
-      if (!has(own, m)) break;
+      if (!inBoard(m, size) || !has(own, m)) break;
       line.unshift(m);
     }
     if (line.length === 5 || (line.length > 5 && allowOverline)) return line;

@@ -55,14 +55,7 @@ describe("승패 — 다섯", () => {
 });
 
 describe("승패 — 장목", () => {
-  const six = alternate([
-    move(3, 7),
-    move(4, 7),
-    move(5, 7),
-    move(6, 7),
-    move(7, 7),
-    move(8, 7),
-  ]);
+  const six = alternate([move(3, 7), move(4, 7), move(5, 7), move(6, 7), move(7, 7), move(8, 7)]);
 
   it("렌주에서는 장목도 이긴 것으로 센다", () => {
     // 렌주의 장목 금지는 흑의 **금수**이고 엔진의 FORBID 가 막는다. 여기까지
