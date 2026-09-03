@@ -1,39 +1,50 @@
 {
   "_": [
     "웹 전용 BENCH 기준선. '폰과 같음'이 아니라 '웹 안에서 회귀 없음'을 지키는 값이다.",
-    "W0-3 에서 wasm 빌드가 네이티브(e240ab16)와 다른 해시를 낸다는 것이 확인됐고,",
-    "설정 차이는 배제됐다(host(android)==host(wasmcfg)==e240ab16). 그래서 비트 동일성",
-    "게이트를 웹에 한해 내려놓는 대신, 웹 자신의 값을 여기 고정해 회귀만 막는다.",
     "이 값을 바꾸려면 반드시 '왜 바뀌었는지'를 커밋 메시지에 적을 것 —",
     "엔진/가중치/emsdk 를 올리지 않았는데 이 값이 바뀌면 그건 버그다.",
     "",
-    "2026-09-01 갱신: 원인이 밝혀졌다. wasm 엔진의 탐색 결과는 네이티브와 **같다**.",
+    "2026-09-01: 원인 규명. wasm 엔진의 탐색 결과는 네이티브와 **같다**.",
     "benchmark.cpp 가 size_t 를 객체 표현 그대로 해시에 넣는데 그 폭이 wasm32 에서 4바이트,",
     "LP64 에서 8바이트라 digest 만 갈렸다. 그 한 줄을 uint64_t 로 고정하면 양쪽 모두",
     "e240ab16 이 나온다(tools/diag_hash_width.sh, CI run 33469545091).",
-    "그래서 4100a973 은 '웹이 다르다'가 아니라 'upstream 이 아직 고쳐지지 않았다'는 뜻이다.",
-    "upstream 이 고치면 이 값은 e240ab16 이 되고, 그때 '폰과 비트가 같다' 게이트를 되살린다."
+    "",
+    "2026-09-03: **기준선을 4100a973 -> 2b7c7da9 로 갱신했다. 우리가 바꾼 것 때문이다.**",
+    "Cloudflare 의 파일당 25MB 상한을 넘기려고 .data 를 렌주 가중치만 남겨 줄였다",
+    "(40.3MB -> 19.87MB). 그런데 BENCH 는 **자체 국면 집합**을 쓰고 그 안에 규칙이 섞여 있다:",
+    "프리스타일 4 · 스탠다드 3 · 렌주 3, 각 항목이 자기 규칙을 설정한다(benchmark.cpp 의 benchSet).",
+    "그래서 10개 중 7개가 이제 없는 가중치를 찾아 폴백으로 돌고, 노드 수가",
+    "4,391,204 -> 7,170,518 로 늘고 해시가 갈렸다. 엔진이 달라진 것이 아니라",
+    "**엔진에게 준 가중치가 달라진 것**이다.",
+    "",
+    "따라오는 한계도 적어 둔다: 이제 이 해시의 7/10 은 폴백 평가를 재고 있어",
+    "렌주 경로의 회귀 신호로는 약하다. 배포 구성의 진짜 기능 게이트는",
+    "scripts/engine-smoke.ts 다 — 브라우저에서 렌주 규칙으로 기동해 착수·분석·정지까지 돈다."
   ],
-  "measuredAt": "2026-08-31",
-  "measuredBy": "CI w0-spike.yml run 33320283087 (ubuntu-latest)",
+  "measuredAt": "2026-09-03",
+  "measuredBy": "CI engine-release.yml run 33713658585 (ubuntu-latest)",
   "engine": {
     "upstream": "3c94c2a976f24a0dd1c5517623e9ab6fffe66bd7",
     "networks": "e32ad77a5364363b3e3a02b3f9e8610ade19ea98",
-    "config": "Networks/config-example/gomocalc-mix9svq.toml (default_thread_num = 1)"
+    "config": "렌주 전용 사본 (rapfiweb-renju.toml). default_thread_num = 1",
+    "preloads": "렌주 흑/백 가중치 + classical/model210901.bin + config.toml"
   },
   "native": {
     "hash": "e240ab16",
-    "note": "x86 자동감지(AVX2) 및 폰(NEON). 지금은 웹과 표기가 다르지만 원인이 벤치 해시의 폭 문제로 밝혀졌다 — 엔진의 답은 같다. upstream 수정 후에는 이 값이 웹 게이트가 된다."
+    "note": "x86 자동감지(AVX2) 및 폰(NEON). **가중치 4종 전부**를 가진 빌드의 값이라 지금은 직접 비교 대상이 아니다. 폭 문제(2026-09-01)에 더해 가중치 구성도 달라졌다."
   },
   "variants": {
     "single-simd128": {
-      "hash": "4100a973",
-      "nodes": "4391204",
-      "note": "배포 경로. 이 값이 바뀌면 CI 실패. upstream 이 benchmark.cpp 의 size_t 폭을 고치면 e240ab16 으로 바뀔 값이다."
+      "hash": "2b7c7da9",
+      "nodes": "7170518",
+      "note": "배포 경로(렌주 전용 .data). 이 값이 바뀌면 CI 실패."
     },
     "multi-simd128": {
       "hash": null,
-      "note": "미측정. PROXY_TO_PTHREAD 빌드에서 node-bench 가 0.2초 만에 아무 출력 없이 끝났다(sendCommand 펌프가 프록시된 main 스레드에 닿지 않는 것으로 보임). 배포 경로가 아니므로 참고로만 잰다."
+      "note": "미측정. PROXY_TO_PTHREAD 빌드에서 node-bench 가 0.2초 만에 아무 출력 없이 끝났다. 배포 경로가 아니므로 참고로만 잰다."
     }
-  }
+  },
+  "history": [
+    { "hash": "4100a973", "nodes": "4391204", "until": "2026-09-03", "why": "가중치 4종 전부를 굽던 시절의 값" }
+  ]
 }
