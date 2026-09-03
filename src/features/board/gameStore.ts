@@ -234,6 +234,46 @@ export const useGameStore = create<GameState>((set, get) => {
   };
 
   /**
+   * 협상 응답 감시견.
+   *
+   * **이 엔진(Rapfi)은 `yxswap2step*` / `yxsoosorvstep*` 를 모른다.** 그 둘은
+   * Yixin 의 명령이고, 데스크톱 main.c 가 말을 거는 상대가 Yixin 이다.
+   * Rapfi 의 명령표(`command/gomocup.cpp`)에는 없고, GUI 모드에서는 모르는
+   * 명령을 **오류도 없이 삼킨다** — 그래서 답이 영원히 오지 않는다.
+   *
+   * 답이 오지 않을 때 Swap2 는 `thinking` 을 켠 채로 굳어 판이 통째로 잠긴다
+   * (모든 탭이 «엔진이 생각 중입니다»로 거절된다). 무엇을 하기로 정하든 그건
+   * 고장이므로, 기다림에 바닥을 깔아 잠금을 풀고 사람에게 사실을 알린다.
+   *
+   * 시험(node)에는 `window` 가 없다 — 감시견은 화면의 안전망이라 거기서는
+   * 걸지 않는다. 덤으로 시험이 끝난 뒤 타이머가 남지 않는다.
+   */
+  const NEGOTIATION_TIMEOUT_MS = 15_000;
+  let watchdog: ReturnType<typeof setTimeout> | null = null;
+
+  const disarmWatchdog = () => {
+    if (watchdog !== null) {
+      clearTimeout(watchdog);
+      watchdog = null;
+    }
+  };
+
+  const armWatchdog = () => {
+    if (typeof window === "undefined") return;
+    disarmWatchdog();
+    watchdog = setTimeout(() => {
+      watchdog = null;
+      if (get().result) return;
+      set((st) => ({ thinking: false, clock: stopClock(st.clock) }));
+      prompt({
+        kind: "info",
+        text: "이 엔진은 이 오프닝 협상에 답하지 않습니다 — 손으로 이어서 두세요.",
+      });
+      log("협상 응답 없음 — 기다림을 풀었습니다");
+    }, NEGOTIATION_TIMEOUT_MS);
+  };
+
+  /**
    * 사람이 만든 국면을 엔진에게 **판정**시킨다 — Swap2 의 2·3단계뿐이다.
    * 착수가 아니므로 분석 보드(`YXBOARD`)로 넘긴 뒤 단계 명령을 보낸다.
    *
@@ -245,12 +285,14 @@ export const useGameStore = create<GameState>((set, get) => {
     addIncrement("human");
     set((s) => ({ thinking: true, clock: startClock(s.clock, "computer") }));
     send({ kind: "yxboard", stones: board().placements() }, ...step);
+    armWatchdog();
   };
 
   /** Soosorv 의 단계 명령 — 사람의 가산만 붙이고 그대로 보낸다. */
   const sendStep = (cmd: EngineCommand) => {
     addIncrement("human");
     send(cmd);
+    armWatchdog();
   };
 
   /** 엔진이 답해 차례가 사람에게 돌아왔다. */
@@ -334,6 +376,7 @@ export const useGameStore = create<GameState>((set, get) => {
     refreshForbidden,
 
     newGame: () => {
+      disarmWatchdog();
       board().clear();
       board().setForbidden([]);
       set((s) => ({
@@ -711,6 +754,7 @@ export const useGameStore = create<GameState>((set, get) => {
    * 엔진이 이미 했다.
    */
   function onOpening(r: OpeningResponse) {
+    disarmWatchdog(); // 답이 왔으니 감시견은 내린다
     if (get().result) return;
 
     if (r.kind === "openingMove") {

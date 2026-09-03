@@ -5,13 +5,21 @@
  *   SMOKE_BASE_URL=https://… pnpm exec tsx scripts/game-smoke.ts   # 배포본 검사
  *
  * `engine-smoke.ts` 가 「분석이 흐른다」를 보는 데 비해 이쪽은 **대국**을 본다:
- * 차례가 오가는가, 시계가 줄어드는가, 협상이 끝까지 가는가, 기권·무승부가
- * 판을 닫는가. W4 의 검수 항목 다섯을 그대로 옮긴 것이다.
+ * 차례가 오가는가, 시계가 줄어드는가, 개시가 도는가, 기권·무승부가 판을 닫는가.
  *
  * 왜 단위 시험으로 안 되는가 — `game.test.ts` 는 엔진의 답을 **우리가** 만든다.
  * 그러면 「우리가 상상한 프로토콜」만 검증된다. 여기서는 엔진이 실제로 무엇을
- * 말하는지가 답이다. W0-1 에서 빈 판의 7,7 을 성공으로 읽었던 것과 같은 종류의
- * 착각을 막는 유일한 방법이다.
+ * 말하는지가 답이고, 그 덕에 이 스모크가 W4 의 큰 사실 하나를 찾아냈다:
+ *
+ *   **Rapfi 는 `yxswap2step*` / `yxsoosorvstep*` 를 모른다.** 그 둘은 Yixin 의
+ *   명령이고 데스크톱 main.c 가 말을 거는 상대가 Yixin 이다. Rapfi 의 명령표
+ *   (`command/gomocup.cpp` @3c94c2a9)에 없으며, GUI 모드는 모르는 명령을
+ *   오류도 없이 삼킨다. 앱(RapfiDroid)도 같은 명령을 보내고 같은 침묵을 받는데,
+ *   그쪽 시험도 `FakeEngine` 이라 여태 드러나지 않았다.
+ *
+ * 그래서 여기서 도는 개시는 **엔진의 협상 명령이 필요 없는 셋**이다(자유 렌주,
+ * RIF, 첫 수 이후 교환). Soosorv-8 과 스왑2 는 「협상이 된다」가 아니라
+ * 「막혔을 때 판이 잠기지 않는다」를 본다.
  */
 import { chromium, type Page } from "playwright";
 import { createServer } from "node:http";
@@ -111,144 +119,10 @@ async function waitStones(n: number, timeoutMs = 60_000, why = "") {
   throw new Error(`돌 ${n}개를 기다렸으나 ${await stoneCount()}개 ${why}`);
 }
 
-/** 돌 수가 `from` 보다 커질 때까지. 「누구 차례인지」를 몰라도 되는 기다림이다. */
-async function waitGrew(from: number, timeoutMs = 90_000) {
-  const t0 = Date.now();
-  while (Date.now() - t0 < timeoutMs) {
-    if ((await stoneCount()) > from) return;
-    await page.waitForTimeout(250);
-  }
-  throw new Error(`돌이 ${from}개에서 더 늘지 않습니다`);
-}
-
-/**
- * 5수 후보를 몇 개 내라고 하는가. 협상 pane 의 안내문에 굵게 적힌 수다.
- * 그 단계가 아니면 0 — 엔진이 다른 갈래로 갔다는 뜻이고 그것도 정상이다.
- */
-async function fifthCountAsked(timeoutMs: number): Promise<number> {
-  const t0 = Date.now();
-  const el = page.locator(".panel__hint[data-k=fifth] strong");
-  while (Date.now() - t0 < timeoutMs) {
-    if (await el.count()) {
-      const n = Number(/(\d+)/.exec((await el.textContent()) ?? "")?.[1] ?? 0);
-      if (n > 0) return n;
-    }
-    await page.waitForTimeout(200);
-  }
-  return 0;
-}
-
 /** 지금 떠 있는 물음의 종류. 없으면 null. */
 async function prompt(): Promise<string | null> {
   const el = page.locator(".ask[data-prompt]");
   return (await el.count()) ? el.first().getAttribute("data-prompt") : null;
-}
-
-/**
- * 5수 후보를 놓을 후보 자리들 — **넉넉히 둔다.**
- *
- * 엔진의 4수가 어디에 놓일지는 모르고, 하필 우리가 고른 자리면 그 탭은 「이미
- * 돌이 있음」으로 조용히 무시된다. 그래서 개시에서 먼 자리를 여덟 개보다 많이
- * 준비하고, **놓인 것을 세어 가며** 다음 자리로 넘어간다.
- */
-const FIFTH_SPOTS: readonly [number, number][] = [
-  [1, 1],
-  [1, 3],
-  [1, 5],
-  [3, 1],
-  [5, 1],
-  [13, 13],
-  [13, 11],
-  [11, 13],
-  [1, 13],
-  [13, 1],
-  [1, 7],
-  [13, 7],
-];
-
-/** `need` 개가 실제로 놓일 때까지 자리 목록을 훑는다. */
-async function placeFifths(need: number): Promise<void> {
-  const base = await stoneCount();
-  for (const [x, y] of FIFTH_SPOTS) {
-    if ((await stoneCount()) >= base + need) return;
-    await tap(x, y);
-  }
-  const placed = (await stoneCount()) - base;
-  if (placed < need) throw new Error(`5수 후보 ${need}개 중 ${placed}개만 놓였습니다`);
-}
-
-/**
- * 협상을 끝까지 몬다 — **묻는 것에 답할 뿐, 수순을 기대하지 않는다.**
- *
- * 처음에는 「2단계 → swap 물음 → 5수 N개」라는 한 갈래만 기다렸다. 그러나
- * 그 갈래를 고르는 것은 엔진이다(교환을 받아 버리면 물음의 종류부터 다르다).
- * 특정 수순을 못 박은 시험은 엔진이 정당하게 다른 길로 갔을 때 빨갛게 되고,
- * 그건 회귀가 아니라 시험의 착각이다.
- *
- * @returns 실제로 지나온 단계들
- */
-async function negotiate(maxRounds = 12): Promise<string[]> {
-  const seen: string[] = [];
-  for (let round = 0; round < maxRounds; round++) {
-    const kind = await waitSettle();
-    if (kind === null) {
-      // 물음이 없다 — 5수 후보를 놓으라는 단계일 수 있다.
-      const need = await fifthCountAsked(2_000);
-      if (need === 0) return seen; // 협상 끝
-      seen.push(`5수 후보 ${need}개`);
-      await placeFifths(need);
-      // 엔진이 하나를 고르면 판이 **넷으로 되감기고** 그 하나가 5수가 된다.
-      await waitStones(5, 150_000, "(엔진의 5수 선택)");
-      seen.push("엔진이 5수 선택");
-      continue;
-    }
-
-    seen.push(kind);
-    switch (kind) {
-      case "swap":
-        // 「그대로」 — 우리가 잡은 색을 지킨다. 어느 쪽이든 협상은 이어진다.
-        await click("그대로");
-        break;
-      case "fifthCount":
-        await click("3");
-        break;
-      case "swapInfo":
-      case "info":
-        await click("확인");
-        break;
-      case "illegalOpening":
-        throw new Error("개시 영역 검사가 정상 개시를 물렸습니다");
-      case "forbidden":
-        await click("확인");
-        break;
-      default:
-        throw new Error(`협상에서 뜻밖의 물음: ${kind}`);
-    }
-    await page.waitForTimeout(400);
-  }
-  throw new Error(`협상이 ${maxRounds}바퀴에 안 끝납니다: ${seen.join(" → ")}`);
-}
-
-/**
- * 화면이 잠잠해질 때까지 기다린 뒤 지금 떠 있는 물음을 돌려준다.
- * 엔진이 생각하는 동안은 물음도 없고 판도 그대로라, 그 둘이 함께 멎어야
- * 「지금이 우리 차례」다.
- */
-async function waitSettle(timeoutMs = 150_000): Promise<string | null> {
-  const t0 = Date.now();
-  let last = -1;
-  let stable = 0;
-  while (Date.now() - t0 < timeoutMs) {
-    const p = await prompt();
-    if (p) return p;
-    const n = await stoneCount();
-    stable = n === last ? stable + 1 : 0;
-    last = n;
-    // 1.5초 동안 판이 그대로면 엔진은 말을 마쳤다.
-    if (stable >= 6) return null;
-    await page.waitForTimeout(250);
-  }
-  throw new Error("협상이 멎지 않습니다 — 엔진이 계속 생각 중입니다");
 }
 
 /** 칩·버튼은 이름으로 집는다 — 순서는 화면을 손볼 때마다 바뀐다. */
@@ -374,40 +248,84 @@ try {
   if (!drawn.includes("무승부")) fail(`무승부 결과가 표시되지 않습니다: ${drawn}`);
   else ok(`무승부 → ${drawn}`);
 
-  // ── 5. Soosorv-8 협상 전체 흐름 ───────────────────────────────────
+  // ── 5. RIF 오프닝 — 첫 세 수를 손으로 ─────────────────────────────
   //
-  // 여기가 이 스모크의 본론이다. 첫 세 수를 손으로 놓으면 그 뒤는 엔진이
-  // 이끈다 — 교환을 물을 수도, 4수와 N 을 낼 수도 있다. **어느 갈래로 갈지는
-  // 엔진이 정한다.** 그래서 특정 수순을 기대하지 않고, 묻는 것에 답하며
-  // 「협상이 끝나고 평범한 대국으로 이어지는가」를 본다.
-  console.log("\n5. Soosorv-8 — 협상 전체");
-  await click("Soosorv-8"); // 규칙을 바꾸면 새 대국이다
+  // RIF 는 협상 명령이 오가지 않는다. 첫 세 수를 개시 영역 안에 손으로 놓고
+  // 그 뒤는 평범한 대국이다 — 그래서 이 엔진에서도 온전히 돈다.
+  console.log("\n5. RIF 오프닝");
+  await click("RIF 오프닝"); // 규칙을 바꾸면 새 대국이다
   await click("컴퓨터 백");
-
-  // 개시 영역: 1수 천원, 2수 한 점 이내, 3수 두 점 이내.
   await tap(7, 7);
   await tap(8, 7);
   await tap(9, 5);
-  const opened = await stoneCount();
-  if (opened !== 3) fail(`개시 세 수가 놓이지 않았습니다: ${opened}개`);
+  const rifOpened = await stoneCount();
+  if (rifOpened !== 3) fail(`개시 세 수가 놓이지 않았습니다: ${rifOpened}개`);
   else ok("개시 세 수를 손으로 놓았다");
+  // 세 수가 차면 백 차례 — 엔진이 받는다.
+  await waitStones(4, 90_000, "(RIF 개시 뒤 엔진의 4수)");
+  ok("세 수 뒤 엔진이 이어받았다");
 
-  const seen = await negotiate();
-  if (seen.length === 0) fail("협상이 한 번도 말을 걸지 않았습니다");
-  else ok(`협상 단계: ${seen.join(" → ")}`);
+  // ── 6. 첫 수 이후 교환 ────────────────────────────────────────────
+  //
+  // 교환 여부를 **데스크톱이 스스로** 정하는 규칙이라(main.c:2771) 엔진의
+  // 협상 명령이 필요 없다. 그래서 이 엔진에서도 온전히 돈다.
+  console.log("\n6. 첫 수 이후 교환");
+  await click("첫 수 이후 교환");
+  await click("컴퓨터 백");
+  await tap(7, 7); // 천원 — 먼 개시라 교환 조건에 걸린다
+  await page.waitForTimeout(600);
+  if ((await prompt()) === "swapInfo") {
+    ok("엔진이 색을 가져가고 알렸다");
+    await click("확인");
+    // 이제 우리가 백이다 — 한 수 두면 엔진(흑)이 답한다.
+    await tap(5, 5);
+    await waitStones(3, 90_000, "(교환 뒤 엔진의 3수)");
+    ok("색이 넘어간 뒤에도 차례가 돈다");
+  } else {
+    // 교환하지 않았으면 엔진이 백으로 그대로 이어 둔다.
+    await waitStones(2, 90_000, "(교환 없이 엔진의 2수)");
+    ok("교환 없이 엔진이 이어 뒀다");
+  }
 
-  const settled = await stoneCount();
-  if (settled < 4) fail(`협상이 끝났는데 판이 ${settled}개뿐입니다`);
-  else ok(`협상 종료 — 돌 ${settled}개`);
+  // ── 7. Soosorv-8 · 스왑2 — 이 엔진이 답하지 못하는 협상 ───────────
+  //
+  // **Rapfi 는 `yxsoosorvstep*` / `yxswap2step*` 를 모른다.** 그 둘은 Yixin 의
+  // 명령이고, 데스크톱 main.c 가 말을 거는 상대가 Yixin 이다. Rapfi 의 명령표
+  // (`command/gomocup.cpp` @3c94c2a9)에는 없으며 GUI 모드에서는 모르는 명령을
+  // 오류도 없이 삼킨다 — 그래서 답이 영원히 오지 않는다.
+  //
+  // 여기서 보는 것은 「협상이 된다」가 아니라 **「막혔을 때 판이 잠기지
+  // 않는다」**다. 감시견이 기다림을 풀고 사람에게 사실을 알려야 한다.
+  console.log("\n7. Soosorv-8 · 스왑2 — 엔진이 답하지 않는 협상");
 
-  // 협상이 끝났으면 그 뒤로는 평범한 대국이어야 한다. 몇 수째인지는 위
-  // 갈래에 따라 다르므로 **자라는지**만 본다 — 엔진 차례면 저절로, 사람
-  // 차례면 한 번 눌러서.
-  // 협상에서 구석을 여럿 썼을 수 있으니 아직 비어 있을 자리를 고른다.
-  if (settled % 2 === 0) await tap(7, 12);
-  await waitGrew(settled, 150_000);
-  ok(`협상 뒤 평범한 대국으로 이어진다 (돌 ${await stoneCount()}개)`);
+  // 개시 영역 검사는 **우리가** 한다(앱과 같이 Soosorv 에서만) — 엔진과 무관하다.
+  await click("Soosorv-8");
+  await click("컴퓨터 백");
+  await tap(0, 0);
+  await tap(1, 1);
+  await tap(2, 2);
+  await page.waitForTimeout(400);
+  if ((await prompt()) !== "illegalOpening") fail("개시 영역 위반을 알리지 않습니다");
+  else ok("개시 영역 위반을 잡아 판을 되돌렸다");
+  await click("확인");
 
+  await click("스왑2");
+  await click("컴퓨터 백");
+  await tap(7, 7);
+  await tap(8, 7);
+  await tap(8, 8); // 셋째 돌 뒤에 yxswap2step2 가 나간다
+  await page.waitForTimeout(600);
+
+  // 감시견이 풀어 줄 때까지. 이게 없으면 판은 영영 «엔진이 생각 중»이다.
+  await page.locator('.ask[data-prompt="info"]').waitFor({ timeout: 40_000 });
+  ok("협상이 막혀도 감시견이 기다림을 풀었다");
+  await click("확인");
+
+  // 그리고 사용자는 빠져나올 수 있어야 한다 — 자유 렌주로 돌아가 이어 둔다.
+  await click("자유 렌주");
+  await tap(7, 7);
+  await waitStones(2, 90_000, "(협상이 막힌 뒤 복구)");
+  ok("막힌 협상에서 빠져나와 다시 둘 수 있다");
   if (pageErrors.length) {
     fail(`페이지 오류 ${pageErrors.length}건:\n  ${pageErrors.slice(0, 5).join("\n  ")}`);
   }
