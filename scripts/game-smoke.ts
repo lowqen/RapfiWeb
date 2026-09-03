@@ -95,10 +95,18 @@ const STEP_DIV = 15.5;
  * 보드 y 는 화면에서 아래로 자란다 — 뒤집히는 것은 **사람이 읽는 표기**뿐이다
  * (`label` 이 `size - y` 로 센다). 처음에 여기서 14-y 를 쓴 탓에 둘째 수가
  * 엔진이 방금 둔 자리를 눌러 조용히 무시됐다.
+ *
+ * **먼저 보드를 화면 안으로 들인다.** `mouse.click` 은 뷰포트 좌표를 쓰는데,
+ * 바로 앞의 `locator.click()`(칩·버튼)이 그 요소를 보이게 하려고 페이지를
+ * 스크롤한다. 옆 칸이 길어지자 보드가 위로 424px 밀려 `boundingBox().y` 가
+ * 음수가 됐고, 탭이 뷰포트 밖을 눌러 **아무 일도 일어나지 않았다**.
  */
 async function tap(x: number, y: number) {
-  const view = await page.locator(".board__view").boundingBox();
+  const board = page.locator(".board__view");
+  await board.scrollIntoViewIfNeeded();
+  const view = await board.boundingBox();
   if (!view) throw new Error("보드가 화면에 없습니다");
+  if (view.y < 0) throw new Error(`보드가 화면 위로 밀려 있습니다(y=${Math.round(view.y)})`);
   const step = view.width / STEP_DIV;
   await page.mouse.click(view.x + step * (0.75 + x), view.y + step * (0.75 + y));
   await page.waitForTimeout(120);
