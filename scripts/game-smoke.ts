@@ -106,7 +106,7 @@ async function tap(x: number, y: number) {
   await board.scrollIntoViewIfNeeded();
   const view = await board.boundingBox();
   if (!view) throw new Error("보드가 화면에 없습니다");
-  if (view.y < 0) throw new Error(`보드가 화면 위로 밀려 있습니다(y=${Math.round(view.y)})`);
+  if (view.y < 0) throw new Error(`보드가 화면 위로 밀렸습니다 (y=${view.y})`);
   const step = view.width / STEP_DIV;
   await page.mouse.click(view.x + step * (0.75 + x), view.y + step * (0.75 + y));
   await page.waitForTimeout(120);
@@ -310,10 +310,25 @@ try {
   // 손으로 놓는 개시(RIF)에서 천원 둘레를 벗어나면 판을 되돌리고 알린다.
   // **엔진과 무관하다** — 데스크톱도 이건 스스로 판정한다(main.c:2786).
   console.log("\n7. 개시 영역 검사");
+  await click("RIF 오프닝"); // 개시를 고르면 새 대국이다
   await click("컴퓨터 백");
-  await click("RIF 오프닝");
+
+  // **앞 단계의 상태를 물려받지 않는다.** 6단계에서 엔진이 색을 가져가
+  // 컴퓨터가 흑이 되어 있었고, 그 상태로 개시를 놓으면 첫 탭이 «두어라»로
+  // 읽혀 엔진이 대신 둔다 — 그러면 검사할 국면 자체가 만들어지지 않는다.
+  // 그래서 고른 값이 실제로 반영됐는지 확인하고 들어간다.
+  const sideOn = await page
+    .getByRole("button", { name: "컴퓨터 백", exact: true })
+    .getAttribute("aria-pressed");
+  if (sideOn !== "true") fail(`컴퓨터 색이 백이 아닙니다: aria-pressed=${sideOn}`);
+  if ((await stoneCount()) !== 0) fail("새 대국인데 판이 비어 있지 않습니다");
+
+  // 두 수는 그냥 놓인다. **검사는 셋째 수에서 돈다** — 그 자리에서 판이
+  // 되돌아가므로 셋째 뒤에 돌 수를 세면 3이 아니라 0이다.
   await tap(0, 0);
+  if ((await stoneCount()) !== 1) fail("개시 1수가 놓이지 않았습니다");
   await tap(1, 1);
+  if ((await stoneCount()) !== 2) fail("개시 2수가 놓이지 않았습니다");
   await tap(2, 2);
   await page.waitForTimeout(500);
   if ((await prompt()) !== "illegalOpening") fail("개시 영역 위반을 알리지 않습니다");
