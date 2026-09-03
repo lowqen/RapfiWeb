@@ -109,7 +109,12 @@ jobs:
           fi
           echo "확인됨."
 
+      - name: Playwright(Chromium) 설치
+        if: env.TARGET == 'cloudflare'
+        run: pnpm exec playwright install --with-deps chromium
+
       - name: Cloudflare Pages 배포
+        id: cf
         if: env.TARGET == 'cloudflare'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -130,4 +135,23 @@ jobs:
           pnpm dlx wrangler@3 pages deploy dist \
             --project-name "$PROJECT" \
             --branch "${{ github.ref_name }}" \
-            --commit-dirty=true
+            --commit-dirty=true | tee deploy.log
+
+          # 이 배포만의 주소와 프로덕션 주소를 둘 다 남긴다.
+          url=$(grep -oE 'https://[^ ]+\.pages\.dev' deploy.log | tail -1)
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          {
+            echo "### 배포 완료"
+            echo
+            echo "- 이 배포: $url"
+            echo "- 프로덕션: https://$PROJECT.pages.dev"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # 「올라갔다」와 「돈다」는 다르다. 배포된 주소에서 엔진을 실제로 띄워
+      # 렌주로 착수·분석·정지까지 한 바퀴 돈다 — CI 안의 dist 가 아니라 CDN 이
+      # 내주는 파일로. MIME(.wasm), 캐시 헤더, SPA 폴백이 여기서만 드러난다.
+      - name: 배포 검증 — 실제 주소에서 렌주 엔진
+        if: env.TARGET == 'cloudflare'
+        env:
+          SMOKE_BASE_URL: ${{ steps.cf.outputs.url }}
+        run: pnpm exec tsx scripts/engine-smoke.ts

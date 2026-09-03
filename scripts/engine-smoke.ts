@@ -18,15 +18,23 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const DIST = resolve(HERE, "../dist");
 const PORT = Number(process.env.SMOKE_PORT ?? 4181);
 
+/**
+ * `SMOKE_BASE_URL` 을 주면 **이미 떠 있는 사이트**를 검사한다(배포 확인용).
+ * 없으면 여기서 dist 를 띄워 검사한다(CI 기본).
+ */
+const REMOTE = process.env.SMOKE_BASE_URL?.replace(/\/$/, "") ?? "";
+const BASE = REMOTE || `http://localhost:${PORT}`;
+
 const GLUE = join(DIST, "engine/rapfi-single-simd128.js");
 const WASM = join(DIST, "engine/rapfi-single-simd128.wasm");
 const DATA = join(DIST, "engine/rapfi-single-simd128.data");
 
-if (!existsSync(GLUE) || !existsSync(WASM) || !existsSync(DATA)) {
+if (!REMOTE && (!existsSync(GLUE) || !existsSync(WASM) || !existsSync(DATA))) {
   console.log("엔진 산출물이 없어 건너뜁니다 (dist/engine/rapfi-single-simd128.{js,wasm,data}).");
   console.log("  engine-release.yml 을 한 번 돌리면 채워집니다.");
   process.exit(0);
 }
+if (REMOTE) console.log(`원격 검사: ${REMOTE}`);
 
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -57,7 +65,7 @@ const fail = (m: string) => {
   process.exitCode = 1;
 };
 
-await new Promise<void>((r) => server.listen(PORT, r));
+if (!REMOTE) await new Promise<void>((r) => server.listen(PORT, r));
 const browser = await chromium.launch();
 let page: import("playwright").Page | null = null;
 const pageErrors: string[] = [];
@@ -106,7 +114,7 @@ try {
     if (m.type() === "error") errors.push("[console] " + m.text());
   });
 
-  await page.goto(`http://localhost:${PORT}/board`, { waitUntil: "networkidle" });
+  await page.goto(`${BASE}/board`, { waitUntil: "networkidle" });
 
   // 1. 엔진 기동. 40MB .data 를 받고 가중치를 푸는 시간이 든다.
   const t0 = Date.now();
@@ -204,5 +212,5 @@ try {
   fail(first);
 } finally {
   await browser.close();
-  server.close();
+  if (!REMOTE) server.close();
 }
