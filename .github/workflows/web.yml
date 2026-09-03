@@ -79,6 +79,11 @@ jobs:
       - name: 엔진 스모크 — 클릭 -> 분석 -> 보드
         run: pnpm exec tsx scripts/engine-smoke.ts
 
+      # W4 부터: 분석이 아니라 **대국**을 돈다. 협상은 엔진이 실제로 무엇을
+      # 말하는지가 답이라, 우리가 답을 만들어 넣는 단위 시험으로는 닿지 않는다.
+      - name: 대국 스모크 — 협상·시계·기권까지 한 판
+        run: pnpm exec tsx scripts/game-smoke.ts
+
       # RenjuNet 오염 게이트. 이 저장소에서 가장 중요한 CI 단계다 —
       # 앱은 실수로 포함해도 기기에 머물지만, 웹은 그 순간 «온라인 시스템에 게시»가
       # 되어 라이선스를 바로 위반한다.

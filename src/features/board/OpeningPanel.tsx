@@ -30,7 +30,7 @@ export function OpeningPanel() {
       {g.prompt && <Prompt />}
 
       {g.offeringFifth && !g.prompt && (
-        <p className="panel__hint">
+        <p className="panel__hint" data-k="fifth">
           5수 후보를 <strong>{g.fifthCount}개</strong> 놓으세요. 지금까지 {Math.max(0, stones - 4)}
           개 — 다 놓으면 상대가 그중 하나를 고릅니다.
         </p>
@@ -122,6 +122,7 @@ function Prompt() {
     case "swap":
       return (
         <Ask
+          kind={p.kind}
           text={
             p.fifthCount === undefined
               ? "색을 교환하시겠습니까?"
@@ -139,7 +140,7 @@ function Prompt() {
 
     case "swap2":
       return (
-        <Ask text="셋 중 하나를 고르세요.">
+        <Ask kind={p.kind} text="셋 중 하나를 고르세요.">
           {(["stayWhite", "swap", "addTwo"] as Swap2Choice[]).map((c) => (
             <button key={c} type="button" onClick={() => g.answerSwap2(c)}>
               {SWAP2_CHOICE_LABEL[c]}
@@ -150,7 +151,7 @@ function Prompt() {
 
     case "fifthCount":
       return (
-        <Ask text="5수 후보를 몇 개 낼까요?">
+        <Ask kind={p.kind} text="5수 후보를 몇 개 낼까요?">
           {FIFTH_COUNT_RANGE.map((n) => (
             <button key={n} type="button" onClick={() => g.answerFifthCount(n)}>
               {n}
@@ -161,7 +162,7 @@ function Prompt() {
 
     case "swapInfo":
       return (
-        <Ask text="상대가 색을 가져갔습니다.">
+        <Ask kind={p.kind} text="상대가 색을 가져갔습니다.">
           <button type="button" onClick={g.dismissPrompt}>
             확인
           </button>
@@ -170,7 +171,7 @@ function Prompt() {
 
     case "illegalOpening":
       return (
-        <Ask text={ILLEGAL_OPENING}>
+        <Ask kind={p.kind} text={ILLEGAL_OPENING}>
           <button type="button" onClick={g.dismissPrompt}>
             확인
           </button>
@@ -179,7 +180,7 @@ function Prompt() {
 
     case "forbidden":
       return (
-        <Ask text={`${label(p.cell)} 은 흑의 금수입니다.`}>
+        <Ask kind={p.kind} text={`${label(p.cell)} 은 흑의 금수입니다.`}>
           <button type="button" onClick={g.dismissPrompt}>
             확인
           </button>
@@ -188,7 +189,7 @@ function Prompt() {
 
     case "timeout":
       return (
-        <Ask text="시간이 다 됐습니다.">
+        <Ask kind={p.kind} text="시간이 다 됐습니다.">
           <button type="button" onClick={g.dismissPrompt}>
             확인
           </button>
@@ -197,7 +198,7 @@ function Prompt() {
 
     case "info":
       return (
-        <Ask text={p.text}>
+        <Ask kind={p.kind} text={p.text}>
           <button type="button" onClick={g.dismissPrompt}>
             확인
           </button>
@@ -206,9 +207,11 @@ function Prompt() {
   }
 }
 
-function Ask({ text, children }: { text: string; children: ReactNode }) {
+function Ask({ kind, text, children }: { kind: string; text: string; children: ReactNode }) {
   return (
-    <div className="ask panel-enter">
+    // `data-prompt` 는 스모크가 «지금 무엇을 묻고 있나»를 문구가 아니라
+    // 종류로 집게 한다 — 문구는 다듬을 수 있고 종류는 프로토콜의 것이다.
+    <div className="ask panel-enter" data-prompt={kind}>
       <p className="ask__text">{text}</p>
       <div className="ask__actions">{children}</div>
     </div>

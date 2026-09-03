@@ -155,3 +155,12 @@ jobs:
         env:
           SMOKE_BASE_URL: ${{ steps.cf.outputs.url }}
         run: pnpm exec tsx scripts/engine-smoke.ts
+
+      # 분석이 흐르는 것과 **한 판 두는 것**은 다르다. 차례가 오가고, 시계가
+      # 줄고, 협상이 끝까지 가고, 기권이 판을 닫는가 — W4 의 검수 항목이다.
+      # 단위 시험은 엔진의 답을 우리가 만들어 넣으므로 여기서만 드러나는 것이 있다.
+      - name: 배포 검증 — 실제로 한 판 둔다
+        if: env.TARGET == 'cloudflare'
+        env:
+          SMOKE_BASE_URL: ${{ steps.cf.outputs.url }}
+        run: pnpm exec tsx scripts/game-smoke.ts

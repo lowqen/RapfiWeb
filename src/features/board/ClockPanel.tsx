@@ -55,14 +55,21 @@ function ClockFace({ side, label }: { side: ClockSide; label: string }) {
   const urgent = isUrgent(clock, side);
 
   return (
-    <div className="clock" data-active={active || undefined} data-urgent={urgent || undefined}>
+    <div
+      className="clock"
+      // 스모크가 순서가 아니라 **이름**으로 집는다 — 시계 두 칸의 좌우가 바뀌어도
+      // 시험이 헛짚지 않게. W3 에서 `.kv dd` 의 순서로 집었다가 두 번 깨졌다.
+      data-side={side}
+      data-active={active || undefined}
+      data-urgent={urgent || undefined}
+    >
       <span className="clock__label">{label}</span>
-      <span className="clock__big tnum">
+      <span className="clock__big tnum" data-k="big">
         {clock.limited
           ? formatShort(leftTurnMs(clock, side))
           : formatShort(usedTurnMs(clock, side))}
       </span>
-      <span className="clock__sub tnum">
+      <span className="clock__sub tnum" data-k="sub">
         {clock.limited
           ? `대국 ${format(leftMatchMs(clock, side))}`
           : `합계 ${format(usedMatchMs(clock, side))}`}
