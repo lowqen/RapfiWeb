@@ -276,6 +276,19 @@ export const useGameStore = create<GameState>((set, get) => {
     }
   };
 
+  // 엔진 쪽에 처리기를 걸어 둔다. `engine-state` 는 「대국」을 모르고, 대국이
+  // 자기 손잡이를 등록한다 — 두 모듈이 서로를 import 하지 않게 하는 방향이다.
+  //
+  // **`return` 앞이어야 한다.** 처음에는 파일 맨 아래, 아래쪽 함수 선언들 뒤에
+  // 두었는데 그 자리는 `return` 다음이라 **한 번도 실행되지 않았다**. 선언은
+  // 끌어올려지지만 호출문은 아니다 — 엔진의 답이 대국에 닿지 않아 협상이
+  // 통째로 죽어 있었고, 시험 열넷이 그것을 잡았다.
+  setGameHandlers({
+    onEngineMove,
+    onOpening,
+    onForbid: (cells) => board().setForbidden(get().showForbidden ? cells : []),
+  });
+
   return {
     computerSide: "none",
     opening: "none",
@@ -786,11 +799,4 @@ export const useGameStore = create<GameState>((set, get) => {
     if (r.move) place(r.move);
   }
 
-  // 엔진 쪽에 처리기를 걸어 둔다. `engine-state` 는 「대국」을 모르고, 대국이
-  // 자기 손잡이를 등록한다 — 두 모듈이 서로를 import 하지 않게 하는 방향이다.
-  setGameHandlers({
-    onEngineMove,
-    onOpening,
-    onForbid: (cells) => board().setForbidden(get().showForbidden ? cells : []),
-  });
 });
