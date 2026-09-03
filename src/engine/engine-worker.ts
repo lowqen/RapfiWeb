@@ -1,7 +1,12 @@
 /// <reference lib="webworker" />
 import { CoordMapper, parse, serialize } from "./engine-protocol";
 import { SearchAggregator } from "./engine-aggregator";
-import { toSerializable, type FromWorker, type ToWorker } from "./engine-types";
+import {
+  toSerializable,
+  type EngineCommand,
+  type FromWorker,
+  type ToWorker,
+} from "./engine-types";
 
 /**
  * 엔진 워커 — Emscripten 모듈을 만지는 유일한 자리.
@@ -54,6 +59,30 @@ interface EmscriptenModule {
 type ModuleFactory = (opts: Partial<EmscriptenModule>) => Promise<EmscriptenModule>;
 
 const post = (m: FromWorker) => self.postMessage(m);
+
+/**
+ * 예외를 사람이 읽을 문장으로.
+ *
+ * `String(e)` 만 쓰면 안 된다. Emscripten 이 던지는 `ExitStatus` 는 Error 가 아니라
+ * **평범한 객체**라, 화면에 «[object Object]» 만 뜨고 원인이 통째로 사라진다 —
+ * 실제로 그렇게 나와서 한 런을 헤맸다.
+ */
+function describe(e: unknown): string {
+  if (e instanceof Error) return e.stack ?? e.message;
+  if (typeof e === "string") return e;
+  if (e && typeof e === "object") {
+    const o = e as Record<string, unknown>;
+    if (o.name === "ExitStatus" || typeof o.status === "number") {
+      return `엔진이 종료했습니다 (ExitStatus ${String(o.status)}) — 분석 중 exit 가 불렸습니다`;
+    }
+    try {
+      return JSON.stringify(e) ?? String(e);
+    } catch {
+      return String(e);
+    }
+  }
+  return String(e);
+}
 
 let mod: EmscriptenModule | null = null;
 let coord = new CoordMapper();
@@ -143,8 +172,32 @@ function loadFactory(baseUrl: string, variant: string): ModuleFactory {
   return factory as ModuleFactory;
 }
 
-const send = (lines: readonly string[]) => {
-  for (const l of lines) mod?.sendCommand(l);
+/**
+ * 명령 하나를 보낸다. **여러 줄짜리 명령은 한 번의 `sendCommand` 로 보내야 한다.**
+ *
+ * `preamble.js` 의 펌프는 이렇게 생겼다:
+ *
+ *     Module["sendCommand"] = function (data) {
+ *       stdin_queue.push(data + "\n");
+ *       execute_command();            // = gomocupLoopOnce()
+ *     };
+ *
+ * 즉 **넣자마자 프로토콜을 한 바퀴 돌린다.** `BOARD`/`YXBOARD` 처럼 뒤에 돌 목록과
+ * `DONE` 이 따라오는 블록 명령을 줄 단위로 나눠 보내면, 엔진이 `YXBOARD` 를 읽은
+ * 그 순간 큐가 비어 있어 `stdin()` 이 null(=EOF)을 돌려준다. 돌이 하나도 없는
+ * 빈 국면이 세워지고, 뒤이어 도착한 `7,7,1` 같은 줄은 **명령으로** 해석된다.
+ *
+ * W0 스파이크가 이걸 놓쳤다: BOARD 를 줄 단위로 보내고 `7,7` 을 받아 「통과」로
+ * 적었는데, 7,7 은 15×15 의 정중앙이다 — 빈 판에서 엔진이 두는 자리 그대로였다.
+ * 국면이 전달됐다는 증거가 아니라 전달되지 **않았다**는 증거였던 셈이다.
+ */
+const sendCommand = (lines: readonly string[]) => {
+  if (lines.length) mod?.sendCommand(lines.join("\n"));
+};
+
+/** 명령 여러 개를 순서대로. 각각이 자기만의 `sendCommand` 호출이 된다. */
+const sendAll = (cmds: readonly EngineCommand[]) => {
+  for (const c of cmds) sendCommand(serialize(c, coord));
 };
 
 async function boot(msg: Extract<ToWorker, { type: "boot" }>) {
@@ -166,10 +219,12 @@ async function boot(msg: Extract<ToWorker, { type: "boot" }>) {
 
   // 기동 직후 상세 모드로 바꾼다. 이걸 안 보내면 INFO PV/DEPTH/EVAL/WINRATE 가
   // 한 줄도 오지 않고 분석 UI 가 통째로 빈다(데스크톱도 init_engine 에서 같은 짝을 보낸다).
-  send(serialize({ kind: "showDetail", level: 3 }, coord));
-  send(serialize({ kind: "yxshowinfo" }, coord));
-  send(serialize({ kind: "start", size: msg.size }, coord));
-  send(serialize({ kind: "about" }, coord));
+  sendAll([
+    { kind: "showDetail", level: 3 },
+    { kind: "yxshowinfo" },
+    { kind: "start", size: msg.size },
+    { kind: "about" },
+  ]);
 
   // ABOUT 응답이 위 drain 을 지나 콘솔에 들어가 있다. 버전만 뽑아 올린다.
   const about =
@@ -199,12 +254,11 @@ async function search(msg: Extract<ToWorker, { type: "search" }>) {
   // 국면은 **한 번만** 세운다. 데스크톱도 분석마다 `yxboard` 를 한 번 보내고
   // START 는 세션 내내 보내지 않는다 — START 는 엔진을 리셋한다
   // (EngineRepositoryImpl.analyze 의 주석이 그 이유를 적어 두었다).
-  send(msg.setup.flatMap((c) => serialize(c, coord)));
-  const repeat = msg.repeat.flatMap((c) => serialize(c, coord));
+  sendAll(msg.setup);
 
   // sliceMs = 0 은 「분할하지 않는다」 — 멀티스레드 변형이 살아난 뒤의 설정이다.
   if (sliceMs <= 0) {
-    send(repeat);
+    sendAll(msg.repeat);
     searching = false;
     maybeEmitSnapshot(true);
     post({ type: "searchDone", reason: "finished", elapsedMs: Math.round(performance.now() - t0) });
@@ -217,7 +271,8 @@ async function search(msg: Extract<ToWorker, { type: "search" }>) {
     if (left <= 0) break;
     // 조각 하나: 이만큼만 생각하고 돌아온다. 해시 테이블이 남아 있으므로 다음
     // 조각은 이어서 깊어진다 — 매번 처음부터 다시 세는 것이 아니다.
-    send([`INFO timeout_turn ${Math.min(sliceMs, Math.ceil(left))}`, ...repeat]);
+    sendCommand([`INFO timeout_turn ${Math.min(sliceMs, Math.ceil(left))}`]);
+    sendAll(msg.repeat);
     maybeEmitSnapshot(true);
     await yieldToLoop(); // ← 정지 요청이 들어올 수 있는 유일한 지점
   }
@@ -225,7 +280,7 @@ async function search(msg: Extract<ToWorker, { type: "search" }>) {
 
   // 조각 사이에는 엔진이 놀고 있으므로 여기서 YXSTOP 은 무해하다.
   // 앱도 분석 흐름을 닫을 때 같은 것을 보낸다(awaitClose).
-  send(serialize({ kind: "stop" }, coord));
+  sendAll([{ kind: "stop" }]);
 
   searching = false;
   maybeEmitSnapshot(true);
@@ -241,7 +296,7 @@ self.onmessage = async (ev: MessageEvent<ToWorker>) => {
         await boot(msg);
         break;
       case "send":
-        send(msg.commands.flatMap((c) => serialize(c, coord)));
+        sendAll(msg.commands);
         maybeEmitSnapshot(true);
         break;
       case "search":
@@ -250,17 +305,17 @@ self.onmessage = async (ev: MessageEvent<ToWorker>) => {
       case "stop":
         stopRequested = true;
         // 탐색 중이 아닐 때만 닿는다. 탐색 중이면 조각 경계에서 위 루프가 본다.
-        if (!searching) send(serialize({ kind: "stop" }, coord));
+        if (!searching) sendAll([{ kind: "stop" }]);
         break;
       case "shutdown":
         try {
-          send(serialize({ kind: "end" }, coord));
+          sendAll([{ kind: "end" }]);
         } catch {
           // END 는 정상 종료라 ExitStatus 를 던진다. 오류가 아니다.
         }
         break;
     }
   } catch (e) {
-    post({ type: "fatal", message: e instanceof Error ? (e.stack ?? e.message) : String(e) });
+    post({ type: "fatal", message: describe(e) });
   }
 };
