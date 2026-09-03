@@ -299,8 +299,12 @@ try {
   console.log("\n7. Soosorv-8 · 스왑2 — 엔진이 답하지 않는 협상");
 
   // 개시 영역 검사는 **우리가** 한다(앱과 같이 Soosorv 에서만) — 엔진과 무관하다.
-  await click("Soosorv-8");
+  //
+  // **색을 먼저 고른다.** 개시 칩은 곧 새 대국이고, 새 대국은 「컴퓨터 흑 +
+  // 스왑2/Soosorv」면 협상을 먼저 연다. 앞 단계에서 색이 흑으로 넘어와 있으면
+  // 여기서 그 협상이 열려 판이 잠긴 채로 시작한다.
   await click("컴퓨터 백");
+  await click("Soosorv-8");
   await tap(0, 0);
   await tap(1, 1);
   await tap(2, 2);
@@ -309,8 +313,8 @@ try {
   else ok("개시 영역 위반을 잡아 판을 되돌렸다");
   await click("확인");
 
-  await click("스왑2");
   await click("컴퓨터 백");
+  await click("스왑2");
   await tap(7, 7);
   await tap(8, 7);
   await tap(8, 8); // 셋째 돌 뒤에 yxswap2step2 가 나간다
