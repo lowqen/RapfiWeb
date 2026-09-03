@@ -308,24 +308,27 @@ try {
   console.log("\n3. 다크 모드 — 시계가 읽히는가");
   await page.evaluate(() => (document.documentElement.dataset.theme = "dark"));
   await page.waitForTimeout(300);
-  const contrast = await page.evaluate(() => {
-    const el = document.querySelector(".clock[data-side=human] [data-k=big]");
+  // **문자열로 넘긴다.** tsx(esbuild)가 keep-names 로 이름 있는 함수에
+  // `__name(...)` 헬퍼를 끼워 넣는데 그 헬퍼는 브라우저에 없다 —
+  // `engine-smoke.ts` 가 같은 자리에서 한 번 죽었고, 여기서 또 죽었다.
+  // 문자열은 변환을 거치지 않는다.
+  const contrast = (await page.evaluate(`(() => {
+    var el = document.querySelector(".clock[data-side=human] [data-k=big]");
     if (!el) return null;
-    const lum = (c: string) => {
-      const m = c.match(/[\d.]+/g)?.map(Number) ?? [0, 0, 0];
-      const [r, g, b] = m.map((v) => {
-        const s = v / 255;
-        return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
-      }) as [number, number, number];
-      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    };
+    function lum(c) {
+      var m = (c.match(/[\\d.]+/g) || [0, 0, 0]).map(Number);
+      var v = m.slice(0, 3).map(function (x) {
+        var s = x / 255;
+        return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+      });
+      return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+    }
     // 배경은 시계 칸에서 온다 — 글자 자체는 배경이 투명하다.
-    const box = el.closest(".clock")!;
-    const fg = lum(getComputedStyle(el).color);
-    const bg = lum(getComputedStyle(box).backgroundColor);
-    const [hi, lo] = fg > bg ? [fg, bg] : [bg, fg];
+    var fg = lum(getComputedStyle(el).color);
+    var bg = lum(getComputedStyle(el.closest(".clock")).backgroundColor);
+    var hi = Math.max(fg, bg), lo = Math.min(fg, bg);
     return (hi + 0.05) / (lo + 0.05);
-  });
+  })()`)) as number | null;
   if (contrast === null) fail("다크 모드에서 시계를 찾지 못했습니다");
   else if (contrast < 4.5) fail(`다크 시계 대비 ${contrast.toFixed(2)}:1 (4.5 미만)`);
   else ok(`다크 모드 시계 대비 ${contrast.toFixed(2)}:1`);
