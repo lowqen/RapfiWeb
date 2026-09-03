@@ -21,8 +21,11 @@ RapfiDroid(안드로이드 오목·렌주 분석반)의 **웹 이식**. Rapfi �
 돌아온다. 나머지 여덟 화면은 라우팅과 셸이 다 연결돼 있고 내용은 「무엇이 될 자리인지」를
 적은 자리표시자다.
 
-엔진은 **자동으로 뜨지 않는다** — 「분석 ▸ 엔진 시작」을 눌러야 뜬다. 40MB 짜리
+엔진은 **자동으로 뜨지 않는다** — 「분석 ▸ 엔진 시작」을 눌러야 뜬다. 20MB 짜리
 가중치를 아무도 요청하지 않았는데 받아 오지 않기 위해서다.
+
+**이 웹 버전은 렌주 전용이다.** 가중치가 규칙마다 10MB 씩이고 Cloudflare 는 파일당
+25MB 가 상한이라, 렌주 흑/백 두 개만 싣는다(`src/core/model/rules.ts`).
 
 ## 로컬 개발 환경
 
@@ -72,7 +75,7 @@ pnpm engine:build          # tools/build_engine_wasm.sh
 `.env` 의 `VITE_ENGINE_BASE_URL` 로 다른 경로를 가리킬 수도 있다.
 
 **빌드하지 않고 받아 쓰는 쪽이 빠르다.** `.js`/`.wasm` 은 이미 저장소에 있고,
-40MB 짜리 `.data` 만 릴리스에서 받으면 된다:
+20MB 짜리 `.data` 만 릴리스에서 받으면 된다:
 
 ```bash
 gh release download engine-3c94c2a9 --dir public/engine \n  --pattern 'rapfi-single-simd128.data'
@@ -85,9 +88,8 @@ gh release download engine-3c94c2a9 --dir public/engine \n  --pattern 'rapfi-sin
 **Cloudflare Pages** 로 나간다. 처음 한 번의 설정과 그 뒤의 흐름은
 [`docs/배포-cloudflare.md`](docs/배포-cloudflare.md) 에 처음부터 끝까지 적어 두었다.
 
-> ⚠️ Cloudflare 는 **파일 하나가 25MB 를 넘으면 거부한다.** 지금 `.data` 가 40.3MB 라
-> 그대로는 올라가지 않는다 — 계획서 §4 의 프리로드 축소가 배포의 전제다.
-> 그전까지 배포된 사이트는 보드는 되고 엔진은 안 된다.
+> Cloudflare 는 파일 하나가 25MB 를 넘으면 거부한다. 렌주 전용으로 줄여 `.data` 가
+> 약 19.9MB 이므로 통과한다 — 자세히는 `docs/배포-cloudflare.md` 의 「알아 둘 것」.
 
 ## 이 저장소에서 절대 하지 말 것
 
@@ -96,7 +98,7 @@ gh release download engine-3c94c2a9 --dir public/engine \n  --pattern 'rapfi-sin
 «온라인 시스템에 게시»라 앱보다 더 위험하다. `.gitignore` 와 CI 게이트가 둘 다 막고 있지만,
 막는 장치가 있다는 것이 해도 된다는 뜻은 아니다.
 
-가중치(`*.bin.lz4`)는 CC0 라 재배포는 자유롭지만 40MB 라 릴리스 자산으로 나른다.
+가중치(`*.bin.lz4`)는 CC0 라 재배포는 자유롭지만 20MB 라 릴리스 자산으로 나른다.
 
 ## 브라우저 요구사항
 
