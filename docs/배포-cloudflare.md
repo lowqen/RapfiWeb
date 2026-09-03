@@ -20,19 +20,19 @@ W0 에서 **COOP/COEP 헤더가 필요 없어졌습니다** — 배포 경로가
 
 ## 1. Cloudflare 쪽 준비 (5분)
 
-### 1-1. 계정과 프로젝트
+### 1-1. 계정
 
-1. <https://dash.cloudflare.com> 에 가입/로그인합니다. 카드 등록은 필요 없습니다.
-2. 왼쪽 메뉴에서 **Workers & Pages** ▸ **Create** ▸ **Pages** 탭 ▸
-   **Upload assets** 를 고릅니다.
-   - Git 연동(**Connect to Git**)이 아니라 **직접 업로드**입니다. 빌드는 우리 CI 가
-     하고 Cloudflare 는 결과만 받습니다 — 그래야 엔진 조립·오염 게이트가 배포 전에 돕니다.
-3. 프로젝트 이름을 **`rapfiweb`** 으로 합니다.
-   - 다른 이름을 쓰려면 `.github/workflows/deploy.yml` 의 `PROJECT` 를 같이 고치세요.
-4. 아무 폴더나 하나 올려 프로젝트를 만듭니다(빈 `index.html` 하나면 됩니다).
-   나중에 CI 가 진짜 내용으로 덮어씁니다.
+<https://dash.cloudflare.com> 에 가입/로그인합니다. 카드 등록은 필요 없습니다.
 
-만들고 나면 주소가 생깁니다: `https://rapfiweb.pages.dev`
+**Pages 프로젝트는 손으로 만들지 않아도 됩니다** — 배포 워크플로가 없으면 만듭니다
+(`wrangler pages project create`, 아래 토큰 권한으로 됩니다). 이름은
+`.github/workflows/deploy.yml` 의 `PROJECT`(기본 `rapfiweb`)를 씁니다.
+
+> 처음에는 대시보드에서 먼저 만들라고 안내했는데, 그러면 「비밀값은 넣었는데
+> 프로젝트가 없어서」 배포가 실패합니다 — 실제로 한 번 걸렸습니다
+> (`Project not found`, code 8000007). 그 단계를 없앴습니다.
+
+만들어지면 주소가 생깁니다: `https://rapfiweb.pages.dev`
 
 ### 1-2. Account ID
 

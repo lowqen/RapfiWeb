@@ -4,13 +4,13 @@ name: deploy
 #
 # ## 처음 한 번 해야 하는 것 (자세히는 docs/배포-cloudflare.md)
 #
-#   1. Cloudflare 대시보드 ▸ Workers & Pages ▸ Create ▸ Pages ▸
-#      "Direct Upload" 로 프로젝트를 하나 만든다. 이름은 아래 PROJECT 와 같아야 한다.
-#   2. API 토큰을 만든다: My Profile ▸ API Tokens ▸ Create Token ▸
+#   1. API 토큰을 만든다: My Profile ▸ API Tokens ▸ Create Token ▸
 #      템플릿 없이 "Account ▸ Cloudflare Pages ▸ Edit" 권한 하나만.
-#   3. 이 저장소 Settings ▸ Secrets and variables ▸ Actions 에 넣는다:
+#   2. 이 저장소 Settings ▸ Secrets and variables ▸ Actions 에 넣는다:
 #        CLOUDFLARE_API_TOKEN
 #        CLOUDFLARE_ACCOUNT_ID   (대시보드 우측 사이드바의 Account ID)
+#
+# Pages 프로젝트는 **이 워크플로가 없으면 만든다** — 대시보드에서 미리 만들 필요 없다.
 #
 # Cloudflare Pages 는 도메인 루트에서 서빙하므로 base 는 "/" 다(GitHub Pages 와
 # 다른 점). `public/_headers` 와 `public/_redirects` 도 그대로 읽어 준다 —
@@ -115,6 +115,18 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
+          # 프로젝트가 없으면 만든다. 처음에는 대시보드에서 손으로 만들라고 안내했는데,
+          # 그러면 「비밀값은 넣었는데 프로젝트가 없어서」 배포가 실패한다 —
+          # 실제로 그렇게 한 번 걸렸다(code 8000007 Project not found).
+          # 「Pages: Edit」 토큰이면 생성도 되므로 그 단계를 없앤다.
+          if pnpm dlx wrangler@3 pages project list 2>/dev/null \
+               | grep -qE "(^|[[:space:]])${PROJECT}([[:space:]]|$)"; then
+            echo "프로젝트 $PROJECT — 있음"
+          else
+            echo "프로젝트 $PROJECT 가 없어 만듭니다."
+            pnpm dlx wrangler@3 pages project create "$PROJECT" --production-branch main
+          fi
+
           pnpm dlx wrangler@3 pages deploy dist \
             --project-name "$PROJECT" \
             --branch "${{ github.ref_name }}" \
