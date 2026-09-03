@@ -343,3 +343,100 @@ describe("집계 — INFO 블록이 스냅샷이 된다", () => {
     expect(s.bestMove).toBeNull();
   });
 });
+
+// ── 오프닝 협상 (W4) ─────────────────────────────────────────────────
+
+describe("협상 명령 직렬화", () => {
+  it("스왑2 단계는 인자도 좌표도 없다", () => {
+    expect(serialize({ kind: "yxswap2step", step: 2 }, coord)).toEqual(["yxswap2step2"]);
+  });
+
+  it("Soosorv 단계는 수 목록을 스스로 들고 간다", () => {
+    expect(
+      serialize(
+        { kind: "yxsoosorvstep", step: 2, moves: [{ x: 7, y: 7 }, { x: 8, y: 7 }] },
+        coord,
+      ),
+    ).toEqual(["yxsoosorvstep2", "7,7", "7,8", "done"]);
+  });
+
+  it("N 은 머리줄에 붙는다", () => {
+    expect(
+      serialize({ kind: "yxsoosorvstep", step: 4, fifthCount: 3, moves: [{ x: 1, y: 2 }] }, coord),
+    ).toEqual(["yxsoosorvstep4 3", "2,1", "done"]);
+  });
+
+  it("수가 없으면 done 도 없다 — 빈 목록에 done 만 보내면 국면이 비워진다", () => {
+    expect(serialize({ kind: "yxsoosorvstep", step: 1 }, coord)).toEqual(["yxsoosorvstep1"]);
+  });
+
+  it("무승부·기권도 엔진에 알린다", () => {
+    expect(serialize({ kind: "yxdraw" }, coord)).toEqual(["yxdraw"]);
+    expect(serialize({ kind: "yxresign" }, coord)).toEqual(["yxresign"]);
+  });
+});
+
+describe("협상 응답 해석", () => {
+  it("SWAP2 MOVE1 은 판 위의 돌이다", () => {
+    const r = p("MESSAGE SWAP2 MOVE1 7 8");
+    expect(r).toMatchObject({ kind: "openingMove", swap2: true, index: 1, move: { x: 8, y: 7 } });
+  });
+
+  it("SWAP2 SWAP1 YES/NO", () => {
+    expect(p("MESSAGE SWAP2 SWAP1 YES")).toMatchObject({
+      kind: "openingSwap",
+      swap2: true,
+      which: 1,
+      yes: true,
+    });
+    expect(p("MESSAGE SWAP2 SWAP1 NO")).toMatchObject({ kind: "openingSwap", yes: false });
+  });
+
+  it("Soosorv 는 Y/N 한 글자로 답한다", () => {
+    expect(p("MESSAGE SOOSORV SWAP2 Y")).toMatchObject({
+      kind: "openingSwap",
+      swap2: false,
+      which: 2,
+      yes: true,
+    });
+    expect(p("MESSAGE SOOSORV SWAP1 N")).toMatchObject({ which: 1, yes: false });
+  });
+
+  it("SOOSORV MOVE4 는 좌표 뒤에 N 을 덧붙인다", () => {
+    expect(p("MESSAGE SOOSORV MOVE4 6 7 3")).toMatchObject({
+      kind: "openingMove",
+      swap2: false,
+      index: 4,
+      move: { x: 7, y: 6 },
+      fifthCount: 3,
+    });
+  });
+
+  it("SOOSORV MOVE5 는 돌이 아니라 5수 단계다", () => {
+    expect(p("MESSAGE SOOSORV MOVE5 C 6 7")).toMatchObject({
+      kind: "soosorvFifth",
+      stage: "choose",
+      move: { x: 7, y: 6 },
+    });
+    expect(p("MESSAGE SOOSORV MOVE5 R")).toMatchObject({ stage: "refresh", move: null });
+    expect(p("MESSAGE SOOSORV MOVE5 D")).toMatchObject({ stage: "done", move: null });
+    expect(p("MESSAGE SOOSORV MOVE5 6 7")).toMatchObject({ stage: "offer", move: { x: 7, y: 6 } });
+  });
+
+  it("좌표는 여기서도 y,x 다 — 협상만 x,y 로 읽는 실수를 막는다", () => {
+    const r = p("MESSAGE SWAP2 MOVE2 0 14");
+    expect(r).toMatchObject({ move: { x: 14, y: 0 } });
+  });
+
+  it("모르는 협상 줄은 메시지로 남는다 — 조용히 삼키지 않는다", () => {
+    expect(p("MESSAGE SOOSORV WHAT")).toMatchObject({
+      kind: "message",
+      text: "SOOSORV WHAT",
+    });
+  });
+
+  it("본문이 없으면 좌표로 읽지 않는다", () => {
+    // «MOVE1» 만 오면 머리말의 1 을 좌표로 삼아선 안 된다.
+    expect(p("MESSAGE SWAP2 MOVE1")).toMatchObject({ kind: "message" });
+  });
+});

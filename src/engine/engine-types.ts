@@ -37,6 +37,13 @@ export type EngineCommand =
    * 을 불러 판을 리셋하고 TT 도 비운다. 기동 순서에서는 그럴 이유가 없다.
    */
   | { kind: "rule"; id: 0 | 1 | 4 | 5 | 6 }
+  /** Swap2 협상 단계. `yxswap2step<n>` — 인자도 좌표도 없다. */
+  | { kind: "yxswap2step"; step: number }
+  /**
+   * Soosorv-8 협상 단계. Swap2 와 달리 **수 목록을 스스로 들고 간다**:
+   * `yxsoosorvstep2` + `y,x` 줄들 + `done`(main.c:2807). 4·5단계는 5수 개수를 받는다.
+   */
+  | { kind: "yxsoosorvstep"; step: number; fifthCount?: number; moves?: readonly Move[] }
   /**
    * Rapfi 를 **상세(Yixin) 출력 모드**로 바꾼다.
    *
@@ -48,6 +55,9 @@ export type EngineCommand =
   | { kind: "showDetail"; level: number }
   | { kind: "yxshowinfo" }
   | { kind: "yxshowforbid" }
+  /** 무승부 제안·기권을 엔진에게 알린다. 엔진은 답하지 않고 기록만 한다. */
+  | { kind: "yxdraw" }
+  | { kind: "yxresign" }
   | { kind: "stop" }
   | { kind: "end" }
   | { kind: "raw"; line: string };
@@ -97,7 +107,32 @@ export type EngineResponse =
   | { kind: "realtimeDone"; move: Move; raw: string }
   | { kind: "realtimeRefresh"; raw: string }
   | { kind: "realtimePv"; line: readonly Move[]; raw: string }
-  | { kind: "realtimeVal"; value: number; raw: string };
+  | { kind: "realtimeVal"; value: number; raw: string }
+
+  // MESSAGE SWAP2 … / MESSAGE SOOSORV … — 오프닝 협상 (W4)
+  /** `MOVE<n> <y> <x>`. Soosorv 의 MOVE4 는 5수 후보 개수 N 도 함께 알린다. */
+  | {
+      kind: "openingMove";
+      swap2: boolean;
+      /** 협상 안에서의 수 번호 1..5. */
+      index: number;
+      move: Move;
+      fifthCount: number | null;
+      raw: string;
+    }
+  /** `SWAP1 YES|NO`(swap2) / `SWAP2 Y|N`(soosorv). `which` 는 1 또는 2. */
+  | { kind: "openingSwap"; swap2: boolean; which: number; yes: boolean; raw: string }
+  /**
+   * `MESSAGE SOOSORV MOVE5 …` — 5수 단계.
+   * `C <y> <x>` 는 엔진이 제시된 5수 중 하나를 고른 것(판이 넷으로 되감긴 뒤),
+   * `REFRESH`/`DONE` 이 후보 묶음을 여닫고, 맨 `<y> <x>` 하나는 후보다(main.c:13498).
+   */
+  | {
+      kind: "soosorvFifth";
+      stage: "choose" | "refresh" | "done" | "offer";
+      move: Move | null;
+      raw: string;
+    };
 
 // ── 집계 결과 ────────────────────────────────────────────────────────
 
@@ -186,6 +221,21 @@ export type ToWorker =
       repeat: readonly EngineCommand[];
       totalMs: number;
     }
+  /**
+   * **착수** 요청. 분석과 다르다 — 조각으로 나누지 않고 `INFO timeout_turn` 하나로
+   * 묶어 한 번만 돌린다. 대국의 한 수는 시계가 정하는 유한한 일이고, 조각마다
+   * 다시 물으면 매번 새 탐색이 되기 때문이다.
+   */
+  | {
+      type: "move";
+      commands: readonly EngineCommand[];
+      turnMs: number;
+      /**
+       * `INFO time_left` — 대국 예산의 남은 양. 데스크톱은 매 차례 앞에 이것도
+       * 보낸다(main.c:2742). 없으면 엔진이 차례 예산만 보고 시간 배분을 못 한다.
+       */
+      matchLeftMs?: number;
+    }
   | { type: "stop" }
   | { type: "shutdown" };
 
@@ -196,6 +246,14 @@ export type FromWorker =
   /** 콘솔용 원시 줄. 저주파 배치. */
   | { type: "console"; lines: readonly string[] }
   | { type: "bestMove"; moves: readonly Move[] }
+  /** 오프닝 협상 응답. 대국 상태 기계가 받는다(W4). */
+  | {
+      type: "opening";
+      response: Extract<
+        EngineResponse,
+        { kind: "openingMove" } | { kind: "openingSwap" } | { kind: "soosorvFifth" }
+      >;
+    }
   | { type: "forbid"; cells: readonly Move[] }
   | { type: "searchDone"; reason: "finished" | "stopped" | "timeout"; elapsedMs: number }
   | { type: "exit"; code: number }

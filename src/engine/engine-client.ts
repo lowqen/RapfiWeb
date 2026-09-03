@@ -78,6 +78,8 @@ export interface EngineEvents {
   onBestMove?: (moves: readonly Move[]) => void;
   onForbid?: (cells: readonly Move[]) => void;
   onError?: (message: string) => void;
+  /** 오프닝 협상 응답. 대국 상태 기계가 받는다(W4). */
+  onOpening?: (r: OpeningResponse) => void;
 }
 
 export interface EngineOptions extends EngineEvents {
@@ -85,6 +87,12 @@ export interface EngineOptions extends EngineEvents {
   sliceMs?: number;
   size?: number;
 }
+
+/** 협상 응답 세 갈래만 골라 낸 것 — 화면과 상태 기계가 이 타입으로 받는다. */
+export type OpeningResponse = Extract<
+  FromWorker,
+  { type: "opening" }
+>["response"];
 
 const env = import.meta.env;
 
@@ -153,6 +161,9 @@ export class EngineClient {
           break;
         case "bestMove":
           this.events.onBestMove?.(m.moves);
+          break;
+        case "opening":
+          this.events.onOpening?.(m.response);
           break;
         case "forbid":
           this.events.onForbid?.(m.cells);
@@ -225,6 +236,29 @@ export class EngineClient {
       repeat: [{ kind: "yxnbest", n: opts.nbest ?? 5 }],
       totalMs: opts.totalMs ?? 5000,
     });
+  }
+
+  /**
+   * 대국의 한 수를 둔다 — 분석이 아니라 **착수**다.
+   *
+   * 빈 판이면 `BEGIN`, 아니면 `BOARD …/DONE` 이다. gomocup 에서는 둘 다 그 자체로
+   * 「두어라」라는 뜻이고 엔진이 좌표 한 줄로 답한다. 조각으로 나누지 않는 이유는
+   * 워커 주석에 있다 — 한 수는 시계가 정하는 유한한 일이다.
+   */
+  play(
+    stones: readonly Placement[],
+    emptyBoard: boolean,
+    opts: { turnMs?: number; matchLeftMs?: number } = {},
+  ): void {
+    this.setStatus("searching");
+    const msg: Extract<ToWorker, { type: "move" }> = {
+      type: "move",
+      commands: emptyBoard ? [{ kind: "begin" }] : [{ kind: "board", stones }],
+      turnMs: opts.turnMs ?? 5000,
+    };
+    // exactOptionalPropertyTypes: 값이 없으면 키 자체가 없어야 한다.
+    if (opts.matchLeftMs !== undefined) msg.matchLeftMs = opts.matchLeftMs;
+    this.post(msg);
   }
 
   /**

@@ -75,6 +75,16 @@ export function serialize(cmd: EngineCommand, coord: CoordMapper): string[] {
       return [`INFO ${cmd.key} ${cmd.value}`];
     case "rule":
       return [`INFO RULE ${cmd.id}`];
+    case "yxswap2step":
+      return [`yxswap2step${cmd.step}`];
+    case "yxsoosorvstep": {
+      // 여러 줄이다. 워커의 sendCommand 가 개행으로 이어 붙여 **한 번에** 보낸다 —
+      // 줄마다 나눠 보내면 엔진이 첫 줄을 읽는 순간 큐가 비어 EOF 가 된다(W3 참고).
+      const head =
+        `yxsoosorvstep${cmd.step}` + (cmd.fifthCount === undefined ? "" : ` ${cmd.fifthCount}`);
+      const moves = cmd.moves ?? [];
+      return moves.length === 0 ? [head] : [head, ...moves.map((m) => coord.toWire(m)), "done"];
+    }
     case "showDetail":
       // 소문자 `info` 다 — 데스크톱이 보내는 철자를 그대로 옮긴다.
       return [`info show_detail ${cmd.level}`];
@@ -82,6 +92,10 @@ export function serialize(cmd: EngineCommand, coord: CoordMapper): string[] {
       return ["yxshowinfo"];
     case "yxshowforbid":
       return ["YXSHOWFORBID"];
+    case "yxdraw":
+      return ["yxdraw"];
+    case "yxresign":
+      return ["yxresign"];
     case "stop":
       return ["YXSTOP"];
     case "end":
@@ -96,6 +110,8 @@ export function serialize(cmd: EngineCommand, coord: CoordMapper): string[] {
 const BEST_MOVE = /^(\d+)\s*,\s*(\d+)(?:\s+(\d+)\s*,\s*(\d+))?$/;
 const WHITESPACE = /\s+/;
 const FIRST_DIGITS = /\d+/;
+/** 협상 줄의 좌표는 쉼표가 아니라 공백으로 나뉜다 — 숫자만 훑어 뽑는다. */
+const SIGNED_DIGITS = /-?\d+/g;
 const ABOUT_FIELD = /(\w+)\s*=\s*"([^"]*)"|(\w+)\s*=\s*([^,]+)/g;
 
 const int = (s: string): number | null => {
@@ -118,6 +134,10 @@ export function parse(rawLine: string, coord: CoordMapper): EngineResponse {
   const upper = line.toUpperCase();
 
   if (upper.startsWith("MESSAGE REALTIME")) return parseRealtime(line.slice(16).trim(), coord, raw);
+  if (upper.startsWith("MESSAGE SWAP2")) return parseOpening(line.slice(13).trim(), true, coord, raw);
+  if (upper.startsWith("MESSAGE SOOSORV")) {
+    return parseOpening(line.slice(15).trim(), false, coord, raw);
+  }
   if (upper.startsWith("MESSAGE INFO")) {
     const rest = line.slice(12).trim();
     const sp = rest.indexOf(" ");
@@ -297,6 +317,68 @@ function parseRealtime(rest: string, coord: CoordMapper, raw: string): EngineRes
     return { kind: "realtimeVal", value: int(rest.slice(3).trim()) ?? 0, raw };
   }
   return { kind: "unknown", raw };
+}
+
+/**
+ * `MESSAGE SWAP2 …` / `MESSAGE SOOSORV …` — 오프닝 협상(main.c:13347-13537).
+ * 여기서는 좌표가 **쉼표가 아니라 공백**으로 나뉜다.
+ */
+function parseOpening(
+  rest: string,
+  swap2: boolean,
+  coord: CoordMapper,
+  raw: string,
+): EngineResponse {
+  const upper = rest.toUpperCase();
+  // 첫 공백 **뒤**. 공백이 없으면 빈 문자열이다 — `slice(indexOf+1)` 로 쓰면
+  // -1+1=0 이 되어 머리말까지 본문에 들어온다(앱의 `substringAfter(' ', "")`).
+  const sp = rest.indexOf(" ");
+  const body = sp < 0 ? "" : rest.slice(sp + 1).trim();
+  const nums = (s: string): number[] =>
+    (s.match(SIGNED_DIGITS) ?? []).map(Number).filter(Number.isFinite);
+
+  // Soosorv 의 MOVE5 는 5수 단계이지 평범한 돌이 아니다.
+  if (!swap2 && upper.startsWith("MOVE5")) {
+    const tail = rest.slice(5).trim();
+    const t = tail.toUpperCase();
+    const c = nums(tail);
+    const pair = (stage: "choose" | "offer"): EngineResponse =>
+      c.length >= 2
+        ? { kind: "soosorvFifth", stage, move: coord.fromWire(c[0]!, c[1]!), raw }
+        : { kind: "message", text: `SOOSORV ${rest}`, raw };
+    if (t.startsWith("C")) return pair("choose");
+    if (t.startsWith("R")) return { kind: "soosorvFifth", stage: "refresh", move: null, raw };
+    if (t.startsWith("D")) return { kind: "soosorvFifth", stage: "done", move: null, raw };
+    return pair("offer");
+  }
+
+  const n = nums(body);
+  if (upper.startsWith("MOVE") && n.length >= 2) {
+    const index = Number(upper[4]);
+    return {
+      kind: "openingMove",
+      swap2,
+      index: Number.isInteger(index) ? index : 0,
+      move: coord.fromWire(n[0]!, n[1]!),
+      // Soosorv 의 MOVE4 는 N 을 덧붙인다(main.c:13472 "%d %d %d").
+      fifthCount: n.length >= 3 ? n[2]! : null,
+      raw,
+    };
+  }
+
+  if (upper.startsWith("SWAP")) {
+    const w = Number(upper[4]);
+    // Swap2 는 YES/NO 로, Soosorv 는 Y/N 으로 답한다 — 둘 다 첫 글자가 가른다.
+    return {
+      kind: "openingSwap",
+      swap2,
+      which: Number.isInteger(w) ? w : 1,
+      yes: body.toUpperCase().startsWith("Y"),
+      raw,
+    };
+  }
+
+  return { kind: "message", text: `${swap2 ? "SWAP2" : "SOOSORV"} ${rest}`, raw };
 }
 
 /** `FORBID` + `"yyxx"` 묶음이 `.` 까지. 두 자리 행, 두 자리 열이다. */

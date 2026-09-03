@@ -151,6 +151,9 @@ function drain(chunk: string) {
     if (agg.consume(r)) snapshotDirty = true;
     if (r.kind === "bestMove") post({ type: "bestMove", moves: r.moves });
     else if (r.kind === "forbid") post({ type: "forbid", cells: r.cells });
+    else if (r.kind === "openingMove" || r.kind === "openingSwap" || r.kind === "soosorvFifth") {
+      post({ type: "opening", response: r });
+    }
   }
   maybeEmitSnapshot();
 }
@@ -310,6 +313,27 @@ self.onmessage = async (ev: MessageEvent<ToWorker>) => {
       case "search":
         await search(msg);
         break;
+      case "move": {
+        // 한 수는 **한 번의 유한한 탐색**이다. 조각으로 나누면 조각마다 새 탐색이 되어
+        // 엔진이 매번 처음부터 생각한다.
+        agg.reset();
+        searching = true;
+        const t0 = performance.now();
+        sendCommand([`INFO timeout_turn ${Math.max(100, Math.round(msg.turnMs))}`]);
+        if (msg.matchLeftMs !== undefined) {
+          sendCommand([`INFO time_left ${Math.max(0, Math.round(msg.matchLeftMs))}`]);
+        }
+        sendAll(msg.commands);
+        searching = false;
+        maybeEmitSnapshot(true);
+        flushConsole();
+        post({
+          type: "searchDone",
+          reason: "finished",
+          elapsedMs: Math.round(performance.now() - t0),
+        });
+        break;
+      }
       case "stop":
         stopRequested = true;
         // 탐색 중이 아닐 때만 닿는다. 탐색 중이면 조각 경계에서 위 루프가 본다.

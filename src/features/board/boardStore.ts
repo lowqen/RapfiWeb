@@ -32,6 +32,13 @@ interface BoardState {
 
   /** 분석 오버레이만 걷어낸다(돌은 그대로). 착수하거나 무를 때 부른다. */
   clearAnalysis: () => void;
+
+  /** 돌 목록을 통째로 갈아 끼운다. Soosorv 의 5수 되감기가 쓴다. */
+  setStones: (stones: readonly Move[]) => void;
+
+  /** 렌주 금수 목록. 엔진의 `FORBID` 가 채운다(W4). */
+  forbidden: readonly Move[];
+  setForbidden: (cells: readonly Move[]) => void;
 }
 
 /** 분석 오버레이를 비운 상태. 국면이 바뀌는 모든 곳이 이걸 얹는다. */
@@ -105,4 +112,13 @@ export const useBoardStore = create<BoardState>((set, get) => ({
     })),
 
   clearAnalysis: () => set((s) => ({ render: { ...s.render, ...CLEARED } })),
+
+  setStones: (stones) =>
+    set((s) => ({
+      render: { ...s.render, stones: [...stones], lastMove: stones.at(-1) ?? null, ...CLEARED },
+    })),
+
+  forbidden: [],
+  setForbidden: (cells) =>
+    set((s) => ({ forbidden: cells, render: { ...s.render, forbidden: cells } })),
 }));

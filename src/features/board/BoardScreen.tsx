@@ -1,29 +1,60 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { BoardCanvas } from "../../core/board/BoardCanvas";
 import { useBoardStore } from "./boardStore";
+import { useGameStore } from "./gameStore";
 import { LadderStrip } from "./LadderStrip";
 import { AnalysisPanel } from "./AnalysisPanel";
+import { ClockPanel } from "./ClockPanel";
+import { GamePanel } from "./GamePanel";
+import { OpeningPanel } from "./OpeningPanel";
 import { EngineConsole } from "./EngineConsole";
 import { useEngineStore } from "../../engine/engine-state";
-import { label } from "../../core/model/move";
+import { label, type Move } from "../../core/model/move";
 import { RULE_LABEL } from "../../core/model/rules";
 
 /**
- * 보드 화면 — W3 판.
+ * 보드 화면 — W4 판.
  *
- * 보드 pane + 분석 pane 2열. 대국 규칙·시계·오프닝 협상은 아직 없다(W4).
- * 지금 있는 것은 「돌을 놓고, 엔진에 물어보고, 답을 보드에서 읽는다」까지다.
+ * 탭이 이제 `boardStore.place` 가 아니라 **`gameStore.tap`** 으로 간다. 그래야
+ * 금수·차례·협상 단계가 한 곳에서 판단된다 — 보드는 여전히 규칙을 모른다.
+ * 「돌을 놓는다」와 「대국의 한 수를 둔다」는 다른 일이고, 그 차이가 이 한 줄이다.
  */
 export function BoardScreen() {
   const render = useBoardStore((s) => s.render);
-  const place = useBoardStore((s) => s.place);
-  const undo = useBoardStore((s) => s.undo);
-  const clear = useBoardStore((s) => s.clear);
+  const undo = useGameStore((s) => s.undoMove);
   const toggleNumbers = useBoardStore((s) => s.toggleNumbers);
   const markBlocked = useBoardStore((s) => s.markBlocked);
   const applyAnalysis = useBoardStore((s) => s.applyAnalysis);
 
+  const tap = useGameStore((s) => s.tap);
+  const refreshForbidden = useGameStore((s) => s.refreshForbidden);
   const snapshot = useEngineStore((s) => s.snapshot);
+  const status = useEngineStore((s) => s.status);
+
+  // 엔진이 **놀게 되는 순간**마다 금수를 물어본다. 기동 직후와 탐색이 끝난
+  // 직후가 여기다 — 엔진의 착수 응답은 상태가 아직 searching 일 때 도착하므로,
+  // 그때의 조회는 대국 스토어 쪽에서 건너뛰고 이 효과가 뒤이어 받아 온다.
+  // 대국 스토어가 엔진 상태를 스스로 구독하면 두 스토어가 서로를 보게 된다.
+  useEffect(() => {
+    if (status === "ready") refreshForbidden();
+  }, [status, refreshForbidden]);
+
+  /** 거절 사유를 잠깐 띄운다. 아무 반응이 없으면 「먹통」으로 읽힌다. */
+  const [notice, setNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!notice) return;
+    const id = window.setTimeout(() => setNotice(null), 2200);
+    return () => window.clearTimeout(id);
+  }, [notice]);
+
+  const onTap = useCallback(
+    (m: Move) => {
+      const r = tap(m);
+      if (r.kind === "rejected") setNotice(r.reason);
+      else setNotice(null);
+    },
+    [tap],
+  );
 
   // 엔진 스냅샷 → 보드. 스토어를 둘로 나눠 두고 여기서 잇는 이유는, 보드가 엔진을
   // **모르는 채로** 그려질 수 있어야 하기 때문이다(내보내기·정석 미리보기 등).
@@ -37,7 +68,12 @@ export function BoardScreen() {
   return (
     <div className="boardscreen">
       <div className="boardscreen__board">
-        <BoardCanvas render={render} onTap={place} onLongPress={markBlocked} />
+        <BoardCanvas render={render} onTap={onTap} onLongPress={markBlocked} />
+        {notice && (
+          <p className="board-notice" role="status">
+            {notice}
+          </p>
+        )}
       </div>
 
       <aside className="boardscreen__side">
@@ -63,9 +99,8 @@ export function BoardScreen() {
             <button type="button" onClick={undo} disabled={render.stones.length === 0}>
               무르기
             </button>
-            <button type="button" onClick={clear} disabled={render.stones.length === 0}>
-              비우기
-            </button>
+            {/* 「비우기」는 아래 대국 패널의 「새 대국」이 한다 — 판만 비우고
+                시계·협상은 그대로 두는 버튼은 조용히 어긋난 상태를 만든다. */}
             <button type="button" onClick={toggleNumbers}>
               번호 {render.showNumbers ? "끄기" : "켜기"}
             </button>
@@ -76,6 +111,9 @@ export function BoardScreen() {
           </p>
         </section>
 
+        <ClockPanel />
+        <OpeningPanel />
+        <GamePanel />
         <AnalysisPanel />
         <LadderStrip />
         <EngineConsole />

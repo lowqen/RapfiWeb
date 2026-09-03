@@ -1,9 +1,15 @@
 import { create } from "zustand";
 import type { Move } from "../core/model/move";
-import { EngineClient, detectCapabilities, type Capabilities } from "./engine-client";
+import {
+  EngineClient,
+  detectCapabilities,
+  type Capabilities,
+  type OpeningResponse,
+} from "./engine-client";
 import {
   EMPTY_SNAPSHOT,
   type AnalysisSnapshot,
+  type EngineCommand,
   type EngineStatus,
   type Placement,
 } from "./engine-types";
@@ -34,12 +40,43 @@ interface EngineState {
 
   start: () => Promise<void>;
   analyze: (stones: readonly Placement[], totalMs?: number) => Promise<void>;
+  /** 대국의 한 수. 분석과 달리 조각으로 나누지 않는다. */
+  play: (
+    stones: readonly Placement[],
+    emptyBoard: boolean,
+    budget?: { turnMs?: number; matchLeftMs?: number },
+  ) => Promise<void>;
+  /** 명령 몇 개를 그대로 보낸다(협상 단계 등). */
+  send: (...cmds: EngineCommand[]) => void;
   stop: () => void;
   terminate: () => void;
   clearConsole: () => void;
 }
 
 let client: EngineClient | null = null;
+
+/**
+ * 대국 상태 기계가 여기 걸어 두는 손잡이들.
+ *
+ * `engine-state` 가 `gameStore` 를 직접 부르면 두 모듈이 서로를 import 하게 된다.
+ * 대신 게임 쪽이 자기 처리기를 등록한다 — 엔진은 「대국」이라는 것을 몰라도 된다.
+ */
+let gameHandlers: {
+  onEngineMove?: (moves: readonly Move[]) => void;
+  onOpening?: (r: OpeningResponse) => void;
+  onForbid?: (cells: readonly Move[]) => void;
+} = {};
+
+export const setGameHandlers = (h: typeof gameHandlers) => {
+  gameHandlers = h;
+};
+
+/**
+ * 등록된 손잡이를 꺼내 본다 — **시험이 엔진 응답을 흉내 내는 유일한 통로**다.
+ * 협상 전체를 실제 워커 없이 돌리려면 「엔진이 이렇게 답했다」를 넣을 자리가
+ * 필요하고, 그 자리가 여기다. 화면 코드는 이걸 쓰지 않는다.
+ */
+export const getGameHandlers = () => gameHandlers;
 
 /**
  * 예외를 사람이 읽을 문장으로. `String(e)` 만 쓰면 평범한 객체가
@@ -66,8 +103,15 @@ export const useEngineStore = create<EngineState>((set) => {
           const next = [...s.console, ...lines];
           return { console: next.length > CONSOLE_MAX ? next.slice(-CONSOLE_MAX) : next };
         }),
-      onBestMove: (moves) => set({ lastBestMove: moves[0] ?? null }),
-      onForbid: (cells) => set({ forbidden: cells }),
+      onBestMove: (moves) => {
+        set({ lastBestMove: moves[0] ?? null });
+        gameHandlers.onEngineMove?.(moves);
+      },
+      onOpening: (r) => gameHandlers.onOpening?.(r),
+      onForbid: (cells) => {
+        set({ forbidden: cells });
+        gameHandlers.onForbid?.(cells);
+      },
       onError: (error) => set({ error }),
     });
     return client;
@@ -102,6 +146,22 @@ export const useEngineStore = create<EngineState>((set) => {
       } catch (e) {
         set({ error: describe(e), status: "error" });
       }
+    },
+
+    play: async (stones, emptyBoard, budget) => {
+      const c = ensure();
+      set({ error: null });
+      try {
+        if (c.currentStatus === "idle" || c.currentStatus === "error") await c.start();
+        c.play(stones, emptyBoard, budget ?? {});
+      } catch (e) {
+        set({ error: describe(e), status: "error" });
+      }
+    },
+
+    send: (...cmds) => {
+      // 엔진이 아직 없으면 조용히 흘린다 — 「엔진 시작」 전에 눌린 버튼이다.
+      client?.send(...cmds);
     },
 
     stop: () => client?.stop(),
