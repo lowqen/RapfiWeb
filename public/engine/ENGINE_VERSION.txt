@@ -6,6 +6,6 @@ cmake opts : -DNO_COMMAND_MODULES=ON -DUSE_WASM_SIMD=ON -DUSE_WASM_SIMD_RELAXED=
 link opts  : (upstream CMakeLists 의 EMSCRIPTEN 블록이 전부 정한다 — 우리는 얹지 않는다)
 variants   : single-simd128 / multi-simd128
 note       : SIMD 없는 변형은 eval/mix10nnue.cpp 의 static_assert 때문에 이 커밋에서 빌드되지 않는다
-built_at   : 2026-09-02T04:18:11Z
+built_at   : 2026-09-03T04:18:29Z
 build_by   : RapfiWeb/tools/build_engine_wasm.sh
 bench      : spike/node-bench.mjs 가 두 변형에서 Hash 를 뽑아 e240ab16 과 대조한다
