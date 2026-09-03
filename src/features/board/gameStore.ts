@@ -312,9 +312,7 @@ export const useGameStore = create<GameState>((set, get) => {
     if (s.opening !== "swap2" && s.opening !== "soosorv") return;
     set((st) => ({ thinking: true, clock: startClock(st.clock, "computer") }));
     send(
-      s.opening === "swap2"
-        ? { kind: "yxswap2step", step: 1 }
-        : { kind: "yxsoosorvstep", step: 1 },
+      s.opening === "swap2" ? { kind: "yxswap2step", step: 1 } : { kind: "yxsoosorvstep", step: 1 },
     );
     // 여기도 감시견을 건다. 빠뜨렸을 때 「컴퓨터 흑 + 스왑2/Soosorv」로 새 대국을
     // 열면 판이 처음부터 잠겼다 — 첫 탭부터 «엔진이 생각 중입니다»였다.
