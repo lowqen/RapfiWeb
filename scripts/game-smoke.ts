@@ -148,6 +148,13 @@ async function dump(why: string) {
   try {
     console.error(`\n떠 있는 물음: ${await prompt()}`);
     console.error(`돌 ${await stoneCount()}개`);
+    // 거절당했다면 이유가 보드 위에 떠 있다 — 「클릭이 빗나갔다」와
+    // 「눌렀는데 거절됐다」를 가르는 유일한 단서다.
+    const n = page.locator(".board-notice");
+    console.error(`보드 안내: ${(await n.count()) ? await n.innerText() : "(없음)"}`);
+    const box = await page.locator(".board__view").boundingBox();
+    const vp = page.viewportSize();
+    console.error(`보드 위치: ${JSON.stringify(box)} / 뷰포트: ${JSON.stringify(vp)}`);
   } catch {
     /* 화면이 이미 무너졌으면 더 캘 것이 없다 */
   }
@@ -169,6 +176,9 @@ try {
   console.log("1. 자유 렌주 — 차례가 오가는가");
   await click("컴퓨터 백");
   await tap(7, 7);
+  // 사람 돌부터 따로 본다 — 「클릭이 빗나갔다」와 「엔진이 답하지 않았다」는
+  // 다른 고장인데, 한 번에 2를 기다리면 둘이 같은 메시지로 뭉개진다.
+  await waitStones(1, 5_000, "(사람이 놓은 첫 수)");
   await waitStones(2, 60_000, "(사람 1수 뒤 엔진의 답)");
   ok("사람 → 엔진 → 사람으로 차례가 돌았다");
 
@@ -310,9 +320,7 @@ try {
   // (`docs/오프닝-협상-엔진-지원.md`). 화면에 남아 있으면 못 하는 일을 계속
   // 제안하게 되므로 목록에서 내렸다 — **배포본에서 그것을 확인한다.**
   console.log("\n8. 개시 목록");
-  const chips = await page
-    .locator('[role=group][aria-label="오프닝"] .chip')
-    .allInnerTexts();
+  const chips = await page.locator('[role=group][aria-label="오프닝"] .chip').allInnerTexts();
   const names = chips.map((c) => c.trim()).sort();
   const want = ["RIF 오프닝", "자유 렌주", "첫 수 이후 교환"].sort();
   if (JSON.stringify(names) !== JSON.stringify(want)) {

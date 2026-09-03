@@ -377,10 +377,7 @@ export const useGameStore = create<GameState>((set, get) => {
       }
 
       // 렌주 금수 — 데스크톱의 대화상자와 같이 거절한다.
-      if (
-        sideToMove(moves) === "black" &&
-        board().forbidden.some((m) => sameMove(m, cell))
-      ) {
+      if (sideToMove(moves) === "black" && board().forbidden.some((m) => sameMove(m, cell))) {
         prompt({ kind: "forbidden", cell });
         return { kind: "rejected", reason: `금수입니다 (${label(cell, size)})` };
       }
