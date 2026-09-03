@@ -105,6 +105,13 @@ jobs:
         id: fmt
         if: always()
         run: |
+          # **먼저 --check 로 묻는다.** 예전에는 곧장 --write 하고 `git diff` 가
+          # 비었는지만 봤는데, 그러면 Prettier 와 무관한 변경까지 서식 실패로
+          # 둔갑한다 — 실제로 pnpm 이 잠금 파일을 갱신했다는 이유로 빨갛게 났다.
+          if pnpm exec prettier --check . > /dev/null 2>&1; then
+            echo "서식 깨끗합니다."
+            exit 0
+          fi
           pnpm exec prettier --write . > /dev/null
           if ! git diff --quiet; then
             git diff > prettier.patch
