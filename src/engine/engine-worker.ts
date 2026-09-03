@@ -1,12 +1,7 @@
 /// <reference lib="webworker" />
 import { CoordMapper, parse, serialize } from "./engine-protocol";
 import { SearchAggregator } from "./engine-aggregator";
-import {
-  toSerializable,
-  type EngineCommand,
-  type FromWorker,
-  type ToWorker,
-} from "./engine-types";
+import { toSerializable, type EngineCommand, type FromWorker, type ToWorker } from "./engine-types";
 
 /**
  * 엔진 워커 — Emscripten 모듈을 만지는 유일한 자리.
