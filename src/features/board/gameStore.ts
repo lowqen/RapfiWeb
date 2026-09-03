@@ -10,7 +10,6 @@ import {
   type GameResult,
   type OpeningProtocol,
   type StoneColor,
-  type Swap2Choice,
   type TapResult,
 } from "../../core/model/game";
 import {
@@ -33,33 +32,29 @@ import {
 } from "../../core/model/referee";
 import { useBoardStore } from "./boardStore";
 import { setGameHandlers, useEngineStore } from "../../engine/engine-state";
-import type { OpeningResponse } from "../../engine/engine-client";
 import type { EngineCommand } from "../../engine/engine-types";
 
 /**
- * 대국 상태 기계 — `data/game/GameRepositoryImpl.kt` 의 대국·협상·시계 부분.
+ * 대국 상태 기계 — `data/game/GameRepositoryImpl.kt` 의 대국·개시·시계 부분.
  *
- * **협상은 엔진이 한다.** 우리가 규칙을 다시 구현하는 것이 아니라, `yxswap2step*` /
- * `yxsoosorvstep*` 로 물어보고 `MESSAGE SWAP2 …` / `MESSAGE SOOSORV …` 로 오는 답을
- * 화면과 보드에 옮긴다. 데스크톱이 그렇게 하고(main.c), 앱도 그대로 옮겼다.
- * 그래서 이 파일에는 「누가 언제 무엇을 묻는가」만 있고 렌주 판정은 한 줄도 없다.
+ * **이 파일에는 렌주 판정이 한 줄도 없다.** 금수는 엔진이 `YXSHOWFORBID` 로
+ * 알려 주고, 승패만 `referee` 가 본다. 데스크톱·앱과 같은 분담이다.
  *
- * 예외가 셋 있는데, 모두 데스크톱이 **스스로** 정하는 것이라 옮겼다:
- *   - 개시 영역 검사(`openingAreaOk`) — RIF·Soosorv 의 첫 세 수
+ * 개시에서 우리가 직접 정하는 것은 셋뿐이고, 모두 **데스크톱도 엔진에게 묻지
+ * 않는** 것들이다:
+ *   - 개시 영역 검사(`openingAreaOk`) — 손으로 놓는 첫 세 수
  *   - 「첫 수 이후 교환」의 교환 여부(`swapAfterFirstMove`) — 동전 던지기 포함
  *   - 그 규칙의 정해진 개시 두 수(`SWAP_FIRST_OPENING` / `SWAP_FIRST_REPLY`)
  *
+ * 엔진에게 협상을 시키던 Soosorv-8·스왑2 는 빠졌다 — Rapfi 가 그 명령을 모른다
+ * (`docs/오프닝-협상-엔진-지원.md`).
+ *
  * **시계는 `place()` 가 건드리지 않는다.** 앱과 같다: 시계는 «엔진에게 넘길 때»
  * 컴퓨터로, «엔진이 답할 때» 사람으로 넘어가고 가산은 그 두 자리에서만 붙는다.
- * 돌 하나마다 시계를 만지면 협상처럼 한쪽이 여러 수를 두는 구간에서 어긋난다.
  */
 
 /** 렌주에서는 장목이 흑의 **금수**라 승리 판정에서는 장목을 인정한다. */
 const ALLOW_OVERLINE = true;
-
-/** Soosorv 의 5수 후보 개수. 데스크톱의 N 대화상자와 같이 1~8. */
-export const FIFTH_COUNT_RANGE = [1, 2, 3, 4, 5, 6, 7, 8] as const;
-const MAX_FIFTH = 8;
 
 /** 시간 제한이 없을 때 한 수에 쓰는 예산. */
 const DEFAULT_TURN_MS = 5_000;
@@ -81,13 +76,6 @@ interface GameState {
   result: GameResult | null;
   clock: GameClock;
   prompt: GamePrompt | null;
-  /** Soosorv `move5N`: 5수 후보를 몇 개 내는가. */
-  fifthCount: number;
-  /** 5수 후보가 판에 올라와 있고 하나를 골라야 한다. */
-  offeringFifth: boolean;
-  /** 5수 단계가 끝났다(데스크톱의 `refreshboardflag2`). */
-  fifthStageDone: boolean;
-  swapDone: boolean;
   /** 금수 표시를 켤 것인가. */
   showForbidden: boolean;
   log: readonly string[];
@@ -112,8 +100,6 @@ interface GameState {
   offerDraw: () => void;
   dismissPrompt: () => void;
   answerSwap: (yes: boolean) => void;
-  answerSwap2: (choice: Swap2Choice) => void;
-  answerFifthCount: (n: number) => void;
 
   /** 시계 틱. 화면이 250ms 마다 부른다. */
   advanceClock: (deltaMs: number) => void;
@@ -126,8 +112,8 @@ const engine = () => useEngineStore.getState();
 const sideToMove = (moves: readonly Move[]): StoneColor => colorAt(moves.length);
 
 /**
- * RIF·Soosorv 는 첫 세 수를 손으로 놓으므로 그 안에서는 엔진에게 두라고 하지
- * 않는다 — 다만 **빈 판**은 예외다(엔진이 흑이면 개시를 열 수 있다, main.c:2726).
+ * RIF 는 첫 세 수를 손으로 놓으므로 그 안에서는 엔진에게 두라고 하지 않는다 —
+ * 다만 **빈 판**은 예외다(엔진이 흑이면 개시를 열 수 있다, main.c:2726).
  */
 const openingLetsEngineMove = (o: OpeningProtocol, n: number): boolean =>
   !handEnteredOpening(o) || n >= 3 || n === 0;
@@ -168,13 +154,6 @@ export const useGameStore = create<GameState>((set, get) => {
     refreshForbidden();
   };
 
-  /** 판을 `count` 개까지 되감는다(데스크톱의 반복 `change_piece`). */
-  const rewindTo = (count: number) => {
-    const moves = board().render.stones;
-    if (moves.length <= count) return;
-    board().setStones(moves.slice(0, count));
-  };
-
   const prompt = (p: GamePrompt) => set({ prompt: p });
 
   /**
@@ -208,47 +187,24 @@ export const useGameStore = create<GameState>((set, get) => {
   };
 
   /**
-   * 엔진에게 지금 국면을 넘기고 두라고 한다.
+   * 엔진 무응답 감시견.
    *
-   * W3 의 `analyze` 와 달리 이쪽은 **착수**다 — `YXBOARD`+`YXNBEST` 가 아니라
-   * 판을 통째로 준 뒤 `BEGIN`/`BOARD` 를 쓴다. 앱은 방해받지 않은 수순에서
-   * `TURN` 한 줄로 줄이지만, 여기서는 언제나 판 전체를 보낸다 — 협상이 판을
-   * 되감는 규칙이 셋이라 «방해받지 않았다»를 따로 추적할 값이 하나 더 늘 뿐이다.
+   * `thinking` 을 켜 두고 답을 기다리는 모든 자리에 바닥을 깐다. 답이 오지 않으면
+   * 판이 통째로 잠기기 때문이다 — 이후 모든 탭이 「엔진이 생각 중입니다」로
+   * 거절되고 시계만 흘러간다. W4 에서 실제로 겪은 고장이고, 그때 원인은 이
+   * 엔진이 협상 명령을 모른다는 것이었다(`docs/오프닝-협상-엔진-지원.md`).
+   *
+   * 협상이 돌아올 때를 위해 **15초 바닥을 남겨 둔다.** 협상 응답은 탐색이 아니라
+   * 즉답이므로 그보다 오래 걸릴 이유가 없고, 착수는 자기 예산에 여유를 더해 잰다.
+   *
+   * 늦게 온 답이 `thinking: false` 를 만나 조용히 버려지지 않도록, 풀 때
+   * `YXSTOP` 도 함께 보낸다.
+   *
+   * 시험(node)에는 `window` 가 없다 — 감시견은 화면의 안전망이라 거기서는 걸지
+   * 않는다. 덤으로 시험이 끝난 뒤 타이머가 남지 않는다.
    */
-  const engineTurn = () => {
-    const s = get();
-    if (s.result) return;
-    const moves = board().render.stones;
-    const clock = startClock(s.clock, "computer");
-    set({ thinking: true, clock });
-    engine().play(
-      board().placements(),
-      moves.length === 0,
-      clock.limited
-        ? {
-            turnMs: Math.max(500, leftTurnMs(clock, "computer")),
-            matchLeftMs: engineTimeLeftMs(clock),
-          }
-        : { turnMs: DEFAULT_TURN_MS },
-    );
-  };
-
-  /**
-   * 협상 응답 감시견.
-   *
-   * **이 엔진(Rapfi)은 `yxswap2step*` / `yxsoosorvstep*` 를 모른다.** 그 둘은
-   * Yixin 의 명령이고, 데스크톱 main.c 가 말을 거는 상대가 Yixin 이다.
-   * Rapfi 의 명령표(`command/gomocup.cpp`)에는 없고, GUI 모드에서는 모르는
-   * 명령을 **오류도 없이 삼킨다** — 그래서 답이 영원히 오지 않는다.
-   *
-   * 답이 오지 않을 때 Swap2 는 `thinking` 을 켠 채로 굳어 판이 통째로 잠긴다
-   * (모든 탭이 «엔진이 생각 중입니다»로 거절된다). 무엇을 하기로 정하든 그건
-   * 고장이므로, 기다림에 바닥을 깔아 잠금을 풀고 사람에게 사실을 알린다.
-   *
-   * 시험(node)에는 `window` 가 없다 — 감시견은 화면의 안전망이라 거기서는
-   * 걸지 않는다. 덤으로 시험이 끝난 뒤 타이머가 남지 않는다.
-   */
-  const NEGOTIATION_TIMEOUT_MS = 15_000;
+  const WATCHDOG_FLOOR_MS = 15_000;
+  const WATCHDOG_SLACK_MS = 10_000;
   let watchdog: ReturnType<typeof setTimeout> | null = null;
 
   const disarmWatchdog = () => {
@@ -258,79 +214,52 @@ export const useGameStore = create<GameState>((set, get) => {
     }
   };
 
-  const armWatchdog = () => {
+  const armWatchdog = (budgetMs: number) => {
     if (typeof window === "undefined") return;
     disarmWatchdog();
-    watchdog = setTimeout(() => {
-      watchdog = null;
-      if (get().result) return;
-      set((st) => ({ thinking: false, clock: stopClock(st.clock) }));
-      prompt({
-        kind: "info",
-        text: "이 엔진은 이 오프닝 협상에 답하지 않습니다 — 손으로 이어서 두세요.",
-      });
-      log("협상 응답 없음 — 기다림을 풀었습니다");
-    }, NEGOTIATION_TIMEOUT_MS);
+    watchdog = setTimeout(
+      () => {
+        watchdog = null;
+        if (!get().thinking || get().result) return;
+        send({ kind: "stop" });
+        set((st) => ({ thinking: false, clock: stopClock(st.clock) }));
+        prompt({ kind: "info", text: "엔진이 답하지 않습니다 — 손으로 이어서 두세요." });
+        log("엔진 무응답 — 기다림을 풀었습니다");
+      },
+      Math.max(WATCHDOG_FLOOR_MS, budgetMs + WATCHDOG_SLACK_MS),
+    );
   };
 
   /**
-   * 사람이 만든 국면을 엔진에게 **판정**시킨다 — Swap2 의 2·3단계뿐이다.
-   * 착수가 아니므로 분석 보드(`YXBOARD`)로 넘긴 뒤 단계 명령을 보낸다.
+   * 엔진에게 지금 국면을 넘기고 두라고 한다.
    *
-   * Soosorv 는 이걸 쓰지 않는다: `yxsoosorvstep<n>` 이 **수 목록을 스스로 들고
-   * 가기 때문**이다(명령 정의의 주석 참고). 거기서 판을 한 번 더 밀면 같은 국면을
-   * 두 번 말하는 셈이 된다.
+   * W3 의 `analyze` 와 달리 이쪽은 **착수**다 — `YXBOARD`+`YXNBEST` 가 아니라
+   * 판을 통째로 준 뒤 `BEGIN`/`BOARD` 를 쓴다. 앱은 방해받지 않은 수순에서
+   * `TURN` 한 줄로 줄이지만, 여기서는 언제나 판 전체를 보낸다 — 개시가 판을
+   * 되감을 수 있어 «방해받지 않았다»를 따로 추적할 값이 하나 더 늘 뿐이다.
    */
-  const askEngine = (...step: EngineCommand[]) => {
-    addIncrement("human");
-    set((s) => ({ thinking: true, clock: startClock(s.clock, "computer") }));
-    send({ kind: "yxboard", stones: board().placements() }, ...step);
-    armWatchdog();
-  };
-
-  /** Soosorv 의 단계 명령 — 사람의 가산만 붙이고 그대로 보낸다. */
-  const sendStep = (cmd: EngineCommand) => {
-    addIncrement("human");
-    send(cmd);
-    armWatchdog();
+  const engineTurn = () => {
+    const s = get();
+    if (s.result) return;
+    const moves = board().render.stones;
+    const clock = startClock(s.clock, "computer");
+    const turnMs = clock.limited ? Math.max(500, leftTurnMs(clock, "computer")) : DEFAULT_TURN_MS;
+    set({ thinking: true, clock });
+    engine().play(
+      board().placements(),
+      moves.length === 0,
+      clock.limited ? { turnMs, matchLeftMs: engineTimeLeftMs(clock) } : { turnMs },
+    );
+    armWatchdog(turnMs);
   };
 
   /** 엔진이 답해 차례가 사람에게 돌아왔다. */
   const handBackToHuman = () => {
+    disarmWatchdog();
     addIncrement("computer");
     set({ thinking: false });
     runClock("human");
   };
-
-  /**
-   * 엔진이 먼저 움직여야 하는 협상을 연다(`new_game_resetclock`, main.c:4263).
-   * 컴퓨터가 흑일 때의 Swap2·Soosorv 만 해당한다.
-   */
-  const startOpening = () => {
-    const s = get();
-    if (s.computerSide !== "black") return;
-    if (s.opening !== "swap2" && s.opening !== "soosorv") return;
-    set((st) => ({ thinking: true, clock: startClock(st.clock, "computer") }));
-    send(
-      s.opening === "swap2" ? { kind: "yxswap2step", step: 1 } : { kind: "yxsoosorvstep", step: 1 },
-    );
-    // 여기도 감시견을 건다. 빠뜨렸을 때 「컴퓨터 흑 + 스왑2/Soosorv」로 새 대국을
-    // 열면 판이 처음부터 잠겼다 — 첫 탭부터 «엔진이 생각 중입니다»였다.
-    armWatchdog();
-  };
-
-  // 엔진 쪽에 처리기를 걸어 둔다. `engine-state` 는 「대국」을 모르고, 대국이
-  // 자기 손잡이를 등록한다 — 두 모듈이 서로를 import 하지 않게 하는 방향이다.
-  //
-  // **`return` 앞이어야 한다.** 처음에는 파일 맨 아래, 아래쪽 함수 선언들 뒤에
-  // 두었는데 그 자리는 `return` 다음이라 **한 번도 실행되지 않았다**. 선언은
-  // 끌어올려지지만 호출문은 아니다 — 엔진의 답이 대국에 닿지 않아 협상이
-  // 통째로 죽어 있었고, 시험 열넷이 그것을 잡았다.
-  setGameHandlers({
-    onEngineMove,
-    onOpening,
-    onForbid: (cells) => board().setForbidden(get().showForbidden ? cells : []),
-  });
 
   return {
     computerSide: "none",
@@ -339,10 +268,6 @@ export const useGameStore = create<GameState>((set, get) => {
     result: null,
     clock: EMPTY_CLOCK,
     prompt: null,
-    fifthCount: 1,
-    offeringFifth: false,
-    fifthStageDone: false,
-    swapDone: false,
     showForbidden: true,
     log: [],
 
@@ -355,7 +280,7 @@ export const useGameStore = create<GameState>((set, get) => {
     setOpening: (opening) => {
       set({ opening });
       log(`오프닝: ${opening}`);
-      // 협상은 판이 빈 상태에서만 의미가 있다 — 규칙을 바꾸면 새 대국이다.
+      // 개시는 판이 빈 상태에서만 의미가 있다 — 규칙을 바꾸면 새 대국이다.
       get().newGame();
     },
 
@@ -384,10 +309,6 @@ export const useGameStore = create<GameState>((set, get) => {
         result: null,
         thinking: false,
         prompt: null,
-        offeringFifth: false,
-        fifthStageDone: false,
-        fifthCount: 1,
-        swapDone: false,
         log: [],
         clock: {
           ...EMPTY_CLOCK,
@@ -400,10 +321,8 @@ export const useGameStore = create<GameState>((set, get) => {
       }));
       send({ kind: "restart" });
       log("새 대국");
-      // 엔진이 먼저 말해야 하는 협상만 여기서 연다. **평범한 규칙에서 엔진이 흑
-      // 이어도 자동으로 두지 않는다** — 데스크톱·앱과 같이 사람이 판을 한 번
-      // 눌러 «두어라»라고 해야 시작한다.
-      startOpening();
+      // **엔진이 흑이어도 자동으로 두지 않는다** — 데스크톱·앱과 같이 사람이
+      // 판을 한 번 눌러 «두어라»라고 해야 시작한다.
       refreshForbidden();
     },
 
@@ -422,17 +341,10 @@ export const useGameStore = create<GameState>((set, get) => {
       if (s.prompt) return { kind: "rejected", reason: "먼저 위 물음에 답해 주세요" };
 
       const moves = board().render.stones;
-      const occupied = moves.some((m) => sameMove(m, cell));
-
-      // Swap2 의 개시 돌은 **색과 무관하게 사람이 놓는다** — 그래서 여느 차례
-      // 검사보다 앞에 온다. 이걸 뒤에 두면 「컴퓨터 백」에서 백 돌을 놓을 수 없다.
-      if (s.opening === "swap2" && (moves.length < 3 || (moves.length < 5 && !s.swapDone))) {
-        return occupied ? { kind: "ignored" } : swap2Tap(cell);
-      }
+      if (moves.some((m) => sameMove(m, cell))) return { kind: "ignored" };
 
       // 엔진 차례에 누르면 «두어라»라는 뜻이다(main.c:2725).
       if (
-        !s.offeringFifth &&
         enginePlays(s.computerSide, sideToMove(moves)) &&
         openingLetsEngineMove(s.opening, moves.length)
       ) {
@@ -446,28 +358,8 @@ export const useGameStore = create<GameState>((set, get) => {
         return { kind: "ignored" };
       }
 
-      if (occupied) {
-        // Soosorv: 올라온 5수 후보 중 하나를 고르는 탭이다(main.c:2752).
-        const number = moves.findIndex((m) => sameMove(m, cell)) + 1;
-        if (
-          s.opening === "soosorv" &&
-          s.offeringFifth &&
-          s.computerSide !== "white" &&
-          number >= 4
-        ) {
-          set({ offeringFifth: false });
-          rewindTo(4);
-          place(cell);
-          log(`5수 선택: ${label(cell, size)}`);
-          return { kind: "placed" };
-        }
-        return { kind: "ignored" };
-      }
-
-      // 렌주 금수 — 데스크톱의 대화상자와 같이 거절한다. 5수 후보를 올리는
-      // 중에는 검사하지 않는다(그 단계에서는 금수 위에도 후보를 놓는다).
+      // 렌주 금수 — 데스크톱의 대화상자와 같이 거절한다.
       if (
-        !s.offeringFifth &&
         sideToMove(moves) === "black" &&
         board().forbidden.some((m) => sameMove(m, cell))
       ) {
@@ -494,6 +386,7 @@ export const useGameStore = create<GameState>((set, get) => {
       if (board().render.stones.length === 0) return;
       // 엔진에 `TAKEBACK` 을 보내지 않는다 — 다음 요청이 `BOARD`/`YXBOARD` 로
       // 국면을 통째로 다시 세우므로, 엔진의 판은 그때 맞춰진다.
+      disarmWatchdog();
       if (get().thinking) send({ kind: "stop" });
       board().undo();
       set((s) => ({ thinking: false, prompt: null, clock: stopClock(s.clock) }));
@@ -505,6 +398,7 @@ export const useGameStore = create<GameState>((set, get) => {
     resign: () => {
       const s = get();
       if (s.result) return;
+      disarmWatchdog();
       // 기권하면 지금 둘 차례의 반대가 이긴다.
       const loser = sideToMove(board().render.stones);
       send({ kind: "yxresign" });
@@ -519,6 +413,7 @@ export const useGameStore = create<GameState>((set, get) => {
     offerDraw: () => {
       const s = get();
       if (s.result) return;
+      disarmWatchdog();
       send({ kind: "yxdraw" });
       set({
         result: { end: "drawAgreed", winner: null },
@@ -534,74 +429,22 @@ export const useGameStore = create<GameState>((set, get) => {
     },
 
     /**
-     * 「교환하시겠습니까?」의 답. 규칙마다 뒤가 다르다 — 데스크톱을 그대로 옮긴다.
+     * 「색을 교환하시겠습니까?」의 답 — 「첫 수 이후 교환」에서만 나온다.
+     *
+     * 예: 데스크톱이 정해진 답수를 두고 색을 맞바꾼다(main.c:2468).
+     * 아니오: 그대로 둔다. 다음은 사람(백)의 수다.
      */
     answerSwap: (yes) => {
-      const s = get();
-      const moves = board().render.stones;
       set({ prompt: null });
       addIncrement("human");
       if (!yes) {
-        // Swap2 는 «아니오»에서도 색이 넘어간다(main.c:2485).
-        if (s.opening === "swap2") applySwapSides();
         log("교환 안 함");
+        refreshForbidden();
         return;
       }
-      switch (s.opening) {
-        case "swap2":
-          engineTurn();
-          break;
-        case "soosorv":
-          applySwapSides();
-          // 가산은 위에서 이미 붙였다 — 여기서는 단계만 보낸다.
-          send(
-            moves.length === 3
-              ? { kind: "yxsoosorvstep", step: 3, moves }
-              : { kind: "yxsoosorvstep", step: 5, fifthCount: s.fifthCount, moves },
-          );
-          break;
-        case "swapFirst":
-          place(SWAP_FIRST_REPLY);
-          applySwapSides();
-          break;
-        default:
-          break;
-      }
+      place(SWAP_FIRST_REPLY);
+      applySwapSides();
       log("교환");
-    },
-
-    answerSwap2: (choice) => {
-      set({ prompt: null });
-      log(`스왑2: ${choice}`);
-      switch (choice) {
-        case "stayWhite":
-          // 사람이 백을 유지한다 — 다음은 사람의 수다.
-          set({ swapDone: true });
-          break;
-        case "swap":
-          addIncrement("human");
-          applySwapSides();
-          set({ swapDone: true });
-          engineTurn();
-          break;
-        case "addTwo":
-          // 두 수를 더 놓는다 — 사람이 판에 직접 놓는다.
-          set({ swapDone: false });
-          break;
-      }
-      refreshForbidden();
-    },
-
-    answerFifthCount: (n) => {
-      const count = Math.min(MAX_FIFTH, Math.max(1, Math.round(n)));
-      set({ prompt: null, fifthCount: count });
-      log(`5수 후보 ${count}개`);
-      sendStep({
-        kind: "yxsoosorvstep",
-        step: 4,
-        fifthCount: count,
-        moves: board().render.stones,
-      });
     },
 
     advanceClock: (deltaMs) => {
@@ -610,6 +453,7 @@ export const useGameStore = create<GameState>((set, get) => {
       const next = tickClock(s.clock, deltaMs);
       // 데스크톱은 **사람 쪽만** 경고하고, 한 번만 한다(timeoutflag).
       if (playerTimedOut(next) && !next.timedOutNotified) {
+        disarmWatchdog();
         set({
           clock: { ...stopClock(next), timedOutNotified: true },
           result: { end: "timeout", winner: "white" },
@@ -623,45 +467,13 @@ export const useGameStore = create<GameState>((set, get) => {
   };
 
   /**
-   * Swap2 개시: 두 수 놓고 판정, 두 수 더 놓고 판정(main.c:2683).
-   * 어느 색이든 **사람이 판에 놓는다** — 협상은 색이 아직 정해지지 않은 단계다.
-   */
-  function swap2Tap(cell: Move): TapResult {
-    const s = get();
-    const n = board().render.stones.length;
-    const engineBlack = enginePlays(s.computerSide, "black");
-    const engineWhite = enginePlays(s.computerSide, "white");
-
-    if (n < 2 && !engineBlack) {
-      place(cell);
-      return { kind: "placed" };
-    }
-    if (n === 2 && !engineBlack) {
-      place(cell);
-      askEngine({ kind: "yxswap2step", step: 2 });
-      return { kind: "placed" };
-    }
-    if (n === 3 && !engineWhite && !s.swapDone) {
-      place(cell);
-      return { kind: "placed" };
-    }
-    if (n === 4 && !engineWhite && !s.swapDone) {
-      place(cell);
-      askEngine({ kind: "yxswap2step", step: 3 });
-      return { kind: "placed" };
-    }
-    return { kind: "ignored" };
-  }
-
-  /**
-   * 사람 돌 하나 뒤의 개시 처리. **이미 엔진에게 국면을 넘겼으면 `true`** 를
-   * 돌려준다(데스크톱의 `flag`) — 그러면 호출부가 착수를 또 시키지 않는다.
+   * 사람 돌 하나 뒤의 개시 처리. **이미 국면을 넘겼거나 물음을 띄웠으면 `true`**
+   * 를 돌려준다(데스크톱의 `flag`) — 그러면 호출부가 착수를 또 시키지 않는다.
    */
   function afterHumanMove(cell: Move): boolean {
     const s = get();
     const moves = board().render.stones;
     const n = moves.length;
-    let handled = false;
     if (s.result) return true;
 
     // ── 첫 수 이후 교환 ─────────────────────────────────────────────
@@ -670,59 +482,25 @@ export const useGameStore = create<GameState>((set, get) => {
       if (swapAfterFirstMove(cell, board().render.size, Math.random() < 0.5)) {
         applySwapSides();
         prompt({ kind: "swapInfo" });
+        return true;
       }
     }
 
-    // ── Soosorv-8 ───────────────────────────────────────────────────
-    if (s.opening === "soosorv" && n === 3 && s.computerSide !== "black") {
+    // ── 손으로 놓는 개시(RIF)의 영역 검사 ───────────────────────────
+    //
+    // 앱은 이 검사를 Soosorv 에만 걸었지만, RIF 도 첫 세 수를 천원 둘레에
+    // 놓는 규칙이고 화면이 그렇게 안내한다. Soosorv 가 빠진 지금 그 조건을
+    // 그대로 두면 검사가 아무 데도 걸리지 않으므로, **손으로 놓는 개시**로
+    // 옮긴다 — 앱과의 의도된 차이다.
+    if (handEnteredOpening(s.opening) && n === 3 && s.computerSide !== "black") {
       if (!openingAreaOk(moves, board().render.size)) {
         get().newGame();
         prompt({ kind: "illegalOpening" });
         return true;
       }
     }
-    if (
-      s.opening === "soosorv" &&
-      n === 3 &&
-      s.computerSide !== "none" &&
-      s.computerSide !== "black"
-    ) {
-      sendStep({ kind: "yxsoosorvstep", step: 2, moves });
-      handled = true;
-    }
-    if (
-      s.opening === "soosorv" &&
-      n === 4 &&
-      s.computerSide !== "none" &&
-      s.computerSide !== "white"
-    ) {
-      // 데스크톱은 여기서 N 을 묻고 그 답과 함께 4단계를 보낸다.
-      prompt({ kind: "fifthCount" });
-      handled = true;
-    }
-    if (
-      s.opening === "soosorv" &&
-      n >= 5 &&
-      n <= 4 + s.fifthCount &&
-      s.computerSide !== "none" &&
-      s.computerSide !== "black"
-    ) {
-      if (!s.fifthStageDone) set({ offeringFifth: true });
-      if (get().offeringFifth) handled = true;
-    }
-    if (
-      s.opening === "soosorv" &&
-      n === 4 + s.fifthCount &&
-      s.computerSide !== "none" &&
-      s.computerSide !== "black" &&
-      !s.fifthStageDone
-    ) {
-      set({ offeringFifth: false, fifthStageDone: true });
-      sendStep({ kind: "yxsoosorvstep", step: 6, moves: board().render.stones });
-      handled = true;
-    }
 
-    return handled;
+    return false;
   }
 
   /** 엔진이 한 수(밸런스 탐색이면 두 수)를 답했다 — main.c:13934. */
@@ -748,99 +526,19 @@ export const useGameStore = create<GameState>((set, get) => {
     }
   }
 
-  /**
-   * 협상 응답. 데스크톱의 `onOpeningMove`/`onOpeningSwap`/`SoosorvFifth` 세 갈래.
-   *
-   * 여기서 하는 일은 **판에 올리고 무엇을 물을지 정하는 것**뿐이다 — 규칙 판단은
-   * 엔진이 이미 했다.
-   */
-  function onOpening(r: OpeningResponse) {
-    disarmWatchdog(); // 답이 왔으니 감시견은 내린다
-    if (get().result) return;
-
-    if (r.kind === "openingMove") {
-      place(r.move);
-      if (r.swap2 && r.index === 3) {
-        handBackToHuman();
-        prompt({ kind: "swap2" });
-      } else if (r.swap2 && r.index === 5) {
-        handBackToHuman();
-        set({ swapDone: true });
-        prompt({ kind: "swap" });
-      } else if (!r.swap2 && r.index === 3) {
-        handBackToHuman();
-        prompt({ kind: "swap" });
-      } else if (!r.swap2 && r.index === 4) {
-        // MOVE4 는 N 도 함께 알리고, 후보를 보여 주기 시작한다.
-        handBackToHuman();
-        set((st) => ({
-          fifthCount: r.fifthCount ?? st.fifthCount,
-          offeringFifth: st.fifthStageDone ? st.offeringFifth : true,
-        }));
-        prompt({ kind: "swap", fifthCount: get().fifthCount });
-      }
-      // MOVE1/2(그리고 Swap2 의 MOVE4)는 그냥 판 위의 돌이다.
-      return;
-    }
-
-    if (r.kind === "openingSwap") {
-      const moves = board().render.stones;
-      if (r.swap2 && r.which === 1 && !r.yes) {
-        // 엔진이 백을 유지하고 이어 둔다(main.c:13367).
-        set({ swapDone: true });
-        engineTurn();
-      } else if (r.swap2 && r.which === 1 && r.yes) {
-        handBackToHuman();
-        set({ swapDone: true });
-        applySwapSides();
-        prompt({ kind: "swapInfo" });
-      } else if (r.swap2 && r.yes) {
-        // 둘째 물음(main.c:13405).
-        handBackToHuman();
-        log("컴퓨터가 흑을 선택했습니다");
-      } else if (r.swap2) {
-        log("컴퓨터가 백을 선택했습니다");
-        applySwapSides();
-        engineTurn();
-      } else if (r.yes) {
-        // Soosorv: 예 = 엔진이 색을 가져간다.
-        handBackToHuman();
-        applySwapSides();
-        prompt({ kind: "swapInfo" });
-      } else if (r.which === 1) {
-        send({ kind: "yxsoosorvstep", step: 3, moves });
-      } else {
-        send({
-          kind: "yxsoosorvstep",
-          step: 5,
-          fifthCount: get().fifthCount,
-          moves,
-        });
-      }
-      return;
-    }
-
-    // soosorvFifth
-    if (r.stage === "choose") {
-      // 엔진이 제시된 5수 중 하나를 골랐다 — 판을 넷으로 되감고 그 하나만 둔다(13502).
-      rewindTo(4);
-      if (r.move) place(r.move);
-      engineTurn();
-      return;
-    }
-    if (r.stage === "refresh") {
-      set({ offeringFifth: true });
-      return;
-    }
-    if (r.stage === "done") {
-      handBackToHuman();
-      set((st) => ({
-        fifthStageDone: true,
-        offeringFifth: st.fifthCount === 1 ? false : st.offeringFifth,
-      }));
-      return;
-    }
-    // offer
-    if (r.move) place(r.move);
-  }
+  // 엔진 쪽에 처리기를 걸어 둔다. `engine-state` 는 「대국」을 모르고, 대국이
+  // 자기 손잡이를 등록한다 — 두 모듈이 서로를 import 하지 않게 하는 방향이다.
+  //
+  // **`return` 앞이어야 한다.** 아래쪽 함수 선언들 뒤(= `return` 다음)에 두었다가
+  // 한 번도 실행되지 않은 적이 있다 — 선언은 끌어올려지지만 호출문은 아니다.
+  setGameHandlers({
+    onEngineMove,
+    onOpening: (r) => {
+      // 이 빌드는 협상을 걸지 않는다(파일 머리 주석). 그래도 오면 **삼키지
+      // 않는다** — 「모르는 줄도 버리지 않는다」가 이 저장소의 규칙이다.
+      disarmWatchdog();
+      log(`예상치 못한 협상 응답: ${r.kind}`);
+    },
+    onForbid: (cells) => board().setForbidden(get().showForbidden ? cells : []),
+  });
 });

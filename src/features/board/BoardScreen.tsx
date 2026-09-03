@@ -6,7 +6,7 @@ import { LadderStrip } from "./LadderStrip";
 import { AnalysisPanel } from "./AnalysisPanel";
 import { ClockPanel } from "./ClockPanel";
 import { GamePanel } from "./GamePanel";
-import { OpeningPanel } from "./OpeningPanel";
+import { OpeningPanel, PromptPanel } from "./OpeningPanel";
 import { EngineConsole } from "./EngineConsole";
 import { useEngineStore } from "../../engine/engine-state";
 import { label, type Move } from "../../core/model/move";
@@ -111,6 +111,7 @@ export function BoardScreen() {
           </p>
         </section>
 
+        <PromptPanel />
         <ClockPanel />
         <OpeningPanel />
         <GamePanel />

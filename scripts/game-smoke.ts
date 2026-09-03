@@ -17,9 +17,9 @@
  *   오류도 없이 삼킨다. 앱(RapfiDroid)도 같은 명령을 보내고 같은 침묵을 받는데,
  *   그쪽 시험도 `FakeEngine` 이라 여태 드러나지 않았다.
  *
- * 그래서 여기서 도는 개시는 **엔진의 협상 명령이 필요 없는 셋**이다(자유 렌주,
- * RIF, 첫 수 이후 교환). Soosorv-8 과 스왑2 는 「협상이 된다」가 아니라
- * 「막혔을 때 판이 잠기지 않는다」를 본다.
+ * 그래서 Soosorv-8 과 스왑2 는 **목록에서 내렸다**. 남은 셋(자유 렌주, RIF,
+ * 첫 수 이후 교환)은 엔진의 협상 명령이 필요 없고, 여기서 끝까지 돈다.
+ * 8단계가 「배포본에 정말 셋만 있는가」를 확인한다.
  */
 import { chromium, type Page } from "playwright";
 import { createServer } from "node:http";
@@ -287,49 +287,50 @@ try {
     ok("교환 없이 엔진이 이어 뒀다");
   }
 
-  // ── 7. Soosorv-8 · 스왑2 — 이 엔진이 답하지 못하는 협상 ───────────
+  // ── 7. 개시 영역 검사 ─────────────────────────────────────────────
   //
-  // **Rapfi 는 `yxsoosorvstep*` / `yxswap2step*` 를 모른다.** 그 둘은 Yixin 의
-  // 명령이고, 데스크톱 main.c 가 말을 거는 상대가 Yixin 이다. Rapfi 의 명령표
-  // (`command/gomocup.cpp` @3c94c2a9)에는 없으며 GUI 모드에서는 모르는 명령을
-  // 오류도 없이 삼킨다 — 그래서 답이 영원히 오지 않는다.
-  //
-  // 여기서 보는 것은 「협상이 된다」가 아니라 **「막혔을 때 판이 잠기지
-  // 않는다」**다. 감시견이 기다림을 풀고 사람에게 사실을 알려야 한다.
-  console.log("\n7. Soosorv-8 · 스왑2 — 엔진이 답하지 않는 협상");
-
-  // 개시 영역 검사는 **우리가** 한다(앱과 같이 Soosorv 에서만) — 엔진과 무관하다.
-  //
-  // **색을 먼저 고른다.** 개시 칩은 곧 새 대국이고, 새 대국은 「컴퓨터 흑 +
-  // 스왑2/Soosorv」면 협상을 먼저 연다. 앞 단계에서 색이 흑으로 넘어와 있으면
-  // 여기서 그 협상이 열려 판이 잠긴 채로 시작한다.
+  // 손으로 놓는 개시(RIF)에서 천원 둘레를 벗어나면 판을 되돌리고 알린다.
+  // **엔진과 무관하다** — 데스크톱도 이건 스스로 판정한다(main.c:2786).
+  console.log("\n7. 개시 영역 검사");
   await click("컴퓨터 백");
-  await click("Soosorv-8");
+  await click("RIF 오프닝");
   await tap(0, 0);
   await tap(1, 1);
   await tap(2, 2);
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(500);
   if ((await prompt()) !== "illegalOpening") fail("개시 영역 위반을 알리지 않습니다");
   else ok("개시 영역 위반을 잡아 판을 되돌렸다");
   await click("확인");
+  if ((await stoneCount()) !== 0) fail("판을 되돌리지 않았습니다");
+  else ok("판이 비워졌다");
 
-  await click("컴퓨터 백");
-  await click("스왑2");
-  await tap(7, 7);
-  await tap(8, 7);
-  await tap(8, 8); // 셋째 돌 뒤에 yxswap2step2 가 나간다
-  await page.waitForTimeout(600);
+  // ── 8. 개시 목록은 셋뿐 ───────────────────────────────────────────
+  //
+  // Soosorv-8 과 스왑2 는 엔진에게 협상을 시키는데 Rapfi 가 그 명령을 모른다
+  // (`docs/오프닝-협상-엔진-지원.md`). 화면에 남아 있으면 못 하는 일을 계속
+  // 제안하게 되므로 목록에서 내렸다 — **배포본에서 그것을 확인한다.**
+  console.log("\n8. 개시 목록");
+  const chips = await page
+    .locator('[role=group][aria-label="오프닝"] .chip')
+    .allInnerTexts();
+  const names = chips.map((c) => c.trim()).sort();
+  const want = ["RIF 오프닝", "자유 렌주", "첫 수 이후 교환"].sort();
+  if (JSON.stringify(names) !== JSON.stringify(want)) {
+    fail(`개시 칩이 기대와 다릅니다: ${names.join(" · ")}`);
+  } else {
+    ok(`개시 칩 셋: ${names.join(" · ")}`);
+  }
+  for (const gone of ["스왑2", "Soosorv-8"]) {
+    if (names.includes(gone)) fail(`${gone} 이 아직 화면에 있습니다`);
+  }
+  if (!names.includes("스왑2") && !names.includes("Soosorv-8")) {
+    ok("스왑2 · Soosorv-8 은 없다");
+  }
 
-  // 감시견이 풀어 줄 때까지. 이게 없으면 판은 영영 «엔진이 생각 중»이다.
-  await page.locator('.ask[data-prompt="info"]').waitFor({ timeout: 40_000 });
-  ok("협상이 막혀도 감시견이 기다림을 풀었다");
-  await click("확인");
+  const notice = (await page.locator('[data-k="opening-notice"]').innerText()).trim();
+  if (!notice.includes("Rapfi")) fail(`안내 문구가 없습니다: ${notice}`);
+  else ok("왜 셋뿐인지 화면이 말한다");
 
-  // 그리고 사용자는 빠져나올 수 있어야 한다 — 자유 렌주로 돌아가 이어 둔다.
-  await click("자유 렌주");
-  await tap(7, 7);
-  await waitStones(2, 90_000, "(협상이 막힌 뒤 복구)");
-  ok("막힌 협상에서 빠져나와 다시 둘 수 있다");
   if (pageErrors.length) {
     fail(`페이지 오류 ${pageErrors.length}건:\n  ${pageErrors.slice(0, 5).join("\n  ")}`);
   }

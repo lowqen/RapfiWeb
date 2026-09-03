@@ -673,6 +673,15 @@ a {
 }
 
 /* ── 물음 상자 ──────────────────────────────────────────────────── */
+/* 물음만 담는 패널은 테두리를 두 겹 그리지 않는다 — 상자 자체가 이미 강조다. */
+.panel--prompt {
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+.panel--prompt .ask {
+  margin-top: 0;
+}
 .ask {
   margin-top: var(--space-l);
   padding: var(--space-l);

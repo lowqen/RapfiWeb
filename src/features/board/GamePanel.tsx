@@ -5,6 +5,7 @@ import {
   COMPUTER_SIDE_LABEL,
   OPENING_HINT,
   OPENING_LABEL,
+  OPENING_NOTICE,
   describeResult,
   type ComputerSide,
   type OpeningProtocol,
@@ -13,13 +14,16 @@ import {
 /**
  * 대국 패널 — 앱의 대국 도구를 옮긴 것.
  *
- * **규칙은 렌주 하나이고, 고르는 것은 오프닝 협상이다.** 데스크톱의 `specialrule`
- * 은 기반 규칙 위에 얹히는 층이라, 렌주 전용인 웹에서 「규칙 선택」은 곧 「협상
- * 선택」이 된다. 그래서 칩이 다섯 개다.
+ * **기반 규칙은 렌주 하나이고, 고르는 것은 개시 방식이다.** 데스크톱의
+ * `specialrule` 이 기반 규칙 위에 얹히는 층이라, 렌주 전용인 웹에서 「규칙 선택」은
+ * 곧 「개시 선택」이 된다.
+ *
+ * 칩이 셋인 이유는 `OPENING_NOTICE` 가 화면에서 직접 말한다 — Soosorv-8·스왑2 는
+ * 엔진에게 협상을 시키는데 Rapfi 가 그 명령을 모른다.
  */
 
 const SIDES: readonly ComputerSide[] = ["none", "black", "white", "both"];
-const OPENINGS: readonly OpeningProtocol[] = ["none", "rif", "swapFirst", "soosorv", "swap2"];
+const OPENINGS: readonly OpeningProtocol[] = ["none", "rif", "swapFirst"];
 
 /** 시간 제한 프리셋. 데스크톱의 커스텀 레벨(settings.txt 6행 = 1)에 해당한다. */
 const TIME_PRESETS = [
@@ -57,6 +61,9 @@ export function GamePanel() {
         ))}
       </ChipGroup>
       <p className="panel__hint">{OPENING_HINT[g.opening]}</p>
+      <p className="panel__hint" data-k="opening-notice">
+        {OPENING_NOTICE}
+      </p>
 
       <ChipGroup label="컴퓨터">
         {SIDES.map((s) => (

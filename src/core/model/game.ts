@@ -62,30 +62,42 @@ export function swappedSide(side: ComputerSide): ComputerSide {
 // ── 오프닝 협상 ───────────────────────────────────────────────────────
 
 /**
- * 데스크톱의 `specialrule`. settings.txt 3행에서 `load_setting`(main.c:14070)과
- * 똑같이 해독한다 — 메뉴 콜백 `change_rule` 은 3과 4를 반대로 맵핑하는데,
- * 그건 데스크톱 자신의 불일치다. 파일이 양쪽이 저장하는 것이므로 파일이 이긴다.
+ * 데스크톱의 `specialrule` 중 **이 엔진으로 실제 돌아가는 것들**.
+ *
+ * 데스크톱에는 Soosorv-8 과 스왑2 도 있지만 그 둘은 `yxsoosorvstep*` /
+ * `yxswap2step*` 로 **엔진에게 협상을 시킨다.** 그 명령은 Yixin 의 것이고
+ * Rapfi 의 명령표(`command/gomocup.cpp` @3c94c2a9)에 없다 — GUI 모드는 모르는
+ * 명령을 오류도 없이 삼키므로 답이 영영 오지 않는다. 근거와 확인 경위는
+ * `docs/오프닝-협상-엔진-지원.md`.
+ *
+ * 그래서 남은 셋은 **엔진의 협상 명령이 필요 없는 것들**이다: 협상이 아예
+ * 없거나(none), 첫 세 수를 사람이 놓거나(rif), 교환 여부를 우리가 정한다
+ * (swapFirst — 데스크톱도 엔진에게 묻지 않는다, main.c:2771).
  */
-export type OpeningProtocol = "none" | "rif" | "swapFirst" | "soosorv" | "swap2";
+export type OpeningProtocol = "none" | "rif" | "swapFirst";
 
 export const OPENING_LABEL: Record<OpeningProtocol, string> = {
   none: "자유 렌주",
   rif: "RIF 오프닝",
   swapFirst: "첫 수 이후 교환",
-  soosorv: "Soosorv-8",
-  swap2: "스왑2",
 };
 
 export const OPENING_HINT: Record<OpeningProtocol, string> = {
   none: "협상 없이 흑부터 둡니다.",
   rif: "첫 세 수를 천원 둘레에 손으로 놓고 시작합니다.",
   swapFirst: "흑이 한 수를 놓으면 상대가 그 색을 가져갈지 정합니다.",
-  soosorv: "첫 세 수를 손으로 놓고, 흑이 5수 후보를 N개(1~8) 제시합니다.",
-  swap2: "흑 둘·백 하나를 놓은 뒤 상대가 셋 중 하나를 고릅니다.",
 };
 
-/** 첫 세 수를 손으로 놓는 협상 — 그 안에서는 엔진에게 두라고 하지 않는다. */
-export const handEnteredOpening = (o: OpeningProtocol): boolean => o === "rif" || o === "soosorv";
+/**
+ * 왜 셋뿐인지 화면에 적는 문장. 「없습니다」로 끝내지 않고 **어디에 원인이
+ * 있는지**까지 말한다 — `unsupportedRuleNotice` 와 같은 규칙이다.
+ */
+export const OPENING_NOTICE =
+  "웹 버전은 Rapfi 엔진이 지원하는 렌주 규칙만 제공합니다. " +
+  "스왑2와 Soosorv-8은 현재 Rapfi에서 지원하지 않습니다.";
+
+/** 첫 세 수를 손으로 놓는 개시 — 그 안에서는 엔진에게 두라고 하지 않는다. */
+export const handEnteredOpening = (o: OpeningProtocol): boolean => o === "rif";
 
 /** 협상이 있는가. 없으면 협상 pane 을 아예 그리지 않는다. */
 export const negotiates = (o: OpeningProtocol): boolean => o !== "none";
@@ -116,26 +128,16 @@ export function describeResult(r: GameResult): string {
 
 // ── 물어보는 것들 ─────────────────────────────────────────────────────
 
-/** 데스크톱의 세 버튼 Swap2 대화상자(main.c:2347). */
-export type Swap2Choice = "stayWhite" | "swap" | "addTwo";
-
-export const SWAP2_CHOICE_LABEL: Record<Swap2Choice, string> = {
-  stayWhite: "백 유지",
-  swap: "색 교환",
-  addTwo: "두 수 추가",
-};
-
 /**
  * 게임이 사용자에게 물어보는 것, 또는 알려 주는 것. 각 항목이 데스크톱의 대화상자
  * 하나에 대응한다.
+ *
+ * 스왑2의 세 버튼 대화상자(`show_dialog_swap_query2`)와 Soosorv 의 N 대화상자
+ * (`show_dialog_move5N`)는 그 두 개시와 함께 빠졌다 — 물어봐도 답할 엔진이 없다.
  */
 export type GamePrompt =
-  /** `show_dialog_swap_query` — 예/아니오. Soosorv 5수 단계에서는 N 을 함께 보여 준다. */
-  | { kind: "swap"; fifthCount?: number }
-  /** `show_dialog_swap_query2` — 유지 / 교환 / 두 수 추가. */
-  | { kind: "swap2" }
-  /** `show_dialog_move5N` — 5수 후보를 몇 개 낼 것인가. */
-  | { kind: "fifthCount" }
+  /** `show_dialog_swap_query` — 예/아니오. */
+  | { kind: "swap" }
   /** `show_dialog_swap_info` — 엔진이 반대 색을 가져갔다. */
   | { kind: "swapInfo" }
   /** `show_dialog_illegal_opening` — 판이 초기화됐다. */

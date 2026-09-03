@@ -1,58 +1,50 @@
 import type { ReactNode } from "react";
 import { useBoardStore } from "./boardStore";
-import { FIFTH_COUNT_RANGE, useGameStore } from "./gameStore";
-import {
-  OPENING_LABEL,
-  SWAP2_CHOICE_LABEL,
-  negotiates,
-  type OpeningProtocol,
-  type Swap2Choice,
-} from "../../core/model/game";
+import { useGameStore } from "./gameStore";
+import { OPENING_LABEL, negotiates, type OpeningProtocol } from "../../core/model/game";
 import { label } from "../../core/model/move";
 
 /**
- * 오프닝 협상 pane — 지금 어느 단계인지, 무엇을 고를 수 있는지.
+ * 개시 pane — 지금 어느 단계인지, 무엇을 고를 수 있는지.
  *
- * 협상이 없는 규칙(자유 렌주)에서는 **아예 그리지 않는다.** 언제나 자리를 차지하는
- * 빈 패널은 화면에서 「여기 뭔가 있어야 하는데 없다」로 읽힌다.
+ * 개시 절차가 없는 규칙(자유 렌주)에서는 **아예 그리지 않는다.** 언제나 자리를
+ * 차지하는 빈 패널은 화면에서 「여기 뭔가 있어야 하는데 없다」로 읽힌다.
  */
 export function OpeningPanel() {
-  const g = useGameStore();
+  const opening = useGameStore((s) => s.opening);
   const stones = useBoardStore((s) => s.render.stones.length);
-  if (!negotiates(g.opening)) return null;
+  if (!negotiates(opening)) return null;
 
   return (
     <section className="panel">
-      <h2 className="panel__title">{OPENING_LABEL[g.opening]}</h2>
-
-      <Timeline opening={g.opening} stones={stones} fifthCount={g.fifthCount} done={g.swapDone} />
-
-      {g.prompt && <Prompt />}
-
-      {g.offeringFifth && !g.prompt && (
-        <p className="panel__hint" data-k="fifth">
-          5수 후보를 <strong>{g.fifthCount}개</strong> 놓으세요. 지금까지 {Math.max(0, stones - 4)}
-          개 — 다 놓으면 상대가 그중 하나를 고릅니다.
-        </p>
-      )}
+      <h2 className="panel__title">{OPENING_LABEL[opening]}</h2>
+      <Timeline opening={opening} stones={stones} />
     </section>
   );
 }
 
-/** 협상의 단계들을 한 줄로. 지금 어디인지가 한눈에 보여야 한다. */
-function Timeline({
-  opening,
-  stones,
-  fifthCount,
-  done,
-}: {
-  opening: OpeningProtocol;
-  stones: number;
-  fifthCount: number;
-  done: boolean;
-}) {
-  const steps = stepsFor(opening, fifthCount);
-  const at = currentStep(opening, stones, done, fifthCount);
+/**
+ * 물음 상자 — **개시 pane 과 따로 산다.**
+ *
+ * 예전에는 개시 pane 안에 있었는데, 그 pane 은 자유 렌주에서 그려지지 않는다.
+ * 그런데 금수·시간 초과·엔진 무응답 물음은 자유 렌주에서도 뜬다 — 그러면 물음이
+ * **보이지 않는 채로** 상태에만 남고, `tap` 이 「먼저 위 물음에 답해 주세요」로
+ * 모든 탭을 거절해 판이 잠긴다. 보이지 않는 것을 답하라고 하는 화면이었다.
+ */
+export function PromptPanel() {
+  const p = useGameStore((s) => s.prompt);
+  if (!p) return null;
+  return (
+    <section className="panel panel--prompt">
+      <Prompt />
+    </section>
+  );
+}
+
+/** 개시의 단계들을 한 줄로. 지금 어디인지가 한눈에 보여야 한다. */
+function Timeline({ opening, stones }: { opening: OpeningProtocol; stones: number }) {
+  const steps = stepsFor(opening);
+  const at = currentStep(opening, stones);
   return (
     <ol className="timeline">
       {steps.map((s, i) => (
@@ -68,40 +60,23 @@ function Timeline({
   );
 }
 
-function stepsFor(o: OpeningProtocol, fifthCount: number): string[] {
+function stepsFor(o: OpeningProtocol): string[] {
   switch (o) {
     case "swapFirst":
       return ["흑 1수", "색 결정", "대국"];
-    case "swap2":
-      return ["흑2·백1", "선택", "(두 수 추가)", "대국"];
     case "rif":
-      // 앱과 같다: RIF 에서 협상 명령은 오가지 않고, 첫 세 수를 손으로 놓는 것만
-      // 다르다. 없는 단계를 그려 두면 오지 않는 물음을 기다리게 된다.
       return ["첫 3수", "대국"];
-    case "soosorv":
-      return ["첫 3수", "백 4수", `5수 후보 ${fifthCount}개`, "선택", "대국"];
     case "none":
       return [];
   }
 }
 
-function currentStep(o: OpeningProtocol, n: number, done: boolean, fifthCount: number): number {
+function currentStep(o: OpeningProtocol, n: number): number {
   switch (o) {
     case "swapFirst":
       return n < 1 ? 0 : n === 1 ? 1 : 2;
-    case "swap2":
-      if (n < 3) return 0;
-      if (n === 3) return 1;
-      if (n < 5 && !done) return 2;
-      return 3;
     case "rif":
       return n < 3 ? 0 : 1;
-    case "soosorv":
-      if (n < 3) return 0;
-      if (n === 3) return 1;
-      if (n < 4 + fifthCount) return 2;
-      if (n === 4 + fifthCount) return 3;
-      return 4;
     case "none":
       return 0;
   }
@@ -121,42 +96,13 @@ function Prompt() {
   switch (p.kind) {
     case "swap":
       return (
-        <Ask
-          kind={p.kind}
-          text={
-            p.fifthCount === undefined
-              ? "색을 교환하시겠습니까?"
-              : `5수 후보 ${p.fifthCount}개가 올라왔습니다. 색을 교환하시겠습니까?`
-          }
-        >
+        <Ask kind={p.kind} text="색을 교환하시겠습니까?">
           <button type="button" onClick={() => g.answerSwap(true)}>
             교환
           </button>
           <button type="button" onClick={() => g.answerSwap(false)}>
             그대로
           </button>
-        </Ask>
-      );
-
-    case "swap2":
-      return (
-        <Ask kind={p.kind} text="셋 중 하나를 고르세요.">
-          {(["stayWhite", "swap", "addTwo"] as Swap2Choice[]).map((c) => (
-            <button key={c} type="button" onClick={() => g.answerSwap2(c)}>
-              {SWAP2_CHOICE_LABEL[c]}
-            </button>
-          ))}
-        </Ask>
-      );
-
-    case "fifthCount":
-      return (
-        <Ask kind={p.kind} text="5수 후보를 몇 개 낼까요?">
-          {FIFTH_COUNT_RANGE.map((n) => (
-            <button key={n} type="button" onClick={() => g.answerFifthCount(n)}>
-              {n}
-            </button>
-          ))}
         </Ask>
       );
 

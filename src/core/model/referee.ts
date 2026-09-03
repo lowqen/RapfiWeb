@@ -96,9 +96,12 @@ export function winningLine(moves: readonly Move[], size: number, allowOverline:
 }
 
 /**
- * RIF·Soosorv-8 이 첫 세 수에 요구하는 개시 영역: 1수는 천원, 2수는 그 한 점
+ * 손으로 놓는 개시(RIF)가 첫 세 수에 요구하는 영역: 1수는 천원, 2수는 그 한 점
  * 이내, 3수는 두 점 이내 — 데스크톱이 `yxsoosorvstep2` 앞에서 하는 바운딩 박스
  * 검사다(main.c:2786).
+ *
+ * 데스크톱·앱은 이 검사를 Soosorv-8 에만 걸었지만, 이 빌드에는 Soosorv 가 없고
+ * RIF 도 같은 영역을 요구하므로 RIF 에 건다(`gameStore.afterHumanMove`).
  */
 export function openingAreaOk(moves: readonly Move[], size: number): boolean {
   if (moves.length < 3) return true;
