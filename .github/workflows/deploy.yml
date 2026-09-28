@@ -90,11 +90,14 @@ jobs:
           fi
           echo "깨끗합니다."
 
+      # 기록용일 뿐 뒤 단계가 받아 쓰지 않는다 — 저장 한도가 차도 배포를 막지 않는다.
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: dist
           path: dist/
           if-no-files-found: error
+          retention-days: 3
 
       - name: 비밀값 확인
         if: env.TARGET == 'cloudflare'
