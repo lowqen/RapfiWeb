@@ -175,3 +175,14 @@ export const useEngineStore = create<EngineState>((set) => {
     clearConsole: () => set({ console: [] }),
   };
 });
+
+/**
+ * 콘솔 **전체**를 꺼내 보는 손잡이. 화면은 마지막 40줄만 그리므로, 엔진이
+ * 이상하게 굴 때(예: `MaxTime 0ms`) 그 직전에 무엇을 보냈는지가 화면에서
+ * 밀려나 있다. 브라우저 개발자 도구에서 `__rapfiConsole()` 로 부르면 되고,
+ * 대국 스모크도 이걸로 읽는다.
+ */
+if (typeof window !== "undefined") {
+  (window as unknown as { __rapfiConsole: () => readonly string[] }).__rapfiConsole = () =>
+    useEngineStore.getState().console;
+}

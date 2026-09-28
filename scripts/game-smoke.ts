@@ -175,17 +175,29 @@ async function tapNotice(): Promise<string> {
  * 그 직전에 우리가 보낸 `timeout_turn` 을 함께 본다.
  */
 async function thought(label: string) {
-  const lines = (await page.locator(".console").innerText()).split("\n");
-  const last = (re: RegExp) => [...lines].reverse().find((l) => re.test(l)) ?? "";
-  const time = last(/OptiTime \d+ms \| MaxTime \d+ms/);
-  const depth = last(/Depth \d+-\d+/);
-  const sent = last(/^> INFO timeout_turn/);
-  const maxMs = Number(/MaxTime (\d+)ms/.exec(time)?.[1] ?? -1);
-  const d = Number(/Depth (\d+)-/.exec(depth)?.[1] ?? -1);
-  const where = `[${sent || "timeout_turn 없음"} | ${time || "시간 줄 없음"} | ${depth}]`;
-  if (maxMs <= 0) fail(`${label}: 엔진에 생각할 시간이 없었습니다 ${where}`);
-  else if (d < 2) fail(`${label}: 엔진이 거의 읽지 않았습니다(Depth ${d}) ${where}`);
-  else ok(`${label}: MaxTime ${maxMs}ms · Depth ${d}`);
+  // 화면의 콘솔은 마지막 40줄뿐이라 탐색 시작 줄이 밀려난다 — 전체를 읽는다.
+  const lines = (await page.evaluate(`window.__rapfiConsole()`)) as string[];
+  const lastIndex = (re: RegExp, before = lines.length) => {
+    for (let i = before - 1; i >= 0; i--) if (re.test(lines[i]!)) return i;
+    return -1;
+  };
+  // 마지막 착수 응답(좌표 한 줄)을 기준으로 그 탐색의 줄들을 본다.
+  const moveAt = lastIndex(/^\d+,\d+$/);
+  const timeAt = lastIndex(/OptiTime \d+ms \| MaxTime \d+ms/, moveAt);
+  const depthAt = lastIndex(/Depth \d+-\d+/, moveAt);
+  const sentAt = lastIndex(/^> INFO timeout_turn/, moveAt);
+  const maxMs = timeAt < 0 ? null : Number(/MaxTime (\d+)ms/.exec(lines[timeAt]!)?.[1]);
+  const d = depthAt < 0 ? -1 : Number(/Depth (\d+)-/.exec(lines[depthAt]!)?.[1]);
+  const bad = (maxMs !== null && maxMs <= 0) || d < 2;
+  if (bad) {
+    fail(`${label}: 엔진이 생각하지 않았습니다 (MaxTime ${maxMs ?? "?"}ms · Depth ${d})`);
+    // 그 수 직전에 무엇을 보냈고 엔진이 무엇을 했는지 — 원인은 여기 있다.
+    const from = Math.max(0, (sentAt >= 0 ? sentAt : moveAt) - 12);
+    console.error(lines.slice(from, moveAt + 1).map((l) => `      ${l}`).join("\n"));
+  } else {
+    const t = maxMs === null ? "" : `MaxTime ${maxMs}ms · `;
+    ok(`${label}: ${t}Depth ${d} · ${lines[sentAt]?.slice(2) ?? "timeout_turn ?"}`);
+  }
 }
 
 /** 칩·버튼은 이름으로 집는다 — 순서는 화면을 손볼 때마다 바뀐다. */
@@ -270,6 +282,22 @@ try {
   await waitStones(6, 60_000, "(분석 뒤 왕복)");
   await page.waitForTimeout(300);
   await thought("분석 뒤 착수");
+
+  // 분석이 **도는 도중에** 한 수를 둔다. 워커의 분석은 조각 사이에 이벤트 루프로
+  // 돌아오므로, 그 틈에 착수 요청이 끼어든다 — 명령이 섞이기 가장 쉬운 자리다.
+  await click("분석");
+  await page.locator('.panel__badge[data-status="searching"]').waitFor({ timeout: 10_000 });
+  await tap(13, 1);
+  await waitStones(8, 60_000, "(분석 도중 왕복)");
+  await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 30_000 });
+  await page.waitForTimeout(300);
+  await thought("분석 도중 착수");
+
+  // 그리고 그 다음 수도 — 명령 흐름이 한 칸 밀렸다면 **다음** 수부터 망가진다.
+  await tap(13, 13);
+  await waitStones(10, 60_000, "(분석 도중 다음 왕복)");
+  await page.waitForTimeout(300);
+  await thought("그 다음 착수");
 
   // ── 2. 시계 ───────────────────────────────────────────────────────
   console.log("\n2. 시계 — 줄어드는가");
