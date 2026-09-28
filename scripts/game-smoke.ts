@@ -5,7 +5,8 @@
  *   SMOKE_BASE_URL=https://… pnpm exec tsx scripts/game-smoke.ts   # 배포본 검사
  *
  * `engine-smoke.ts` 가 「분석이 흐른다」를 보는 데 비해 이쪽은 **대국**을 본다:
- * 차례가 오가는가, 시계가 줄어드는가, 개시가 도는가, 기권·무승부가 판을 닫는가.
+ * 차례가 오가는가, 착수 시간을 지키는가, 평가 바가 오는가, 개시가 도는가,
+ * 기권·무승부가 판을 닫는가.
  *
  * 왜 단위 시험으로 안 되는가 — `game.test.ts` 는 엔진의 답을 **우리가** 만든다.
  * 그러면 「우리가 상상한 프로토콜」만 검증된다. 여기서는 엔진이 실제로 무엇을
@@ -85,9 +86,9 @@ page.on("console", (m) => {
 
 // ── 화면 사이를 오가는 손 ────────────────────────────────────────────
 //
-// 대국 설정·조작(개시·컴퓨터 색·시간·새 대국·기권·무승부)은 **설정 탭**에 있고,
-// 판·시계·엔진 상태·물음·「지금 두기」는 **보드 탭**에 있다. 대국 상태는 스토어에
-// 살아 있으므로 탭을 오가도 판은 그대로다 — 사용자가 하는 그대로 레일로 오간다.
+// 대국 설정·조작(개시·컴퓨터 색·엔진 착수 시간·새 대국·기권·무승부)은 **설정 탭**에
+// 있고, 판·평가 바·엔진 상태·물음·「지금 두기」는 **보드 탭**에 있다. 대국 상태는
+// 스토어에 살아 있으므로 탭을 오가도 판은 그대로다 — 사용자가 하는 그대로 레일로 오간다.
 
 type Screen = "board" | "settings";
 
@@ -96,11 +97,13 @@ const ON_SETTINGS = new Set([
   "새 대국",
   "기권",
   "무승부",
-  "5분",
-  "15분",
-  "30분",
+  // 엔진 착수 시간 칩. 분석 시간의 「무제한」은 radio 라 버튼 이름과 겹치지 않는다.
   "무제한",
-  "사용자 정의",
+  "1초",
+  "3초",
+  "5초",
+  "10초",
+  "30초",
   "자유 렌주",
   "RIF 오프닝",
   "첫 수 이후 교환",
@@ -349,17 +352,6 @@ async function click(name: string) {
   await page.getByRole("button", { name, exact: true }).click();
 }
 
-const clockText = async (side: "human" | "computer", k: "big" | "sub") => {
-  await goto("board");
-  return (await page.locator(`.clock[data-side=${side}] [data-k=${k}]`).innerText()).trim();
-};
-
-const toMs = (mmss: string): number => {
-  const p = mmss.split(":").map(Number);
-  if (p.length === 3) return ((p[0] ?? 0) * 3600 + (p[1] ?? 0) * 60 + (p[2] ?? 0)) * 1000;
-  return ((p[0] ?? 0) * 60 + (p[1] ?? 0)) * 1000;
-};
-
 async function dump(why: string) {
   console.error(`\n──── 실패 지점: ${why} ────`);
   try {
@@ -469,38 +461,38 @@ try {
   await page.waitForTimeout(300);
   await thought("「지금 두기」로 둔 수");
 
-  // ── 2. 시계 ───────────────────────────────────────────────────────
-  console.log("\n2. 시계 — 줄어드는가");
+  // ── 2. 엔진 착수 시간 — 대국 시계 없이 ───────────────────────────
+  //
+  // 대국 시계는 걷어냈다. 엔진의 한 수 시간만 정하고(`timeout_turn`), 대국
+  // 예산(`timeout_match`)은 늘 0 이다. 그래도 엔진이 그 시간만큼 읽는가.
+  console.log("\n2. 엔진 착수 시간 — 3초");
+  await goto("board");
+  if ((await page.locator(".clock").count()) !== 0) fail("보드에 시계가 남아 있습니다");
+  else ok("보드에 시계가 없다");
   await click("새 대국");
-  await click("5분");
-  await click("사람 대 사람"); // 엔진이 끼어들지 않게 두고 사람 시계만 본다
-  await tap(7, 7); // 시계가 돌기 시작한다
-
-  const before = await clockText("human", "big");
-  await page.waitForTimeout(2500);
-  const after = await clockText("human", "big");
-  const delta = toMs(before) - toMs(after);
-  if (delta < 1000) fail(`사람 시계가 2.5초에 ${delta}ms 만 줄었습니다`);
-  else ok(`사람 시계 카운트다운 ${before} → ${after}`);
-
-  const active = await page.locator(".clock[data-active]").count();
-  if (active !== 1) fail(`도는 시계가 정확히 하나가 아닙니다: ${active}개`);
-  else ok("도는 시계는 한 쪽뿐");
-
-  // 시간 제한이 있을 때도 엔진이 생각하는가 — 예산이 시계에서 계산되는 경로다.
-  await click("새 대국");
+  await click("3초");
   await click("컴퓨터 백");
   await tap(7, 7);
-  await waitStones(2, 60_000, "(5분 제한에서 엔진의 답)");
+  await waitStones(2, 60_000, "(3초 착수에서 엔진의 답)");
   await page.waitForTimeout(300);
-  await thought("5분 제한 첫 수");
+  await thought("3초 착수 첫 수");
 
-  // 사용자 보고의 자리: 시간제 대국을 둔 **뒤에** 분석. 대국 예산이 엔진에
-  // 남아 있으면 조각마다 time_left 가 깎여 0ms 조각이 된다.
-  await analysisHealthy("시간제 대국 뒤 분석");
+  // 착수 **뒤에** 분석. 착수가 남긴 시간 설정이 조각에 새어 들면 0ms 조각이 된다.
+  await analysisHealthy("시간 착수 뒤 분석");
 
-  // ── 3. 다크 모드에서 시계 가독성 ──────────────────────────────────
-  console.log("\n3. 다크 모드 — 시계가 읽히는가");
+  // ── 3. 평가 바 ────────────────────────────────────────────────────
+  console.log("\n3. 평가 바 — 값이 오고, 판과 같은 높이이고, 다크에서 읽히는가");
+  await goto("board");
+  const bar = page.getByRole("meter", { name: "평가 바" });
+  const text = (await bar.getAttribute("aria-valuetext")) ?? "";
+  if (!/흑 \d+%|외통/.test(text)) fail(`분석 뒤에도 평가 바에 값이 없습니다: «${text}»`);
+  else ok(`평가 바: ${text}`);
+  const [barBox, boardBox] = [await bar.boundingBox(), await page.locator(".board").boundingBox()];
+  if (!barBox || !boardBox) fail("평가 바나 판이 화면에 없습니다");
+  else if (Math.abs(barBox.height - boardBox.height) > 2) {
+    fail(`평가 바(${barBox.height}px)가 판(${boardBox.height}px)과 높이가 다릅니다`);
+  } else ok(`평가 바 = 판 높이 ${Math.round(boardBox.height)}px`);
+
   await page.evaluate(() => (document.documentElement.dataset.theme = "dark"));
   await page.waitForTimeout(300);
   // **문자열로 넘긴다.** tsx(esbuild)가 keep-names 로 이름 있는 함수에
@@ -508,8 +500,9 @@ try {
   // `engine-smoke.ts` 가 같은 자리에서 한 번 죽었고, 여기서 또 죽었다.
   // 문자열은 변환을 거치지 않는다.
   const contrast = (await page.evaluate(`(() => {
-    var el = document.querySelector(".clock[data-side=human] [data-k=big]");
-    if (!el) return null;
+    var bar = document.querySelector(".evalbar");
+    var label = bar && bar.querySelector(".evalbar__main");
+    if (!label) return null;
     function lum(c) {
       var m = (c.match(/[\\d.]+/g) || [0, 0, 0]).map(Number);
       var v = m.slice(0, 3).map(function (x) {
@@ -518,15 +511,18 @@ try {
       });
       return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
     }
-    // 배경은 시계 칸에서 온다 — 글자 자체는 배경이 투명하다.
-    var fg = lum(getComputedStyle(el).color);
-    var bg = lum(getComputedStyle(el.closest(".clock")).backgroundColor);
+    // 라벨은 앞선 쪽 칸 위에 얹힌다 — 흑이 앞서면 검은 칸, 아니면 흰 바탕.
+    var black = bar.getAttribute("data-lead") === "black";
+    var under = black ? bar.querySelector(".evalbar__black") : bar;
+    var bgColor = getComputedStyle(under).backgroundImage.match(/rgba?\\([^)]*\\)/);
+    var fg = lum(getComputedStyle(label).color);
+    var bg = lum(bgColor ? bgColor[0] : getComputedStyle(under).backgroundColor);
     var hi = Math.max(fg, bg), lo = Math.min(fg, bg);
     return (hi + 0.05) / (lo + 0.05);
   })()`)) as number | null;
-  if (contrast === null) fail("다크 모드에서 시계를 찾지 못했습니다");
-  else if (contrast < 4.5) fail(`다크 시계 대비 ${contrast.toFixed(2)}:1 (4.5 미만)`);
-  else ok(`다크 모드 시계 대비 ${contrast.toFixed(2)}:1`);
+  if (contrast === null) fail("다크 모드에서 평가 바 라벨을 찾지 못했습니다");
+  else if (contrast < 4.5) fail(`다크 평가 바 라벨 대비 ${contrast.toFixed(2)}:1 (4.5 미만)`);
+  else ok(`다크 모드 평가 바 라벨 대비 ${contrast.toFixed(2)}:1`);
   await page.evaluate(() => (document.documentElement.dataset.theme = "light"));
 
   // ── 4. 기권 · 무승부 ──────────────────────────────────────────────

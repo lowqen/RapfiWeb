@@ -167,7 +167,16 @@ describe("파싱 — INFO 스트림", () => {
   it("WINRATE 와 카운터", () => {
     expect(p("INFO WINRATE 0.63")).toMatchObject({ kind: "infoWinRate", winRate: 0.63 });
     expect(p("INFO NODE 123456")).toMatchObject({ kind: "infoStat", key: "NODE", value: 123456 });
-    expect(p("INFO SPEED 250k")).toMatchObject({ kind: "infoStat", key: "SPEED", value: 250 });
+    // 줄여 쓴 수는 곱해서 읽는다 — 예전엔 250k 를 250 으로 읽었다.
+    expect(p("INFO SPEED 250k")).toMatchObject({ kind: "infoStat", key: "SPEED", value: 250_000 });
+  });
+
+  it("Rapfi 의 실제 카운터 키 — TOTALNODES·TOTALTIME·SELDEPTH", () => {
+    // 모두 엔진 출력 캡처(0.43.02, single-simd128)에서 옮긴 줄이다.
+    expect(p("INFO TOTALNODES 16118")).toMatchObject({ key: "TOTALNODES", value: 16118 });
+    expect(p("INFO TOTALTIME 618")).toMatchObject({ key: "TOTALTIME", value: 618 });
+    expect(p("INFO NODES 8122")).toMatchObject({ key: "NODES", value: 8122 });
+    expect(p("INFO SELDEPTH 20")).toMatchObject({ key: "SELDEPTH", value: 20 });
   });
 
   it("모르는 INFO 키는 메시지로 남는다", () => {
@@ -185,10 +194,17 @@ describe("파싱 — 사람이 읽는 한 줄", () => {
     expect(r.depth).toBe(16);
     expect(r.selDepth).toBe(35);
     expect(r.evalCp).toBe(777);
-    expect(r.nodes).toBe(200);
+    expect(r.nodes).toBe(200_000); // 200K — 예전엔 200 으로 읽었다
     expect(r.timeMs).toBe(1469);
     // PV 는 문자 라벨이다: H8 = x 7, y 15-8 = 7
     expect(r.line[0]).toEqual({ x: 7, y: 7 });
+  });
+
+  it("탐색 끝 요약 줄(Speed 로 시작)도 읽는다 — 시간 단위와 K 를 살려서", () => {
+    const r = p("MESSAGE Speed 53270 | Depth 15-26 | Eval -326 | Node 36K | Time 691ms");
+    expect(r).toMatchObject({ kind: "thinking", speed: 53270, nodes: 36_000, timeMs: 691 });
+    expect(p("MESSAGE Depth 20-31 | Eval 12 | Time 29s | H8")).toMatchObject({ timeMs: 29_000 });
+    expect(p("MESSAGE Depth 22-40 | Eval 12 | Time 3min | H8")).toMatchObject({ timeMs: 180_000 });
   });
 
   it("외통도 같은 줄에서 읽는다", () => {
@@ -513,5 +529,99 @@ describe("집계 — 얕은 조각이 여럿 이어져도", () => {
     for (const d of [2, 3, 4, 5]) for (const l of block(d, "0,0")) agg.consume(parse(l, coord));
     expect(agg.snapshot().pvs).toHaveLength(1);
     expect(agg.snapshot().pvs[0]!.depth).toBe(14);
+  });
+});
+
+describe("집계 — 노드·시간은 흔들리지 않는다", () => {
+  const feed = (agg: SearchAggregator, lines: string[]) => {
+    for (const l of lines) agg.consume(parse(l, coord));
+  };
+
+  /** 멀티 PV 두 줄짜리 한 깊이 — 캡처 그대로(PV 마다 NODES 가 따로 온다). */
+  const depthBlock = (d: number, pv0: number[], pv1: number[]) => [
+    "INFO PV 0",
+    "INFO NUMPV 2",
+    `INFO DEPTH ${d}`,
+    `INFO NODES ${pv0[0]}`,
+    `INFO TOTALNODES ${pv0[1]}`,
+    `INFO TOTALTIME ${pv0[2]}`,
+    "INFO BESTLINE 9,9 6,6",
+    "INFO PV DONE",
+    "INFO PV 1",
+    "INFO NUMPV 2",
+    `INFO DEPTH ${d}`,
+    `INFO NODES ${pv1[0]}`,
+    `INFO TOTALNODES ${pv1[1]}`,
+    `INFO TOTALTIME ${pv1[2]}`,
+    "INFO BESTLINE 6,6 9,9",
+    "INFO PV DONE",
+  ];
+
+  it("PV 하나의 NODES 가 아니라 TOTALNODES 를 그린다 — 줄마다 늘기만 한다", () => {
+    const agg = new SearchAggregator(15);
+    const seen: number[] = [];
+    const lines = [
+      ...depthBlock(2, [3, 64, 30], [4, 127, 33]),
+      ...depthBlock(3, [21, 206, 36], [10, 271, 36]),
+      ...depthBlock(4, [27, 338, 37], [21, 408, 38]),
+    ];
+    for (const l of lines) {
+      agg.consume(parse(l, coord));
+      const n = agg.snapshot().stats.nodes;
+      if (n !== null) seen.push(n);
+    }
+    // 예전: 3, 64, 4, 127, 21, 206, 10, 271 … — PV 마다 NODES 가 끼어들어 튀었다.
+    expect(seen.every((n, i) => i === 0 || n >= seen[i - 1]!)).toBe(true);
+    expect(agg.snapshot().stats.nodes).toBe(408);
+    expect(agg.snapshot().stats.timeMs).toBe(38);
+  });
+
+  it("조각을 넘으면 앞 조각의 몫을 더한다 — 0 으로 돌아가지 않는다", () => {
+    const agg = new SearchAggregator(15);
+    agg.beginSlice();
+    feed(agg, [
+      ...depthBlock(11, [1968, 8325, 387], [8122, 16118, 618]),
+      "MESSAGE Speed 26080 | Depth 11-15 | Eval -319 | Node 16K | Time 618ms",
+    ]);
+    expect(agg.snapshot().stats.nodes).toBe(16118);
+    // 다음 조각 — 엔진은 0 부터 다시 센다(캡처: 65 · 1ms).
+    agg.beginSlice();
+    feed(agg, ["INFO PV 0", "INFO DEPTH 2", "INFO TOTALNODES 65", "INFO TOTALTIME 1"]);
+    const s = agg.snapshot().stats;
+    expect(s.nodes).toBe(16118 + 65);
+    expect(s.timeMs).toBe(618 + 1);
+    // 속도는 누적 평균 — 조각 머리의 엔진 SPEED(수천)로 떨어지지 않는다.
+    expect(s.speed).toBe(Math.round(((16118 + 65) * 1000) / 619));
+  });
+
+  it("마지막 PV 뒤의 몫은 탐색 끝 요약 줄이 채운다 — 속도×시간으로 정확하게", () => {
+    const agg = new SearchAggregator(15);
+    agg.beginSlice();
+    // 캡처: 마지막 TOTALNODES 22307 @ 431ms, 조각은 691ms 까지 읽고 끝 줄만 남겼다.
+    feed(agg, ["INFO PV 0", "INFO DEPTH 15", "INFO TOTALNODES 22307", "INFO TOTALTIME 431"]);
+    feed(agg, ["MESSAGE Speed 53270 | Depth 15-26 | Eval -326 | Node 36K | Time 691ms"]);
+    const s = agg.snapshot().stats;
+    expect(s.timeMs).toBe(691);
+    expect(s.nodes).toBe(Math.floor((53270 * 691) / 1000)); // 36809 — 「36K」보다 정확
+  });
+
+  it("얕은 조각 머리에서도 시간은 흐른다 — 깊이·평가만 보류한다", () => {
+    const agg = new SearchAggregator(15);
+    agg.beginSlice();
+    feed(agg, [...depthBlock(10, [1, 900, 200], [2, 1000, 300])]);
+    agg.beginSlice(); // 이제 floor 10 — 얕은 줄은 깊이를 덮지 않는다
+    feed(agg, ["INFO PV 0", "INFO DEPTH 3", "INFO TOTALNODES 50", "INFO TOTALTIME 5"]);
+    const s = agg.snapshot().stats;
+    expect(s.depth).toBe(10);
+    expect(s.timeMs).toBe(305);
+    expect(s.nodes).toBe(1050);
+  });
+
+  it("새 탐색(reset)은 누적을 비운다", () => {
+    const agg = new SearchAggregator(15);
+    feed(agg, ["INFO TOTALNODES 500", "INFO TOTALTIME 40"]);
+    agg.reset();
+    expect(agg.snapshot().stats.nodes).toBeNull();
+    expect(agg.snapshot().stats.timeMs).toBeNull();
   });
 });

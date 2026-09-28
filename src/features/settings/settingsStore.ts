@@ -53,7 +53,8 @@ export interface Settings {
   multiPv: number;
   analysisSec: number;
   // ── 표시 ──
-  showClock: boolean;
+  /** 보드 옆 평가 바(앱 settings_dev 의 `showEvalBar`). */
+  showEvalBar: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -66,7 +67,7 @@ export const DEFAULT_SETTINGS: Settings = {
   // 5 는 W3 부터 분석이 보내 온 `YXNBEST 5` 그대로다 — 스모크가 그 줄로 조각을 센다.
   multiPv: MULTI_PV.initial,
   analysisSec: 0,
-  showClock: true,
+  showEvalBar: true,
 };
 
 const KEY = "rapfi.settings";
@@ -91,7 +92,7 @@ export function sanitize(raw: Partial<Settings>): Settings {
     hashAutoClear: typeof raw.hashAutoClear === "boolean" ? raw.hashAutoClear : d.hashAutoClear,
     multiPv: clamp(num(raw.multiPv, d.multiPv), MULTI_PV.min, MULTI_PV.max),
     analysisSec: sec > 0 ? Math.round(sec) : 0,
-    showClock: typeof raw.showClock === "boolean" ? raw.showClock : d.showClock,
+    showEvalBar: typeof raw.showEvalBar === "boolean" ? raw.showEvalBar : d.showEvalBar,
   };
 }
 
@@ -117,8 +118,10 @@ function save(s: Settings) {
  * 뺀 것이다 — 규칙은 워커가 START 앞에서 렌주로 고정하고(가중치가 렌주뿐이다),
  * DB 는 DB 화면(W6)이 열릴 때 붙는다.
  *
- * `thread_num` 은 언제나 1 이다. 단일 스레드 빌드이고, 1 이 아닌 값을 보내면 엔진이
- * 스레드를 만들려다 실패한다.
+ * `thread_num` 은 언제나 1 이다 — 배포 변형이 단일 스레드 빌드라서다. 실측(0.43.02
+ * single-simd128): 이 빌드는 `INFO THREAD_NUM 4`·`8` 을 오류 없이 **받고 무시한다**
+ * (속도·출력이 1 과 같다). 그러니 1 이 아닌 값은 해롭지는 않지만 거짓 설정이 된다.
+ * 스레드 조절은 멀티 변형이 브라우저에서 살아난 뒤의 일이다(W0c).
  */
 export function engineInfo(s: Settings): EngineCommand[] {
   const info = (key: string, value: string | number): EngineCommand => ({
@@ -184,6 +187,6 @@ function pick(s: SettingsState): Settings {
     hashAutoClear: s.hashAutoClear,
     multiPv: s.multiPv,
     analysisSec: s.analysisSec,
-    showClock: s.showClock,
+    showEvalBar: s.showEvalBar,
   };
 }

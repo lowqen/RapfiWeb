@@ -185,10 +185,41 @@ try {
   const pvRows = await page.locator(".pvlist__row").count();
   console.log(`PV ${pvRows}개`);
 
-  // 4b. **무제한 분석은 스스로 멈추지 않는다.** 예전엔 분석 예산이 5초였고, 즉답
+  // 4b. **노드·시간이 실시간으로, 늘기만 하며 오른다.** 예전엔 PV 하나의 `NODES` 를
+  // 총계로 그려 노드가 튀었고, `TOTALTIME` 을 몰라 시간이 조각(0.5초) 안에서만 돌았다.
+  // 0.5초 간격으로 여덟 번 읽어 단조 증가와 0.5초 천장 돌파를 본다.
+  const pg = page; // 닫힘 안에서는 null 좁히기가 풀린다
+  const tile = (k: string) =>
+    pg.locator(".stat", { has: pg.locator(`dt:text-is("${k}")`) }).locator("dd");
+  const readNum = (t: string): number => {
+    const s = t.trim();
+    const mmss = /^(\d+):(\d{2})$/.exec(s);
+    if (mmss) return (Number(mmss[1]) * 60 + Number(mmss[2])) * 1000;
+    const m = /^([\d.]+)\s*([KMGs]?)/.exec(s);
+    if (!m) return NaN;
+    const scale: Record<string, number> = { K: 1e3, M: 1e6, G: 1e9, s: 1000, "": 1 };
+    return Number(m[1]) * (scale[m[2] ?? ""] ?? 1);
+  };
+  const samples: { t: number; n: number }[] = [];
+  for (let i = 0; i < 8; i++) {
+    samples.push({
+      t: readNum(await tile("TIME").innerText()),
+      n: readNum(await tile("NODE").innerText()),
+    });
+    await page.waitForTimeout(500);
+  }
+  const ok = (xs: number[]) => xs.every((x, i) => !Number.isNaN(x) && (i === 0 || x >= xs[i - 1]!));
+  const ts = samples.map((s) => s.t);
+  const ns = samples.map((s) => s.n);
+  if (!ok(ts)) fail(`TIME 이 줄거나 비었습니다: ${ts.join(" → ")}`);
+  else if (ts.at(-1)! <= 1000) fail(`TIME 이 조각(0.5초) 천장을 넘지 못합니다: ${ts.join(" → ")}`);
+  else if (!ok(ns)) fail(`NODE 가 들쭉날쭉합니다: ${ns.join(" → ")}`);
+  else console.log(`실시간 카운터: TIME ${ts[0]}→${ts.at(-1)}ms · NODE ${ns[0]}→${ns.at(-1)}`);
+
+  // 4c. **무제한 분석은 스스로 멈추지 않는다.** 예전엔 분석 예산이 5초였고, 즉답
   // 조각(좌표 한 줄)에서도 끝나 YXSTOP 을 보냈다. 옛 한도를 넘겨 기다린 뒤에도
-  // 여전히 탐색 중이어야 한다.
-  await page.waitForTimeout(4000);
+  // 여전히 탐색 중이어야 한다(위 표본 4초 + 여기 1초).
+  await page.waitForTimeout(1000);
   const still = await page
     .locator(".panel")
     .filter({ has: page.locator(".panel__badge") })

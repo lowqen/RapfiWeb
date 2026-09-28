@@ -35,7 +35,7 @@ export function AnalysisPanel() {
   const analysisMs = useEngineStore((s) => s.analysisMs);
   const analyzing = useEngineStore((s) => s.analyzing);
   const thinking = useGameStore((s) => s.thinking);
-  const unlimitedGame = useGameStore((s) => !s.clock.limited);
+  const unlimitedGame = useGameStore((s) => s.moveTimeMs <= 0);
   const moveNow = useGameStore((s) => s.moveNow);
 
   const render = useBoardStore((s) => s.render);

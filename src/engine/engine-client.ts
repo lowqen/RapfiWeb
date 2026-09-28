@@ -158,6 +158,9 @@ export class EngineClient {
           this.setStatus("ready");
           break;
         case "snapshot":
+          // 밀려난 탐색이 마지막으로 올린 스냅샷은 **옛 국면**의 값이다. 받으면 보드의
+          // 값 칩과 평가 바가 새 국면 위에서 옛 값을 말한다.
+          if (m.id !== this.searchSeq) break;
           this.snapshot = fromSerializable(m.snapshot);
           this.events.onSnapshot?.(this.snapshot);
           break;

@@ -156,8 +156,11 @@ function maybeEmitSnapshot(force = false) {
   if (!force && now - lastSnapshotAt < SNAPSHOT_MS) return;
   lastSnapshotAt = now;
   snapshotDirty = false;
-  post({ type: "snapshot", snapshot: toSerializable(agg.snapshot()) });
+  post({ type: "snapshot", id: currentSearchId, snapshot: toSerializable(agg.snapshot()) });
 }
+
+/** 지금(또는 마지막으로) 집계기를 쓰는 탐색 요청의 번호. 스냅샷에 붙는다. */
+let currentSearchId = 0;
 
 /**
  * 엔진이 뱉은 줄 하나를 처리한다.
@@ -326,6 +329,7 @@ async function search(msg: Extract<ToWorker, { type: "search" }>, epoch: number)
   // 여기서 무조건 false 로 되돌려, 기동·앞 요청을 기다리던 중에 누른 정지가
   // 조용히 사라졌다.
   stopRequested = epoch !== stopEpoch || pending > 0;
+  currentSearchId = msg.id;
   agg.reset();
   sliceMoves = null;
   const t0 = performance.now();
@@ -496,6 +500,7 @@ async function handle(msg: ToWorker, epoch: number): Promise<void> {
       case "move": {
         // 한 수는 **한 번의 유한한 탐색**이다. 조각으로 나누면 조각마다 새 탐색이 되어
         // 엔진이 매번 처음부터 생각한다.
+        currentSearchId = msg.id;
         agg.reset();
         searching = true;
         const t0 = performance.now();

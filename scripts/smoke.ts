@@ -175,10 +175,17 @@ try {
   const woodDark = await pixel();
   if (woodDark === woodLight) fail(`다크에서 나무 색이 그대로입니다: ${woodDark}`);
 
-  // 보드 옆 칸은 엔진 상태 · 국면 · 시계 셋뿐이다. 대국 설정은 설정 탭, 콘솔은
-  // 엔진 탭으로 갔다 — 옆 칸에 다시 쌓이기 시작하면 여기서 잡는다.
+  // 보드 옆 칸은 엔진 상태 · 국면 둘뿐이다. 대국 설정은 설정 탭, 콘솔은 엔진 탭으로
+  // 갔고 대국 시계는 없앴다 — 옆 칸에 다시 쌓이기 시작하면 여기서 잡는다.
   const sideCards = await page.locator(".boardscreen__side > .panel").count();
-  if (sideCards !== 3) fail(`보드 옆 칸 카드가 셋(엔진·국면·시계)이 아닙니다: ${sideCards}`);
+  if (sideCards !== 2) fail(`보드 옆 칸 카드가 둘(엔진·국면)이 아닙니다: ${sideCards}`);
+  if ((await page.locator(".clock, .clocks").count()) !== 0) fail("보드에 시계가 남아 있습니다");
+  // 평가 바 — 엔진 없이도 자리를 잡고 있어야 한다(값은 「—」, 50:50).
+  const meter = page.getByRole("meter", { name: "평가 바" });
+  if ((await meter.count()) !== 1) fail("평가 바가 없습니다");
+  else if ((await meter.getAttribute("aria-valuenow")) !== "50") {
+    fail(`엔진 없이 평가 바가 50 이 아닙니다: ${await meter.getAttribute("aria-valuenow")}`);
+  }
   for (const gone of ["새 대국", "기권", "컴퓨터 백"]) {
     const n = await page.getByRole("button", { name: gone, exact: true }).count();
     if (n !== 0) fail(`「${gone}」 이 아직 보드 화면에 있습니다 — 설정 탭의 것입니다`);
@@ -204,10 +211,12 @@ try {
       var root = document.scrollingElement;
       var content = document.querySelector(".shell__content");
       var b = document.querySelector(".board__view").getBoundingClientRect();
+      var e = document.querySelector(".evalbar").getBoundingClientRect();
       return {
         pageScroll: root.scrollHeight - root.clientHeight,
         contentScroll: content.scrollHeight - content.clientHeight,
         top: b.top, left: b.left, bottom: b.bottom, right: b.right, side: b.width,
+        barTop: e.top, barBottom: e.bottom, barLeft: e.left, barRight: e.right,
       };
     })()`)) as {
       pageScroll: number;
@@ -217,12 +226,24 @@ try {
       bottom: number;
       right: number;
       side: number;
+      barTop: number;
+      barBottom: number;
+      barLeft: number;
+      barRight: number;
     };
     const tag = `${s.name} ${s.width}×${s.height}`;
     if (m.pageScroll > 1 || m.contentScroll > 1) {
       fail(`${tag}: 스크롤이 생깁니다 (페이지 ${m.pageScroll}px · 내용 ${m.contentScroll}px)`);
     } else if (m.top < 0 || m.left < 0 || m.bottom > s.height + 1 || m.right > s.width + 1) {
       fail(`${tag}: 보드가 화면 밖으로 나갑니다 ${JSON.stringify(m)}`);
+    } else if (
+      // 평가 바는 판의 왼쪽에 붙어 판과 같은 높이여야 한다(체스닷컴처럼).
+      Math.abs(m.barTop - m.top) > 2 ||
+      Math.abs(m.barBottom - m.bottom) > 2 ||
+      m.barRight > m.left ||
+      m.left - m.barRight > 16
+    ) {
+      fail(`${tag}: 평가 바가 판 옆에 판 높이로 붙지 않았습니다 ${JSON.stringify(m)}`);
     } else if (m.side < Math.min(s.width, s.height) * 0.4) {
       fail(`${tag}: 보드가 지나치게 작습니다 (${Math.round(m.side)}px)`);
     } else {
@@ -240,7 +261,7 @@ try {
   const groups = await page.locator(".sgroup").count();
   const rows = await page.locator(".srow").count();
   if (groups < 6) fail(`설정 분류 카드가 모자랍니다: ${groups}`);
-  for (const name of ["새 대국", "컴퓨터 백", "RIF 오프닝", "5분", "무제한"]) {
+  for (const name of ["새 대국", "컴퓨터 백", "RIF 오프닝", "3초", "무제한"]) {
     const n = await page.getByRole("button", { name, exact: true }).count();
     if (n !== 1) fail(`설정 탭에 「${name}」 이 하나가 아닙니다: ${n}개`);
   }
@@ -282,7 +303,7 @@ try {
     console.log(
       "스모크 통과 — 레일 6 · 연구 탭 4 · 라우팅 · 토큰(라이트/다크) · 좁은 폭 전환\n" +
         "             보드 2레이어 · 나무 렌더 · H8 착수 · 중복 착수 무시 · 다크 나무\n" +
-        `             보드 옆 칸 3장 · 설정 ${rows}줄(검색·저장·좁은 폭) · 엔진 탭`,
+        `             보드 옆 칸 2장 · 평가 바(판 높이) · 설정 ${rows}줄(검색·저장·좁은 폭) · 엔진 탭`,
     );
   }
 } finally {

@@ -420,6 +420,33 @@ a:focus-visible {
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
+  /* 판과 평가 바의 크기를 이 칸 기준으로 잰다(아래 `--board-side`). */
+  container-type: size;
+}
+/* 평가 바 몫. 바를 끄면 0 이 되어 판이 그만큼 커진다. */
+.boardscreen {
+  --evalbar-w: 28px;
+  --evalbar-gap: var(--space-m);
+  --evalbar-space: 0px;
+}
+.boardscreen[data-evalbar] {
+  --evalbar-space: calc(var(--evalbar-w) + var(--evalbar-gap));
+}
+/* 바 + 판을 한 묶음으로 가운데. 판은 (칸 높이, 칸 너비 − 바 몫) 중 작은 쪽의
+   정사각형이고, 바는 그 판과 **같은 높이**다 — 체스닷컴처럼 판 옆에 붙는다. */
+.boardrow {
+  --board-side: min(100cqh, 100cqw - var(--evalbar-space));
+  display: flex;
+  gap: var(--evalbar-gap);
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+.boardrow > .board {
+  flex: none;
+  width: var(--board-side);
+  height: var(--board-side);
 }
 .boardscreen__side {
   display: flex;
@@ -445,7 +472,7 @@ a:focus-visible {
   .boardscreen__board {
     flex: none;
     width: 100%;
-    height: min(100cqw, calc(60cqh - var(--transport-h)));
+    height: min(100cqw - var(--evalbar-space), 60cqh - var(--transport-h));
   }
 }
 
@@ -1216,61 +1243,76 @@ a:focus-visible {
   white-space: pre;
 }
 
-/* ── 시계 (W4) ──────────────────────────────────────────────────── */
-/* 두 시계를 나란히. 「지금 누구 차례인가」가 색이 아니라 **테두리와 굵기**로
-   드러나야 한다 — 색만으로 구별하면 색각 이상에서 두 칸이 같아진다. */
-.clocks {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-m);
-  margin-top: var(--space-m);
+/* ── 평가 바 ─────────────────────────────────────────────────────────
+   체스닷컴의 세로 게이지. 위가 흑, 아래가 백 — 흑 승률만큼 위에서 검게 찬다.
+   색은 **돌의 토큰**을 그대로 쓴다: 바의 흑백이 판 위 돌의 흑백과 같은 것이어야
+   «어느 편인가»를 따로 배우지 않는다. 앞선 쪽 끝에 승률·평가값을 적는다. */
+.evalbar {
+  position: relative;
+  flex: none;
+  width: var(--evalbar-w);
+  height: var(--board-side);
+  overflow: hidden;
+  background: linear-gradient(90deg, var(--c-board-white-high), var(--c-board-white-low));
+  border-radius: var(--radius-xs);
+  /* 바깥 테두리 — 다크 배경에서 검은 칸이 화면에 녹아 바의 윤곽이 사라지지 않게. */
+  box-shadow:
+    inset 0 0 0 1px var(--c-board-white-rim),
+    0 0 0 1px var(--c-outline-variant);
 }
-.clock {
+.evalbar__black {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  background: linear-gradient(90deg, var(--c-board-black-high), var(--c-board-black-low));
+  /* 채움만 옮긴다 — 200ms, 미끄러지듯이 아니라 따라잡듯이(Motion.kt 상한). */
+  transition: height var(--motion-value) ease-out;
+}
+/* 50% 눈금. 바가 어느 쪽으로 기울었는지 한눈에 재는 기준선이다. */
+.evalbar__mid {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: var(--c-board-last-move);
+  opacity: 0.7;
+}
+.evalbar__label {
+  position: absolute;
+  right: 0;
+  left: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: var(--space-m);
-  background: var(--c-surface-container-lowest);
-  border: 1px solid var(--c-outline-variant);
-  border-radius: var(--radius-s);
+  align-items: center;
+  gap: 1px;
+  padding: var(--space-s) 0;
+  line-height: 1;
+  text-align: center;
+  pointer-events: none;
 }
-.clock[data-active] {
-  color: var(--c-on-secondary-container);
-  background: var(--c-secondary-container);
-  border-color: var(--c-secondary);
-}
-.clock__label {
-  font: var(--type-label-medium);
-  color: var(--c-on-surface-variant);
-}
-.clock[data-active] .clock__label {
-  color: inherit;
-}
-.clock__big {
-  /* 숫자는 커야 흘깃 읽힌다. 하지만 판보다 커서는 안 된다. */
-  font: var(--type-headline-small);
-  font-variant-numeric: tabular-nums;
-}
-.clock__sub {
-  font: var(--type-label-small);
-  color: var(--c-on-surface-variant);
-}
-.clock[data-active] .clock__sub {
-  color: inherit;
-}
-/* 다급함은 색 + 굵기 두 갈래로 알린다. 깜빡이지는 않는다 — 시간에 쫓기는
-   화면에서 깜빡임은 읽기를 더 어렵게 만든다. */
-.clock[data-urgent] {
-  color: var(--c-on-error-container);
-  background: var(--c-error-container);
-  border-color: var(--c-error);
-}
-.clock[data-urgent] .clock__big {
+.evalbar__main {
+  font-size: 11px;
   font-weight: 700;
 }
-.clock[data-urgent] .clock__label,
-.clock[data-urgent] .clock__sub {
-  color: inherit;
+.evalbar__sub {
+  font-size: 9px;
+  font-weight: 500;
+  opacity: 0.8;
+}
+/* 앞선 쪽 끝으로 간다. 흑이 앞서면 위(검은 칸 위의 밝은 글자), 백이면 아래. */
+.evalbar[data-lead="black"] .evalbar__label {
+  top: 0;
+  color: var(--c-board-white-high);
+}
+.evalbar[data-lead="white"] .evalbar__label,
+.evalbar:not([data-lead]) .evalbar__label {
+  bottom: 0;
+  color: var(--c-board-black-low);
+}
+.evalbar:not([data-lead]) .evalbar__label {
+  opacity: 0.6;
 }
 
 /* ── 칩 묶음 (규칙·컴퓨터 색·시간) ──────────────────────────────── */
@@ -1408,12 +1450,8 @@ a:focus-visible {
   pointer-events: none;
 }
 
-/* 좁은 화면: 시계 두 칸은 유지하되(나란히 봐야 의미가 있다) 여백을 줄인다. */
+/* 좁은 화면: 카드 여백을 줄이고 버튼이 줄을 채운다. */
 @media (max-width: 640px) {
-  .clock__big {
-    font: var(--type-title-large);
-    font-variant-numeric: tabular-nums;
-  }
   .panel {
     padding: var(--space-m);
   }

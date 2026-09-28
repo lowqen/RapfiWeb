@@ -52,6 +52,23 @@ export class SearchAggregator {
   private floor = 0;
   private shallow = false;
 
+  /**
+   * **노드·시간은 조각을 넘어 쌓는다.** 분석은 500ms 조각으로 돌고 조각마다 엔진에게는
+   * 새 탐색이라, `TOTALNODES`·`TOTALTIME` 이 조각 머리에서 0 으로 돌아간다(캡처:
+   * 앞 조각 끝 16118 · 618ms → 다음 조각 첫 줄 65 · 1ms). 그대로 그리면 노드와 시간이
+   * 톱니처럼 오르내리고, 시간은 0.5초를 넘지 못한다. 끝난 조각의 몫은 `base` 에
+   * 더하고, 도는 조각의 몫은 `slice` 에 두어 둘의 합을 그린다.
+   */
+  private baseNodes = 0;
+  private baseTimeMs = 0;
+  private sliceNodes = 0;
+  private sliceTimeMs = 0;
+  /** 이 탐색에서 카운터가 한 번이라도 왔는가 — 아직이면 화면은 「—」다. */
+  private sawNodes = false;
+  private sawTime = false;
+  /** 엔진이 찍은 속도. 시간이 아직 0 일 때만 쓴다(그 뒤로는 누적 평균). */
+  private engineSpeed: number | null = null;
+
   private readonly pvs = new Map<number, PvSnapshot>();
   private readonly tags = new Map<number, CellTag>();
   private readonly candidates = new Map<number, "live" | "done">();
@@ -72,11 +89,51 @@ export class SearchAggregator {
     this.sawInfoPv = false;
     this.floor = 0;
     this.shallow = false;
+    this.baseNodes = 0;
+    this.baseTimeMs = 0;
+    this.sliceNodes = 0;
+    this.sliceTimeMs = 0;
+    this.sawNodes = false;
+    this.sawTime = false;
+    this.engineSpeed = null;
   }
 
-  /** 새 조각을 연다. 이미 끝낸 깊이까지 다시 올라올 동안은 화면을 건드리지 않는다. */
+  /**
+   * 새 조각을 연다. 이미 끝낸 깊이까지 다시 올라올 동안은 화면을 건드리지 않는다.
+   * 앞 조각의 노드·시간은 여기서 누적으로 넘긴다 — 엔진이 이제 0 부터 다시 센다.
+   */
   beginSlice(): void {
     this.shallow = this.floor > 0;
+    this.baseNodes += this.sliceNodes;
+    this.baseTimeMs += this.sliceTimeMs;
+    this.sliceNodes = 0;
+    this.sliceTimeMs = 0;
+  }
+
+  /**
+   * 도는 조각의 카운터를 올린다. **줄어드는 값은 받지 않는다** — 한 조각 안에서
+   * 총계는 늘기만 하고, 사람이 읽는 줄의 `16K` 는 정확한 값보다 작게 반올림된다.
+   */
+  private counters(c: { nodes?: number | null; timeMs?: number | null; speed?: number | null }) {
+    if (c.nodes != null) {
+      this.sawNodes = true;
+      this.sliceNodes = Math.max(this.sliceNodes, c.nodes);
+    }
+    if (c.timeMs != null) {
+      this.sawTime = true;
+      this.sliceTimeMs = Math.max(this.sliceTimeMs, c.timeMs);
+    }
+    if (c.speed != null) this.engineSpeed = c.speed;
+    const nodes = this.baseNodes + this.sliceNodes;
+    const timeMs = this.baseTimeMs + this.sliceTimeMs;
+    this.stats = {
+      ...this.stats,
+      nodes: this.sawNodes ? nodes : null,
+      timeMs: this.sawTime ? timeMs : null,
+      // 누적 평균. 엔진의 SPEED 는 조각마다 0 에서 다시 올라오므로(조각 머리
+      // 2206 → 끝 26123) 그대로 그리면 속도도 톱니가 된다.
+      speed: this.sawNodes && timeMs > 0 ? Math.round((nodes * 1000) / timeMs) : this.engineSpeed,
+    };
   }
 
   /** 응답 하나를 먹인다. 화면에 보일 것이 바뀌었으면 `true`. */
@@ -158,26 +215,48 @@ export class SearchAggregator {
       }
 
       case "infoStat":
-        this.stats = {
-          ...this.stats,
-          nodes: r.key === "NODE" || r.key === "NODES" ? r.value : this.stats.nodes,
-          speed: r.key === "SPEED" ? r.value : this.stats.speed,
-          timeMs: r.key === "TIME" ? r.value : this.stats.timeMs,
-        };
-        return true;
+        switch (r.key) {
+          // **NODES 는 총계가 아니다** — Rapfi 에서는 PV 하나(루트 수 하나)의 노드
+          // 수라, 멀티 PV 블록마다 3 → 4 → 21 → 10 처럼 오르내린다. 총계로 그리면
+          // 노드 수가 들쭉날쭉 튄다. 총계는 TOTALNODES 가 나른다.
+          case "NODES":
+            return false;
+          case "TOTALNODES":
+          case "NODE": // 옛 Yixin 철자 — 총계다
+            this.counters({ nodes: r.value });
+            return true;
+          case "TOTALTIME":
+          case "TIME":
+            this.counters({ timeMs: r.value });
+            return true;
+          case "SPEED":
+            this.counters({ speed: r.value });
+            return true;
+          case "SELDEPTH":
+            if (this.shallow) return false;
+            this.stats = { ...this.stats, selDepth: r.value };
+            return true;
+        }
+        return false;
 
       case "thinking": {
-        // 사람이 읽는 요약 줄도 같은 규칙 — 얕은 조각 머리의 줄은 넘긴다.
-        if (this.shallow || (r.depth !== null && r.depth < this.floor)) return false;
+        // 노드·시간은 얕은 조각 머리에서도 **센다** — 깊이·평가처럼 되돌아가는 값이
+        // 아니라 쌓이기만 하는 값이다. 탐색 끝 요약 줄(`Speed … | Node 36K |
+        // Time 691ms`)은 반올림된 노드 대신 속도×시간으로 정확한 값을 되살린다.
+        const exact =
+          r.speed !== null && r.timeMs !== null ? Math.floor((r.speed * r.timeMs) / 1000) : null;
+        this.counters({
+          nodes: exact !== null && r.nodes !== null ? Math.max(exact, r.nodes) : r.nodes,
+          timeMs: r.timeMs,
+        });
+        // 깊이·평가·PV 는 같은 규칙 — 얕은 조각 머리의 줄은 넘긴다.
+        if (this.shallow || (r.depth !== null && r.depth < this.floor)) return true;
         this.stats = {
           ...this.stats,
           depth: r.depth ?? this.stats.depth,
           selDepth: r.selDepth ?? this.stats.selDepth,
           evalCp: r.evalCp ?? this.stats.evalCp,
           mate: r.mate ?? this.stats.mate,
-          nodes: r.nodes ?? this.stats.nodes,
-          speed: r.speed ?? this.stats.speed,
-          timeMs: r.timeMs ?? this.stats.timeMs,
         };
         // 상세 모드가 살아 있으면 PV 는 그쪽이 권위다.
         if (!this.sawInfoPv && r.line.length > 0) {

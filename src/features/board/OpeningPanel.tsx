@@ -132,15 +132,6 @@ function Prompt() {
         </Ask>
       );
 
-    case "timeout":
-      return (
-        <Ask kind={p.kind} text="시간이 다 됐습니다.">
-          <button type="button" onClick={g.dismissPrompt}>
-            확인
-          </button>
-        </Ask>
-      );
-
     case "info":
       return (
         <Ask kind={p.kind} text={p.text}>

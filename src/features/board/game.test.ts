@@ -4,7 +4,6 @@ import { useBoardStore } from "./boardStore";
 import { getGameHandlers, useEngineStore } from "../../engine/engine-state";
 import { move, type Move } from "../../core/model/move";
 import { OPENING_LABEL, type ComputerSide, type OpeningProtocol } from "../../core/model/game";
-import { EMPTY_CLOCK } from "../../core/model/clock";
 import type { EngineCommand, EngineStatus, Placement } from "../../engine/engine-types";
 import type { OpeningResponse } from "../../engine/engine-client";
 
@@ -62,8 +61,8 @@ function fresh(
     computerSide: opts.computerSide ?? "none",
     opening: opts.opening ?? "none",
     showForbidden: opts.showForbidden ?? false,
-    // 시계 한도는 새 대국이 **일부러** 이어받는다 — 앞 시험의 한도가 새어 들지 않게 비운다.
-    clock: EMPTY_CLOCK,
+    // 착수 시간은 새 대국이 **일부러** 이어받는다 — 앞 시험의 값이 새어 들지 않게 비운다.
+    moveTimeMs: 0,
   });
   g().newGame();
   resetSpies();
@@ -260,21 +259,6 @@ describe("대국 패널의 동작", () => {
     expect(kinds()).toContain("yxdraw");
   });
 
-  it("사람 시계가 다 되면 대국이 끝나고 한 번만 알린다", () => {
-    fresh();
-    g().setClockLimits({ limited: true, turnLimitMs: 1_000, matchLimitMs: 10_000 });
-    useGameStore.setState({ clock: { ...g().clock, running: "human" } });
-    g().advanceClock(1_500);
-    expect(g().result).toEqual({ end: "timeout", winner: "white" });
-    expect(g().prompt).toEqual({ kind: "timeout" });
-    expect(g().clock.timedOutNotified).toBe(true);
-
-    // 두 번째 틱은 아무 일도 하지 않는다.
-    g().dismissPrompt();
-    g().advanceClock(1_000);
-    expect(g().prompt).toBeNull();
-  });
-
   it("무르기는 결과를 되돌린다", () => {
     fresh();
     // 흑 5목을 만들고 무른다.
@@ -290,8 +274,9 @@ describe("대국 패널의 동작", () => {
     expect(stones()).toHaveLength(8);
   });
 
-  it("새 대국은 판과 물음과 시계를 함께 비운다", () => {
+  it("새 대국은 판과 물음을 함께 비운다 — 엔진 착수 시간은 지킨다", () => {
     fresh({ computerSide: "white", opening: "rif" });
+    g().setMoveTime(3_000);
     g().tap(move(7, 7));
     g().tap(move(8, 7));
     useGameStore.setState({ prompt: { kind: "swapInfo" } });
@@ -300,9 +285,16 @@ describe("대국 패널의 동작", () => {
     expect(g().prompt).toBeNull();
     expect(g().thinking).toBe(false);
     expect(g().result).toBeNull();
-    // 시계는 **제한 설정은 지키고 쓴 시간만** 비운다.
-    expect(g().clock.humanTurnMs).toBe(0);
-    expect(g().clock.running).toBe("human");
+    expect(g().moveTimeMs).toBe(3_000);
+  });
+
+  it("대국 시계는 없다 — 상태에도 명령에도", () => {
+    fresh({ computerSide: "white" });
+    expect("clock" in g()).toBe(false);
+    g().setMoveTime(5_000);
+    g().tap(move(7, 7));
+    // 대국 예산(timeout_match)은 0, 남은 대국 시간(time_left)은 보내지 않는다.
+    expect(plays[0]!.budget).toEqual({ turnMs: 5_000, matchMs: 0 });
   });
 });
 
@@ -364,25 +356,27 @@ describe("착수 예산", () => {
     expect(r.kind === "rejected" && r.reason.includes("지금 두기")).toBe(true);
   });
 
-  it("시간 제한이 있으면 차례 한도 · 대국 한도 · 남은 대국 시간을 함께 보낸다", () => {
+  it("착수 시간을 정하면 그 시간을 차례 한도로 보낸다", () => {
     fresh({ computerSide: "white" });
-    g().setClockLimits({ limited: true, turnLimitMs: 30_000, matchLimitMs: 300_000 });
+    g().setMoveTime(30_000);
     g().tap(move(7, 7));
-    // matchMs 가 0 이면 Rapfi 는 time_left 를 무시한다 — 대국 한도가 꼭 가야 한다.
-    expect(plays[0]!.budget).toEqual({
-      turnMs: 30_000,
-      matchMs: 300_000,
-      matchLeftMs: 300_000,
-    });
+    expect(plays[0]!.budget).toEqual({ turnMs: 30_000, matchMs: 0 });
   });
 
   it("예산은 결코 0 이 아니다", () => {
-    // 차례 시간을 다 써도 최소 500ms 는 준다 — 0 을 넘기면 엔진은 읽지 않고 던진다.
+    // 아주 짧게 정해도 최소 500ms 는 준다 — 0 을 넘기면 엔진은 읽지 않고 던진다.
     fresh({ computerSide: "white" });
-    g().setClockLimits({ limited: true, turnLimitMs: 1_000, matchLimitMs: 1_000 });
-    useGameStore.setState({ clock: { ...g().clock, computerMatchMs: 5_000 } });
+    g().setMoveTime(100);
     g().tap(move(7, 7));
     expect(plays[0]!.budget!.turnMs).toBeGreaterThanOrEqual(500);
+  });
+
+  it("착수 시간이 있으면 생각 중 탭에 「지금 두기」를 권하지 않는다", () => {
+    fresh({ computerSide: "white" });
+    g().setMoveTime(3_000);
+    g().tap(move(7, 7));
+    const r = g().tap(move(3, 3));
+    expect(r).toEqual({ kind: "rejected", reason: "엔진이 생각 중입니다" });
   });
 });
 

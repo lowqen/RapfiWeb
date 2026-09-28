@@ -84,7 +84,23 @@ export type EngineResponse =
   | { kind: "infoBestline"; line: readonly Move[]; raw: string }
   | { kind: "infoWinRate"; winRate: number; raw: string }
   | { kind: "infoEval"; mate: number | null; cp: number | null; raw: string }
-  | { kind: "infoStat"; key: "NODE" | "NODES" | "SPEED" | "TIME"; value: number; raw: string }
+  /**
+   * 탐색 카운터. Rapfi 상세 모드의 실제 철자(엔진 출력 캡처로 확인):
+   *
+   *     INFO NODES 21          ← **이 PV(루트 수) 하나의** 노드 수 — 총계가 아니다
+   *     INFO TOTALNODES 206    ← 이번 탐색 전체의 누적 노드 수
+   *     INFO TOTALTIME 36      ← 이번 탐색의 경과 ms
+   *     INFO SPEED 5722        ← 노드/초
+   *     INFO SELDEPTH 6
+   *
+   * `NODE`·`TIME` 은 옛 Yixin 엔진 철자라 받아 둔다.
+   */
+  | {
+      kind: "infoStat";
+      key: "NODE" | "NODES" | "TOTALNODES" | "SPEED" | "TIME" | "TOTALTIME" | "SELDEPTH";
+      value: number;
+      raw: string;
+    }
 
   // 사람이 읽는 한 줄 요약 — 상세 모드가 아닐 때의 유일한 정보원
   | {
@@ -270,8 +286,12 @@ export type SearchEndReason = "finished" | "stopped" | "timeout";
 
 export type FromWorker =
   | { type: "booted"; version: string; bootMs: number; about: Record<string, string> }
-  /** 집계된 스냅샷. 메인 스레드는 원시 줄이 아니라 이것을 받는다. */
-  | { type: "snapshot"; snapshot: SerializableSnapshot }
+  /**
+   * 집계된 스냅샷. 메인 스레드는 원시 줄이 아니라 이것을 받는다. `id` 는 그 스냅샷을
+   * 만든 탐색 요청의 번호다 — 밀려난 탐색이 마지막으로 올린 것(옛 국면의 값)을
+   * 클라이언트가 버리게 한다. 평가 바가 옛 값을 새 국면의 차례로 읽으면 뒤집힌다.
+   */
+  | { type: "snapshot"; id: number; snapshot: SerializableSnapshot }
   /** 콘솔용 원시 줄. 저주파 배치. */
   | { type: "console"; lines: readonly string[] }
   | { type: "bestMove"; moves: readonly Move[] }

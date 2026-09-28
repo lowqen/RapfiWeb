@@ -13,19 +13,6 @@ import {
   type TapResult,
 } from "../../core/model/game";
 import {
-  EMPTY_CLOCK,
-  addIncrement as addClockIncrement,
-  engineTimeLeftMs,
-  leftTurnMs,
-  playerTimedOut,
-  start as startClock,
-  stop as stopClock,
-  tick as tickClock,
-  withLimits,
-  type ClockSide,
-  type GameClock,
-} from "../../core/model/clock";
-import {
   openingAreaOk,
   result as refereeResult,
   swapAfterFirstMove,
@@ -49,9 +36,14 @@ import type { EngineCommand } from "../../engine/engine-types";
  * 엔진에게 협상을 시키던 Soosorv-8·스왑2 는 빠졌다 — Rapfi 가 그 명령을 모른다
  * (`docs/오프닝-협상-엔진-지원.md`).
  *
- * **시계는 `place()` 가 건드리지 않는다.** 앱과 같다: 시계는 «엔진에게 넘길 때»
- * 컴퓨터로, «엔진이 답할 때» 사람으로 넘어가고 가산은 그 두 자리에서만 붙는다.
+ * **대국 시계는 없다.** 시계·시간 초과·수당 가산을 걷어냈다. 엔진의 한 수에 쓸
+ * 시간만 `moveTimeMs` 하나로 정한다 — 0 이면 무제한(「지금 두기」까지 읽는다),
+ * 아니면 매 수 그만큼(`INFO timeout_turn`, 대국 예산 없음). 데스크톱의 「사용자 정의
+ * 레벨」에서 턴 시간만 남긴 것과 같다.
  */
+
+/** 엔진 착수 시간 선택지(ms). 0 = 무제한. */
+export const MOVE_TIME_CHOICES = [0, 1_000, 3_000, 5_000, 10_000, 30_000] as const;
 
 /** 렌주에서는 장목이 흑의 **금수**라 승리 판정에서는 장목을 인정한다. */
 const ALLOW_OVERLINE = true;
@@ -71,7 +63,8 @@ interface GameState {
   /** 대국 탐색이 돌고 있다(데스크톱의 `isthinking`). */
   thinking: boolean;
   result: GameResult | null;
-  clock: GameClock;
+  /** 엔진이 한 수에 쓸 시간(ms). 0 = 무제한 — 「지금 두기」까지 읽는다. */
+  moveTimeMs: number;
   prompt: GamePrompt | null;
   /** 금수 표시를 켤 것인가. */
   showForbidden: boolean;
@@ -79,9 +72,7 @@ interface GameState {
 
   setComputerSide: (s: ComputerSide) => void;
   setOpening: (o: OpeningProtocol) => void;
-  setClockLimits: (
-    limits: Partial<Pick<GameClock, "limited" | "turnLimitMs" | "matchLimitMs" | "incrementMs">>,
-  ) => void;
+  setMoveTime: (ms: number) => void;
   toggleForbidden: () => void;
   /**
    * 금수 목록을 다시 받아 온다. 화면이 **엔진이 준비되는 순간** 한 번 부른다 —
@@ -111,9 +102,6 @@ interface GameState {
    * 대국에서 엔진의 한 수를 끝내는 유일한 방법이다(데스크톱의 정지와 같다).
    */
   moveNow: () => void;
-
-  /** 시계 틱. 화면이 250ms 마다 부른다. */
-  advanceClock: (deltaMs: number) => void;
 }
 
 const board = () => useBoardStore.getState();
@@ -134,12 +122,6 @@ export const useGameStore = create<GameState>((set, get) => {
 
   const send = (...cmds: EngineCommand[]) => engine().send(...cmds);
 
-  const addIncrement = (side: ClockSide) =>
-    set((s) => ({ clock: addClockIncrement(s.clock, side) }));
-
-  /** 시계를 그쪽으로 넘긴다. */
-  const runClock = (side: ClockSide) => set((s) => ({ clock: startClock(s.clock, side) }));
-
   /**
    * 판이 바뀔 때마다의 승패 검사 — 데스크톱은 `make_move` 안에서 한다.
    * 결과가 사라지는 방향(무르기)도 반영한다.
@@ -148,14 +130,14 @@ export const useGameStore = create<GameState>((set, get) => {
     const r = refereeResult(board().render.stones, board().render.size, ALLOW_OVERLINE);
     const s = get();
     if (r && !s.result) {
-      set((st) => ({ result: r, thinking: false, clock: stopClock(st.clock) }));
+      set({ result: r, thinking: false });
       log(`대국 종료 — ${r.winner ?? "무승부"} / ${r.end}`);
     } else if (!r && s.result) {
       set({ result: null });
     }
   };
 
-  /** 돌 하나. **시계는 건드리지 않는다** — 위 파일 주석 참고. */
+  /** 돌 하나. */
   const place = (cell: Move) => {
     const moves = board().render.stones;
     if (!inBoard(cell, board().render.size)) return;
@@ -233,7 +215,7 @@ export const useGameStore = create<GameState>((set, get) => {
         watchdog = null;
         if (!get().thinking || get().result) return;
         send({ kind: "stop" });
-        set((st) => ({ thinking: false, clock: stopClock(st.clock) }));
+        set({ thinking: false });
         prompt({ kind: "info", text: "엔진이 답하지 않습니다 — 손으로 이어서 두세요." });
         log("엔진 무응답 — 기다림을 풀었습니다");
       },
@@ -253,9 +235,8 @@ export const useGameStore = create<GameState>((set, get) => {
     const s = get();
     if (s.result) return;
     const moves = board().render.stones;
-    const clock = startClock(s.clock, "computer");
-    set({ thinking: true, clock });
-    if (!clock.limited) {
+    set({ thinking: true });
+    if (s.moveTimeMs <= 0) {
       // **무제한: 엔진은 「지금 두기」까지 생각한다.** 데스크톱·앱의 기본 레벨
       // (level 0 — 시간·노드 무제한, 사용자가 멈추면 둔다)과 같다. 예전엔 여기서
       // 5초를 줬고 「앱의 기본값」이라고 적었는데, 틀린 말이었다.
@@ -263,8 +244,9 @@ export const useGameStore = create<GameState>((set, get) => {
       void engine().play(board().placements(), moves.length === 0, { turnMs: Infinity });
       return;
     }
-    const turnMs = Math.max(500, leftTurnMs(clock, "computer"));
-    const budget = { turnMs, matchMs: clock.matchLimitMs, matchLeftMs: engineTimeLeftMs(clock) };
+    // 한 수 예산만 준다. 대국 예산(`timeout_match`)은 0 — 대국 시계가 없다.
+    const turnMs = Math.max(500, s.moveTimeMs);
+    const budget = { turnMs, matchMs: 0 };
     // 감시견은 **엔진이 준비된 뒤에** 건다. 첫 수에는 엔진 기동(20MB 가중치
     // 내려받기)이 끼는데, 느린 회선에서 그 시간까지 세면 멀쩡한 대국을 끊는다.
     void engine()
@@ -277,9 +259,7 @@ export const useGameStore = create<GameState>((set, get) => {
   /** 엔진이 답해 차례가 사람에게 돌아왔다. */
   const handBackToHuman = () => {
     disarmWatchdog();
-    addIncrement("computer");
     set({ thinking: false });
-    runClock("human");
   };
 
   // 엔진 쪽에 처리기를 걸어 둔다. `engine-state` 는 「대국」을 모르고, 대국이
@@ -305,7 +285,7 @@ export const useGameStore = create<GameState>((set, get) => {
     opening: "none",
     thinking: false,
     result: null,
-    clock: EMPTY_CLOCK,
+    moveTimeMs: 0,
     prompt: null,
     showForbidden: true,
     log: [],
@@ -323,15 +303,11 @@ export const useGameStore = create<GameState>((set, get) => {
       get().newGame();
     },
 
-    setClockLimits: (limits) =>
-      set((s) => ({
-        clock: withLimits(s.clock, {
-          limited: limits.limited ?? s.clock.limited,
-          turnLimitMs: limits.turnLimitMs ?? s.clock.turnLimitMs,
-          matchLimitMs: limits.matchLimitMs ?? s.clock.matchLimitMs,
-          incrementMs: limits.incrementMs ?? s.clock.incrementMs,
-        }),
-      })),
+    setMoveTime: (ms) => {
+      const moveTimeMs = ms > 0 ? Math.round(ms) : 0;
+      set({ moveTimeMs });
+      log(`엔진 착수 시간: ${moveTimeMs === 0 ? "무제한" : `${moveTimeMs}ms`}`);
+    },
 
     toggleForbidden: () => {
       set({ showForbidden: !get().showForbidden });
@@ -344,20 +320,7 @@ export const useGameStore = create<GameState>((set, get) => {
       disarmWatchdog();
       board().clear();
       board().setForbidden([]);
-      set((s) => ({
-        result: null,
-        thinking: false,
-        prompt: null,
-        log: [],
-        clock: {
-          ...EMPTY_CLOCK,
-          limited: s.clock.limited,
-          turnLimitMs: s.clock.turnLimitMs,
-          matchLimitMs: s.clock.matchLimitMs,
-          incrementMs: s.clock.incrementMs,
-          running: "human",
-        },
-      }));
+      set({ result: null, thinking: false, prompt: null, log: [] });
       send({ kind: "restart" });
       log("새 대국");
       // **엔진이 흑이어도 자동으로 두지 않는다** — 데스크톱·앱과 같이 사람이
@@ -371,9 +334,10 @@ export const useGameStore = create<GameState>((set, get) => {
       if (!inBoard(cell, size)) return { kind: "ignored" };
       // 데스크톱은 탐색 중과 종국 뒤의 클릭을 삼킨다(main.c:2663 / 2676).
       if (s.thinking) {
-        const reason = s.clock.limited
-          ? "엔진이 생각 중입니다"
-          : "엔진이 생각 중입니다 — 「지금 두기」를 누르면 둡니다";
+        const reason =
+          s.moveTimeMs > 0
+            ? "엔진이 생각 중입니다"
+            : "엔진이 생각 중입니다 — 「지금 두기」를 누르면 둡니다";
         return { kind: "rejected", reason };
       }
       if (s.result) {
@@ -417,7 +381,6 @@ export const useGameStore = create<GameState>((set, get) => {
         enginePlays(next.computerSide, sideToMove(board().render.stones)) &&
         openingLetsEngineMove(next.opening, board().render.stones.length)
       ) {
-        addIncrement("human");
         engineTurn();
       }
       return { kind: "placed" };
@@ -441,7 +404,6 @@ export const useGameStore = create<GameState>((set, get) => {
       set({
         result: { end: "resigned", winner: loser === "black" ? "white" : "black" },
         thinking: false,
-        clock: stopClock(s.clock),
       });
       log("기권했습니다 (yxresign)");
     },
@@ -451,11 +413,7 @@ export const useGameStore = create<GameState>((set, get) => {
       if (s.result) return;
       disarmWatchdog();
       send({ kind: "yxdraw" });
-      set({
-        result: { end: "drawAgreed", winner: null },
-        thinking: false,
-        clock: stopClock(s.clock),
-      });
+      set({ result: { end: "drawAgreed", winner: null }, thinking: false });
       log("무승부를 제안했습니다 (yxdraw)");
     },
 
@@ -477,7 +435,6 @@ export const useGameStore = create<GameState>((set, get) => {
      */
     answerSwap: (yes) => {
       set({ prompt: null });
-      addIncrement("human");
       if (!yes) {
         log("교환 안 함");
         refreshForbidden();
@@ -486,24 +443,6 @@ export const useGameStore = create<GameState>((set, get) => {
       place(SWAP_FIRST_REPLY);
       applySwapSides();
       log("교환");
-    },
-
-    advanceClock: (deltaMs) => {
-      const s = get();
-      if (!s.clock.running || s.result) return;
-      const next = tickClock(s.clock, deltaMs);
-      // 데스크톱은 **사람 쪽만** 경고하고, 한 번만 한다(timeoutflag).
-      if (playerTimedOut(next) && !next.timedOutNotified) {
-        disarmWatchdog();
-        set({
-          clock: { ...stopClock(next), timedOutNotified: true },
-          result: { end: "timeout", winner: "white" },
-          thinking: false,
-          prompt: { kind: "timeout" },
-        });
-        return;
-      }
-      set({ clock: next });
     },
   };
 
@@ -518,7 +457,7 @@ export const useGameStore = create<GameState>((set, get) => {
     disarmWatchdog();
     if (get().thinking) engine().stop();
     for (let i = 0; i < n && board().render.stones.length > 0; i++) board().undo();
-    set((s) => ({ thinking: false, prompt: null, clock: stopClock(s.clock) }));
+    set({ thinking: false, prompt: null });
     judge();
     log(what);
     refreshForbidden();
@@ -616,36 +555,6 @@ export const useGameStore = create<GameState>((set, get) => {
  * 착수(`play`)가 이어지고, 그 착수가 분석 의도를 끈다. 여기서 즉시 분석을 걸면
  * 착수 앞에 쓸데없는 분석 요청이 하나 끼어든다.
  */
-/**
- * **시계 틱 — 화면이 아니라 스토어가 돌린다.** 대국 조작이 설정 탭으로 가면서,
- * 시계 카드가 틱을 돌리던 때는 탭을 옮기면 시계가 멈췄다(시간 초과도 오지 않았다).
- *
- * 틱은 250ms 다. 초 단위 표시에 16ms 마다 리렌더할 이유가 없고, 초가 바뀌는 순간을
- * 놓치지도 않는다. 벽시계로 잰다 — setInterval 은 밀리므로 간격을 믿고 더하면
- * 시계가 느려진다.
- *
- * 시험(node)에는 `window` 가 없다 — 시험은 `advanceClock` 을 손으로 부른다.
- */
-const TICK_MS = 250;
-if (typeof window !== "undefined") {
-  let tick: ReturnType<typeof setInterval> | null = null;
-  useGameStore.subscribe((s, prev) => {
-    const running = s.clock.running !== null;
-    if (running === (prev.clock.running !== null)) return;
-    if (tick !== null) {
-      clearInterval(tick);
-      tick = null;
-    }
-    if (!running) return;
-    let last = performance.now();
-    tick = setInterval(() => {
-      const now = performance.now();
-      useGameStore.getState().advanceClock(now - last);
-      last = now;
-    }, TICK_MS);
-  });
-}
-
 let followScheduled = false;
 useBoardStore.subscribe((s, prev) => {
   if (s.render.stones === prev.render.stones || followScheduled) return;

@@ -109,7 +109,6 @@ export function serialize(cmd: EngineCommand, coord: CoordMapper): string[] {
 
 const BEST_MOVE = /^(\d+)\s*,\s*(\d+)(?:\s+(\d+)\s*,\s*(\d+))?$/;
 const WHITESPACE = /\s+/;
-const FIRST_DIGITS = /\d+/;
 /** 협상 줄의 좌표는 쉼표가 아니라 공백으로 나뉜다 — 숫자만 훑어 뽑는다. */
 const SIGNED_DIGITS = /-?\d+/g;
 const ABOUT_FIELD = /(\w+)\s*=\s*"([^"]*)"|(\w+)\s*=\s*([^,]+)/g;
@@ -120,11 +119,31 @@ const int = (s: string): number | null => {
   return Number(t);
 };
 
-/** `"12345k"` 같은 값에서 앞쪽 숫자만. */
-const digits = (v: string): number | null => {
-  const m = FIRST_DIGITS.exec(v);
-  return m ? Number(m[0]) : null;
-};
+/**
+ * 개수. Rapfi 는 사람이 읽는 줄에서 큰 수를 줄여 쓴다(`Node 36K`, `Node 1.2M`).
+ * 예전엔 앞쪽 숫자만 떼어 `36K` 를 36 으로 읽었다 — 탐색 끝 요약 줄마다 노드 수가
+ * 천분의 일로 떨어졌다가 다음 줄에 되돌아왔다.
+ */
+const COUNT = /^([+-]?\d+(?:\.\d+)?)\s*([KMGB])?/i;
+const SCALE: Record<string, number> = { K: 1e3, M: 1e6, G: 1e9, B: 1e9 };
+export function count(v: string): number | null {
+  const m = COUNT.exec(v.trim());
+  if (!m) return null;
+  const unit = m[2]?.toUpperCase();
+  return Math.round(Number(m[1]) * (unit ? SCALE[unit]! : 1));
+}
+
+/**
+ * 시간 → ms. `INFO TOTALTIME 36` 은 단위 없는 ms 이고, 사람이 읽는 줄은
+ * `691ms`·`29s`·`3min`·`1h` 로 쓴다(Rapfi `timeText`).
+ */
+const DURATION = /^(\d+(?:\.\d+)?)\s*(ms|s|min|h)?\b/i;
+const UNIT_MS: Record<string, number> = { ms: 1, s: 1000, min: 60_000, h: 3_600_000 };
+export function durationMs(v: string): number | null {
+  const m = DURATION.exec(v.trim());
+  if (!m) return null;
+  return Math.round(Number(m[1]) * UNIT_MS[(m[2] ?? "ms").toLowerCase()]!);
+}
 
 /** 한 줄 → 응답. 모르는 줄도 `unknown` 으로 **남긴다** — 버리지 않는다. */
 export function parse(rawLine: string, coord: CoordMapper): EngineResponse {
@@ -197,9 +216,14 @@ function parseInfo(rest: string, coord: CoordMapper, raw: string): EngineRespons
       return parseEval(value, raw);
     case "NODE":
     case "NODES":
+    case "TOTALNODES":
     case "SPEED":
-    case "TIME": {
-      const v = digits(value);
+    case "SELDEPTH":
+    case "TIME":
+    case "TOTALTIME": {
+      // 예전엔 TOTALNODES·TOTALTIME 을 몰라 메시지로 흘렸고, 대신 **PV 하나의**
+      // 노드 수인 NODES 를 총계로 그렸다 — 노드가 들쭉날쭉 튀고 시간이 멈춰 보인 이유.
+      const v = key.endsWith("TIME") ? durationMs(value) : count(value);
       return v === null
         ? { kind: "message", text: `INFO ${rest}`, raw }
         : { kind: "infoStat", key, value: v, raw };
@@ -227,7 +251,12 @@ function parseEval(value: string, raw: string): EngineResponse {
  * 호출자가 `message` 로 떨어뜨리게 한다.
  */
 function parseThinking(body: string, raw: string): EngineResponse | null {
-  if (!body.toUpperCase().startsWith("DEPTH") || !body.includes("|")) return null;
+  // 두 모양이다: 깊이마다의 `Depth 11-15 | Eval -319 | Time 618ms | …` 와, 탐색이
+  // 끝날 때 한 번의 `Speed 26080 | Depth 11-15 | Eval -319 | Node 16K | Time 618ms`.
+  // 뒤엣것이 조각 하나의 **마지막** 노드·시간을 나르는 유일한 줄이다 — 깊은 조각은
+  // 마지막 PV 뒤에도 수백 ms 를 더 읽는데, 그 몫은 여기에만 찍힌다.
+  const head = body.toUpperCase();
+  if (!(head.startsWith("DEPTH") || head.startsWith("SPEED")) || !body.includes("|")) return null;
   let depth: number | null = null;
   let selDepth: number | null = null;
   let evalCp: number | null = null;
@@ -262,15 +291,15 @@ function parseThinking(body: string, raw: string): EngineResponse | null {
         break;
       }
       case "TIME":
-        timeMs = int(value.replace(/ms$/i, "").trim());
+        timeMs = durationMs(value);
         break;
       case "NODE":
       case "NODES":
       case "N":
-        nodes = digits(value);
+        nodes = count(value);
         break;
       case "SPEED":
-        speed = digits(value);
+        speed = count(value);
         break;
       default: {
         // 키가 없는 조각 = PV. 토큰이 **전부** 좌표 라벨일 때만 PV 로 본다.

@@ -3,7 +3,7 @@ import { BoardCanvas } from "../../core/board/BoardCanvas";
 import { useBoardStore } from "./boardStore";
 import { useGameStore } from "./gameStore";
 import { AnalysisPanel } from "./AnalysisPanel";
-import { ClockPanel } from "./ClockPanel";
+import { EvalBar } from "./EvalBar";
 import { PromptPanel } from "./OpeningPanel";
 import { MoveTransport } from "./MoveTransport";
 import { useEngineStore } from "../../engine/engine-state";
@@ -19,17 +19,16 @@ import { OPENING_LABEL, describeResult } from "../../core/model/game";
  * 금수·차례·협상 단계가 한 곳에서 판단된다 — 보드는 여전히 규칙을 모른다.
  * 「돌을 놓는다」와 「대국의 한 수를 둔다」는 다른 일이고, 그 차이가 이 한 줄이다.
  *
- * **배치.** 왼쪽 칸은 보드와 그 바로 밑의 이동 바(`MoveTransport`)뿐이다.
- * 오른쪽 칸(좁은 세로 화면에서는 아래)에는 **엔진 상태 · 국면 · 시계** 세 카드만
- * 둔다. 대국 설정·조작은 설정 탭, 콘솔은 엔진 탭이 진다 — 보드 옆은 판을 읽는
- * 데 필요한 것만 남긴다.
+ * **배치.** 왼쪽 칸은 평가 바 · 보드 · 그 바로 밑의 이동 바(`MoveTransport`)뿐이다.
+ * 오른쪽 칸(좁은 세로 화면에서는 아래)에는 **엔진 상태 · 국면** 두 카드만 둔다.
+ * 대국 설정·조작은 설정 탭, 콘솔은 엔진 탭이 진다. 대국 시계는 없다.
  */
 export function BoardScreen() {
   const render = useBoardStore((s) => s.render);
   const ahead = useBoardStore((s) => s.future.length);
   const result = useGameStore((s) => s.result);
   const opening = useGameStore((s) => s.opening);
-  const showClock = useSettingsStore((s) => s.showClock);
+  const showEvalBar = useSettingsStore((s) => s.showEvalBar);
   const markBlocked = useBoardStore((s) => s.markBlocked);
   const applyAnalysis = useBoardStore((s) => s.applyAnalysis);
 
@@ -73,10 +72,15 @@ export function BoardScreen() {
   const turn = render.stones.length % 2 === 0 ? "흑" : "백";
 
   return (
-    <div className="boardscreen">
+    <div className="boardscreen" data-evalbar={showEvalBar || undefined}>
       <div className="boardscreen__stage">
         <div className="boardscreen__board">
-          <BoardCanvas render={render} onTap={onTap} onLongPress={markBlocked} />
+          {/* 평가 바와 판을 한 줄로 — 판은 바 몫을 뺀 정사각형이고, 바는 판과 같은
+              높이다(CSS 의 컨테이너 단위). 둘을 묶어 가운데 둔다. */}
+          <div className="boardrow">
+            {showEvalBar && <EvalBar empty={render.stones.length === 0} />}
+            <BoardCanvas render={render} onTap={onTap} onLongPress={markBlocked} />
+          </div>
           {notice && (
             <p className="board-notice" role="status">
               {notice}
@@ -125,8 +129,6 @@ export function BoardScreen() {
             손가락으로 확대할 수 있고, ← → Home End 로 수를 옮깁니다.
           </p>
         </section>
-
-        {showClock && <ClockPanel />}
       </aside>
     </div>
   );

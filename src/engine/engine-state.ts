@@ -13,6 +13,7 @@ import {
   type EngineStatus,
   type Placement,
 } from "./engine-types";
+import { toEvalView, type EvalView } from "./eval-view";
 
 /**
  * 엔진의 화면쪽 그림자.
@@ -59,6 +60,13 @@ interface EngineState {
    */
   analyzing: boolean;
   /**
+   * 평가 바가 그릴 값(흑 관점). 스냅샷이 **받아들여질 때** 그 탐색 국면의 차례로
+   * 돌려 둔다 — 화면에서 스냅샷과 지금 판을 짝지으면, 수를 둔 직후(새 탐색의 첫
+   * 스냅샷이 오기 전) 옛 값을 새 차례로 읽어 바가 뒤집힌다. 새 탐색이 아직 아무것도
+   * 모르면 앞 값을 그대로 둔다(체스닷컴의 바처럼 비지 않는다).
+   */
+  evalView: EvalView | null;
+  /**
    * 엔진 파라미터(`INFO caution_factor` 등). 기동하면 한 번, 바뀌면 다시 보낸다.
    * **탐색 중에는 보내지 않고 미뤘다가** 다음 탐색 직전에 보낸다 — 워커는 줄에 선
    * 명령을 처리하려고 도는 분석을 멈추므로, 설정 하나 바꿨다고 분석이 끊기면 안 된다.
@@ -95,6 +103,8 @@ let config: EngineConfig = { info: [], hashAutoClear: false };
 let configDirty = false;
 /** 마지막으로 분석한 국면 — 밀려 끝난 분석을 다시 이을 때 쓴다. */
 let analysisStones: readonly Placement[] = [];
+/** 마지막 탐색 요청 국면의 돌 수 — 짝수면 흑 차례. 평가 바의 관점을 정한다. */
+let requestPly = 0;
 
 /**
  * 대국 상태 기계가 여기 걸어 두는 손잡이들.
@@ -146,6 +156,7 @@ export const useEngineStore = create<EngineState>((set, get) => {
     flushConfig(c);
     if (config.hashAutoClear) c.send({ kind: "raw", line: "YXHASHCLEAR" });
     analysisStones = stones;
+    requestPly = stones.length;
     const nbest = get().multiPv;
     const budget = totalMs ?? get().analysisMs;
     // exactOptionalPropertyTypes: 무제한은 키를 비워 둔다(클라이언트 기본값이 무제한).
@@ -156,7 +167,8 @@ export const useEngineStore = create<EngineState>((set, get) => {
     if (client) return client;
     client = new EngineClient({
       onStatus: (status) => set({ status }),
-      onSnapshot: (snapshot) => set({ snapshot }),
+      onSnapshot: (snapshot) =>
+        set((s) => ({ snapshot, evalView: toEvalView(snapshot.stats, requestPly) ?? s.evalView })),
       onConsole: (lines) =>
         set((s) => {
           const next = [...s.console, ...lines];
@@ -203,6 +215,7 @@ export const useEngineStore = create<EngineState>((set, get) => {
     analysisMs: Infinity,
     setAnalysisMs: (ms) => set({ analysisMs: ms > 0 ? ms : Infinity }),
     analyzing: false,
+    evalView: null,
 
     configure: (next) => {
       config = next;
@@ -253,6 +266,7 @@ export const useEngineStore = create<EngineState>((set, get) => {
         }
         flushConfig(c);
         if (config.hashAutoClear) c.send({ kind: "raw", line: "YXHASHCLEAR" });
+        requestPly = stones.length;
         c.play(stones, emptyBoard, budget ?? {});
       } catch (e) {
         set({ error: describe(e), status: "error" });
@@ -274,7 +288,13 @@ export const useEngineStore = create<EngineState>((set, get) => {
     terminate: () => {
       client?.terminate();
       client = null;
-      set({ status: "idle", snapshot: EMPTY_SNAPSHOT, lastBestMove: null, analyzing: false });
+      set({
+        status: "idle",
+        snapshot: EMPTY_SNAPSHOT,
+        lastBestMove: null,
+        analyzing: false,
+        evalView: null,
+      });
     },
 
     clearConsole: () => set({ console: [] }),

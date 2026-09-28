@@ -1,5 +1,5 @@
 import { useMemo, useState, type ComponentType } from "react";
-import { useGameStore } from "../board/gameStore";
+import { MOVE_TIME_CHOICES, useGameStore } from "../board/gameStore";
 import { useBoardStore } from "../board/boardStore";
 import { OpeningProgress } from "../board/OpeningPanel";
 import { useEngineStore, MULTI_PV } from "../../engine/engine-state";
@@ -39,11 +39,10 @@ import { Chip, ChipGroup, NumberField, Segmented, Stepper, Switch } from "./cont
  * 엔진·분석은 `settingsStore`. 이 화면은 그 주인들을 직접 만진다.
  */
 
-type Category = "game" | "time" | "engine" | "analysis" | "display" | "database" | "system";
+type Category = "game" | "engine" | "analysis" | "display" | "database" | "system";
 
 const CATEGORY_LABEL: Record<Category, string> = {
   game: "대국",
-  time: "시간 제어",
   engine: "엔진",
   analysis: "분석",
   display: "표시",
@@ -52,8 +51,7 @@ const CATEGORY_LABEL: Record<Category, string> = {
 };
 
 const CATEGORY_DESC: Record<Category, string> = {
-  game: "규칙·개시·누가 두는가. 개시를 바꾸면 새 대국이 시작됩니다.",
-  time: "대국 시계. 시간 제한이 있으면 엔진도 그 예산 안에서 둡니다.",
+  game: "규칙·개시·누가 두는가·엔진의 한 수 시간. 개시를 바꾸면 새 대국이 시작됩니다.",
   engine: "엔진에 INFO 로 밀어 넣는 탐색 파라미터. 탐색 중에 바꾸면 다음 탐색부터 적용됩니다.",
   analysis: "보드의 분석(▶). 무제한이면 정지하거나 국면이 바뀔 때까지 읽습니다.",
   display: "보드와 화면에 무엇을 그릴지.",
@@ -166,90 +164,21 @@ function ComputerControl() {
   );
 }
 
-/** 시간 제한 프리셋. 데스크톱의 커스텀 레벨(settings.txt 6행 = 1)에 해당한다. */
-const TIME_PRESETS = [
-  { label: "무제한", limited: false, turn: 0, match: 0 },
-  { label: "5분", limited: true, turn: 30_000, match: 300_000 },
-  { label: "15분", limited: true, turn: 60_000, match: 900_000 },
-  { label: "30분", limited: true, turn: 120_000, match: 1_800_000 },
-] as const;
+const moveTimeLabel = (ms: number) => (ms === 0 ? "무제한" : `${ms / 1000}초`);
 
-function TimeControl() {
-  const clock = useGameStore((s) => s.clock);
-  const setLimits = useGameStore((s) => s.setClockLimits);
-  const preset = TIME_PRESETS.find(
-    (p) =>
-      clock.limited === p.limited &&
-      (!p.limited || (clock.turnLimitMs === p.turn && clock.matchLimitMs === p.match)),
-  );
-  const [customOpen, setCustomOpen] = useState(false);
-  const custom = customOpen || (clock.limited && !preset);
-
+/** 엔진 한 수의 시간 — 대국 시계 없이 `timeout_turn` 하나만 정한다. */
+function MoveTimeControl() {
+  const v = useGameStore((s) => s.moveTimeMs);
+  const set = useGameStore((s) => s.setMoveTime);
   return (
-    <div className="stack">
-      <ChipGroup label="시간 제한">
-        {TIME_PRESETS.map((p) => (
-          <Chip
-            key={p.label}
-            on={!customOpen && preset === p}
-            onClick={() => {
-              setCustomOpen(false);
-              setLimits({ limited: p.limited, turnLimitMs: p.turn, matchLimitMs: p.match });
-            }}
-          >
-            {p.label}
-          </Chip>
-        ))}
-        <Chip
-          on={custom}
-          onClick={() => {
-            setCustomOpen(true);
-            setLimits({
-              limited: true,
-              turnLimitMs: clock.turnLimitMs || 60_000,
-              matchLimitMs: clock.matchLimitMs || 600_000,
-            });
-          }}
-        >
-          사용자 정의
+    <ChipGroup label="엔진 착수 시간">
+      {MOVE_TIME_CHOICES.map((ms) => (
+        <Chip key={ms} on={v === ms} onClick={() => set(ms)}>
+          {moveTimeLabel(ms)}
         </Chip>
-      </ChipGroup>
-      {custom && (
-        <div className="fields">
-          <NumberField
-            label="턴 시간"
-            unit="초"
-            min={1}
-            max={3600}
-            value={Math.round(clock.turnLimitMs / 1000)}
-            onCommit={(v) => setLimits({ limited: true, turnLimitMs: v * 1000 })}
-          />
-          <NumberField
-            label="대국 시간"
-            unit="분"
-            min={1}
-            max={600}
-            value={Math.round(clock.matchLimitMs / 60_000)}
-            onCommit={(v) => setLimits({ limited: true, matchLimitMs: v * 60_000 })}
-          />
-          <NumberField
-            label="수당 증가"
-            unit="초"
-            min={0}
-            max={60}
-            value={Math.round(clock.incrementMs / 1000)}
-            onCommit={(v) => setLimits({ limited: true, incrementMs: v * 1000 })}
-          />
-        </div>
-      )}
-    </div>
+      ))}
+    </ChipGroup>
   );
-}
-
-function ShowClockControl() {
-  const on = useSettingsStore((s) => s.showClock);
-  const update = useSettingsStore((s) => s.update);
-  return <Switch label="시계 표시" on={on} onChange={(v) => update({ showClock: v })} />;
 }
 
 function VariantControl() {
@@ -397,6 +326,12 @@ function MultiPvControl() {
   );
 }
 
+function EvalBarControl() {
+  const on = useSettingsStore((s) => s.showEvalBar);
+  const update = useSettingsStore((s) => s.update);
+  return <Switch label="평가 바 표시" on={on} onChange={(v) => update({ showEvalBar: v })} />;
+}
+
 function NumbersControl() {
   const on = useBoardStore((s) => s.render.showNumbers);
   const toggle = useBoardStore((s) => s.toggleNumbers);
@@ -495,21 +430,14 @@ const ROWS: readonly RowSpec[] = [
     Control: ComputerControl,
   },
   {
-    id: "timeLimit",
-    cat: "time",
-    label: "시간 제한",
-    note: "무제한이면 엔진은 보드의 「지금 두기」까지 읽습니다(데스크톱 level 0).",
-    engineKey: "timeout_turn · timeout_match · time_increment",
-    keywords: "레벨 턴 매치 증가 시계",
+    id: "moveTime",
+    cat: "game",
+    label: "엔진 착수 시간",
+    note: "대국에서 엔진이 한 수에 쓰는 시간. 무제한이면 보드의 「지금 두기」까지 읽습니다(데스크톱 level 0). 대국 시계는 없습니다.",
+    engineKey: "timeout_turn",
+    keywords: "레벨 턴 시간 무제한 level",
     wide: true,
-    Control: TimeControl,
-  },
-  {
-    id: "showClock",
-    cat: "time",
-    label: "시계 표시",
-    note: "보드 화면의 두 시계. 꺼도 시계는 계속 갑니다.",
-    Control: ShowClockControl,
+    Control: MoveTimeControl,
   },
   {
     id: "variant",
@@ -614,6 +542,14 @@ const ROWS: readonly RowSpec[] = [
     engineKey: "YXNBEST",
     keywords: "nbest pv",
     Control: MultiPvControl,
+  },
+  {
+    id: "evalBar",
+    cat: "display",
+    label: "평가 바 표시",
+    note: "보드 왼쪽의 흑백 게이지. 흑 승률만큼 위(흑)가 차고, 끝에 승률과 평가값을 적습니다.",
+    keywords: "eval bar 승률 게이지",
+    Control: EvalBarControl,
   },
   {
     id: "numbers",

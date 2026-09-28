@@ -104,14 +104,14 @@ export const negotiates = (o: OpeningProtocol): boolean => o !== "none";
 
 // ── 결과 ─────────────────────────────────────────────────────────────
 
-export type GameEnd = "five" | "boardFull" | "resigned" | "drawAgreed" | "timeout";
+/** 대국이 끝나는 길. 시간 초과는 대국 시계와 함께 빠졌다(시계가 없다). */
+export type GameEnd = "five" | "boardFull" | "resigned" | "drawAgreed";
 
 export const GAME_END_LABEL: Record<GameEnd, string> = {
   five: "5목 완성",
   boardFull: "판이 다 찼습니다",
   resigned: "기권",
   drawAgreed: "무승부 합의",
-  timeout: "시간 초과",
 };
 
 export interface GameResult {
@@ -144,8 +144,6 @@ export type GamePrompt =
   | { kind: "illegalOpening" }
   /** `show_dialog_forbidden_info` — 렌주 금수를 눌렀다. */
   | { kind: "forbidden"; cell: Move }
-  /** `show_dialog_timeout` — 시계가 다 됐다(settings.txt 31행). */
-  | { kind: "timeout" }
   | { kind: "info"; text: string };
 
 /** 보드를 눌렀을 때 무슨 일이 있었나. */
