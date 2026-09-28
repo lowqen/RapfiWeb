@@ -1,7 +1,13 @@
 /// <reference lib="webworker" />
 import { CoordMapper, parse, serialize } from "./engine-protocol";
 import { SearchAggregator } from "./engine-aggregator";
-import { toSerializable, type EngineCommand, type FromWorker, type ToWorker } from "./engine-types";
+import {
+  toSerializable,
+  type EngineCommand,
+  type FromWorker,
+  type SearchEndReason,
+  type ToWorker,
+} from "./engine-types";
 import type { Move } from "../core/model/move";
 
 /**
@@ -292,13 +298,44 @@ async function boot(msg: Extract<ToWorker, { type: "boot" }>) {
 /** 이벤트 루프에 한 번 양보한다 — 이 틈에만 `stop` 이 도착할 수 있다. */
 const yieldToLoop = () => new Promise<void>((r) => setTimeout(r, 0));
 
-async function search(msg: Extract<ToWorker, { type: "search" }>) {
+/** 잠깐 쉰다. 즉답만 돌아오는 분석이 코어 하나를 헛돌리지 않게. */
+let wakeIdle: (() => void) | null = null;
+const sleep = (ms: number) =>
+  new Promise<void>((r) => {
+    const id = setTimeout(() => {
+      wakeIdle = null;
+      r();
+    }, ms);
+    wakeIdle = () => {
+      clearTimeout(id);
+      r();
+    };
+  });
+
+/**
+ * 즉답 분석의 쉼 — 처음 100ms 에서 두 배씩, 1초에서 멈춘다. 쉬는 동안 정지나 새
+ * 요청이 오면 `interrupt()` 가 곧바로 깨운다(`wakeIdle`).
+ */
+const IDLE_MIN_MS = 100;
+const IDLE_MAX_MS = 1000;
+
+async function search(msg: Extract<ToWorker, { type: "search" }>, epoch: number) {
   if (!mod) return;
   searching = true;
-  stopRequested = false;
+  // 줄 뒤에서 기다리는 동안 정지가 왔다면 그 정지는 **이 요청의 것**이다. 예전엔
+  // 여기서 무조건 false 로 되돌려, 기동·앞 요청을 기다리던 중에 누른 정지가
+  // 조용히 사라졌다.
+  stopRequested = epoch !== stopEpoch || pending > 0;
   agg.reset();
   sliceMoves = null;
   const t0 = performance.now();
+
+  // 분석인데 시작도 하기 전에 멈추라고 했다 — 한 조각도 돌리지 않는다.
+  // (착수는 다르다: 한 조각은 돌아야 둘 수가 있다. 아래 `first`.)
+  if (stopRequested && msg.mode === "analyze") {
+    finishSearch(msg, "stopped", t0);
+    return;
+  }
 
   // **대국 예산을 물려받지 않는다.** 앞선 시간제 대국이 `timeout_match` 를 걸어
   // 두었다면 Rapfi 는 탐색마다 쓴 시간을 `time_left` 에서 빼는데(gomocup.cpp:134),
@@ -314,10 +351,13 @@ async function search(msg: Extract<ToWorker, { type: "search" }>) {
     return;
   }
 
-  let reason: "finished" | "stopped" | "timeout" = "timeout";
+  let reason: SearchEndReason = "timeout";
+  let idleMs = 0;
   // 착수는 최소 한 조각은 돈다 — 한 조각도 없으면 둘 수가 없다.
   let first = true;
-  while (first || !stopRequested) {
+  for (;;) {
+    if (pending > 0) stopRequested = true; // 뒤에 선 요청에 자리를 내준다
+    if (stopRequested && !first) break;
     first = false;
     const left = msg.totalMs - (performance.now() - t0);
     // 자투리 조각은 보내지 않는다. `Math.ceil(left)` 가 몇 ms 이면 엔진의 예산이
@@ -334,15 +374,26 @@ async function search(msg: Extract<ToWorker, { type: "search" }>) {
     sendAll(msg.repeat); // 단일 스레드 빌드에서 탐색은 이 호출 안에서 끝난다
     const took = performance.now() - s0;
     maybeEmitSnapshot(true);
-    // **즉답이면 더 읽을 것이 없다.** 5목을 완성하는 수·막아야만 하는 수처럼
-    // 뻔한 국면에서 Rapfi 는 탐색 없이 곧바로 답한다(tryTrivialBestmove). 그때
-    // 조각을 계속 돌리면 초당 수백 번 같은 답을 받으며 헛돈다 — 무제한 착수가
-    // 「지금 두기」까지 엔진과 콘솔을 그렇게 덮었다. 착수면 그 수를 바로 둔다.
     if (took < TRIVIAL_SLICE_MS) {
-      reason = "finished";
-      break;
+      // **즉답** — 5목을 완성하는 수·막아야만 하는 수처럼 뻔한 국면에서 Rapfi 는
+      // 탐색 없이 곧바로 좌표(`7,8`)를 돌려준다(tryTrivialBestmove).
+      //
+      // 착수면 그 수를 바로 둔다. 조각을 계속 돌리면 초당 수백 번 같은 답을 받으며
+      // 헛돈다 — 무제한 착수가 「지금 두기」까지 엔진과 콘솔을 그렇게 덮었다.
+      if (msg.mode === "move") {
+        reason = "finished";
+        break;
+      }
+      // **분석은 끝내지 않는다.** 예전엔 착수와 같이 여기서 `finished` 로 빠져
+      // YXSTOP 을 보냈다 — 무제한 분석이 좌표 한 줄에 스스로 멈춘 버그다. 분석의
+      // 끝은 사용자(정지)나 새 국면(새 요청)만 정한다. 다만 같은 답을 초당 수백 번
+      // 받지 않도록 쉬어 가며 되묻는다.
+      idleMs = Math.min(IDLE_MAX_MS, idleMs ? idleMs * 2 : IDLE_MIN_MS);
+      await sleep(idleMs); // ← 이 틈에도 정지가 들어온다
+      continue;
     }
-    await yieldToLoop(); // ← 정지 요청이 들어올 수 있는 유일한 지점
+    idleMs = 0;
+    await yieldToLoop(); // ← 정지 요청이 들어올 수 있는 지점
   }
   if (stopRequested) reason = "stopped";
 
@@ -354,7 +405,7 @@ async function search(msg: Extract<ToWorker, { type: "search" }>) {
 
 function finishSearch(
   msg: Extract<ToWorker, { type: "search" }>,
-  reason: "finished" | "stopped" | "timeout",
+  reason: SearchEndReason,
   t0: number,
 ) {
   searching = false;
@@ -363,7 +414,13 @@ function finishSearch(
   // 무제한 대국의 한 수: 마지막 조각이 고른 수가 착수다. 분석의 조각별 좌표는
   // 어디에도 올리지 않는다 — 올리면 대국이 그것을 엔진의 수로 받아 둔다.
   if (msg.mode === "move" && sliceMoves) post({ type: "bestMove", moves: sliceMoves });
-  post({ type: "searchDone", reason, elapsedMs: Math.round(performance.now() - t0) });
+  post({
+    type: "searchDone",
+    id: msg.id,
+    mode: msg.mode,
+    reason,
+    elapsedMs: Math.round(performance.now() - t0),
+  });
 }
 
 /**
@@ -383,20 +440,47 @@ function finishSearch(
  */
 let queue: Promise<void> = Promise.resolve();
 
+/**
+ * 정지 요청의 차례 번호. 요청은 줄에 설 때 이 값을 적어 두고, 제 차례가 와서
+ * 시작할 때 값이 달라져 있으면 「기다리는 동안 정지가 왔다」로 읽는다.
+ */
+let stopEpoch = 0;
+
+/**
+ * 줄에서 기다리는 요청 수. 제 차례가 온 무제한 분석도 **뒤에 누가 서 있으면**
+ * 한 조각 뒤 비켜야 한다 — `interrupt()` 는 이미 돌고 있는 탐색만 깨우므로, 줄 안의
+ * 분석이 시작하며 정지 표시를 지우면 뒤에 선 착수가 영원히 기다린다.
+ */
+let pending = 0;
+
+/** 즉답 분석이 쉬는 중이면 깨운다 — 정지·새 요청이 쉼이 끝나기를 기다리지 않게. */
+function interrupt() {
+  stopRequested = true;
+  const w = wakeIdle;
+  wakeIdle = null;
+  w?.();
+}
+
 self.onmessage = (ev: MessageEvent<ToWorker>) => {
   const msg = ev.data;
   if (msg.type === "stop") {
-    stopRequested = true;
+    stopEpoch++;
+    interrupt();
     // 탐색 중이 아닐 때만 곧바로 닿는다. 탐색 중이면 조각 경계에서 루프가 본다.
     if (!searching) sendAll([{ kind: "stop" }]);
     return;
   }
   // 분석이 돌고 있으면 비켜 달라고 한다 — 착수·새 대국·국면 변경이 기다린다.
-  if (msg.type !== "boot" && searching) stopRequested = true;
-  queue = queue.then(() => handle(msg));
+  if (msg.type !== "boot" && searching) interrupt();
+  const epoch = stopEpoch;
+  pending++;
+  queue = queue.then(() => {
+    pending--;
+    return handle(msg, epoch);
+  });
 };
 
-async function handle(msg: ToWorker): Promise<void> {
+async function handle(msg: ToWorker, epoch: number): Promise<void> {
   try {
     switch (msg.type) {
       case "boot":
@@ -407,7 +491,7 @@ async function handle(msg: ToWorker): Promise<void> {
         maybeEmitSnapshot(true);
         break;
       case "search":
-        await search(msg);
+        await search(msg, epoch);
         break;
       case "move": {
         // 한 수는 **한 번의 유한한 탐색**이다. 조각으로 나누면 조각마다 새 탐색이 되어
@@ -432,6 +516,8 @@ async function handle(msg: ToWorker): Promise<void> {
         flushConsole();
         post({
           type: "searchDone",
+          id: msg.id,
+          mode: "move",
           reason: "finished",
           elapsedMs: Math.round(performance.now() - t0),
         });
@@ -449,6 +535,9 @@ async function handle(msg: ToWorker): Promise<void> {
         break;
     }
   } catch (e) {
+    // 탐색 도중에 던졌으면 `searching` 이 켜진 채로 남는다 — 그러면 뒤이은 모든
+    // 요청이 「돌고 있는 분석」을 멈추려 들며 헛돈다.
+    searching = false;
     post({ type: "fatal", message: describe(e) });
   }
 }

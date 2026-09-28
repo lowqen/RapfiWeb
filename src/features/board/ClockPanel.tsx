@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { useGameStore } from "./gameStore";
 import {
   formatShort,
@@ -14,28 +13,13 @@ import {
 /**
  * 두 시계 — `GameClock.kt` 가 계산하고 여기는 보여 주기만 한다.
  *
- * **틱은 250ms 다.** 초 단위 표시에 16ms 마다 리렌더할 이유가 없고, 초가 바뀌는
- * 순간을 놓치지도 않는다. 그리고 `Motion.kt` 의 규칙대로 **숫자를 보간하지 않는다** —
+ * **시계를 돌리는 것은 이 카드가 아니다**(`gameStore` 의 틱). 예전엔 여기서
+ * 돌렸는데, 대국 설정이 설정 탭으로 가면서 화면을 옮기면 시계가 멈췄다 — 시간은
+ * 화면이 보이든 말든 간다. `Motion.kt` 의 규칙대로 **숫자를 보간하지 않는다** —
  * 시계는 실시간 값이라 애니메이션이 곧 거짓말이다.
  */
-const TICK_MS = 250;
-
 export function ClockPanel() {
   const clock = useGameStore((s) => s.clock);
-  const advance = useGameStore((s) => s.advanceClock);
-  const running = clock.running;
-
-  useEffect(() => {
-    if (!running) return;
-    // 벽시계로 잰다. setInterval 은 밀리므로 간격을 믿고 더하면 시계가 느려진다.
-    let last = performance.now();
-    const id = window.setInterval(() => {
-      const now = performance.now();
-      advance(now - last);
-      last = now;
-    }, TICK_MS);
-    return () => window.clearInterval(id);
-  }, [running, advance]);
 
   return (
     <section className="panel">

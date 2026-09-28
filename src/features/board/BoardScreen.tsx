@@ -2,16 +2,15 @@ import { useCallback, useEffect, useState } from "react";
 import { BoardCanvas } from "../../core/board/BoardCanvas";
 import { useBoardStore } from "./boardStore";
 import { useGameStore } from "./gameStore";
-import { LadderStrip } from "./LadderStrip";
 import { AnalysisPanel } from "./AnalysisPanel";
 import { ClockPanel } from "./ClockPanel";
-import { GamePanel } from "./GamePanel";
-import { OpeningPanel, PromptPanel } from "./OpeningPanel";
-import { EngineConsole } from "./EngineConsole";
+import { PromptPanel } from "./OpeningPanel";
 import { MoveTransport } from "./MoveTransport";
 import { useEngineStore } from "../../engine/engine-state";
+import { useSettingsStore } from "../settings/settingsStore";
 import { label, type Move } from "../../core/model/move";
 import { RULE_LABEL } from "../../core/model/rules";
+import { OPENING_LABEL, describeResult } from "../../core/model/game";
 
 /**
  * 보드 화면 — W4 판.
@@ -21,13 +20,16 @@ import { RULE_LABEL } from "../../core/model/rules";
  * 「돌을 놓는다」와 「대국의 한 수를 둔다」는 다른 일이고, 그 차이가 이 한 줄이다.
  *
  * **배치.** 왼쪽 칸은 보드와 그 바로 밑의 이동 바(`MoveTransport`)뿐이다.
- * 엔진 수치·후보 수·대국 도구·시계는 전부 오른쪽 칸(좁은 세로 화면에서는 아래)이
- * 카드로 나눠 진다 — 앱의 보드 화면에서 재생 바 밑에 쌓이던 것들이다.
+ * 오른쪽 칸(좁은 세로 화면에서는 아래)에는 **엔진 상태 · 국면 · 시계** 세 카드만
+ * 둔다. 대국 설정·조작은 설정 탭, 콘솔은 엔진 탭이 진다 — 보드 옆은 판을 읽는
+ * 데 필요한 것만 남긴다.
  */
 export function BoardScreen() {
   const render = useBoardStore((s) => s.render);
   const ahead = useBoardStore((s) => s.future.length);
-  const toggleNumbers = useBoardStore((s) => s.toggleNumbers);
+  const result = useGameStore((s) => s.result);
+  const opening = useGameStore((s) => s.opening);
+  const showClock = useSettingsStore((s) => s.showClock);
   const markBlocked = useBoardStore((s) => s.markBlocked);
   const applyAnalysis = useBoardStore((s) => s.applyAnalysis);
 
@@ -84,16 +86,24 @@ export function BoardScreen() {
         <MoveTransport />
       </div>
 
-      <aside className="boardscreen__side" aria-label="분석과 도구">
-        {/* 물음은 맨 위 — 답하기 전까지 판이 잠기므로 가장 먼저 보여야 한다. */}
+      <aside className="boardscreen__side" aria-label="엔진 상태와 국면">
+        {/* 물음은 맨 위 — 답하기 전까지 판이 잠기므로 가장 먼저 보여야 한다.
+            대국 **설정**은 설정 탭으로 갔지만 물음은 판을 잠그는 것이라 여기 남는다. */}
         <PromptPanel />
         <AnalysisPanel />
 
         <section className="panel">
           <h2 className="panel__title">국면</h2>
+          {result && (
+            <p className="gameover" data-winner={result.winner ?? "draw"}>
+              {describeResult(result)}
+            </p>
+          )}
           <dl className="kv">
             <dt>규칙</dt>
-            <dd className="tnum">{RULE_LABEL.renju}</dd>
+            <dd className="tnum">
+              {RULE_LABEL.renju} · {OPENING_LABEL[opening]}
+            </dd>
             <dt>둘 차례</dt>
             <dd className="tnum" data-k="turn">
               {turn}
@@ -110,25 +120,13 @@ export function BoardScreen() {
               {last ? label(last, render.size) : "—"}
             </dd>
           </dl>
-          <div className="panel__actions">
-            {/* 무르기·앞으로는 보드 밑 이동 바가 진다. 「비우기」는 아래 대국 패널의
-                「새 대국」이 한다 — 판만 비우고 시계·협상은 그대로 두는 버튼은 조용히
-                어긋난 상태를 만든다. */}
-            <button type="button" onClick={toggleNumbers} aria-pressed={render.showNumbers}>
-              번호 {render.showNumbers ? "끄기" : "켜기"}
-            </button>
-          </div>
           <p className="panel__hint">
             길게 누르면 그 점을 차단 표시합니다 — 데스크톱의 Ctrl+클릭 자리입니다. 휠이나 두
             손가락으로 확대할 수 있고, ← → Home End 로 수를 옮깁니다.
           </p>
         </section>
 
-        <ClockPanel />
-        <OpeningPanel />
-        <GamePanel />
-        <EngineConsole />
-        <LadderStrip />
+        {showClock && <ClockPanel />}
       </aside>
     </div>
   );

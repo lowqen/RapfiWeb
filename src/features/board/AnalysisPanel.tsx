@@ -1,14 +1,16 @@
 import type { ReactNode } from "react";
-import { useEngineStore, MULTI_PV } from "../../engine/engine-state";
+import { Link } from "react-router-dom";
+import { useEngineStore } from "../../engine/engine-state";
 import type { SearchStats } from "../../engine/engine-types";
 import { useBoardStore } from "./boardStore";
 import { label } from "../../core/model/move";
 import { colorsForTag, DEFAULT_PALETTE } from "../../core/board/ladder";
-import { Icon, ICON } from "./icons";
+import { useGameStore } from "./gameStore";
 
 /**
- * 엔진 카드 — 옆 칸의 맨 위. 앱의 수치 줄(DEPTH·EVAL·WINRATE…)과 「후보 수
- * (멀티 PV)」 스테퍼를 한 카드에 모았다.
+ * 엔진 상태 카드 — 옆 칸의 맨 위. 앱의 수치 줄(DEPTH·EVAL·WINRATE…)과 후보 수순을
+ * 한 카드에 모았다. 후보 수·분석 시간 같은 **설정**은 설정 탭이 진다 — 여기는
+ * 지금 엔진이 무엇을 하고 있는지만 말한다.
  *
  * 여기 있는 숫자는 전부 **집계된 스냅샷**에서 온다. 원시 줄은 워커 안에서 파싱되고
  * 메인 스레드는 ~10Hz 스냅샷과 저주파 콘솔 배치만 받는다(계획서 §3).
@@ -30,7 +32,11 @@ export function AnalysisPanel() {
   const stop = useEngineStore((s) => s.stop);
   const terminate = useEngineStore((s) => s.terminate);
   const multiPv = useEngineStore((s) => s.multiPv);
-  const setMultiPv = useEngineStore((s) => s.setMultiPv);
+  const analysisMs = useEngineStore((s) => s.analysisMs);
+  const analyzing = useEngineStore((s) => s.analyzing);
+  const thinking = useGameStore((s) => s.thinking);
+  const unlimitedGame = useGameStore((s) => !s.clock.limited);
+  const moveNow = useGameStore((s) => s.moveNow);
 
   const render = useBoardStore((s) => s.render);
   const placements = useBoardStore((s) => s.placements);
@@ -77,7 +83,29 @@ export function AnalysisPanel() {
         </button>
       </div>
 
+      {/* 무제한 대국: 엔진은 여기를 누를 때까지 생각한다(데스크톱·앱의 기본 레벨과 같다).
+          보드의 ▶ 는 이때 잠기므로 엔진의 한 수를 끝내는 자리는 여기 하나다. */}
+      {thinking && unlimitedGame && (
+        <div className="panel__actions">
+          <button type="button" className="button--primary" onClick={moveNow}>
+            지금 두기
+          </button>
+          <span className="panel__hint panel__hint--inline">
+            무제한 — 누를 때까지 엔진이 계속 읽습니다
+          </span>
+        </div>
+      )}
+
       {error && <p className="panel__error">{error}</p>}
+
+      <p className="engine-mode" data-on={analyzing || undefined}>
+        <span className="engine-mode__dot" aria-hidden="true" />
+        {analyzing ? "분석 중" : "분석 꺼짐"} ·{" "}
+        {Number.isFinite(analysisMs) ? `${analysisMs / 1000}초` : "무제한"} · 후보 {multiPv}수
+        <Link className="inline-link engine-mode__link" to="/settings">
+          설정
+        </Link>
+      </p>
 
       <dl className="kv stats">
         <Stat k="DEPTH">
@@ -93,33 +121,6 @@ export function AnalysisPanel() {
           {bestMove ? label(bestMove, size) : "—"}
         </Stat>
       </dl>
-
-      <div className="stepper" role="group" aria-label="후보 수">
-        <span className="stepper__label">
-          후보 수 <span className="stepper__sub">(멀티 PV)</span>
-        </span>
-        <button
-          type="button"
-          className="stepper__btn"
-          onClick={() => setMultiPv(multiPv - 1)}
-          disabled={multiPv <= MULTI_PV.min}
-          aria-label="후보 수 줄이기"
-        >
-          <Icon d={ICON.minus} />
-        </button>
-        <output className="stepper__value tnum" aria-live="polite">
-          {multiPv}
-        </output>
-        <button
-          type="button"
-          className="stepper__btn"
-          onClick={() => setMultiPv(multiPv + 1)}
-          disabled={multiPv >= MULTI_PV.max}
-          aria-label="후보 수 늘리기"
-        >
-          <Icon d={ICON.plus} />
-        </button>
-      </div>
 
       {pvs.length > 0 && (
         <ol className="pvlist">
@@ -147,8 +148,8 @@ export function AnalysisPanel() {
       )}
 
       <p className="panel__hint">
-        후보 수는 다음 분석부터 적용됩니다. 정지는 <strong>조각 경계</strong>에서 듣습니다 — 단일
-        스레드 빌드에서는 최대 한 조각(기본 500ms) 뒤에 멈춥니다.
+        분석을 켜 두면 수를 두거나 물러도 새 국면을 이어 읽습니다. 정지는 <strong>조각 경계</strong>
+        에서 듣습니다 — 단일 스레드 빌드에서는 최대 한 조각(기본 500ms) 뒤에 멈춥니다.
       </p>
     </section>
   );

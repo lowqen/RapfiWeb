@@ -229,6 +229,8 @@ export type ToWorker =
       repeat: readonly EngineCommand[];
       /** 전체 예산. `Infinity` 면 정지가 올 때까지. */
       totalMs: number;
+      /** 요청 번호. `searchDone` 이 그대로 돌려준다 — 밀려난 탐색의 끝을 가려낸다. */
+      id: number;
     }
   /**
    * **착수** 요청. 분석과 다르다 — 조각으로 나누지 않고 `INFO timeout_turn` 하나로
@@ -254,9 +256,17 @@ export type ToWorker =
        * 보낸다(main.c:2742). `matchMs` 가 0 이면 엔진이 보지 않는다.
        */
       matchLeftMs?: number;
+      /** 요청 번호. `searchDone` 이 그대로 돌려준다. */
+      id: number;
     }
   | { type: "stop" }
   | { type: "shutdown" };
+
+/**
+ * 탐색이 끝난 까닭. `finished` 는 엔진이 스스로 끝낸 것(유한 착수), `timeout` 은
+ * 분석 예산을 다 쓴 것, `stopped` 는 정지 요청이나 새 요청에 밀린 것이다.
+ */
+export type SearchEndReason = "finished" | "stopped" | "timeout";
 
 export type FromWorker =
   | { type: "booted"; version: string; bootMs: number; about: Record<string, string> }
@@ -274,7 +284,18 @@ export type FromWorker =
       >;
     }
   | { type: "forbid"; cells: readonly Move[] }
-  | { type: "searchDone"; reason: "finished" | "stopped" | "timeout"; elapsedMs: number }
+  /**
+   * 탐색 하나가 끝났다. `id` 는 그 요청의 번호다 — 새 요청에 밀려 끝난 탐색의
+   * `searchDone` 은 **뒤따르는 탐색이 도는 중에** 도착한다. 번호로 가르지 않으면
+   * 화면이 「대기」로 바뀌고, 그 틈에 금수 조회가 나가 돌고 있는 분석을 끊는다.
+   */
+  | {
+      type: "searchDone";
+      id: number;
+      mode: "analyze" | "move";
+      reason: SearchEndReason;
+      elapsedMs: number;
+    }
   | { type: "exit"; code: number }
   | { type: "fatal"; message: string };
 

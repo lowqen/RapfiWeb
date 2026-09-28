@@ -63,7 +63,10 @@ try {
 
   await page.goto(`http://localhost:${PORT}/`, { waitUntil: "networkidle" });
 
-  // 1. 루트가 /board 로 간다
+  // 1. 루트가 /board 로 간다. 이 이동은 **클라이언트 라우터**가 첫 렌더에서 한다 —
+  // networkidle 은 그 렌더를 기다려 주지 않아, 곧바로 URL 을 읽으면 부하에 따라
+  // 가끔 «/» 를 읽었다(수정 전 코드에서도 네 번에 한 번). 이동을 기다린 뒤 본다.
+  await page.waitForURL("**/board", { timeout: 5_000 }).catch(() => undefined);
   if (!page.url().endsWith("/board")) fail(`루트가 /board 로 가지 않았습니다: ${page.url()}`);
 
   // 2. 레일 여섯 항목
@@ -172,8 +175,15 @@ try {
   const woodDark = await pixel();
   if (woodDark === woodLight) fail(`다크에서 나무 색이 그대로입니다: ${woodDark}`);
 
-  const ladder = await page.locator(".ladder__cell").count();
-  if (ladder !== 5) fail(`값 사다리 견본이 5칸이 아닙니다: ${ladder}`);
+  // 보드 옆 칸은 엔진 상태 · 국면 · 시계 셋뿐이다. 대국 설정은 설정 탭, 콘솔은
+  // 엔진 탭으로 갔다 — 옆 칸에 다시 쌓이기 시작하면 여기서 잡는다.
+  const sideCards = await page.locator(".boardscreen__side > .panel").count();
+  if (sideCards !== 3) fail(`보드 옆 칸 카드가 셋(엔진·국면·시계)이 아닙니다: ${sideCards}`);
+  for (const gone of ["새 대국", "기권", "컴퓨터 백"]) {
+    const n = await page.getByRole("button", { name: gone, exact: true }).count();
+    if (n !== 0) fail(`「${gone}」 이 아직 보드 화면에 있습니다 — 설정 탭의 것입니다`);
+  }
+  if ((await page.locator(".console").count()) !== 0) fail("콘솔이 아직 보드 화면에 있습니다");
 
   // 한 화면에 들어오는가 — 휴대폰 · 노트북 · 데스크톱 · 가로 휴대폰에서
   // **페이지가 스크롤되지 않고** 보드 전체가 뷰포트 안에 있어야 한다.
@@ -222,12 +232,57 @@ try {
   if (fits.length === screens.length) console.log(`한 화면 핏: ${fits.join(" · ")}`);
   await page.setViewportSize({ width: 1440, height: 900 });
 
+  // ── 9. 설정 탭 ────────────────────────────────────────────────────
+  // 대국 설정·조작이 여기로 왔다. 레일 1클릭으로 닿고, 검색이 줄을 거르고,
+  // 대국 스모크가 이름으로 집는 칩들이 이 화면에 있어야 한다.
+  await page.locator(".rail__link", { hasText: "설정" }).click();
+  await page.waitForURL("**/settings");
+  const groups = await page.locator(".sgroup").count();
+  const rows = await page.locator(".srow").count();
+  if (groups < 6) fail(`설정 분류 카드가 모자랍니다: ${groups}`);
+  for (const name of ["새 대국", "컴퓨터 백", "RIF 오프닝", "5분", "무제한"]) {
+    const n = await page.getByRole("button", { name, exact: true }).count();
+    if (n !== 1) fail(`설정 탭에 「${name}」 이 하나가 아닙니다: ${n}개`);
+  }
+  await page.getByRole("searchbox", { name: "설정 검색" }).fill("hash_size");
+  const filtered = await page.locator(".srow").count();
+  if (filtered !== 1) fail(`«hash_size» 검색이 한 줄로 좁혀지지 않습니다: ${filtered}줄`);
+  await page.getByRole("searchbox", { name: "설정 검색" }).fill("");
+  // 해시 크기를 바꾸면 새로고침 뒤에도 남는다(localStorage).
+  await page.getByRole("radio", { name: "256", exact: true }).click();
+  await page.reload({ waitUntil: "networkidle" });
+  const kept = await page
+    .getByRole("radio", { name: "256", exact: true })
+    .getAttribute("aria-checked");
+  if (kept !== "true") fail(`해시 크기가 새로고침 뒤 남지 않았습니다: aria-checked=${kept}`);
+  await page.evaluate(() => localStorage.removeItem("rapfi.settings"));
+  // 좁은 폭에서도 가로로 넘치지 않는가 — 칩·세그먼트가 줄을 밀어내면 여기서 잡힌다.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(150);
+  const overflowX = (await page.evaluate(
+    `(() => { var c = document.querySelector(".shell__content");
+              return c.scrollWidth - c.clientWidth; })()`,
+  )) as number;
+  if (overflowX > 1) fail(`좁은 폭 설정 화면이 가로로 ${overflowX}px 넘칩니다`);
+  await page.setViewportSize({ width: 1440, height: 900 });
+
+  // ── 10. 엔진 탭 ───────────────────────────────────────────────────
+  await page.locator(".rail__link", { hasText: "엔진" }).click();
+  await page.waitForURL("**/engine");
+  if ((await page.locator(".enginescreen .panel__badge").count()) !== 1) {
+    fail("엔진 탭에 상태 표시가 없습니다");
+  }
+  if ((await page.locator(".enginescreen__console").count()) !== 1) {
+    fail("엔진 탭에 콘솔 카드가 없습니다");
+  }
+
   if (errors.length) fail(`콘솔 오류 ${errors.length}건:\n  ${errors.join("\n  ")}`);
 
   if (!process.exitCode) {
     console.log(
       "스모크 통과 — 레일 6 · 연구 탭 4 · 라우팅 · 토큰(라이트/다크) · 좁은 폭 전환\n" +
-        "             보드 2레이어 · 나무 렌더 · H8 착수 · 중복 착수 무시 · 다크 나무 · 사다리 5칸",
+        "             보드 2레이어 · 나무 렌더 · H8 착수 · 중복 착수 무시 · 다크 나무\n" +
+        `             보드 옆 칸 3장 · 설정 ${rows}줄(검색·저장·좁은 폭) · 엔진 탭`,
     );
   }
 } finally {

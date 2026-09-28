@@ -2,6 +2,8 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 import { AppShell } from "./AppShell";
 import { Placeholder } from "./Placeholder";
 import { BoardScreen } from "../features/board/BoardScreen";
+import { EngineScreen } from "../features/engine/EngineScreen";
+import { SettingsScreen } from "../features/settings/SettingsScreen";
 
 /**
  * 아홉 화면. 계획서 §6 의 라우트 표를 그대로 옮긴 것이다.
@@ -87,17 +89,8 @@ export const router = createBrowserRouter(
           ),
         },
 
-        {
-          path: "engine",
-          element: (
-            <Placeholder
-              stage="W3"
-              title="엔진"
-              what="변형(single-simd128)·스레드·해시 크기·국면 슬롯 10칸·유지보수·piskvork 콘솔. 앱의 «연결» 탭에서 서버를 걷어낸 자리에 도구가 남는다."
-              needs={["W3 엔진 워커"]}
-            />
-          ),
-        },
+        // 엔진 상태와 piskvork 콘솔. 콘솔은 보드 옆 칸에서 이리로 왔다.
+        { path: "engine", element: <EngineScreen /> },
 
         {
           path: "joseki",
@@ -111,17 +104,9 @@ export const router = createBrowserRouter(
           ),
         },
 
-        {
-          path: "settings",
-          element: (
-            <Placeholder
-              stage="W5"
-              title="설정"
-              what="데스크톱 settings.txt 67항목 왕복. 27행이 다크 모드의 오라클이다 — 불러오면 시스템 설정을 이긴다."
-              needs={["W3 엔진 워커"]}
-            />
-          ),
-        },
+        // 앱 `SettingsScreen.kt` 의 분류(대국·엔진·표시…)를 옮긴 것. 대국 설정·조작은
+        // 보드 옆 칸에서 이리로 왔다. settings.txt 67항목 파일 왕복은 여전히 W5 의 몫이다.
+        { path: "settings", element: <SettingsScreen /> },
 
         { path: "*", element: <Navigate to="/board" replace /> },
       ],

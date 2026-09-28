@@ -5,21 +5,20 @@ import { OPENING_LABEL, negotiates, type OpeningProtocol } from "../../core/mode
 import { label } from "../../core/model/move";
 
 /**
- * 개시 pane — 지금 어느 단계인지, 무엇을 고를 수 있는지.
+ * 개시 진행 — 지금 어느 단계인지. 설정 화면의 「대국 진행」 줄이 그린다.
  *
  * 개시 절차가 없는 규칙(자유 렌주)에서는 **아예 그리지 않는다.** 언제나 자리를
- * 차지하는 빈 패널은 화면에서 「여기 뭔가 있어야 하는데 없다」로 읽힌다.
+ * 차지하는 빈 줄은 화면에서 「여기 뭔가 있어야 하는데 없다」로 읽힌다.
  */
-export function OpeningPanel() {
+export function OpeningProgress() {
   const opening = useGameStore((s) => s.opening);
   const stones = useBoardStore((s) => s.render.stones.length);
   if (!negotiates(opening)) return null;
 
   return (
-    <section className="panel">
-      <h2 className="panel__title">{OPENING_LABEL[opening]}</h2>
+    <div className="opening-progress" role="group" aria-label={`${OPENING_LABEL[opening]} 진행`}>
       <Timeline opening={opening} stones={stones} />
-    </section>
+    </div>
   );
 }
 

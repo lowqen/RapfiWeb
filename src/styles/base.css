@@ -647,22 +647,101 @@ a:focus-visible {
   color: var(--c-on-secondary-container);
 }
 
-/* ── 후보 수 스테퍼 ─────────────────────────────────────────────────
+/* ── 엔진 카드의 분석 상태 줄 ───────────────────────────────────────
+   「분석 중 · 무제한 · 후보 5수  설정」. 켜져 있는지는 점의 색 + 글로 두 번 말한다. */
+.engine-mode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s);
+  align-items: center;
+  margin-top: var(--space-m);
+  font: var(--type-label-medium);
+  color: var(--c-on-surface-variant);
+}
+.engine-mode__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c-outline);
+}
+.engine-mode[data-on] {
+  color: var(--c-on-surface);
+}
+.engine-mode[data-on] .engine-mode__dot {
+  background: var(--c-positive);
+}
+.engine-mode__link {
+  margin-left: auto;
+}
+.inline-link {
+  color: var(--c-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.inline-link:hover {
+  filter: brightness(1.15);
+}
+
+/* ── 공통 버튼 ──────────────────────────────────────────────────────
+   카드 밖(설정 줄 등)에서 쓰는 윤곽 버튼. `.panel__actions button` 과 같은 모양이다. */
+.btn {
+  display: inline-flex;
+  gap: var(--space-m);
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 var(--space-l);
+  font: var(--type-label-large);
+  color: var(--c-on-surface);
+  white-space: nowrap;
+  border: 1px solid var(--c-outline);
+  border-radius: var(--radius-m);
+  transition: background var(--motion-quick) ease-out;
+}
+.btn:hover:not(:disabled) {
+  background: var(--c-surface-container-highest);
+}
+.btn:disabled {
+  color: var(--c-outline);
+  border-color: var(--c-outline-variant);
+  cursor: default;
+}
+.btn--tonal {
+  color: var(--c-on-secondary-container);
+  background: var(--c-secondary-container);
+  border-color: var(--c-secondary-container);
+}
+.btn--tonal:hover:not(:disabled) {
+  background: var(--c-secondary-container);
+  filter: brightness(1.1);
+}
+.btn--danger {
+  color: var(--c-on-error-container);
+  background: var(--c-error-container);
+  border-color: var(--c-error-container);
+}
+.btn--danger:hover:not(:disabled) {
+  background: var(--c-error-container);
+  filter: brightness(1.1);
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s);
+}
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-m);
+  min-width: 0;
+}
+
+/* ── 스테퍼 ─────────────────────────────────────────────────────────
    앱의 「후보 수 (멀티 PV)  −  1  +」. */
 .stepper {
   display: flex;
   gap: var(--space-s);
   align-items: center;
-  margin-top: var(--space-l);
-  padding: var(--space-xs) 0;
-}
-.stepper__label {
-  flex: 1;
-  min-width: 0;
-  font: var(--type-body-medium);
-}
-.stepper__sub {
-  color: var(--c-on-surface-variant);
 }
 .stepper__btn {
   display: grid;
@@ -670,6 +749,7 @@ a:focus-visible {
   width: 36px;
   height: 36px;
   color: var(--c-on-surface);
+  border: 1px solid var(--c-outline-variant);
   border-radius: 50%;
   transition: background var(--motion-quick) ease-out;
 }
@@ -680,101 +760,378 @@ a:focus-visible {
   color: var(--c-outline-variant);
   cursor: default;
 }
+.stepper__btn .icon {
+  width: 20px;
+  height: 20px;
+}
 .stepper__value {
-  min-width: 2.5ch;
+  min-width: 3ch;
   font: var(--type-title-medium);
   text-align: center;
 }
 
-/* ── 접히는 카드 ────────────────────────────────────────────────────
-   앱의 「데이터베이스  저장된 값 없음  ⌄」 줄. 머리 줄 전체가 누를 자리다. */
-.panel.section {
-  padding: 0;
-}
-.section__head {
-  display: flex;
-  align-items: center;
-}
-.section__toggle {
-  display: flex;
-  flex: 1;
-  gap: var(--space-m);
-  align-items: center;
-  min-width: 0;
-  min-height: 52px;
-  padding: var(--space-m) var(--space-l);
-  text-align: left;
-  border-radius: var(--radius-l);
-}
-.section__toggle:hover {
+/* ── 세그먼트 ───────────────────────────────────────────────────────
+   붙어 있는 칸들 — 스타일 0~5, 해시 크기처럼 «눈금»으로 읽혀야 하는 값. 좁으면
+   줄을 바꾸지 않고 가로로 민다(칸이 두 줄로 쪼개지면 눈금이 아니게 된다). */
+.seg {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 3px;
+  overflow-x: auto;
   background: var(--c-surface-container-high);
+  border-radius: var(--radius-m);
+  scrollbar-width: none;
 }
-.section__title {
+.seg__opt {
   flex: none;
-  font: var(--type-title-small);
-}
-.section__summary {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  font: var(--type-label-medium);
+  min-height: 32px;
+  padding: 0 var(--space-l);
+  font: var(--type-label-large);
   color: var(--c-on-surface-variant);
-  text-overflow: ellipsis;
   white-space: nowrap;
+  border-radius: calc(var(--radius-m) - 3px);
+  transition:
+    background var(--motion-quick) ease-out,
+    color var(--motion-quick) ease-out;
 }
-.section__chevron {
-  color: var(--c-on-surface-variant);
-  transition: transform var(--motion-quick) ease-out;
+.seg__opt:hover:not(:disabled):not([aria-checked="true"]) {
+  color: var(--c-on-surface);
+  background: var(--c-surface-container-highest);
 }
-.section[data-open] .section__chevron {
-  transform: rotate(180deg);
+.seg__opt[aria-checked="true"] {
+  font-weight: 600;
+  color: var(--c-on-secondary-container);
+  background: var(--c-secondary-container);
 }
-.section__head .panel__link {
-  flex: none;
-  margin: 0 var(--space-l) 0 0;
+.seg__opt:disabled {
+  color: var(--c-outline);
+  cursor: not-allowed;
 }
-.section__body {
-  padding: 0 var(--space-l) var(--space-l);
-}
-.section__body > :first-child {
-  margin-top: 0;
+.seg__opt:disabled[aria-checked="true"] {
+  color: var(--c-on-secondary-container);
 }
 
-/* ── 값 사다리 견본 ─────────────────────────────────────────────── */
-.ladder {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 2px;
-  margin-top: var(--space-m);
-  overflow: hidden;
-  border-radius: var(--radius-xs);
+/* ── 스위치 ─────────────────────────────────────────────────────────
+   Material 3 스위치. 켜짐은 색 + 손잡이 위치 + 크기 세 갈래로 말한다. */
+.switch {
+  position: relative;
+  flex: none;
+  width: 52px;
+  height: 32px;
+  background: var(--c-surface-container-highest);
+  border: 2px solid var(--c-outline);
+  border-radius: 16px;
+  transition:
+    background var(--motion-quick) ease-out,
+    border-color var(--motion-quick) ease-out;
 }
-.ladder__cell {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  align-items: center;
-  padding: var(--space-m) 2px;
-  /* 칩 위 글자는 언제나 흰색이다 — 사다리 전 구간에서 4.5:1 이 보장된다. */
-  color: #fff;
+.switch__thumb {
+  position: absolute;
+  top: 50%;
+  left: 6px;
+  width: 16px;
+  height: 16px;
+  background: var(--c-outline);
+  border-radius: 50%;
+  transform: translateY(-50%);
+  transition:
+    left var(--motion-quick) ease-out,
+    width var(--motion-quick) ease-out,
+    height var(--motion-quick) ease-out;
 }
-.ladder__pos {
-  font: var(--type-label-medium);
+.switch[aria-checked="true"] {
+  background: var(--c-secondary);
+  border-color: var(--c-secondary);
 }
-.ladder__hex,
-.ladder__ratio {
-  font-size: 10px;
-  opacity: 0.85;
+.switch[aria-checked="true"] .switch__thumb {
+  left: 24px;
+  width: 22px;
+  height: 22px;
+  background: var(--c-on-secondary);
 }
-.ladder--chips {
+.switch:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+/* ── 숫자 칸 ────────────────────────────────────────────────────────
+   네이티브 input 의 흰 상자·스핀 버튼을 걷어내고 토큰으로 다시 그린다. */
+.fields {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-s);
+  gap: var(--space-m);
 }
-.ladder__chip {
-  padding: var(--space-xs) var(--space-m);
+.field {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.field__label {
   font: var(--type-label-medium);
+  color: var(--c-on-surface-variant);
+}
+/* 줄 이름이 이미 같은 말을 하는 자리 — 화면에서는 숨기고 스크린 리더에는 남긴다. */
+.field__label--hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.field__box {
+  display: inline-flex;
+  gap: var(--space-s);
+  align-items: center;
+  min-height: 40px;
+  padding: 0 var(--space-l);
+  background: var(--c-surface-container-high);
+  border: 1px solid var(--c-outline-variant);
+  border-radius: var(--radius-s);
+  transition: border-color var(--motion-quick) ease-out;
+}
+.field__box:focus-within {
+  border-color: var(--c-primary);
+  box-shadow: inset 0 0 0 1px var(--c-primary);
+}
+.field[data-disabled] .field__box {
+  opacity: 0.5;
+}
+.field__input {
+  width: 6ch;
+  padding: 0;
+  font: var(--type-title-medium);
+  color: var(--c-on-surface);
+  text-align: right;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.field__input::-webkit-outer-spin-button,
+.field__input::-webkit-inner-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+.field__unit {
+  font: var(--type-label-medium);
+  color: var(--c-on-surface-variant);
+}
+
+/* 읽기 전용 값. 누를 수 있는 것처럼 보이지 않게 테두리 없이 면만. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 var(--space-l);
+  font: var(--type-label-large);
+  color: var(--c-on-surface-variant);
+  white-space: nowrap;
+  background: var(--c-surface-container-high);
   border-radius: var(--radius-xl);
+}
+
+/* ── 설정 화면 ──────────────────────────────────────────────────────
+   위에는 검색과 분류 칩만 고정한다(앱과 같다). 나머지는 분류별 카드로 흐른다. */
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-l);
+  max-width: 860px;
+  margin: 0 auto;
+}
+.settings__head {
+  position: sticky;
+  top: calc(-1 * var(--space-xl));
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-m);
+  /* 위로만 여백을 먹어 고정 위치가 스크롤 영역 맨 위에 붙게 한다. 옆은 카드 열과
+     같은 폭 — 구분선이 카드보다 삐져나오지 않게. */
+  margin-top: calc(-1 * var(--space-xl));
+  padding: var(--space-xl) 0 var(--space-m);
+  background: var(--c-background);
+  border-bottom: 1px solid var(--c-outline-variant);
+}
+@media (max-width: 640px) {
+  .settings__head {
+    top: calc(-1 * var(--space-m));
+    margin-top: calc(-1 * var(--space-m));
+    padding: var(--space-m) 0;
+  }
+}
+.search {
+  display: flex;
+  gap: var(--space-m);
+  align-items: center;
+  min-height: 48px;
+  padding: 0 var(--space-l);
+  background: var(--c-surface-container-high);
+  border: 1px solid transparent;
+  border-radius: var(--radius-xl);
+  transition: border-color var(--motion-quick) ease-out;
+}
+.search:focus-within {
+  border-color: var(--c-primary);
+}
+.search__icon {
+  color: var(--c-on-surface-variant);
+}
+.search__input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  font: var(--type-body-large);
+  color: var(--c-on-surface);
+  background: transparent;
+  border: 0;
+  outline: 0;
+  appearance: none;
+}
+.search__input::placeholder {
+  color: var(--c-on-surface-variant);
+}
+.search__input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+/* 분류 칩은 한 줄로 가로 스크롤 — 줄바꿈하면 고정 머리의 높이가 정해지지 않는다. */
+.catbar {
+  display: flex;
+  gap: var(--space-s);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.catbar .chip {
+  flex: none;
+}
+.settings__meta {
+  font: var(--type-label-medium);
+  color: var(--c-on-surface-variant);
+}
+.settings__empty {
+  padding: var(--space-xxl);
+  font: var(--type-body-medium);
+  color: var(--c-on-surface-variant);
+  text-align: center;
+}
+
+.sgroup {
+  padding: 0;
+  overflow: hidden;
+}
+.sgroup__head {
+  padding: var(--space-l) var(--space-xl) var(--space-m);
+}
+.sgroup__title {
+  font: var(--type-title-medium);
+  letter-spacing: var(--track-title-medium);
+}
+.sgroup__desc {
+  margin-top: 2px;
+  font: var(--type-body-small);
+  color: var(--c-on-surface-variant);
+}
+
+/* 한 줄 = 이름·설명(왼쪽) + 조작부(오른쪽). 칩이 여럿인 줄은 조작부가 아래로. */
+.srow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-m) var(--space-xl);
+  align-items: center;
+  padding: var(--space-l) var(--space-xl);
+  border-top: 1px solid var(--c-outline-variant);
+}
+.srow[data-wide] {
+  grid-template-columns: minmax(0, 1fr);
+}
+.srow__text {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-m);
+  align-items: baseline;
+  min-width: 0;
+}
+.srow__label {
+  font: var(--type-body-large);
+  color: var(--c-on-surface);
+}
+.srow__key {
+  padding: 1px var(--space-s);
+  font: var(--type-mono);
+  font-size: 11px;
+  color: var(--c-on-surface-variant);
+  background: var(--c-surface-container-high);
+  border-radius: var(--radius-xs);
+}
+.srow__note {
+  flex: 0 0 100%;
+  font: var(--type-body-small);
+  color: var(--c-on-surface-variant);
+}
+.srow__control {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 0;
+}
+.srow[data-wide] .srow__control {
+  justify-content: flex-start;
+}
+.srow__hint {
+  font: var(--type-body-small);
+  color: var(--c-on-surface-variant);
+}
+.srow__status {
+  font: var(--type-title-small);
+}
+.opening-progress .timeline {
+  margin-top: 0;
+}
+/* 좁으면 조작부도 제 줄로 내려간다 — 스위치 하나 때문에 설명이 두 글자 폭이 되지 않게. */
+@media (max-width: 640px) {
+  .srow {
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--space-l);
+  }
+  .srow__control {
+    justify-content: flex-start;
+  }
+  .sgroup__head {
+    padding: var(--space-l) var(--space-l) var(--space-m);
+  }
+}
+
+/* ── 엔진 화면 ──────────────────────────────────────────────────────
+   상태 카드 + 콘솔. 콘솔이 남은 높이를 다 쓴다. */
+.enginescreen {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  gap: var(--space-xl);
+  align-items: start;
+  height: 100%;
+  min-height: 0;
+}
+.enginescreen__console {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 320px;
+}
+.console--full {
+  flex: 1;
+  max-height: none;
+  min-height: 0;
+}
+@media (max-width: 900px) {
+  .enginescreen {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+  }
+  .enginescreen__console {
+    height: 60vh;
+  }
 }
 
 /* ── 분석 pane (W3) ─────────────────────────────────────────────── */
@@ -917,18 +1274,12 @@ a:focus-visible {
 }
 
 /* ── 칩 묶음 (규칙·컴퓨터 색·시간) ──────────────────────────────── */
+/* 이름은 설정 줄이 따로 말하므로 묶음은 칩만 담는다. */
 .chips {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-s);
   align-items: center;
-  margin-top: var(--space-l);
-}
-.chips__legend {
-  /* 라벨은 언제나 제 줄을 차지한다 — 칩과 섞이면 칩처럼 눌러 보게 된다. */
-  flex: 0 0 100%;
-  font: var(--type-label-medium);
-  color: var(--c-on-surface-variant);
 }
 .chip {
   min-height: 32px;

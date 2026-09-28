@@ -81,8 +81,9 @@ async function dumpState(why: string) {
   console.error(`\n──── 실패 지점: ${why} ────`);
   if (!page) return;
   try {
-    const console_ = await page.locator(".console").innerText({ timeout: 2000 });
-    const lines = console_.split("\n");
+    // 콘솔은 엔진 탭으로 갔다 — 화면이 아니라 스토어에서 전체를 읽는다.
+    const lines = (await page.evaluate(`window.__rapfiConsole()`)) as string[];
+    if (lines.length === 0) throw new Error("빈 콘솔");
     console.error(`엔진 콘솔 (마지막 ${Math.min(60, lines.length)}줄):`);
     console.error(lines.slice(-60).join("\n"));
   } catch {
@@ -124,7 +125,8 @@ try {
   console.log(`엔진 기동 ${bootMs}ms`);
 
   // 콘솔에 엔진이 실제로 말한 줄이 있어야 한다 — 파서가 아니라 엔진이 살아 있다는 증거.
-  const consoleText = await page.locator(".console").innerText();
+  await page.waitForTimeout(300); // 콘솔은 100ms 배치로 온다
+  const consoleText = ((await page.evaluate(`window.__rapfiConsole()`)) as string[]).join("\n");
   if (!/Rapfi|Evaluator|config/i.test(consoleText)) {
     fail(`콘솔에 엔진 출력이 없습니다:\n${consoleText.slice(0, 400)}`);
   }
@@ -182,6 +184,19 @@ try {
 
   const pvRows = await page.locator(".pvlist__row").count();
   console.log(`PV ${pvRows}개`);
+
+  // 4b. **무제한 분석은 스스로 멈추지 않는다.** 예전엔 분석 예산이 5초였고, 즉답
+  // 조각(좌표 한 줄)에서도 끝나 YXSTOP 을 보냈다. 옛 한도를 넘겨 기다린 뒤에도
+  // 여전히 탐색 중이어야 한다.
+  await page.waitForTimeout(4000);
+  const still = await page
+    .locator(".panel")
+    .filter({ has: page.locator(".panel__badge") })
+    .locator(".panel__badge")
+    .getAttribute("data-status");
+  if (still !== "searching")
+    fail(`무제한 분석이 ${Date.now() - tAnalyze}ms 만에 멈췄습니다 (${still})`);
+  else console.log(`무제한 분석: ${((Date.now() - tAnalyze) / 1000).toFixed(1)}초째 계속 탐색 중`);
 
   // 5. 정지 — 조각 경계에서 듣는다(기본 500ms). 넉넉히 3초를 준다.
   const tStop = Date.now();

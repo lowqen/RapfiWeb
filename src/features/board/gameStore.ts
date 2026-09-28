@@ -604,3 +604,57 @@ export const useGameStore = create<GameState>((set, get) => {
     }
   }
 });
+
+/**
+ * **분석은 국면을 따라간다.** 분석을 켜 둔 채 수를 두거나 무르면 새 국면을 이어
+ * 읽는다 — 앱의 분석 모드와 같다. 예전에는 착수가 나오면 분석이 옛 국면을 붙든 채
+ * 돌거나(보드의 값 칩이 한 수 전 판을 말한다) 사용자가 다시 눌러야 했다.
+ *
+ * 화면이 아니라 스토어에 건다 — 설정 화면에서 「새 대국」을 눌러도 따라가야 한다.
+ *
+ * **한 박자 늦춰 판단한다.** 대국에서 사람이 두면 같은 호출 안에서 곧바로 엔진의
+ * 착수(`play`)가 이어지고, 그 착수가 분석 의도를 끈다. 여기서 즉시 분석을 걸면
+ * 착수 앞에 쓸데없는 분석 요청이 하나 끼어든다.
+ */
+/**
+ * **시계 틱 — 화면이 아니라 스토어가 돌린다.** 대국 조작이 설정 탭으로 가면서,
+ * 시계 카드가 틱을 돌리던 때는 탭을 옮기면 시계가 멈췄다(시간 초과도 오지 않았다).
+ *
+ * 틱은 250ms 다. 초 단위 표시에 16ms 마다 리렌더할 이유가 없고, 초가 바뀌는 순간을
+ * 놓치지도 않는다. 벽시계로 잰다 — setInterval 은 밀리므로 간격을 믿고 더하면
+ * 시계가 느려진다.
+ *
+ * 시험(node)에는 `window` 가 없다 — 시험은 `advanceClock` 을 손으로 부른다.
+ */
+const TICK_MS = 250;
+if (typeof window !== "undefined") {
+  let tick: ReturnType<typeof setInterval> | null = null;
+  useGameStore.subscribe((s, prev) => {
+    const running = s.clock.running !== null;
+    if (running === (prev.clock.running !== null)) return;
+    if (tick !== null) {
+      clearInterval(tick);
+      tick = null;
+    }
+    if (!running) return;
+    let last = performance.now();
+    tick = setInterval(() => {
+      const now = performance.now();
+      useGameStore.getState().advanceClock(now - last);
+      last = now;
+    }, TICK_MS);
+  });
+}
+
+let followScheduled = false;
+useBoardStore.subscribe((s, prev) => {
+  if (s.render.stones === prev.render.stones || followScheduled) return;
+  // 「끝으로」처럼 한 번에 여러 수가 바뀌어도 분석 요청은 하나만.
+  followScheduled = true;
+  queueMicrotask(() => {
+    followScheduled = false;
+    const e = useEngineStore.getState();
+    if (!e.analyzing || useGameStore.getState().thinking) return;
+    void e.analyze(useBoardStore.getState().placements());
+  });
+});

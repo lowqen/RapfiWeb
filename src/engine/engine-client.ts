@@ -8,6 +8,7 @@ import {
   type EngineStatus,
   type FromWorker,
   type Placement,
+  type SearchEndReason,
   type ToWorker,
 } from "./engine-types";
 
@@ -78,6 +79,11 @@ export interface EngineEvents {
   onBestMove?: (moves: readonly Move[]) => void;
   onForbid?: (cells: readonly Move[]) => void;
   onError?: (message: string) => void;
+  /**
+   * **가장 최근** 요청의 탐색이 끝났다. 밀려난 탐색의 끝은 여기로 오지 않는다 —
+   * 뒤이은 탐색이 이미 돌고 있기 때문이다.
+   */
+  onSearchDone?: (mode: "analyze" | "move", reason: SearchEndReason) => void;
   /** 오프닝 협상 응답. 대국 상태 기계가 받는다(W4). */
   onOpening?: (r: OpeningResponse) => void;
 }
@@ -98,6 +104,8 @@ export class EngineClient {
   private status: EngineStatus = "idle";
   private snapshot: AnalysisSnapshot = EMPTY_SNAPSHOT;
   private readyResolvers: (() => void)[] = [];
+  /** 마지막으로 보낸 탐색 요청의 번호. `searchDone` 이 이것과 같을 때만 「대기」다. */
+  private searchSeq = 0;
 
   readonly capabilities: Capabilities = detectCapabilities();
   readonly engineBaseUrl: string;
@@ -166,7 +174,12 @@ export class EngineClient {
           this.events.onForbid?.(m.cells);
           break;
         case "searchDone":
+          // 밀려난 탐색의 끝이면 무시한다. 새 요청이 이미 돌고 있는데 「대기」로
+          // 바꾸면, 그 틈에 금수 조회(YXBOARD+YXSHOWFORBID)가 나가 도는 분석을
+          // 끊는다 — 무제한 분석이 저절로 멈추던 경로 하나가 이것이었다.
+          if (m.id !== this.searchSeq) break;
           this.setStatus("ready");
+          this.events.onSearchDone?.(m.mode, m.reason);
           break;
         case "exit":
           this.setStatus("idle");
@@ -232,7 +245,10 @@ export class EngineClient {
       // 국면과 탐색을 조각마다 — YXNBEST 가 끝에 엔진 판에 수를 두기 때문이다.
       setup: [{ kind: "yxboard", stones }],
       repeat: [{ kind: "yxnbest", n: opts.nbest ?? 5 }],
-      totalMs: opts.totalMs ?? 5000,
+      // 기본은 **무제한** — 분석은 정지나 새 국면이 올 때까지 읽는다(앱의 분석과
+      // 같다). 예전 기본값 5초는 「무제한 분석」이 5초 뒤 저절로 멈추게 했다.
+      totalMs: opts.totalMs ?? Infinity,
+      id: ++this.searchSeq,
     });
   }
 
@@ -261,6 +277,7 @@ export class EngineClient {
         setup: [{ kind: "yxboard", stones }],
         repeat: [{ kind: "yxnbest", n: 1 }],
         totalMs: Infinity,
+        id: ++this.searchSeq,
       });
       return;
     }
@@ -269,6 +286,7 @@ export class EngineClient {
       commands: emptyBoard ? [{ kind: "begin" }] : [{ kind: "board", stones }],
       turnMs,
       matchMs: opts.matchMs ?? 0,
+      id: ++this.searchSeq,
     };
     // exactOptionalPropertyTypes: 값이 없으면 키 자체가 없어야 한다.
     if (opts.matchLeftMs !== undefined) msg.matchLeftMs = opts.matchLeftMs;

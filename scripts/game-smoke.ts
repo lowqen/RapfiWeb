@@ -83,6 +83,44 @@ page.on("console", (m) => {
   if (m.type() === "error") pageErrors.push("[console] " + m.text());
 });
 
+// ── 화면 사이를 오가는 손 ────────────────────────────────────────────
+//
+// 대국 설정·조작(개시·컴퓨터 색·시간·새 대국·기권·무승부)은 **설정 탭**에 있고,
+// 판·시계·엔진 상태·물음·「지금 두기」는 **보드 탭**에 있다. 대국 상태는 스토어에
+// 살아 있으므로 탭을 오가도 판은 그대로다 — 사용자가 하는 그대로 레일로 오간다.
+
+type Screen = "board" | "settings";
+
+/** 설정 탭에 사는 버튼들. 여기 없는 이름은 보드 탭에서 누른다. */
+const ON_SETTINGS = new Set([
+  "새 대국",
+  "기권",
+  "무승부",
+  "5분",
+  "15분",
+  "30분",
+  "무제한",
+  "사용자 정의",
+  "자유 렌주",
+  "RIF 오프닝",
+  "첫 수 이후 교환",
+  "사람 대 사람",
+  "컴퓨터 흑",
+  "컴퓨터 백",
+  "컴퓨터 양쪽",
+]);
+
+async function goto(screen: Screen) {
+  const marker = screen === "board" ? ".boardscreen" : ".settings";
+  if (await page.locator(marker).count()) return;
+  const label = screen === "board" ? "보드" : "설정";
+  await page.locator(".rail__link", { hasText: label }).click();
+  await page.locator(marker).waitFor({ timeout: 5_000 });
+  // 보드는 다시 붙을 때 ResizeObserver 로 크기를 잡는다 — 한 프레임을 기다린다.
+  if (screen === "board") await page.locator(".board__view").waitFor({ timeout: 5_000 });
+  await page.waitForTimeout(120);
+}
+
 // ── 판을 다루는 손 ───────────────────────────────────────────────────
 
 /** 보드는 15×15 에 여백 0.75칸이라 한 변이 15.5 step 이다. */
@@ -103,6 +141,7 @@ const STEP_DIV = 15.5;
  * 둘 다 「엔진이 답하지 않는다」처럼 보였지만 클릭이 판에 닿지도 않은 것이다.
  */
 async function tap(x: number, y: number) {
+  await goto("board");
   const board = page.locator(".board__view");
   // 누를 **그 점**이 실제로 보드인지 확인하고 누른다. 보드(984px)가 스크롤
   // 영역보다 커서, 스크롤 뒤에는 윗줄이 고정된 상단 바 **밑으로** 들어간다 —
@@ -135,6 +174,7 @@ async function tap(x: number, y: number) {
 }
 
 const stoneCount = async (): Promise<number> => {
+  await goto("board"); // 돌 수는 보드 캔버스의 aria-label 이 말한다
   const aria = (await page.locator("canvas[role=img]").getAttribute("aria-label")) ?? "";
   return Number(/돌 (\d+)개/.exec(aria)?.[1] ?? -1);
 };
@@ -156,6 +196,7 @@ async function waitStones(n: number, timeoutMs = 60_000, why = "") {
  */
 async function engineReply(n: number, why: string, thinkMs = 2_000) {
   await page.waitForTimeout(thinkMs);
+  await goto("board"); // 「지금 두기」는 보드의 엔진 카드에 있다
   const now = page.getByRole("button", { name: "지금 두기", exact: true });
   if (await now.count()) await now.click();
   await waitStones(n, 90_000, why);
@@ -173,9 +214,7 @@ async function engineReply(n: number, why: string, thinkMs = 2_000) {
  */
 async function analysisHealthy(label: string) {
   const before = await stoneCount();
-  await click("분석");
-  await page.locator('.panel__badge[data-status="searching"]').waitFor({ timeout: 10_000 });
-  await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 30_000 });
+  await runAnalysis(3_000);
   await page.waitForTimeout(300);
   const lines = (await page.evaluate(`window.__rapfiConsole()`)) as string[];
   // 가장 최근 분석: 마지막 `YXNBEST 5` 에서 거슬러 올라가 분석 머리
@@ -209,8 +248,24 @@ async function analysisHealthy(label: string) {
   else ok(`${label}: 조각 ${slices}개 · 조각마다 국면 재설정 · 0ms 조각 없음 · 판 그대로`);
 }
 
-/** 지금 떠 있는 물음의 종류. 없으면 null. */
+/**
+ * 분석을 켜고 `ms` 동안 읽힌 뒤 **정지로** 끈다. 분석은 이제 무제한이 기본이라
+ * 스스로 「대기」로 돌아오지 않는다 — 예전처럼 ready 를 기다리면 영원히 기다린다.
+ * 그 사이에 저절로 멈췄다면 그것이 곧 회귀다(무제한 분석 조기 중단 버그).
+ */
+async function runAnalysis(ms: number) {
+  await click("분석");
+  await page.locator('.panel__badge[data-status="searching"]').waitFor({ timeout: 10_000 });
+  await page.waitForTimeout(ms);
+  const still = await page.locator(".panel__badge").first().getAttribute("data-status");
+  if (still !== "searching") fail(`무제한 분석이 ${ms}ms 안에 저절로 멈췄습니다 (${still})`);
+  await click("정지");
+  await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 5_000 });
+}
+
+/** 지금 떠 있는 물음의 종류. 없으면 null. 물음은 보드 탭에 뜬다. */
 async function prompt(): Promise<string | null> {
+  await goto("board");
   const el = page.locator(".ask[data-prompt]");
   return (await el.count()) ? el.first().getAttribute("data-prompt") : null;
 }
@@ -285,11 +340,19 @@ async function thought(label: string) {
   }
 }
 
-/** 칩·버튼은 이름으로 집는다 — 순서는 화면을 손볼 때마다 바뀐다. */
-const click = (name: string) => page.getByRole("button", { name, exact: true }).click();
+/**
+ * 칩·버튼은 이름으로 집는다 — 순서는 화면을 손볼 때마다 바뀐다. 그 버튼이 사는
+ * 탭으로 먼저 간다(`ON_SETTINGS`).
+ */
+async function click(name: string) {
+  await goto(ON_SETTINGS.has(name) ? "settings" : "board");
+  await page.getByRole("button", { name, exact: true }).click();
+}
 
-const clockText = async (side: "human" | "computer", k: "big" | "sub") =>
-  (await page.locator(`.clock[data-side=${side}] [data-k=${k}]`).innerText()).trim();
+const clockText = async (side: "human" | "computer", k: "big" | "sub") => {
+  await goto("board");
+  return (await page.locator(`.clock[data-side=${side}] [data-k=${k}]`).innerText()).trim();
+};
 
 const toMs = (mmss: string): number => {
   const p = mmss.split(":").map(Number);
@@ -300,7 +363,8 @@ const toMs = (mmss: string): number => {
 async function dump(why: string) {
   console.error(`\n──── 실패 지점: ${why} ────`);
   try {
-    const lines = (await page.locator(".console").innerText({ timeout: 2000 })).split("\n");
+    // 콘솔은 엔진 탭에 있다 — 화면이 아니라 스토어에서 읽는다.
+    const lines = (await page.evaluate(`window.__rapfiConsole()`)) as string[];
     console.error(`엔진 콘솔 (마지막 40줄):\n${lines.slice(-40).join("\n")}`);
   } catch {
     console.error("엔진 콘솔을 읽지 못했습니다.");
@@ -361,9 +425,7 @@ try {
   // 분석을 한 번 돌린 **뒤**의 착수. 분석은 `timeout_turn` 을 조각 단위(마지막
   // 조각은 몇 ms 일 수도 있다)로 바꿔 두므로, 착수가 자기 예산을 다시 세우지
   // 않으면 그 찌꺼기로 둔다.
-  await click("분석");
-  await page.locator('.panel__badge[data-status="searching"]').waitFor({ timeout: 10_000 });
-  await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 30_000 });
+  await runAnalysis(2_000);
   await tap(1, 13);
   await engineReply(6, "(분석 뒤 왕복)");
   await page.waitForTimeout(300);
@@ -562,6 +624,7 @@ try {
   // (`docs/오프닝-협상-엔진-지원.md`). 화면에 남아 있으면 못 하는 일을 계속
   // 제안하게 되므로 목록에서 내렸다 — **배포본에서 그것을 확인한다.**
   console.log("\n8. 개시 목록");
+  await goto("settings"); // 개시 칩과 안내는 설정 탭의 「개시 규칙」 줄에 있다
   const chips = await page.locator('[role=group][aria-label="오프닝"] .chip').allInnerTexts();
   const names = chips.map((c) => c.trim()).sort();
   const want = ["RIF 오프닝", "자유 렌주", "첫 수 이후 교환"].sort();

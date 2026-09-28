@@ -41,7 +41,12 @@ export const RAIL: readonly Dest[] = [
   { path: "/database", label: "DB", subtitle: "yixindb 국면 저장소", icon: ICON.database },
   { path: "/engine", label: "엔진", subtitle: "엔진 상태와 도구", icon: ICON.engine },
   { path: "/joseki", label: "정석", subtitle: "오프닝 정석 노트", icon: ICON.joseki },
-  { path: "/settings", label: "설정", subtitle: "데스크톱 설정 67항목", icon: ICON.settings },
+  {
+    path: "/settings",
+    label: "설정",
+    subtitle: "대국 · 시간 · 엔진 · 분석 · 표시",
+    icon: ICON.settings,
+  },
 ];
 
 /**
