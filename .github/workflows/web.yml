@@ -35,11 +35,13 @@ jobs:
 
       - name: 잠금 파일 업로드 (커밋용)
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: pnpm-lock-generated
           path: pnpm-lock.yaml
           if-no-files-found: warn
+          retention-days: 3
 
       - name: 타입
         run: pnpm typecheck
@@ -97,11 +99,13 @@ jobs:
           echo "깨끗합니다."
 
       - name: dist 업로드
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: dist
           path: dist/
           if-no-files-found: error
+          retention-days: 3
 
       # 서식은 **맨 뒤**다. 들여쓰기 한 칸 때문에 진짜 고장(타입·시험·스모크)이
       # 가려지면 안 된다. 그리고 «틀렸다»고만 말하지 않고 고칠 패치까지 준다 —
@@ -131,8 +135,10 @@ jobs:
 
       - name: 서식 패치 업로드
         if: always() && steps.fmt.outcome == 'failure'
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: prettier-patch
           path: prettier.patch
           if-no-files-found: ignore
+          retention-days: 7
