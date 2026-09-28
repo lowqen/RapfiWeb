@@ -98,6 +98,23 @@ for (const name of browsers) {
       `${name.padEnd(8)} ${c.variant.padEnd(6)} ${c.mode.padEnd(10)} ${c.iso ? "iso  " : "plain"} → ` +
         (last.ok ? `ok (${speeds(last)})` : `실패[${last.stage}] ${last.error}`),
     );
+    // 원자료를 로그에도 — 아티팩트 저장소가 가득 차 JSON 이 올라가지 않은 적이 있다.
+    console.log(
+      "    env " +
+        JSON.stringify({ hc: last.env?.hardwareConcurrency, ua: last.env?.userAgent }) +
+        ` first=${last.firstLineMs}ms version=${JSON.stringify(last.version)}`,
+    );
+    for (const s of last.scaling ?? []) {
+      console.log(
+        `    ${s.threads}t depth=${s.depth} wall=${s.wallMs}ms block=${s.blockMs}ms ` +
+          `end=${JSON.stringify(s.endLines?.slice(-2))}`,
+      );
+    }
+    if (!last.ok) {
+      for (const l of last.tail ?? []) console.log(`    tail| ${l}`);
+      for (const l of last.logs ?? []) console.log(`    log | ${l}`);
+      for (const l of last.workerErrors ?? []) console.log(`    werr| ${l}`);
+    }
     await context.close();
   }
   await browser.close();

@@ -60,6 +60,13 @@ jobs:
       - name: 멀티 변형 산출물
         run: ls -l out/engine | sed 's/^/  /'
 
+      # 워커 조합이 왜 실패하는가 — 글루가 pthread 워커를 **무슨 주소로** 띄우는지.
+      # (1차 런: 워커 · 워커+mainScriptUrlOrBlob 둘 다 첫 응답 없음)
+      - name: 멀티 글루의 pthread 기동 경로
+        run: |
+          g=out/engine/rapfi-multi-simd128.js
+          grep -o -E ".{0,80}(new Worker|mainScriptUrlOrBlob|_scriptName *=|em-pthread|ENVIRONMENT_IS_PTHREAD *=|scriptDirectory *=).{0,120}" "$g" | head -40 || true
+
       - run: pnpm install --no-frozen-lockfile
 
       - name: Playwright 브라우저
@@ -76,8 +83,11 @@ jobs:
           if [ -f results/w0c.md ]; then cat results/w0c.md >> "$GITHUB_STEP_SUMMARY"; fi
           echo "nproc: $(nproc)" >> "$GITHUB_STEP_SUMMARY"
 
+      # 계정의 아티팩트 저장 한도에 걸리면 올라가지 않는다(1차 런) — 원자료는 위 실험
+      # 단계 로그에도 찍으므로 여기 실패가 잡 전체를 빨갛게 만들지 않게 한다.
       - name: 결과 업로드
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: w0c-results
@@ -88,6 +98,7 @@ jobs:
       # 멀티 변형 엔진(.data 포함) — 로컬 재측정용. 가중치는 CC0(rapfi-networks)이다.
       - name: 엔진 업로드 (멀티 포함)
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: w0c-engine
