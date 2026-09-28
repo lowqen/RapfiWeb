@@ -248,7 +248,9 @@ export const useGameStore = create<GameState>((set, get) => {
     engine().play(
       board().placements(),
       moves.length === 0,
-      clock.limited ? { turnMs, matchLeftMs: engineTimeLeftMs(clock) } : { turnMs },
+      clock.limited
+        ? { turnMs, matchMs: clock.matchLimitMs, matchLeftMs: engineTimeLeftMs(clock) }
+        : { turnMs, matchMs: 0 },
     );
     armWatchdog(turnMs);
   };

@@ -188,9 +188,15 @@ async function thought(label: string) {
   const sentAt = lastIndex(/^> INFO timeout_turn/, moveAt);
   const maxMs = timeAt < 0 ? null : Number(/MaxTime (\d+)ms/.exec(lines[timeAt]!)?.[1]);
   const d = depthAt < 0 ? -1 : Number(/Depth (\d+)-/.exec(lines[depthAt]!)?.[1]);
-  const bad = (maxMs !== null && maxMs <= 0) || d < 2;
+  // 우리가 보낸 차례 예산과 엔진이 실제로 쓴 예산이 맞는가. 명령 흐름이 한 칸
+  // 밀리면 엔진은 **앞선** 값(분석 조각 500ms 등)으로 돌고, 돌은 멀쩡히 놓인다 —
+  // 깊이만 봐서는 못 잡는다(500ms 로도 Depth 26 이 나온 적이 있다).
+  const sentMs = sentAt < 0 ? null : Number(/timeout_turn (\d+)/.exec(lines[sentAt]!)?.[1]);
+  const mismatch = maxMs !== null && sentMs !== null && sentMs >= 1000 && maxMs < sentMs * 0.5;
+  const bad = (maxMs !== null && maxMs <= 0) || d < 2 || mismatch;
   if (bad) {
-    fail(`${label}: 엔진이 생각하지 않았습니다 (MaxTime ${maxMs ?? "?"}ms · Depth ${d})`);
+    const why = mismatch ? `보낸 ${sentMs}ms 와 다른 예산으로 돌았습니다` : "생각하지 않았습니다";
+    fail(`${label}: 엔진이 ${why} (MaxTime ${maxMs ?? "?"}ms · Depth ${d})`);
     // 그 수 직전에 무엇을 보냈고 엔진이 무엇을 했는지 — 원인은 여기 있다.
     const from = Math.max(0, (sentAt >= 0 ? sentAt : moveAt) - 12);
     console.error(lines.slice(from, moveAt + 1).map((l) => `      ${l}`).join("\n"));

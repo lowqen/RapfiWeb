@@ -245,13 +245,14 @@ export class EngineClient {
   play(
     stones: readonly Placement[],
     emptyBoard: boolean,
-    opts: { turnMs?: number; matchLeftMs?: number } = {},
+    opts: { turnMs?: number; matchMs?: number; matchLeftMs?: number } = {},
   ): void {
     this.setStatus("searching");
     const msg: Extract<ToWorker, { type: "move" }> = {
       type: "move",
       commands: emptyBoard ? [{ kind: "begin" }] : [{ kind: "board", stones }],
       turnMs: opts.turnMs ?? 5000,
+      matchMs: opts.matchMs ?? 0,
     };
     // exactOptionalPropertyTypes: 값이 없으면 키 자체가 없어야 한다.
     if (opts.matchLeftMs !== undefined) msg.matchLeftMs = opts.matchLeftMs;

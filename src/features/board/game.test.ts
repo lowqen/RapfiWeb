@@ -21,7 +21,11 @@ import type { OpeningResponse } from "../../engine/engine-client";
  */
 
 const sent: EngineCommand[] = [];
-const plays: { stones: readonly Placement[]; empty: boolean }[] = [];
+const plays: {
+  stones: readonly Placement[];
+  empty: boolean;
+  budget: { turnMs?: number; matchMs?: number; matchLeftMs?: number } | undefined;
+}[] = [];
 
 const g = () => useGameStore.getState();
 const stones = () => useBoardStore.getState().render.stones;
@@ -49,8 +53,8 @@ function fresh(
     send: (...cmds: EngineCommand[]) => {
       sent.push(...cmds);
     },
-    play: async (s, empty) => {
-      plays.push({ stones: s, empty });
+    play: async (s, empty, budget) => {
+      plays.push({ stones: s, empty, budget });
     },
   });
   useGameStore.setState({
@@ -322,5 +326,40 @@ describe("금수", () => {
     expect(r.kind).toBe("rejected");
     expect(g().prompt).toEqual({ kind: "forbidden", cell: move(4, 4) });
     expect(stones()).toHaveLength(0);
+  });
+});
+
+// ── 착수 예산 ─────────────────────────────────────────────────────────
+
+describe("착수 예산", () => {
+  // 사용자 보고: 엔진이 `OptiTime 0ms | MaxTime 0ms` · `Depth 0-0` 으로 구석에
+  // 즉시 두었다. 착수 요청은 **시간 설정 전체**를 스스로 들고 가야 한다 — 앞선
+  // 명령(분석 조각 등)이 남긴 값이 새어 들 틈을 두지 않는다.
+
+  it("무제한이면 한 수 5초, 대국 예산 0(무제한)을 보낸다", () => {
+    fresh({ computerSide: "white" });
+    g().tap(move(7, 7));
+    expect(plays[0]!.budget).toEqual({ turnMs: 5_000, matchMs: 0 });
+  });
+
+  it("시간 제한이 있으면 차례 한도 · 대국 한도 · 남은 대국 시간을 함께 보낸다", () => {
+    fresh({ computerSide: "white" });
+    g().setClockLimits({ limited: true, turnLimitMs: 30_000, matchLimitMs: 300_000 });
+    g().tap(move(7, 7));
+    // matchMs 가 0 이면 Rapfi 는 time_left 를 무시한다 — 대국 한도가 꼭 가야 한다.
+    expect(plays[0]!.budget).toEqual({
+      turnMs: 30_000,
+      matchMs: 300_000,
+      matchLeftMs: 300_000,
+    });
+  });
+
+  it("예산은 결코 0 이 아니다", () => {
+    // 차례 시간을 다 써도 최소 500ms 는 준다 — 0 을 넘기면 엔진은 읽지 않고 던진다.
+    fresh({ computerSide: "white" });
+    g().setClockLimits({ limited: true, turnLimitMs: 1_000, matchLimitMs: 1_000 });
+    useGameStore.setState({ clock: { ...g().clock, computerMatchMs: 5_000 } });
+    g().tap(move(7, 7));
+    expect(plays[0]!.budget!.turnMs).toBeGreaterThanOrEqual(500);
   });
 });

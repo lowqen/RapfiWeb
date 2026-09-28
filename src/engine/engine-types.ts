@@ -231,8 +231,18 @@ export type ToWorker =
       commands: readonly EngineCommand[];
       turnMs: number;
       /**
+       * `INFO timeout_match` — 대국 전체 예산. 0 이면 무제한.
+       *
+       * **매 수마다 보낸다.** 엔진의 시간 설정은 이전 명령이 남긴 값이 그대로
+       * 살아 있으므로, 착수 요청이 스스로 완결되지 않으면 앞선 값(분석 조각 등)이
+       * 새어 든다. 그리고 이 값이 0 이면 Rapfi 는 `time_left` 를 **무시한다**
+       * (`TimeControl::init` — matchTime 0 은 무제한) — 5분 대국에서 엔진이 대국
+       * 예산을 모른 채 수마다 차례 한도(30초)를 거의 다 쓴 이유다.
+       */
+      matchMs: number;
+      /**
        * `INFO time_left` — 대국 예산의 남은 양. 데스크톱은 매 차례 앞에 이것도
-       * 보낸다(main.c:2742). 없으면 엔진이 차례 예산만 보고 시간 배분을 못 한다.
+       * 보낸다(main.c:2742). `matchMs` 가 0 이면 엔진이 보지 않는다.
        */
       matchLeftMs?: number;
     }

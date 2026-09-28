@@ -96,6 +96,9 @@ let searching = false;
 
 /** 스냅샷은 ~10Hz 로만 올린다. 그보다 잦으면 메인이 그리는 것보다 받는 게 많아진다. */
 const SNAPSHOT_MS = 100;
+
+/** 분석 조각의 하한. 엔진이 30ms 를 통신 여유로 떼므로 그보다 넉넉해야 한다. */
+const MIN_SLICE_MS = 100;
 let lastSnapshotAt = 0;
 let snapshotDirty = false;
 
@@ -284,7 +287,10 @@ async function search(msg: Extract<ToWorker, { type: "search" }>) {
   let reason: "finished" | "stopped" | "timeout" = "timeout";
   while (!stopRequested) {
     const left = msg.totalMs - (performance.now() - t0);
-    if (left <= 0) break;
+    // 자투리 조각은 보내지 않는다. `Math.ceil(left)` 가 몇 ms 이면 엔진의 예산이
+    // `timeout_turn − 30ms(예약)` ≤ 0 이 되어 Depth 0 탐색을 한 번 더 할 뿐이고,
+    // 그 값이 엔진에 **남는다** — 다음 명령이 새 값을 세우지 못하면 착수가 그걸로 돈다.
+    if (left < MIN_SLICE_MS) break;
     // 조각 하나: 이만큼만 생각하고 돌아온다. 해시 테이블이 남아 있으므로 다음
     // 조각은 이어서 깊어진다 — 매번 처음부터 다시 세는 것이 아니다.
     sendCommand([`INFO timeout_turn ${Math.min(sliceMs, Math.ceil(left))}`]);
@@ -304,8 +310,37 @@ async function search(msg: Extract<ToWorker, { type: "search" }>) {
   post({ type: "searchDone", reason, elapsedMs: Math.round(performance.now() - t0) });
 }
 
-self.onmessage = async (ev: MessageEvent<ToWorker>) => {
+/**
+ * 워커의 일은 **한 줄로 세운다.**
+ *
+ * 엔진 쪽 펌프는 `sendCommand` 한 번에 `runProtocol` 한 번 — 명령 하나를 읽는다.
+ * 이 짝이 한 번이라도 어긋나면 그 뒤의 **모든** 명령이 한 칸씩 밀려 읽힌다.
+ * 그런데 분석(`search`)은 조각 사이에 이벤트 루프로 양보하는 비동기 루프라,
+ * 예전에는 그 틈에 착수(`move`)가 끼어들어 명령이 섞였다. 결과: 착수가 자기
+ * `timeout_turn` 이 아니라 분석 조각의 값으로 돌았고, 그 뒤의 수들도 계속 그랬다.
+ * 마지막 조각이 몇 ms 이면 `OptiTime 0ms | MaxTime 0ms` · `Depth 0-0` 으로 구석에
+ * 던지는 수가 된다 — 사용자가 본 그대로다(CI 스모크 「분석 도중 착수」로 재현).
+ *
+ * 그래서: 모든 요청은 앞 요청이 끝난 뒤에 돈다. 돌고 있는 분석은 새 요청이
+ * 오면 **다음 조각 경계에서 멈추고** 자리를 내준다. `stop` 만은 줄을 서지 않는다 —
+ * 줄 뒤에서 기다리는 정지는 정지가 아니다.
+ */
+let queue: Promise<void> = Promise.resolve();
+
+self.onmessage = (ev: MessageEvent<ToWorker>) => {
   const msg = ev.data;
+  if (msg.type === "stop") {
+    stopRequested = true;
+    // 탐색 중이 아닐 때만 곧바로 닿는다. 탐색 중이면 조각 경계에서 루프가 본다.
+    if (!searching) sendAll([{ kind: "stop" }]);
+    return;
+  }
+  // 분석이 돌고 있으면 비켜 달라고 한다 — 착수·새 대국·국면 변경이 기다린다.
+  if (msg.type !== "boot" && searching) stopRequested = true;
+  queue = queue.then(() => handle(msg));
+};
+
+async function handle(msg: ToWorker): Promise<void> {
   try {
     switch (msg.type) {
       case "boot":
@@ -324,7 +359,9 @@ self.onmessage = async (ev: MessageEvent<ToWorker>) => {
         agg.reset();
         searching = true;
         const t0 = performance.now();
+        // 시간 설정 셋을 **모두** 다시 세운다 — 앞 명령이 남긴 값에 기대지 않는다.
         sendCommand([`INFO timeout_turn ${Math.max(100, Math.round(msg.turnMs))}`]);
+        sendCommand([`INFO timeout_match ${Math.max(0, Math.round(msg.matchMs))}`]);
         if (msg.matchLeftMs !== undefined) {
           sendCommand([`INFO time_left ${Math.max(0, Math.round(msg.matchLeftMs))}`]);
         }
@@ -340,9 +377,7 @@ self.onmessage = async (ev: MessageEvent<ToWorker>) => {
         break;
       }
       case "stop":
-        stopRequested = true;
-        // 탐색 중이 아닐 때만 닿는다. 탐색 중이면 조각 경계에서 위 루프가 본다.
-        if (!searching) sendAll([{ kind: "stop" }]);
+        // onmessage 가 줄 밖에서 처리한다 — 여기로 오지 않는다.
         break;
       case "shutdown":
         try {
@@ -355,4 +390,4 @@ self.onmessage = async (ev: MessageEvent<ToWorker>) => {
   } catch (e) {
     post({ type: "fatal", message: describe(e) });
   }
-};
+}

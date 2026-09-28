@@ -44,7 +44,7 @@ interface EngineState {
   play: (
     stones: readonly Placement[],
     emptyBoard: boolean,
-    budget?: { turnMs?: number; matchLeftMs?: number },
+    budget?: { turnMs?: number; matchMs?: number; matchLeftMs?: number },
   ) => Promise<void>;
   /** 명령 몇 개를 그대로 보낸다(협상 단계 등). */
   send: (...cmds: EngineCommand[]) => void;
