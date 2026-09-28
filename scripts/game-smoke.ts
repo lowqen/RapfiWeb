@@ -133,6 +133,17 @@ async function prompt(): Promise<string | null> {
   return (await el.count()) ? el.first().getAttribute("data-prompt") : null;
 }
 
+/**
+ * 보드 위 거절 사유. 2.2초 뒤 사라지므로 **탭 직후에** 읽어야 한다 — 실패
+ * 덤프까지 기다리면 이미 없다(실제로 그래서 한 번 헛짚었다).
+ */
+async function notice(): Promise<string> {
+  const n = page.locator(".board-notice");
+  const badge = await page.locator(".panel__badge").first().getAttribute("data-status");
+  const text = (await n.count()) ? (await n.innerText()).trim() : "(안내 없음)";
+  return `${text} / 엔진 ${badge}`;
+}
+
 /** 칩·버튼은 이름으로 집는다 — 순서는 화면을 손볼 때마다 바뀐다. */
 const click = (name: string) => page.getByRole("button", { name, exact: true }).click();
 
@@ -326,9 +337,9 @@ try {
   // 두 수는 그냥 놓인다. **검사는 셋째 수에서 돈다** — 그 자리에서 판이
   // 되돌아가므로 셋째 뒤에 돌 수를 세면 3이 아니라 0이다.
   await tap(0, 0);
-  if ((await stoneCount()) !== 1) fail("개시 1수가 놓이지 않았습니다");
+  if ((await stoneCount()) !== 1) fail(`개시 1수가 놓이지 않았습니다 — ${await notice()}`);
   await tap(1, 1);
-  if ((await stoneCount()) !== 2) fail("개시 2수가 놓이지 않았습니다");
+  if ((await stoneCount()) !== 2) fail(`개시 2수가 놓이지 않았습니다 — ${await notice()}`);
   await tap(2, 2);
   await page.waitForTimeout(500);
   if ((await prompt()) !== "illegalOpening") fail("개시 영역 위반을 알리지 않습니다");
