@@ -2,6 +2,7 @@
 import { CoordMapper, parse, serialize } from "./engine-protocol";
 import { SearchAggregator } from "./engine-aggregator";
 import { toSerializable, type EngineCommand, type FromWorker, type ToWorker } from "./engine-types";
+import type { Move } from "../core/model/move";
 
 /**
  * 엔진 워커 — Emscripten 모듈을 만지는 유일한 자리.
@@ -93,6 +94,10 @@ let agg = new SearchAggregator(15);
 let sliceMs = 500;
 let stopRequested = false;
 let searching = false;
+/** 지금 엔진이 찍는 좌표가 착수 요청의 답인가(동기 착수 동안만 참). */
+let forwardMoves = false;
+/** 분할 탐색에서 가장 최근 조각이 고른 수. 무제한 착수가 끝에 이걸 둔다. */
+let sliceMoves: readonly Move[] | null = null;
 
 /** 스냅샷은 ~10Hz 로만 올린다. 그보다 잦으면 메인이 그리는 것보다 받는 게 많아진다. */
 const SNAPSHOT_MS = 100;
@@ -152,7 +157,13 @@ function drain(chunk: string) {
     pushConsole(line);
     const r = parse(line, coord);
     if (agg.consume(r)) snapshotDirty = true;
-    if (r.kind === "bestMove") post({ type: "bestMove", moves: r.moves });
+    if (r.kind === "bestMove") {
+      // 좌표 한 줄은 **착수 요청의 답일 때만** 대국에 올린다. 분석의 조각도
+      // 끝날 때마다 좌표를 찍는데(YXNBEST), 그걸 올리면 마침 엔진 차례인 대국이
+      // 분석 조각의 수를 엔진의 착수로 받아 둔다.
+      sliceMoves = r.moves;
+      if (forwardMoves) post({ type: "bestMove", moves: r.moves });
+    }
     else if (r.kind === "forbid") post({ type: "forbid", cells: r.cells });
     else if (r.kind === "openingMove" || r.kind === "openingSwap" || r.kind === "soosorvFifth") {
       post({ type: "opening", response: r });
@@ -268,32 +279,39 @@ async function search(msg: Extract<ToWorker, { type: "search" }>) {
   searching = true;
   stopRequested = false;
   agg.reset();
+  sliceMoves = null;
   const t0 = performance.now();
 
-  // 국면은 **한 번만** 세운다. 데스크톱도 분석마다 `yxboard` 를 한 번 보내고
-  // START 는 세션 내내 보내지 않는다 — START 는 엔진을 리셋한다
-  // (EngineRepositoryImpl.analyze 의 주석이 그 이유를 적어 두었다).
-  sendAll(msg.setup);
+  // **대국 예산을 물려받지 않는다.** 앞선 시간제 대국이 `timeout_match` 를 걸어
+  // 두었다면 Rapfi 는 탐색마다 쓴 시간을 `time_left` 에서 빼는데(gomocup.cpp:134),
+  // 조각마다 그러면 금세 0 이 되어 `OptiTime 0ms | MaxTime 0ms` · `Depth 0-0` 이
+  // 된다 — 사용자가 분석에서 본 그대로다. 무제한으로 되돌리고 조각이 시간을 정한다.
+  sendCommand(["INFO timeout_match 0"]);
 
   // sliceMs = 0 은 「분할하지 않는다」 — 멀티스레드 변형이 살아난 뒤의 설정이다.
   if (sliceMs <= 0) {
+    sendAll(msg.setup);
     sendAll(msg.repeat);
-    searching = false;
-    maybeEmitSnapshot(true);
-    post({ type: "searchDone", reason: "finished", elapsedMs: Math.round(performance.now() - t0) });
+    finishSearch(msg, "finished", t0);
     return;
   }
 
   let reason: "finished" | "stopped" | "timeout" = "timeout";
-  while (!stopRequested) {
+  // 착수는 최소 한 조각은 돈다 — 한 조각도 없으면 둘 수가 없다.
+  let first = true;
+  while (first || !stopRequested) {
+    first = false;
     const left = msg.totalMs - (performance.now() - t0);
     // 자투리 조각은 보내지 않는다. `Math.ceil(left)` 가 몇 ms 이면 엔진의 예산이
-    // `timeout_turn − 30ms(예약)` ≤ 0 이 되어 Depth 0 탐색을 한 번 더 할 뿐이고,
-    // 그 값이 엔진에 **남는다** — 다음 명령이 새 값을 세우지 못하면 착수가 그걸로 돈다.
+    // `timeout_turn − 30ms(예약)` ≤ 0 이 되어 Depth 0 탐색을 한 번 더 할 뿐이다.
     if (left < MIN_SLICE_MS) break;
     // 조각 하나: 이만큼만 생각하고 돌아온다. 해시 테이블이 남아 있으므로 다음
     // 조각은 이어서 깊어진다 — 매번 처음부터 다시 세는 것이 아니다.
-    sendCommand([`INFO timeout_turn ${Math.min(sliceMs, Math.ceil(left))}`]);
+    sendCommand([`INFO timeout_turn ${Math.round(Math.min(sliceMs, left))}`]);
+    // **국면도 조각마다 다시 세운다** — YXNBEST 가 끝에 최선수를 엔진 판에 두므로,
+    // 안 그러면 조각마다 한 수씩 앞선 국면을 분석한다(메시지 타입의 주석 참고).
+    agg.beginSlice();
+    sendAll(msg.setup);
     sendAll(msg.repeat);
     maybeEmitSnapshot(true);
     await yieldToLoop(); // ← 정지 요청이 들어올 수 있는 유일한 지점
@@ -303,10 +321,20 @@ async function search(msg: Extract<ToWorker, { type: "search" }>) {
   // 조각 사이에는 엔진이 놀고 있으므로 여기서 YXSTOP 은 무해하다.
   // 앱도 분석 흐름을 닫을 때 같은 것을 보낸다(awaitClose).
   sendAll([{ kind: "stop" }]);
+  finishSearch(msg, reason, t0);
+}
 
+function finishSearch(
+  msg: Extract<ToWorker, { type: "search" }>,
+  reason: "finished" | "stopped" | "timeout",
+  t0: number,
+) {
   searching = false;
   maybeEmitSnapshot(true);
   flushConsole();
+  // 무제한 대국의 한 수: 마지막 조각이 고른 수가 착수다. 분석의 조각별 좌표는
+  // 어디에도 올리지 않는다 — 올리면 대국이 그것을 엔진의 수로 받아 둔다.
+  if (msg.mode === "move" && sliceMoves) post({ type: "bestMove", moves: sliceMoves });
   post({ type: "searchDone", reason, elapsedMs: Math.round(performance.now() - t0) });
 }
 
@@ -365,7 +393,12 @@ async function handle(msg: ToWorker): Promise<void> {
         if (msg.matchLeftMs !== undefined) {
           sendCommand([`INFO time_left ${Math.max(0, Math.round(msg.matchLeftMs))}`]);
         }
-        sendAll(msg.commands);
+        forwardMoves = true;
+        try {
+          sendAll(msg.commands);
+        } finally {
+          forwardMoves = false;
+        }
         searching = false;
         maybeEmitSnapshot(true);
         flushConsole();

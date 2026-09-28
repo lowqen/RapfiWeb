@@ -149,6 +149,62 @@ async function waitStones(n: number, timeoutMs = 60_000, why = "") {
   throw new Error(`돌 ${n}개를 기다렸으나 ${await stoneCount()}개 ${why}`);
 }
 
+/**
+ * 엔진의 답을 받는다. **무제한 대국에서 엔진은 「지금 두기」까지 생각한다**
+ * (데스크톱·앱의 기본 레벨과 같다) — 조금 읽게 두었다가 눌러서 두게 한다.
+ * 시간제 대국이면 버튼이 없고, 엔진이 제 예산 안에서 스스로 둔다.
+ */
+async function engineReply(n: number, why: string, thinkMs = 2_000) {
+  await page.waitForTimeout(thinkMs);
+  const now = page.getByRole("button", { name: "지금 두기", exact: true });
+  if (await now.count()) await now.click();
+  await waitStones(n, 90_000, why);
+}
+
+/**
+ * 분석 한 번이 건강했는가 — 사용자 보고(분석 중 `MaxTime 0ms` · 좌표가 줄줄이
+ * 튀어나옴)를 그대로 검사로 옮긴 것.
+ *
+ * - 조각마다 국면을 다시 세웠는가(YXBOARD ≥ YXNBEST). YXNBEST 는 끝에 최선수를
+ *   엔진 판에 **실제로 두므로**, 안 그러면 조각마다 한 수씩 앞선 국면을 읽는다.
+ * - 어느 조각도 0ms 로 돌지 않았는가. 앞선 시간제 대국의 대국 예산이 남아
+ *   있으면 조각마다 `time_left` 가 깎여 금세 0 이 된다.
+ * - 분석이 대국 판에 돌을 두지 않았는가.
+ */
+async function analysisHealthy(label: string) {
+  const before = await stoneCount();
+  await click("분석");
+  await page.locator('.panel__badge[data-status="searching"]').waitFor({ timeout: 10_000 });
+  await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 30_000 });
+  await page.waitForTimeout(300);
+  const lines = (await page.evaluate(`window.__rapfiConsole()`)) as string[];
+  // 가장 최근 분석: 마지막 `YXNBEST 5` 에서 거슬러 올라가 분석 머리
+  // (`timeout_match 0`)까지. 대국의 무제한 착수는 YXNBEST 1 이라 섞이지 않는다.
+  let end = -1;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (lines[i] === "> YXNBEST 5") {
+      end = i;
+      break;
+    }
+  }
+  let start = end;
+  while (start > 0 && lines[start] !== "> INFO timeout_match 0") start--;
+  const win = lines.slice(start, end + 400);
+  const slices = win.filter((l) => l === "> YXNBEST 5").length;
+  const boards = win.filter((l) => l.startsWith("> YXBOARD")).length;
+  const TIME = /MaxTime ([\d.]+)(ms|s|min|h)/;
+  const zero = win.filter((l) => {
+    const m = TIME.exec(l);
+    return m !== null && m[2] === "ms" && Number(m[1]) < 50;
+  });
+  const after = await stoneCount();
+  if (end < 0) fail(`${label}: 분석 명령을 찾지 못했습니다`);
+  else if (boards < slices) fail(`${label}: 조각 ${slices}개에 국면은 ${boards}번 — 국면이 흘렀습니다`);
+  else if (zero.length) fail(`${label}: ${zero.length}개 조각이 0ms 로 돌았습니다 — ${zero[0]}`);
+  else if (after !== before) fail(`${label}: 분석이 판에 돌을 두었습니다 (${before}→${after})`);
+  else ok(`${label}: 조각 ${slices}개 · 조각마다 국면 재설정 · 0ms 조각 없음 · 판 그대로`);
+}
+
 /** 지금 떠 있는 물음의 종류. 없으면 null. */
 async function prompt(): Promise<string | null> {
   const el = page.locator(".ask[data-prompt]");
@@ -271,10 +327,11 @@ try {
   // 사람 돌부터 따로 본다 — 「클릭이 빗나갔다」와 「엔진이 답하지 않았다」는
   // 다른 고장인데, 한 번에 2를 기다리면 둘이 같은 메시지로 뭉개진다.
   await waitStones(1, 5_000, "(사람이 놓은 첫 수)");
-  await waitStones(2, 60_000, "(사람 1수 뒤 엔진의 답)");
+  await engineReply(2, "(사람 1수 뒤 엔진의 답)");
   ok("사람 → 엔진 → 사람으로 차례가 돌았다");
   await page.waitForTimeout(300); // 콘솔은 100ms 배치로 온다
   await thought("무제한 첫 수");
+  await analysisHealthy("대국 중 분석");
 
   const turn = (await page.locator("dd[data-k=turn]").innerText()).trim();
   if (turn !== "흑") fail(`두 수 뒤 차례가 흑이 아닙니다: ${turn}`);
@@ -284,7 +341,7 @@ try {
   // **구석에 둔다.** 가운데 근처를 고르면 엔진이 방금 둔 자리와 부딪혀
   // 「무시」로 떨어지고, 시험은 그것을 회귀로 읽는다(실제로 한 번 겪었다).
   await tap(1, 1);
-  await waitStones(4, 60_000, "(둘째 왕복)");
+  await engineReply(4, "(둘째 왕복)");
   ok("두 번째 왕복도 정상");
   await page.waitForTimeout(300);
   await thought("무제한 둘째 수");
@@ -296,7 +353,7 @@ try {
   await page.locator('.panel__badge[data-status="searching"]').waitFor({ timeout: 10_000 });
   await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 30_000 });
   await tap(1, 13);
-  await waitStones(6, 60_000, "(분석 뒤 왕복)");
+  await engineReply(6, "(분석 뒤 왕복)");
   await page.waitForTimeout(300);
   await thought("분석 뒤 착수");
 
@@ -305,16 +362,33 @@ try {
   await click("분석");
   await page.locator('.panel__badge[data-status="searching"]').waitFor({ timeout: 10_000 });
   await tap(13, 1);
-  await waitStones(8, 60_000, "(분석 도중 왕복)");
+  await engineReply(8, "(분석 도중 왕복)");
   await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 30_000 });
   await page.waitForTimeout(300);
   await thought("분석 도중 착수");
 
   // 그리고 그 다음 수도 — 명령 흐름이 한 칸 밀렸다면 **다음** 수부터 망가진다.
   await tap(13, 13);
-  await waitStones(10, 60_000, "(분석 도중 다음 왕복)");
+  await engineReply(10, "(분석 도중 다음 왕복)");
   await page.waitForTimeout(300);
   await thought("그 다음 착수");
+
+  // 사용자 보고: 무제한인데 대국이 중간에 끊긴다 — 감시견이 15초(예산 5초 + 10초)
+  // 뒤에 기다림을 풀어 버렸다. 무제한에서 엔진은 「지금 두기」까지 생각해야 한다.
+  // 옛 한도를 넉넉히 넘겨 20초를 기다린다.
+  await tap(0, 7);
+  await waitStones(11, 5_000, "(무제한 대기 전 사람 수)");
+  await page.waitForTimeout(20_000);
+  const nowBtn = page.getByRole("button", { name: "지금 두기", exact: true });
+  const cut = await prompt();
+  if (cut === "info") fail("무제한인데 감시견이 대국을 끊었습니다");
+  else if ((await nowBtn.count()) === 0) fail("20초 뒤 엔진이 생각을 멈췄습니다 (「지금 두기」 없음)");
+  else if ((await stoneCount()) !== 11) fail(`엔진이 저절로 두었습니다 (돌 ${await stoneCount()}개)`);
+  else ok("무제한: 20초가 지나도 끊기지 않고 계속 읽는다");
+  await nowBtn.click();
+  await waitStones(12, 10_000, "(「지금 두기」 뒤 엔진의 수)");
+  await page.waitForTimeout(300);
+  await thought("「지금 두기」로 둔 수");
 
   // ── 2. 시계 ───────────────────────────────────────────────────────
   console.log("\n2. 시계 — 줄어드는가");
@@ -341,6 +415,10 @@ try {
   await waitStones(2, 60_000, "(5분 제한에서 엔진의 답)");
   await page.waitForTimeout(300);
   await thought("5분 제한 첫 수");
+
+  // 사용자 보고의 자리: 시간제 대국을 둔 **뒤에** 분석. 대국 예산이 엔진에
+  // 남아 있으면 조각마다 time_left 가 깎여 0ms 조각이 된다.
+  await analysisHealthy("시간제 대국 뒤 분석");
 
   // ── 3. 다크 모드에서 시계 가독성 ──────────────────────────────────
   console.log("\n3. 다크 모드 — 시계가 읽히는가");
@@ -404,7 +482,7 @@ try {
   if (rifOpened !== 3) fail(`개시 세 수가 놓이지 않았습니다: ${rifOpened}개`);
   else ok("개시 세 수를 손으로 놓았다");
   // 세 수가 차면 백 차례 — 엔진이 받는다.
-  await waitStones(4, 90_000, "(RIF 개시 뒤 엔진의 4수)");
+  await engineReply(4, "(RIF 개시 뒤 엔진의 4수)");
   ok("세 수 뒤 엔진이 이어받았다");
 
   // ── 6. 첫 수 이후 교환 ────────────────────────────────────────────
@@ -421,11 +499,11 @@ try {
     await click("확인");
     // 이제 우리가 백이다 — 한 수 두면 엔진(흑)이 답한다.
     await tap(5, 5);
-    await waitStones(3, 90_000, "(교환 뒤 엔진의 3수)");
+    await engineReply(3, "(교환 뒤 엔진의 3수)");
     ok("색이 넘어간 뒤에도 차례가 돈다");
   } else {
     // 교환하지 않았으면 엔진이 백으로 그대로 이어 둔다.
-    await waitStones(2, 90_000, "(교환 없이 엔진의 2수)");
+    await engineReply(2, "(교환 없이 엔진의 2수)");
     ok("교환 없이 엔진이 이어 뒀다");
   }
 

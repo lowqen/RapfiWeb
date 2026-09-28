@@ -339,10 +339,29 @@ describe("착수 예산", () => {
   // 즉시 두었다. 착수 요청은 **시간 설정 전체**를 스스로 들고 가야 한다 — 앞선
   // 명령(분석 조각 등)이 남긴 값이 새어 들 틈을 두지 않는다.
 
-  it("무제한이면 한 수 5초, 대국 예산 0(무제한)을 보낸다", () => {
+  it("무제한이면 시간 한도 없이 보낸다 — 「지금 두기」까지 읽는다", () => {
+    // 데스크톱·앱의 기본 레벨(level 0)과 같다. 예전엔 5초를 줬다.
     fresh({ computerSide: "white" });
     g().tap(move(7, 7));
-    expect(plays[0]!.budget).toEqual({ turnMs: 5_000, matchMs: 0 });
+    expect(plays[0]!.budget).toEqual({ turnMs: Infinity });
+  });
+
+  it("「지금 두기」는 생각 중일 때 엔진을 멈춰 착수시킨다", () => {
+    let stops = 0;
+    fresh({ computerSide: "white" });
+    useEngineStore.setState({ stop: () => void stops++ });
+    g().moveNow(); // 생각 중이 아니면 아무 일도 없다
+    expect(stops).toBe(0);
+    g().tap(move(7, 7));
+    g().moveNow();
+    expect(stops).toBe(1);
+  });
+
+  it("무제한에서 생각 중에 누르면 「지금 두기」를 알려 준다", () => {
+    fresh({ computerSide: "white" });
+    g().tap(move(7, 7));
+    const r = g().tap(move(3, 3));
+    expect(r.kind === "rejected" && r.reason.includes("지금 두기")).toBe(true);
   });
 
   it("시간 제한이 있으면 차례 한도 · 대국 한도 · 남은 대국 시간을 함께 보낸다", () => {

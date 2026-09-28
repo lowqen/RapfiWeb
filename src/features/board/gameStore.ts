@@ -100,6 +100,11 @@ interface GameState {
   offerDraw: () => void;
   dismissPrompt: () => void;
   answerSwap: (yes: boolean) => void;
+  /**
+   * 「지금 두기」 — 생각 중인 엔진에게 지금까지의 최선수를 두게 한다. 무제한
+   * 대국에서 엔진의 한 수를 끝내는 유일한 방법이다(데스크톱의 정지와 같다).
+   */
+  moveNow: () => void;
 
   /** 시계 틱. 화면이 250ms 마다 부른다. */
   advanceClock: (deltaMs: number) => void;
@@ -243,16 +248,24 @@ export const useGameStore = create<GameState>((set, get) => {
     if (s.result) return;
     const moves = board().render.stones;
     const clock = startClock(s.clock, "computer");
-    const turnMs = clock.limited ? Math.max(500, leftTurnMs(clock, "computer")) : DEFAULT_TURN_MS;
     set({ thinking: true, clock });
-    engine().play(
-      board().placements(),
-      moves.length === 0,
-      clock.limited
-        ? { turnMs, matchMs: clock.matchLimitMs, matchLeftMs: engineTimeLeftMs(clock) }
-        : { turnMs, matchMs: 0 },
-    );
-    armWatchdog(turnMs);
+    if (!clock.limited) {
+      // **무제한: 엔진은 「지금 두기」까지 생각한다.** 데스크톱·앱의 기본 레벨
+      // (level 0 — 시간·노드 무제한, 사용자가 멈추면 둔다)과 같다. 예전엔 여기서
+      // 5초를 줬고 「앱의 기본값」이라고 적었는데, 틀린 말이었다.
+      // 감시견도 걸지 않는다 — 끝을 정하는 것은 사용자다.
+      void engine().play(board().placements(), moves.length === 0, { turnMs: Infinity });
+      return;
+    }
+    const turnMs = Math.max(500, leftTurnMs(clock, "computer"));
+    const budget = { turnMs, matchMs: clock.matchLimitMs, matchLeftMs: engineTimeLeftMs(clock) };
+    // 감시견은 **엔진이 준비된 뒤에** 건다. 첫 수에는 엔진 기동(20MB 가중치
+    // 내려받기)이 끼는데, 느린 회선에서 그 시간까지 세면 멀쩡한 대국을 끊는다.
+    void engine()
+      .play(board().placements(), moves.length === 0, budget)
+      .then(() => {
+        if (get().thinking) armWatchdog(turnMs);
+      });
   };
 
   /** 엔진이 답해 차례가 사람에게 돌아왔다. */
@@ -351,7 +364,12 @@ export const useGameStore = create<GameState>((set, get) => {
       const size = board().render.size;
       if (!inBoard(cell, size)) return { kind: "ignored" };
       // 데스크톱은 탐색 중과 종국 뒤의 클릭을 삼킨다(main.c:2663 / 2676).
-      if (s.thinking) return { kind: "rejected", reason: "엔진이 생각 중입니다" };
+      if (s.thinking) {
+        const reason = s.clock.limited
+          ? "엔진이 생각 중입니다"
+          : "엔진이 생각 중입니다 — 「지금 두기」를 누르면 둡니다";
+        return { kind: "rejected", reason };
+      }
       if (s.result) {
         return {
           kind: "rejected",
@@ -404,7 +422,7 @@ export const useGameStore = create<GameState>((set, get) => {
       // 엔진에 `TAKEBACK` 을 보내지 않는다 — 다음 요청이 `BOARD`/`YXBOARD` 로
       // 국면을 통째로 다시 세우므로, 엔진의 판은 그때 맞춰진다.
       disarmWatchdog();
-      if (get().thinking) send({ kind: "stop" });
+      if (get().thinking) engine().stop();
       board().undo();
       set((s) => ({ thinking: false, prompt: null, clock: stopClock(s.clock) }));
       judge();
@@ -438,6 +456,11 @@ export const useGameStore = create<GameState>((set, get) => {
         clock: stopClock(s.clock),
       });
       log("무승부를 제안했습니다 (yxdraw)");
+    },
+
+    moveNow: () => {
+      // 워커가 다음 조각 경계(≤ 500ms)에서 멈추고 마지막 조각의 최선수를 올린다.
+      if (get().thinking) engine().stop();
     },
 
     dismissPrompt: () => {

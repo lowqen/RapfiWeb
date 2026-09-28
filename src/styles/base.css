@@ -446,6 +446,20 @@ a {
   color: var(--c-outline);
   cursor: default;
 }
+/* 지금 해야 할 한 가지 — 「지금 두기」. 다른 버튼과 구별돼야 눈에 먼저 들어온다. */
+.panel__actions .button--primary {
+  color: var(--c-on-primary);
+  background: var(--c-primary);
+  border-color: var(--c-primary);
+}
+.panel__actions .button--primary:hover {
+  filter: brightness(1.08);
+  background: var(--c-primary);
+}
+.panel__hint--inline {
+  align-self: center;
+  margin-top: 0;
+}
 .panel__hint {
   margin-top: var(--space-l);
   font: var(--type-body-small);

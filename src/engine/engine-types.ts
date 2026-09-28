@@ -209,16 +209,25 @@ export type ToWorker =
   | { type: "boot"; engineBaseUrl: string; variant: string; sliceMs: number; size: number }
   | { type: "send"; commands: readonly EngineCommand[] }
   /**
-   * 시간 분할 탐색. 조각 사이에 워커의 이벤트 루프가 돌아온다.
+   * 시간 분할 탐색. 조각 사이에 워커의 이벤트 루프가 돌아온다 — 그 틈에만
+   * 정지가 닿는다(단일 스레드 빌드는 탐색 도중에 입력을 읽지 못한다).
    *
-   * `setup` 은 **한 번만** 보낸다(국면 세우기). `repeat` 은 조각마다 다시 보낸다
-   * (탐색 시작). 데스크톱의 흐름이 그렇다: `yxboard` 로 국면을 세우고 `yxnbest` 가
-   * 탐색을 연다. 조각마다 국면을 다시 세우면 증분 상태를 매번 버리게 된다.
+   * `setup`(국면 세우기)과 `repeat`(탐색 시작)을 **조각마다 둘 다** 보낸다.
+   * 예전엔 setup 을 한 번만 보냈는데, `YXNBEST` 는 탐색이 끝나면 최선수를 엔진
+   * 자신의 판에 **실제로 둔다**(`sendActionAndUpdateBoard`). 그래서 조각마다 한
+   * 수씩 앞선 국면을 분석해 PV 가 엉뚱한 곳으로 흘렀다. 해시 테이블은 YXBOARD 로
+   * 지워지지 않으므로 다시 세워도 깊이는 이어진다.
+   *
+   * `mode: "move"` 는 **무제한 대국의 한 수**다. 정지(= 「지금 두기」)가 올 때까지
+   * 조각을 돌고, 마지막 조각의 최선수를 착수로 올린다. 데스크톱·앱의 기본 레벨
+   * (level 0: 시간·노드 무제한, 사용자가 멈추면 둔다)과 같은 동작이다.
    */
   | {
       type: "search";
+      mode: "analyze" | "move";
       setup: readonly EngineCommand[];
       repeat: readonly EngineCommand[];
+      /** 전체 예산. `Infinity` 면 정지가 올 때까지. */
       totalMs: number;
     }
   /**

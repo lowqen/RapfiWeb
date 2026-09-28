@@ -228,7 +228,8 @@ export class EngineClient {
     this.setStatus("searching");
     this.post({
       type: "search",
-      // 국면은 한 번, 탐색은 조각마다.
+      mode: "analyze",
+      // 국면과 탐색을 조각마다 — YXNBEST 가 끝에 엔진 판에 수를 두기 때문이다.
       setup: [{ kind: "yxboard", stones }],
       repeat: [{ kind: "yxnbest", n: opts.nbest ?? 5 }],
       totalMs: opts.totalMs ?? 5000,
@@ -238,9 +239,13 @@ export class EngineClient {
   /**
    * 대국의 한 수를 둔다 — 분석이 아니라 **착수**다.
    *
-   * 빈 판이면 `BEGIN`, 아니면 `BOARD …/DONE` 이다. gomocup 에서는 둘 다 그 자체로
-   * 「두어라」라는 뜻이고 엔진이 좌표 한 줄로 답한다. 조각으로 나누지 않는 이유는
-   * 워커 주석에 있다 — 한 수는 시계가 정하는 유한한 일이다.
+   * **시간 제한이 있으면** 빈 판은 `BEGIN`, 아니면 `BOARD …/DONE` 을 한 번에
+   * 보낸다 — 엔진이 대국 예산 안에서 스스로 멈추고 좌표 한 줄로 답한다.
+   *
+   * **무제한이면**(`turnMs` 가 없거나 `Infinity`) 조각으로 나눠 **정지가 올 때까지**
+   * 생각하고, 정지(「지금 두기」)가 오면 마지막 조각의 최선수를 둔다. 데스크톱·앱의
+   * 기본 레벨(level 0)과 같은 동작이다. 조각으로 나누는 이유는 단일 스레드 빌드가
+   * 탐색 도중에는 정지를 받을 수 없어서다.
    */
   play(
     stones: readonly Placement[],
@@ -248,10 +253,21 @@ export class EngineClient {
     opts: { turnMs?: number; matchMs?: number; matchLeftMs?: number } = {},
   ): void {
     this.setStatus("searching");
+    const turnMs = opts.turnMs ?? Infinity;
+    if (!Number.isFinite(turnMs)) {
+      this.post({
+        type: "search",
+        mode: "move",
+        setup: [{ kind: "yxboard", stones }],
+        repeat: [{ kind: "yxnbest", n: 1 }],
+        totalMs: Infinity,
+      });
+      return;
+    }
     const msg: Extract<ToWorker, { type: "move" }> = {
       type: "move",
       commands: emptyBoard ? [{ kind: "begin" }] : [{ kind: "board", stones }],
-      turnMs: opts.turnMs ?? 5000,
+      turnMs,
       matchMs: opts.matchMs ?? 0,
     };
     // exactOptionalPropertyTypes: 값이 없으면 키 자체가 없어야 한다.

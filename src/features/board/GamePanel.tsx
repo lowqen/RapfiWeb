@@ -94,6 +94,18 @@ export function GamePanel() {
         ))}
       </ChipGroup>
 
+      {/* 무제한: 엔진은 여기를 누를 때까지 생각한다(데스크톱·앱의 기본 레벨과 같다). */}
+      {g.thinking && !g.clock.limited && (
+        <div className="panel__actions">
+          <button type="button" className="button--primary" onClick={g.moveNow}>
+            지금 두기
+          </button>
+          <span className="panel__hint panel__hint--inline">
+            무제한 — 누를 때까지 엔진이 계속 읽습니다
+          </span>
+        </div>
+      )}
+
       <div className="panel__actions">
         <button type="button" onClick={g.newGame}>
           새 대국

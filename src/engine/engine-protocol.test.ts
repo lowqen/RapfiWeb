@@ -447,3 +447,71 @@ describe("협상 응답 해석", () => {
     expect(p("MESSAGE SWAP2 MOVE1")).toMatchObject({ kind: "message" });
   });
 });
+
+describe("집계 — 조각을 넘어도 화면이 덜컥거리지 않는다", () => {
+  const feed = (agg: SearchAggregator, lines: string[]) => {
+    for (const l of lines) agg.consume(parse(l, coord));
+  };
+  const pv = (depth: number, line: string, ev: number) => [
+    "INFO PV 0",
+    `INFO DEPTH ${depth}`,
+    `INFO EVAL ${ev}`,
+    `INFO BESTLINE ${line}`,
+    "INFO PV DONE",
+  ];
+
+  it("새 조각의 얕은 결과는 앞 조각의 깊이를 따라잡을 때까지 보류한다", () => {
+    // 분석은 500ms 조각으로 돌고, 조각마다 엔진은 반복 심화를 처음부터 연다.
+    // 그 머리의 얕은 PV 가 화면을 덮으면 조각마다 최선수·평가가 튄다.
+    const agg = new SearchAggregator(15);
+    feed(agg, pv(12, "7,7 8,8", 300));
+    expect(agg.snapshot().stats.depth).toBe(12);
+
+    agg.beginSlice();
+    feed(agg, pv(3, "1,1 2,2", -900)); // 얕은 머리 — 무시돼야 한다
+    const mid = agg.snapshot();
+    expect(mid.stats.depth).toBe(12);
+    expect(mid.stats.evalCp).toBe(300);
+    expect(mid.bestLine[0]).toEqual({ x: 7, y: 7 });
+
+    feed(agg, pv(13, "7,8 8,8", 320)); // 따라잡았다 — 다시 화면을 맡긴다
+    const after = agg.snapshot();
+    expect(after.stats.depth).toBe(13);
+    expect(after.bestLine[0]).toEqual({ x: 8, y: 7 });
+  });
+
+  it("얕은 머리의 REFRESH 가 후보를 지우지 않는다", () => {
+    const agg = new SearchAggregator(15);
+    feed(agg, [...pv(10, "7,7", 100), "MESSAGE REALTIME POS 5,5"]);
+    expect(agg.snapshot().candidates.size).toBe(1);
+    agg.beginSlice();
+    feed(agg, ["INFO DEPTH 2", "MESSAGE REALTIME REFRESH"]);
+    expect(agg.snapshot().candidates.size).toBe(1);
+  });
+
+  it("새 세션(reset)은 바닥도 비운다", () => {
+    const agg = new SearchAggregator(15);
+    feed(agg, pv(20, "7,7", 100));
+    agg.reset();
+    agg.beginSlice();
+    feed(agg, pv(2, "3,3", 50));
+    expect(agg.snapshot().stats.depth).toBe(2);
+  });
+});
+
+describe("집계 — 얕은 조각이 여럿 이어져도", () => {
+  it("앞 조각의 깊은 PV 를 지우지 않는다", () => {
+    const agg = new SearchAggregator(15);
+    const block = (d: number, line: string) => [
+      "INFO PV 0",
+      `INFO DEPTH ${d}`,
+      `INFO BESTLINE ${line}`,
+      "INFO PV DONE",
+    ];
+    for (const l of block(14, "7,7")) agg.consume(parse(l, coord));
+    agg.beginSlice();
+    for (const d of [2, 3, 4, 5]) for (const l of block(d, "0,0")) agg.consume(parse(l, coord));
+    expect(agg.snapshot().pvs).toHaveLength(1);
+    expect(agg.snapshot().pvs[0]!.depth).toBe(14);
+  });
+});

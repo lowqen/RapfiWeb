@@ -43,6 +43,15 @@ export class SearchAggregator {
   private realtimeLine: readonly Move[] = [];
   private stats: SearchStats = EMPTY_STATS;
 
+  /**
+   * 조각을 넘나드는 깊이 바닥. 분석은 500ms 조각으로 도는데, 조각마다 엔진이
+   * 반복 심화를 처음(깊이 2 안팎)부터 다시 연다 — 해시 덕에 금세 따라잡지만,
+   * 그 사이에 얕은 PV·평가·후보가 화면을 덮으면 조각마다 보드가 **덜컥거린다**.
+   * 한 세션 안에서는 이미 끝낸 깊이보다 얕은 결과를 따라잡을 때까지 보류한다.
+   */
+  private floor = 0;
+  private shallow = false;
+
   private readonly pvs = new Map<number, PvSnapshot>();
   private readonly tags = new Map<number, CellTag>();
   private readonly candidates = new Map<number, "live" | "done">();
@@ -61,6 +70,13 @@ export class SearchAggregator {
     this.stats = EMPTY_STATS;
     this.round = 0;
     this.sawInfoPv = false;
+    this.floor = 0;
+    this.shallow = false;
+  }
+
+  /** 새 조각을 연다. 이미 끝낸 깊이까지 다시 올라올 동안은 화면을 건드리지 않는다. */
+  beginSlice(): void {
+    this.shallow = this.floor > 0;
   }
 
   /** 응답 하나를 먹인다. 화면에 보일 것이 바뀌었으면 `true`. */
@@ -68,7 +84,9 @@ export class SearchAggregator {
     switch (r.kind) {
       case "infoPvStart":
         this.sawInfoPv = true;
-        if (r.index === 0) {
+        // 얕은 조각 머리에서는 라운드를 넘기지 않는다 — 넘기면 두 라운드 뒤에
+        // 앞 조각의 깊은 PV 가 「낡았다」며 지워진다(깊이는 이 뒤 DEPTH 줄에 온다).
+        if (r.index === 0 && !this.shallow) {
           this.round++;
           // 지지난 라운드가 남긴 것은 방금 끝난 라운드가 갱신하지 않았다는 뜻이다.
           for (const [k, pv] of this.pvs) if (pv.round < this.round - 1) this.pvs.delete(k);
@@ -95,17 +113,22 @@ export class SearchAggregator {
 
       case "infoDepth":
         this.curDepth = r.depth;
+        // 이 조각이 앞 조각이 끝낸 깊이까지 올라왔으면 다시 화면을 맡긴다.
+        if (this.shallow && r.depth >= this.floor) this.shallow = false;
+        if (this.shallow) return false;
         this.stats = { ...this.stats, depth: r.depth };
         return true;
 
       case "infoEval":
         this.curMate = r.mate;
         this.curEval = r.cp;
+        if (this.shallow) return false;
         this.stats = { ...this.stats, mate: r.mate, evalCp: r.cp };
         return true;
 
       case "infoWinRate":
         this.curWinRate = r.winRate;
+        if (this.shallow) return false;
         this.stats = { ...this.stats, winRatePct: pct(r.winRate) };
         return true;
 
@@ -114,6 +137,8 @@ export class SearchAggregator {
         return false;
 
       case "infoPvDone": {
+        if (this.shallow) return false;
+        this.floor = Math.max(this.floor, this.curDepth);
         this.pvs.set(this.curIndex, {
           index: this.curIndex,
           depth: this.curDepth,
@@ -142,6 +167,8 @@ export class SearchAggregator {
         return true;
 
       case "thinking": {
+        // 사람이 읽는 요약 줄도 같은 규칙 — 얕은 조각 머리의 줄은 넘긴다.
+        if (this.shallow || (r.depth !== null && r.depth < this.floor)) return false;
         this.stats = {
           ...this.stats,
           depth: r.depth ?? this.stats.depth,
@@ -167,6 +194,24 @@ export class SearchAggregator {
         return true;
       }
 
+      // 실시간 후보는 **지금 반복**의 것이라, 얕은 조각 머리에서는 화면을 흔들기만
+      // 한다(특히 REFRESH 가 후보를 싹 지운다). 따라잡을 때까지 넘긴다.
+      case "realtimeBest":
+      case "realtimePos":
+      case "realtimeDone":
+      case "realtimeLose":
+      case "realtimePv":
+      case "realtimeRefresh":
+        if (this.shallow) return false;
+        return this.realtime(r);
+
+      default:
+        return false;
+    }
+  }
+
+  private realtime(r: EngineResponse): boolean {
+    switch (r.kind) {
       case "realtimeBest":
         this.realtimeBest = r.move;
         return true;
