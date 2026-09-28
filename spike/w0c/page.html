@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>W0c — 스레드 실험</title>
+    <style>
+      body {
+        font: 14px/1.5 system-ui, sans-serif;
+        margin: 16px;
+        color: #222;
+        background: #fafafa;
+      }
+      pre {
+        padding: 8px;
+        overflow: auto;
+        background: #eee;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>W0c</h1>
+    <p id="status">준비 중…</p>
+    <pre id="out"></pre>
+    <script src="probe.js"></script>
+    <script>
+      /*
+       * ?mode=page        글루를 **이 페이지 메인 스레드**에서 띄운다
+       * ?mode=worker      전용 워커 안에서 importScripts — W0 가 실패한 구성 그대로
+       * ?mode=worker-url  같은 워커 + mainScriptUrlOrBlob 로 글루 주소 명시(가설)
+       * &variant=multi|single  &threads=1,2,4,8  &stop=1
+       *
+       * 결과는 window.__w0c 에 놓는다 — run.mjs 가 그걸 기다린다.
+       */
+      (async () => {
+        const q = new URLSearchParams(location.search);
+        const mode = q.get("mode") || "page";
+        const variant = q.get("variant") || "multi";
+        const threads = (q.get("threads") || "1,2,4,8").split(",").map(Number);
+        const stopTest = q.get("stop") === "1";
+        // 엔진은 이 페이지와 같은 접두사(/iso 또는 /plain) 아래 /engine/ 에 있다.
+        const prefix = location.pathname.split("/spike/")[0];
+        const baseUrl = `${location.origin}${prefix}/engine/`;
+        const glueUrl = `${baseUrl}rapfi-${variant}-simd128.js`;
+        const status = document.getElementById("status");
+        status.textContent = `${mode} · ${variant} · 실행 중`;
+
+        let result;
+        try {
+          if (mode === "page") {
+            await new Promise((resolve, reject) => {
+              const s = document.createElement("script");
+              s.src = glueUrl;
+              s.onload = resolve;
+              s.onerror = () => reject(new Error("글루를 읽지 못했습니다: " + glueUrl));
+              document.head.appendChild(s);
+            });
+            result = await runProbe({
+              factory: window.Rapfi,
+              baseUrl,
+              glueUrl,
+              useMainScriptUrl: false,
+              threads,
+              stopTest,
+            });
+          } else {
+            const w = new Worker("worker.js");
+            result = await new Promise((resolve) => {
+              w.onmessage = (ev) => resolve(ev.data);
+              w.onerror = (ev) =>
+                resolve({ ok: false, stage: "worker", error: ev.message || "워커 오류" });
+              w.postMessage({
+                glueUrl,
+                baseUrl,
+                useMainScriptUrl: mode === "worker-url",
+                threads,
+                stopTest,
+              });
+            });
+            w.terminate();
+          }
+        } catch (e) {
+          result = { ok: false, stage: "page", error: String((e && e.message) || e) };
+        }
+        result.mode = mode;
+        result.variant = variant;
+        status.textContent = `${mode} · ${variant} · ${result.ok ? "완료" : "실패: " + result.error}`;
+        document.getElementById("out").textContent = JSON.stringify(result, null, 2);
+        window.__w0c = result;
+      })();
+    </script>
+  </body>
+</html>
