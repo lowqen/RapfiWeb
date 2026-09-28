@@ -1,4 +1,5 @@
 import { useEngineStore } from "../../engine/engine-state";
+import { Section } from "./Section";
 
 /**
  * piskvork 콘솔 — 엔진이 뱉은 **원시 줄** 그대로.
@@ -9,6 +10,8 @@ import { useEngineStore } from "../../engine/engine-state";
  *
  * 워커가 100ms 배치로 올리고 상한은 5,000줄이다 — 탐색 중 초당 수백 줄이 와도
  * 메인 스레드가 그 리듬으로 리렌더하지 않는다.
+ *
+ * 옆 칸에서는 **접혀서** 시작한다. 늘 보는 것이 아니라 이상할 때 여는 창이다.
  */
 export function EngineConsole() {
   const lines = useEngineStore((s) => s.console);
@@ -16,14 +19,16 @@ export function EngineConsole() {
   if (lines.length === 0) return null;
 
   return (
-    <section className="panel">
-      <h2 className="panel__title">
-        콘솔
+    <Section
+      title="콘솔"
+      summary={<span className="tnum">{lines.length.toLocaleString()}줄</span>}
+      actions={
         <button type="button" className="panel__link" onClick={clearConsole}>
           지우기
         </button>
-      </h2>
+      }
+    >
       <pre className="console">{lines.slice(-40).join("\n")}</pre>
-    </section>
+    </Section>
   );
 }

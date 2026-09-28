@@ -25,7 +25,11 @@ h1,
 h2,
 h3,
 p,
-ul {
+ul,
+ol,
+dl,
+dd,
+pre {
   margin: 0;
 }
 ul {
@@ -44,6 +48,21 @@ button {
 a {
   color: inherit;
   text-decoration: none;
+}
+
+/* 키보드로 옮겨 다닐 때만 고리를 그린다 — 마우스·터치에는 그리지 않는다. */
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 2px;
+}
+
+/* Material 24px 아이콘. 색은 글자색을 따른다. */
+.icon {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
 }
 
 /* 변하는 숫자는 폭이 고정돼야 한다. 비례 글꼴의 1 은 0 보다 좁아서, 초당 몇 번씩
@@ -377,30 +396,46 @@ a {
   overflow: hidden;
 }
 .boardscreen {
+  /* 보드 밑 이동 바의 높이. 세로 화면에서 보드 높이를 셈할 때도 쓴다. */
+  --transport-h: 52px;
+
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(260px, 28vw, 340px);
+  grid-template-columns: minmax(0, 1fr) clamp(260px, 28vw, 360px);
   grid-template-rows: minmax(0, 1fr);
   gap: var(--space-xl);
   height: 100%;
   min-height: 0;
   container-type: size;
 }
+/* 왼쪽 칸 = 보드 + 이동 바. 이 칸에는 **다른 것을 넣지 않는다**(BoardScreen 주석). */
+.boardscreen__stage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s);
+  min-width: 0;
+  min-height: 0;
+}
 .boardscreen__board {
   position: relative;
+  flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
 }
 .boardscreen__side {
   display: flex;
   flex-direction: column;
-  gap: var(--space-l);
+  gap: var(--space-m);
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* 스크롤바가 카드 모서리에 붙지 않게. */
+  padding-right: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-outline-variant) transparent;
 }
-/* 세로로 긴 좁은 화면(휴대폰 세로·좁은 창): 보드 위, 옆 칸 아래.
-   보드는 너비를 다 쓰되 남은 높이의 60% 를 넘지 않는다. */
+/* 세로로 긴 좁은 화면(휴대폰 세로·좁은 창): 보드와 이동 바 위, 옆 칸 아래.
+   보드는 너비를 다 쓰되 (남은 높이의 60% − 이동 바)를 넘지 않는다. */
 @media (max-width: 1024px) and (orientation: portrait) {
   .boardscreen {
     grid-template-columns: minmax(0, 1fr);
@@ -408,16 +443,79 @@ a {
     gap: var(--space-l);
   }
   .boardscreen__board {
+    flex: none;
     width: 100%;
-    height: min(100cqw, 60cqh);
+    height: min(100cqw, calc(60cqh - var(--transport-h)));
   }
 }
 
+/* ── 이동 바 ────────────────────────────────────────────────────────
+   앱의 재생 바: 가운데 큰 원이 엔진, 양옆이 기보 이동. 아이콘만 두고 글자는
+   aria-label·title 이 진다 — 판 밑이 좁을수록 글자가 먼저 잘린다. */
+.transport {
+  display: flex;
+  flex: none;
+  gap: var(--space-l);
+  align-items: center;
+  justify-content: center;
+  height: var(--transport-h);
+}
+.transport__btn {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  color: var(--c-on-surface-variant);
+  border-radius: 50%;
+  transition:
+    background var(--motion-quick) ease-out,
+    color var(--motion-quick) ease-out;
+}
+.transport__btn:hover:not(:disabled) {
+  color: var(--c-on-surface);
+  background: var(--c-surface-container-high);
+}
+.transport__btn:disabled {
+  color: var(--c-outline-variant);
+  cursor: default;
+}
+.transport__btn--play {
+  width: 48px;
+  height: 48px;
+  color: var(--c-on-surface);
+  background: var(--c-surface-container-highest);
+}
+.transport__btn--play .icon {
+  width: 28px;
+  height: 28px;
+}
+.transport__btn--play:hover:not(:disabled) {
+  background: var(--c-surface-container-highest);
+  filter: brightness(1.12);
+}
+/* 도는 중은 색 + 아이콘(일시정지) 두 갈래로 말한다. */
+.transport__btn--play[data-running] {
+  color: var(--c-on-secondary-container);
+  background: var(--c-secondary-container);
+}
+.transport__btn--play:disabled {
+  color: var(--c-outline);
+  background: var(--c-surface-container);
+}
+@media (max-width: 640px) {
+  .transport {
+    gap: var(--space-s);
+  }
+}
+
+/* ── 옆 칸 카드 ─────────────────────────────────────────────────────
+   앱의 다크 카드처럼 테두리 없이 한 단 밝은 면으로 구획한다. 테두리를 두르면
+   카드가 여덟 장 쌓이는 옆 칸이 격자처럼 시끄러워진다. */
 .panel {
   padding: var(--space-l);
-  background: var(--c-surface-container-low);
-  border: 1px solid var(--c-outline-variant);
-  border-radius: var(--radius-m);
+  background: var(--c-surface-container);
+  border: 0;
+  border-radius: var(--radius-l);
 }
 .panel--muted {
   background: transparent;
@@ -425,7 +523,7 @@ a {
 }
 .panel__title {
   font: var(--type-title-small);
-  color: var(--c-on-surface-variant);
+  color: var(--c-on-surface);
 }
 .panel__actions {
   display: flex;
@@ -433,18 +531,42 @@ a {
   gap: var(--space-m);
   margin-top: var(--space-l);
 }
+/* 앱의 윤곽 버튼 — 둥근 사각, 한 줄 테두리. 비활성은 글자와 테두리를 함께 죽인다. */
 .panel__actions button {
-  padding: var(--space-s) var(--space-l);
+  display: inline-flex;
+  gap: var(--space-m);
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 var(--space-xl);
   font: var(--type-label-large);
-  border: 1px solid var(--c-outline-variant);
-  border-radius: var(--radius-s);
+  color: var(--c-on-surface);
+  border: 1px solid var(--c-outline);
+  border-radius: var(--radius-m);
+  transition: background var(--motion-quick) ease-out;
 }
 .panel__actions button:hover:not(:disabled) {
-  background: var(--c-surface-container-high);
+  background: var(--c-surface-container-highest);
 }
 .panel__actions button:disabled {
   color: var(--c-outline);
+  border-color: var(--c-outline-variant);
   cursor: default;
+}
+/* 이 카드에서 주로 누르는 한 가지(「분석」) — 앱의 선택 탭과 같은 초록 면. */
+.panel__actions .button--tonal {
+  color: var(--c-on-secondary-container);
+  background: var(--c-secondary-container);
+  border-color: var(--c-secondary-container);
+}
+.panel__actions .button--tonal:hover:not(:disabled) {
+  background: var(--c-secondary-container);
+  filter: brightness(1.1);
+}
+.panel__actions .button--tonal:disabled {
+  color: var(--c-outline);
+  background: transparent;
+  border-color: var(--c-outline-variant);
 }
 /* 지금 해야 할 한 가지 — 「지금 두기」. 다른 버튼과 구별돼야 눈에 먼저 들어온다. */
 .panel__actions .button--primary {
@@ -479,6 +601,143 @@ a {
 .kv dd {
   margin: 0;
   text-align: right;
+}
+.kv__aside {
+  color: var(--c-on-surface-variant);
+}
+
+/* ── 엔진 수치 타일 ─────────────────────────────────────────────────
+   앱의 「DEPTH 0 · EVAL — · WINRATE —」 줄을 옆 칸 폭에 맞게 3열 타일로.
+   라벨은 앱과 같은 영문 대문자라 양수 트래킹을 조금 준다(한글이 아니므로). */
+.kv.stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-s);
+  margin-top: var(--space-l);
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--space-m) var(--space-l);
+  background: var(--c-surface-container-high);
+  border-radius: var(--radius-s);
+}
+.stats .stat__key {
+  font: var(--type-label-small);
+  letter-spacing: 0.04em;
+  color: var(--c-on-surface-variant);
+}
+.stats .stat__value {
+  overflow: hidden;
+  font: var(--type-title-medium);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 최선수는 한 줄을 다 쓴다 — 이 카드에서 가장 먼저 읽힐 값이다. */
+.stat--wide {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.stats .stat--wide .stat__value {
+  font: var(--type-title-large);
+  color: var(--c-on-secondary-container);
+}
+
+/* ── 후보 수 스테퍼 ─────────────────────────────────────────────────
+   앱의 「후보 수 (멀티 PV)  −  1  +」. */
+.stepper {
+  display: flex;
+  gap: var(--space-s);
+  align-items: center;
+  margin-top: var(--space-l);
+  padding: var(--space-xs) 0;
+}
+.stepper__label {
+  flex: 1;
+  min-width: 0;
+  font: var(--type-body-medium);
+}
+.stepper__sub {
+  color: var(--c-on-surface-variant);
+}
+.stepper__btn {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  color: var(--c-on-surface);
+  border-radius: 50%;
+  transition: background var(--motion-quick) ease-out;
+}
+.stepper__btn:hover:not(:disabled) {
+  background: var(--c-surface-container-highest);
+}
+.stepper__btn:disabled {
+  color: var(--c-outline-variant);
+  cursor: default;
+}
+.stepper__value {
+  min-width: 2.5ch;
+  font: var(--type-title-medium);
+  text-align: center;
+}
+
+/* ── 접히는 카드 ────────────────────────────────────────────────────
+   앱의 「데이터베이스  저장된 값 없음  ⌄」 줄. 머리 줄 전체가 누를 자리다. */
+.panel.section {
+  padding: 0;
+}
+.section__head {
+  display: flex;
+  align-items: center;
+}
+.section__toggle {
+  display: flex;
+  flex: 1;
+  gap: var(--space-m);
+  align-items: center;
+  min-width: 0;
+  min-height: 52px;
+  padding: var(--space-m) var(--space-l);
+  text-align: left;
+  border-radius: var(--radius-l);
+}
+.section__toggle:hover {
+  background: var(--c-surface-container-high);
+}
+.section__title {
+  flex: none;
+  font: var(--type-title-small);
+}
+.section__summary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font: var(--type-label-medium);
+  color: var(--c-on-surface-variant);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.section__chevron {
+  color: var(--c-on-surface-variant);
+  transition: transform var(--motion-quick) ease-out;
+}
+.section[data-open] .section__chevron {
+  transform: rotate(180deg);
+}
+.section__head .panel__link {
+  flex: none;
+  margin: 0 var(--space-l) 0 0;
+}
+.section__body {
+  padding: 0 var(--space-l) var(--space-l);
+}
+.section__body > :first-child {
+  margin-top: 0;
 }
 
 /* ── 값 사다리 견본 ─────────────────────────────────────────────── */
@@ -672,7 +931,8 @@ a {
   color: var(--c-on-surface-variant);
 }
 .chip {
-  padding: var(--space-xs) var(--space-m);
+  min-height: 32px;
+  padding: var(--space-xs) var(--space-l);
   font: var(--type-label-medium);
   color: var(--c-on-surface-variant);
   background: transparent;

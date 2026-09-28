@@ -1,4 +1,5 @@
 import { DEFAULT_PALETTE, colorsForTag, inkContrast, ladderHex } from "../../core/board/ladder";
+import { Section } from "./Section";
 
 /**
  * 값 사다리 견본 — 눈으로 확인하는 자리.
@@ -11,9 +12,7 @@ const ANCHORS = [0, 25, 50, 75, 100];
 
 export function LadderStrip() {
   return (
-    <section className="panel">
-      <h2 className="panel__title">값 사다리</h2>
-
+    <Section title="값 사다리" summary="색 견본 · 대비비">
       <div className="ladder">
         {ANCHORS.map((pctPos) => {
           const hex = ladderHex(pctPos / 100);
@@ -56,7 +55,7 @@ export function LadderStrip() {
         명도가 순위를 지고 색상은 어느 편인지만 말합니다 — 흑백으로 인쇄해도 순서가 남습니다. 흰
         글씨는 사다리 전 구간에서 4.5:1 이상입니다.
       </p>
-    </section>
+    </Section>
   );
 }
 

@@ -8,6 +8,7 @@ import { ClockPanel } from "./ClockPanel";
 import { GamePanel } from "./GamePanel";
 import { OpeningPanel, PromptPanel } from "./OpeningPanel";
 import { EngineConsole } from "./EngineConsole";
+import { MoveTransport } from "./MoveTransport";
 import { useEngineStore } from "../../engine/engine-state";
 import { label, type Move } from "../../core/model/move";
 import { RULE_LABEL } from "../../core/model/rules";
@@ -18,10 +19,14 @@ import { RULE_LABEL } from "../../core/model/rules";
  * 탭이 이제 `boardStore.place` 가 아니라 **`gameStore.tap`** 으로 간다. 그래야
  * 금수·차례·협상 단계가 한 곳에서 판단된다 — 보드는 여전히 규칙을 모른다.
  * 「돌을 놓는다」와 「대국의 한 수를 둔다」는 다른 일이고, 그 차이가 이 한 줄이다.
+ *
+ * **배치.** 왼쪽 칸은 보드와 그 바로 밑의 이동 바(`MoveTransport`)뿐이다.
+ * 엔진 수치·후보 수·대국 도구·시계는 전부 오른쪽 칸(좁은 세로 화면에서는 아래)이
+ * 카드로 나눠 진다 — 앱의 보드 화면에서 재생 바 밑에 쌓이던 것들이다.
  */
 export function BoardScreen() {
   const render = useBoardStore((s) => s.render);
-  const undo = useGameStore((s) => s.undoMove);
+  const ahead = useBoardStore((s) => s.future.length);
   const toggleNumbers = useBoardStore((s) => s.toggleNumbers);
   const markBlocked = useBoardStore((s) => s.markBlocked);
   const applyAnalysis = useBoardStore((s) => s.applyAnalysis);
@@ -67,16 +72,23 @@ export function BoardScreen() {
 
   return (
     <div className="boardscreen">
-      <div className="boardscreen__board">
-        <BoardCanvas render={render} onTap={onTap} onLongPress={markBlocked} />
-        {notice && (
-          <p className="board-notice" role="status">
-            {notice}
-          </p>
-        )}
+      <div className="boardscreen__stage">
+        <div className="boardscreen__board">
+          <BoardCanvas render={render} onTap={onTap} onLongPress={markBlocked} />
+          {notice && (
+            <p className="board-notice" role="status">
+              {notice}
+            </p>
+          )}
+        </div>
+        <MoveTransport />
       </div>
 
-      <aside className="boardscreen__side">
+      <aside className="boardscreen__side" aria-label="분석과 도구">
+        {/* 물음은 맨 위 — 답하기 전까지 판이 잠기므로 가장 먼저 보여야 한다. */}
+        <PromptPanel />
+        <AnalysisPanel />
+
         <section className="panel">
           <h2 className="panel__title">국면</h2>
           <dl className="kv">
@@ -87,7 +99,10 @@ export function BoardScreen() {
               {turn}
             </dd>
             <dt>수</dt>
-            <dd className="tnum">{render.stones.length}</dd>
+            <dd className="tnum">
+              {render.stones.length}
+              {ahead > 0 && <span className="kv__aside"> / {render.stones.length + ahead}</span>}
+            </dd>
             <dt>마지막</dt>
             {/* 스모크가 순서가 아니라 이름으로 집게 한다 — kv 에 줄이 하나 늘 때마다
                 시험이 헛짚는 것을 W3 에서 한 번 겪었다. */}
@@ -96,28 +111,24 @@ export function BoardScreen() {
             </dd>
           </dl>
           <div className="panel__actions">
-            <button type="button" onClick={undo} disabled={render.stones.length === 0}>
-              무르기
-            </button>
-            {/* 「비우기」는 아래 대국 패널의 「새 대국」이 한다 — 판만 비우고
-                시계·협상은 그대로 두는 버튼은 조용히 어긋난 상태를 만든다. */}
-            <button type="button" onClick={toggleNumbers}>
+            {/* 무르기·앞으로는 보드 밑 이동 바가 진다. 「비우기」는 아래 대국 패널의
+                「새 대국」이 한다 — 판만 비우고 시계·협상은 그대로 두는 버튼은 조용히
+                어긋난 상태를 만든다. */}
+            <button type="button" onClick={toggleNumbers} aria-pressed={render.showNumbers}>
               번호 {render.showNumbers ? "끄기" : "켜기"}
             </button>
           </div>
           <p className="panel__hint">
             길게 누르면 그 점을 차단 표시합니다 — 데스크톱의 Ctrl+클릭 자리입니다. 휠이나 두
-            손가락으로 확대할 수 있습니다.
+            손가락으로 확대할 수 있고, ← → Home End 로 수를 옮깁니다.
           </p>
         </section>
 
-        <PromptPanel />
         <ClockPanel />
         <OpeningPanel />
         <GamePanel />
-        <AnalysisPanel />
-        <LadderStrip />
         <EngineConsole />
+        <LadderStrip />
       </aside>
     </div>
   );

@@ -28,6 +28,9 @@ import {
 /** 콘솔 링버퍼 상한. 앱과 같은 값(계획서 §3). */
 const CONSOLE_MAX = 5000;
 
+/** 후보 수 범위. 기본 5 는 W3 부터 분석이 보내 온 `YXNBEST 5` 그대로다. */
+export const MULTI_PV = { min: 1, max: 10, initial: 5 } as const;
+
 interface EngineState {
   status: EngineStatus;
   capabilities: Capabilities;
@@ -37,6 +40,12 @@ interface EngineState {
   /** 마지막 확정 착수. `TURN`/`BEGIN` 의 응답이다(분석에서는 오지 않는다). */
   lastBestMove: Move | null;
   forbidden: readonly Move[];
+  /**
+   * 분석이 요청할 후보 수(`YXNBEST n`). 다음 「분석」부터 적용된다 — 도는 탐색의
+   * 명령을 도중에 바꾸면 조각마다 후보 수가 달라져 PV 목록이 흔들린다.
+   */
+  multiPv: number;
+  setMultiPv: (n: number) => void;
 
   start: () => Promise<void>;
   analyze: (stones: readonly Placement[], totalMs?: number) => Promise<void>;
@@ -92,7 +101,7 @@ function describe(e: unknown): string {
   }
 }
 
-export const useEngineStore = create<EngineState>((set) => {
+export const useEngineStore = create<EngineState>((set, get) => {
   const ensure = (): EngineClient => {
     if (client) return client;
     client = new EngineClient({
@@ -125,6 +134,9 @@ export const useEngineStore = create<EngineState>((set) => {
     error: null,
     lastBestMove: null,
     forbidden: [],
+    multiPv: MULTI_PV.initial,
+    setMultiPv: (n) =>
+      set({ multiPv: Math.min(MULTI_PV.max, Math.max(MULTI_PV.min, Math.round(n))) }),
 
     start: async () => {
       set({ error: null });
@@ -142,7 +154,8 @@ export const useEngineStore = create<EngineState>((set) => {
         if (c.currentStatus === "idle" || c.currentStatus === "error") await c.start();
         // exactOptionalPropertyTypes: undefined 를 넘기면 «키가 있는데 값이 없음» 이라
         // 기본값이 안 먹는다. 있을 때만 넣는다.
-        c.analyze(stones, totalMs === undefined ? {} : { totalMs });
+        const nbest = get().multiPv;
+        c.analyze(stones, totalMs === undefined ? { nbest } : { totalMs, nbest });
       } catch (e) {
         set({ error: describe(e), status: "error" });
       }

@@ -385,3 +385,97 @@ describe("착수 예산", () => {
     expect(plays[0]!.budget!.turnMs).toBeGreaterThanOrEqual(500);
   });
 });
+
+describe("이동 바 — 처음·뒤로·앞으로·끝", () => {
+  const future = () => useBoardStore.getState().future;
+  const three = [move(7, 7), move(8, 7), move(7, 8)];
+  const playThree = () => three.forEach((m) => g().tap(m));
+
+  it("무른 수는 앞으로 가기로 그 순서 그대로 돌아온다", () => {
+    fresh();
+    playThree();
+    g().undoMove();
+    g().undoMove();
+    expect(stones()).toEqual(three.slice(0, 1));
+    expect(future()).toEqual(three.slice(1));
+    g().redoMove();
+    expect(stones()).toEqual(three.slice(0, 2));
+    g().redoAll();
+    expect(stones()).toEqual(three);
+    expect(future()).toHaveLength(0);
+  });
+
+  it("처음으로는 빈 판까지, 끝으로는 마지막 수까지 간다", () => {
+    fresh();
+    playThree();
+    g().undoAll();
+    expect(stones()).toHaveLength(0);
+    expect(future()).toEqual(three);
+    g().redoAll();
+    expect(stones()).toEqual(three);
+  });
+
+  it("무른 수와 다른 수를 두면 앞으로 갈 수들이 버려진다", () => {
+    fresh();
+    playThree();
+    g().undoMove();
+    g().tap(move(0, 0));
+    expect(future()).toHaveLength(0);
+    g().redoMove();
+    expect(stones()).toEqual([...three.slice(0, 2), move(0, 0)]);
+  });
+
+  it("무른 수와 같은 수를 손으로 두면 나머지 앞으로 갈 수는 남는다", () => {
+    fresh();
+    playThree();
+    g().undoAll();
+    g().tap(three[0]!);
+    expect(future()).toEqual(three.slice(1));
+  });
+
+  it("앞으로 가기는 착수가 아니다 — 엔진 차례여도 엔진에게 두라고 하지 않는다", () => {
+    fresh({ computerSide: "white" });
+    g().tap(move(7, 7));
+    engineMoves(move(8, 7));
+    g().undoMove();
+    resetSpies();
+    g().redoMove();
+    expect(stones()).toEqual([move(7, 7), move(8, 7)]);
+    expect(plays).toHaveLength(0);
+  });
+
+  it("물음이 떠 있거나 엔진이 생각 중이면 앞으로 가지 않는다", () => {
+    fresh();
+    playThree();
+    g().undoMove();
+    useGameStore.setState({ prompt: { kind: "swapInfo" } });
+    g().redoMove();
+    expect(stones()).toHaveLength(2);
+    useGameStore.setState({ prompt: null, thinking: true });
+    g().redoAll();
+    expect(stones()).toHaveLength(2);
+  });
+
+  it("새 대국은 앞으로 갈 수도 비운다", () => {
+    fresh();
+    playThree();
+    g().undoAll();
+    g().newGame();
+    expect(future()).toHaveLength(0);
+  });
+
+  it("끝으로는 대국이 끝나는 수에서 멈추고 결과를 다시 세운다", () => {
+    fresh();
+    const line = [move(3, 7), move(4, 7), move(5, 7), move(6, 7), move(7, 7)];
+    const filler = [move(0, 14), move(2, 14), move(4, 14), move(6, 14)];
+    for (let i = 0; i < line.length; i++) {
+      g().tap(line[i]!);
+      if (i < filler.length) g().tap(filler[i]!);
+    }
+    g().undoAll();
+    expect(g().result).toBeNull();
+    g().redoAll();
+    expect(stones()).toHaveLength(9);
+    expect(g().result?.end).toBe("five");
+  });
+});

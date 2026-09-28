@@ -13,6 +13,12 @@ import type { AnalysisSnapshot } from "../../engine/engine-types";
  */
 interface BoardState {
   render: BoardRender;
+  /**
+   * 무른 수들 — 다시 둘 차례대로(머리가 바로 다음 수). 보드 아래 이동 바의
+   * `>`·`>|` 가 여기서 꺼낸다. 무른 수와 **다른** 수를 두면 갈래가 갈린 것이라
+   * 통째로 버린다 — 앱·데스크톱의 되돌리기/앞으로와 같은 규칙이다.
+   */
+  future: readonly Move[];
   /** 교점을 눌렀을 때. 이미 돌이 있으면 아무 일도 하지 않는다. */
   place: (m: Move) => void;
   undo: () => void;
@@ -56,13 +62,16 @@ const CLEARED = {
 
 export const useBoardStore = create<BoardState>((set, get) => ({
   render: emptyRender(DEFAULT_SIZE),
+  future: [],
 
   place: (m) =>
     set((s) => {
       if (s.render.stones.some((p) => sameMove(p, m))) return s;
+      const head = s.future[0];
       // 국면이 바뀌면 앞선 분석은 그 국면의 것이 아니다. 남겨 두면 값 칩이
       // 한 수 전 판을 말하게 된다 — 조용히 틀린 화면이라 제일 나쁘다.
       return {
+        future: head && sameMove(head, m) ? s.future.slice(1) : [],
         render: {
           ...s.render,
           stones: [...s.render.stones, m],
@@ -76,12 +85,14 @@ export const useBoardStore = create<BoardState>((set, get) => ({
     set((s) => {
       if (s.render.stones.length === 0) return s;
       const stones = s.render.stones.slice(0, -1);
+      const popped = s.render.stones.at(-1)!;
       return {
+        future: [popped, ...s.future],
         render: { ...s.render, stones, lastMove: stones.at(-1) ?? null, ...CLEARED },
       };
     }),
 
-  clear: () => set((s) => ({ render: { ...emptyRender(s.render.size) } })),
+  clear: () => set((s) => ({ future: [], render: { ...emptyRender(s.render.size) } })),
 
   toggleNumbers: () =>
     set((s) => ({ render: { ...s.render, showNumbers: !s.render.showNumbers } })),
@@ -119,6 +130,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
 
   setStones: (stones) =>
     set((s) => ({
+      future: [],
       render: { ...s.render, stones: [...stones], lastMove: stones.at(-1) ?? null, ...CLEARED },
     })),
 

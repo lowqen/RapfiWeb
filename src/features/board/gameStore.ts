@@ -93,6 +93,15 @@ interface GameState {
   tap: (cell: Move) => TapResult;
   /** 한 수 무르기. 끝난 대국도 다시 열린다. */
   undoMove: () => void;
+  /** 빈 판까지 되돌린다(이동 바의 `|<`). 무른 수는 모두 앞으로 가기에 남는다. */
+  undoAll: () => void;
+  /**
+   * 무른 수 하나를 다시 둔다(이동 바의 `>`). **착수가 아니라 기보 이동**이라
+   * 엔진에게 두라고 하지 않는다 — 엔진 차례면 판을 눌러 시키는 것은 그대로다.
+   */
+  redoMove: () => void;
+  /** 무른 수를 끝까지 다시 둔다(이동 바의 `>|`). */
+  redoAll: () => void;
   resign: () => void;
   offerDraw: () => void;
   dismissPrompt: () => void;
@@ -414,18 +423,13 @@ export const useGameStore = create<GameState>((set, get) => {
       return { kind: "placed" };
     },
 
-    undoMove: () => {
-      if (board().render.stones.length === 0) return;
-      // 엔진에 `TAKEBACK` 을 보내지 않는다 — 다음 요청이 `BOARD`/`YXBOARD` 로
-      // 국면을 통째로 다시 세우므로, 엔진의 판은 그때 맞춰진다.
-      disarmWatchdog();
-      if (get().thinking) engine().stop();
-      board().undo();
-      set((s) => ({ thinking: false, prompt: null, clock: stopClock(s.clock) }));
-      judge();
-      log("무르기");
-      refreshForbidden();
-    },
+    undoMove: () => rewind(1, "무르기"),
+
+    undoAll: () => rewind(board().render.stones.length, "처음으로"),
+
+    redoMove: () => replay(1, "다시 두기"),
+
+    redoAll: () => replay(board().future.length, "끝으로"),
 
     resign: () => {
       const s = get();
@@ -502,6 +506,43 @@ export const useGameStore = create<GameState>((set, get) => {
       set({ clock: next });
     },
   };
+
+  /**
+   * `n` 수 무르기 — 한 수 무르기와 처음으로가 같은 길을 걷는다.
+   *
+   * 엔진에 `TAKEBACK` 을 보내지 않는다 — 다음 요청이 `BOARD`/`YXBOARD` 로
+   * 국면을 통째로 다시 세우므로, 엔진의 판은 그때 맞춰진다.
+   */
+  function rewind(n: number, what: string) {
+    if (n <= 0 || board().render.stones.length === 0) return;
+    disarmWatchdog();
+    if (get().thinking) engine().stop();
+    for (let i = 0; i < n && board().render.stones.length > 0; i++) board().undo();
+    set((s) => ({ thinking: false, prompt: null, clock: stopClock(s.clock) }));
+    judge();
+    log(what);
+    refreshForbidden();
+  }
+
+  /**
+   * 무른 수를 `n` 개 다시 둔다. 생각 중이거나 물음이 떠 있으면 하지 않는다 —
+   * `tap` 이 그때 판을 거절하는 것과 같은 이유다(엔진의 답이 엇갈린 판에 떨어진다).
+   *
+   * 금수 조회는 **끝에 한 번만** 한다. 한 수마다 물으면 `YXBOARD` 가 수만큼 간다.
+   */
+  function replay(n: number, what: string) {
+    const s = get();
+    if (n <= 0 || s.thinking || s.prompt) return;
+    for (let i = 0; i < n; i++) {
+      const next = board().future[0];
+      if (!next) break;
+      board().place(next);
+      judge();
+      if (get().result) break;
+    }
+    log(what);
+    refreshForbidden();
+  }
 
   /**
    * 사람 돌 하나 뒤의 개시 처리. **이미 국면을 넘겼거나 물음을 띄웠으면 `true`**
