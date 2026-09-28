@@ -96,20 +96,42 @@ const STEP_DIV = 15.5;
  * (`label` 이 `size - y` 로 센다). 처음에 여기서 14-y 를 쓴 탓에 둘째 수가
  * 엔진이 방금 둔 자리를 눌러 조용히 무시됐다.
  *
- * **먼저 보드를 화면 안으로 들인다.** `mouse.click` 은 뷰포트 좌표를 쓰는데,
- * 바로 앞의 `locator.click()`(칩·버튼)이 그 요소를 보이게 하려고 페이지를
- * 스크롤한다. 옆 칸이 길어지자 보드가 위로 424px 밀려 `boundingBox().y` 가
- * 음수가 됐고, 탭이 뷰포트 밖을 눌러 **아무 일도 일어나지 않았다**.
+ * **누르기 전에 그 점이 정말 보드인지 본다.** `mouse.click` 은 뷰포트 좌표를
+ * 쓰는데, 바로 앞의 `locator.click()`(칩·버튼)이 그 요소를 보이게 하려고
+ * 스크롤한다. 두 번 당했다: 한 번은 보드가 뷰포트 위로 424px 밀려 탭이 허공을
+ * 눌렀고, 한 번은 보드 윗줄이 고정 상단 바 밑에 깔려 상단 바가 클릭을 받았다.
+ * 둘 다 「엔진이 답하지 않는다」처럼 보였지만 클릭이 판에 닿지도 않은 것이다.
  */
 async function tap(x: number, y: number) {
   const board = page.locator(".board__view");
-  await board.scrollIntoViewIfNeeded();
-  const view = await board.boundingBox();
-  if (!view) throw new Error("보드가 화면에 없습니다");
-  if (view.y < 0) throw new Error(`보드가 화면 위로 밀렸습니다 (y=${view.y})`);
-  const step = view.width / STEP_DIV;
-  await page.mouse.click(view.x + step * (0.75 + x), view.y + step * (0.75 + y));
-  await page.waitForTimeout(120);
+  // 누를 **그 점**이 실제로 보드인지 확인하고 누른다. 보드(984px)가 스크롤
+  // 영역보다 커서, 스크롤 뒤에는 윗줄이 고정된 상단 바 **밑으로** 들어간다 —
+  // 그때 (0,0) 을 누르면 상단 바가 클릭을 받고 판에는 아무 일도 없다.
+  // 보드 전체가 보이는지가 아니라 그 한 점이 보이는지를 봐야 한다.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const view = await board.boundingBox();
+    if (!view) throw new Error("보드가 화면에 없습니다");
+    const step = view.width / STEP_DIV;
+    const px = view.x + step * (0.75 + x);
+    const py = view.y + step * (0.75 + y);
+    const onBoard = (await page.evaluate(
+      `(() => { var e = document.elementFromPoint(${px}, ${py});
+                return !!e && !!e.closest(".board__view"); })()`,
+    )) as boolean;
+    if (onBoard) {
+      await page.mouse.click(px, py);
+      await page.waitForTimeout(120);
+      return;
+    }
+    // 가려져 있다 — 그 점이 스크롤 영역 가운데 오도록 민다.
+    await page.evaluate(
+      `(() => { var c = document.querySelector(".shell__content"); if (!c) return;
+                var r = c.getBoundingClientRect();
+                c.scrollBy(0, ${py} - (r.top + r.height / 2)); })()`,
+    );
+    await page.waitForTimeout(100);
+  }
+  throw new Error(`보드의 (${x},${y}) 가 다른 요소에 가려져 누를 수 없습니다`);
 }
 
 const stoneCount = async (): Promise<number> => {
