@@ -85,6 +85,9 @@ a {
 .shell {
   display: flex;
   height: 100%;
+  /* 휴대폰 주소창이 들어가고 나와도 셸이 화면을 넘지 않게. `100%`(=100vh)는
+     주소창이 보일 때 실제 보이는 높이보다 커서 바닥이 잘린다. */
+  height: 100dvh;
   overflow: hidden;
 }
 .shell__main {
@@ -92,11 +95,19 @@ a {
   flex: 1;
   flex-direction: column;
   min-width: 0;
+  /* 없으면 flex 항목이 내용 높이 아래로 줄지 않아 셸을 밀고 나간다. */
+  min-height: 0;
 }
 .shell__content {
   flex: 1;
+  min-height: 0;
   padding: var(--space-xl);
   overflow: auto;
+}
+@media (max-width: 640px) {
+  .shell__content {
+    padding: var(--space-m);
+  }
 }
 .shell[data-compact] {
   flex-direction: column;
@@ -350,18 +361,33 @@ a {
 }
 
 /* ── 보드 화면 ──────────────────────────────────────────────────── */
+/*
+ * 보드 화면은 **페이지가 스크롤되지 않는다.** 화면 높이 안에 보드와 옆 칸이
+ * 다 들어가고, 넘치는 것은 옆 칸이 제 안에서 스크롤한다.
+ *
+ * 예전에는 보드 칸에 `aspect-ratio: 1` 을 줬다. 그러면 높이가 **칸의 너비**로
+ * 정해져(1440 폭에서 984px) 세로가 모자란 화면에서 페이지가 넘쳤다. 이제 칸은
+ * 남은 영역을 그대로 받고, 정사각형은 `.board` 가 `min(너비, 높이)` 로 만든다
+ * (BoardCanvas 의 ResizeObserver).
+ *
+ * `container-type: size` 로 보드 화면 자체를 크기 기준으로 삼는다 — 좁은 화면에서
+ * 보드 높이를 `cqh` 로 잡으면 상단 바·하단 내비를 뺀 **실제 남은 높이** 기준이 된다.
+ */
+.shell__content:has(> .boardscreen) {
+  overflow: hidden;
+}
 .boardscreen {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1fr) clamp(260px, 28vw, 340px);
+  grid-template-rows: minmax(0, 1fr);
   gap: var(--space-xl);
-  align-items: start;
   height: 100%;
+  min-height: 0;
+  container-type: size;
 }
 .boardscreen__board {
-  /* 보드는 정사각이고, 세로가 모자라면 세로가 이긴다. */
   position: relative;
-  aspect-ratio: 1;
-  max-height: 100%;
+  min-width: 0;
   min-height: 0;
 }
 .boardscreen__side {
@@ -369,10 +395,21 @@ a {
   flex-direction: column;
   gap: var(--space-l);
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
-@media (max-width: 1024px) {
+/* 세로로 긴 좁은 화면(휴대폰 세로·좁은 창): 보드 위, 옆 칸 아래.
+   보드는 너비를 다 쓰되 남은 높이의 60% 를 넘지 않는다. */
+@media (max-width: 1024px) and (orientation: portrait) {
   .boardscreen {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: var(--space-l);
+  }
+  .boardscreen__board {
+    width: 100%;
+    height: min(100cqw, 60cqh);
   }
 }
 

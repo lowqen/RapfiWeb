@@ -175,6 +175,53 @@ try {
   const ladder = await page.locator(".ladder__cell").count();
   if (ladder !== 5) fail(`값 사다리 견본이 5칸이 아닙니다: ${ladder}`);
 
+  // 한 화면에 들어오는가 — 휴대폰 · 노트북 · 데스크톱 · 가로 휴대폰에서
+  // **페이지가 스크롤되지 않고** 보드 전체가 뷰포트 안에 있어야 한다.
+  // 예전 보드 칸은 `aspect-ratio: 1` 이라 높이가 칸 너비로 정해져 세로가
+  // 모자란 화면마다 넘쳤다(1440×1000 에서 보드 984px).
+  const screens = [
+    { name: "휴대폰 세로", width: 390, height: 844 },
+    { name: "휴대폰 가로", width: 844, height: 390 },
+    { name: "태블릿 세로", width: 768, height: 1024 },
+    { name: "노트북", width: 1366, height: 768 },
+    { name: "데스크톱", width: 1920, height: 1080 },
+  ];
+  const fits: string[] = [];
+  for (const s of screens) {
+    await page.setViewportSize({ width: s.width, height: s.height });
+    await page.waitForTimeout(250);
+    const m = (await page.evaluate(`(() => {
+      var root = document.scrollingElement;
+      var content = document.querySelector(".shell__content");
+      var b = document.querySelector(".board__view").getBoundingClientRect();
+      return {
+        pageScroll: root.scrollHeight - root.clientHeight,
+        contentScroll: content.scrollHeight - content.clientHeight,
+        top: b.top, left: b.left, bottom: b.bottom, right: b.right, side: b.width,
+      };
+    })()`)) as {
+      pageScroll: number;
+      contentScroll: number;
+      top: number;
+      left: number;
+      bottom: number;
+      right: number;
+      side: number;
+    };
+    const tag = `${s.name} ${s.width}×${s.height}`;
+    if (m.pageScroll > 1 || m.contentScroll > 1) {
+      fail(`${tag}: 스크롤이 생깁니다 (페이지 ${m.pageScroll}px · 내용 ${m.contentScroll}px)`);
+    } else if (m.top < 0 || m.left < 0 || m.bottom > s.height + 1 || m.right > s.width + 1) {
+      fail(`${tag}: 보드가 화면 밖으로 나갑니다 ${JSON.stringify(m)}`);
+    } else if (m.side < Math.min(s.width, s.height) * 0.4) {
+      fail(`${tag}: 보드가 지나치게 작습니다 (${Math.round(m.side)}px)`);
+    } else {
+      fits.push(`${s.name} ${Math.round(m.side)}px`);
+    }
+  }
+  if (fits.length === screens.length) console.log(`한 화면 핏: ${fits.join(" · ")}`);
+  await page.setViewportSize({ width: 1440, height: 900 });
+
   if (errors.length) fail(`콘솔 오류 ${errors.length}건:\n  ${errors.join("\n  ")}`);
 
   if (!process.exitCode) {
