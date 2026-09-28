@@ -119,9 +119,21 @@ function flushConsole() {
   consoleBuffer = [];
 }
 
+/**
+ * 한 번에 넘기는 콘솔 줄의 상한. 메인 스토어의 링버퍼(5000)와 같게 둔다.
+ *
+ * 예전엔 500 이었다. 그런데 분석 조각 하나(500ms, YXNBEST 5)가 REALTIME 줄만으로
+ * 500 을 넘겨서, 조각 **머리에 있는** 보낸 명령(`> YXNBEST 5`)이 매번 잘려 나갔다
+ * — 엔진이 무엇을 받았는지 보려고 단 에코가 정작 분석에서는 보이지 않았다.
+ * 조각 사이에 이벤트 루프로 돌아올 때만 비워지므로 조각 하나를 통째로 담아야 한다.
+ */
+const CONSOLE_BATCH_MAX = 5000;
+
 function pushConsole(line: string) {
   consoleBuffer.push(line);
-  if (consoleBuffer.length > 500) consoleBuffer = consoleBuffer.slice(-500);
+  if (consoleBuffer.length > CONSOLE_BATCH_MAX) {
+    consoleBuffer = consoleBuffer.slice(-CONSOLE_BATCH_MAX);
+  }
   if (consoleTimer === null) consoleTimer = setTimeout(flushConsole, CONSOLE_BATCH_MS);
 }
 
