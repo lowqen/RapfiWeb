@@ -199,7 +199,8 @@ async function analysisHealthy(label: string) {
   });
   const after = await stoneCount();
   if (end < 0) fail(`${label}: 분석 명령을 찾지 못했습니다`);
-  else if (boards < slices) fail(`${label}: 조각 ${slices}개에 국면은 ${boards}번 — 국면이 흘렀습니다`);
+  else if (boards < slices)
+    fail(`${label}: 조각 ${slices}개에 국면은 ${boards}번 — 국면이 흘렀습니다`);
   else if (zero.length) fail(`${label}: ${zero.length}개 조각이 0ms 로 돌았습니다 — ${zero[0]}`);
   else if (after !== before) fail(`${label}: 분석이 판에 돌을 두었습니다 (${before}→${after})`);
   else ok(`${label}: 조각 ${slices}개 · 조각마다 국면 재설정 · 0ms 조각 없음 · 판 그대로`);
@@ -382,8 +383,10 @@ try {
   const nowBtn = page.getByRole("button", { name: "지금 두기", exact: true });
   const cut = await prompt();
   if (cut === "info") fail("무제한인데 감시견이 대국을 끊었습니다");
-  else if ((await nowBtn.count()) === 0) fail("20초 뒤 엔진이 생각을 멈췄습니다 (「지금 두기」 없음)");
-  else if ((await stoneCount()) !== 11) fail(`엔진이 저절로 두었습니다 (돌 ${await stoneCount()}개)`);
+  else if ((await nowBtn.count()) === 0)
+    fail("20초 뒤 엔진이 생각을 멈췄습니다 (「지금 두기」 없음)");
+  else if ((await stoneCount()) !== 11)
+    fail(`엔진이 저절로 두었습니다 (돌 ${await stoneCount()}개)`);
   else ok("무제한: 20초가 지나도 끊기지 않고 계속 읽는다");
   await nowBtn.click();
   await waitStones(12, 10_000, "(「지금 두기」 뒤 엔진의 수)");

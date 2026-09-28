@@ -56,9 +56,6 @@ import type { EngineCommand } from "../../engine/engine-types";
 /** 렌주에서는 장목이 흑의 **금수**라 승리 판정에서는 장목을 인정한다. */
 const ALLOW_OVERLINE = true;
 
-/** 시간 제한이 없을 때 한 수에 쓰는 예산. */
-const DEFAULT_TURN_MS = 5_000;
-
 const LOG_LIMIT = 30;
 
 /**

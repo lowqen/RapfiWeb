@@ -163,8 +163,7 @@ function drain(chunk: string) {
       // 분석 조각의 수를 엔진의 착수로 받아 둔다.
       sliceMoves = r.moves;
       if (forwardMoves) post({ type: "bestMove", moves: r.moves });
-    }
-    else if (r.kind === "forbid") post({ type: "forbid", cells: r.cells });
+    } else if (r.kind === "forbid") post({ type: "forbid", cells: r.cells });
     else if (r.kind === "openingMove" || r.kind === "openingSwap" || r.kind === "soosorvFifth") {
       post({ type: "opening", response: r });
     }
