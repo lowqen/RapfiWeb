@@ -4,6 +4,7 @@ import { useBoardStore } from "./boardStore";
 import { getGameHandlers, useEngineStore } from "../../engine/engine-state";
 import { move, type Move } from "../../core/model/move";
 import { OPENING_LABEL, type ComputerSide, type OpeningProtocol } from "../../core/model/game";
+import { EMPTY_CLOCK } from "../../core/model/clock";
 import type { EngineCommand, EngineStatus, Placement } from "../../engine/engine-types";
 import type { OpeningResponse } from "../../engine/engine-client";
 
@@ -61,6 +62,8 @@ function fresh(
     computerSide: opts.computerSide ?? "none",
     opening: opts.opening ?? "none",
     showForbidden: opts.showForbidden ?? false,
+    // 시계 한도는 새 대국이 **일부러** 이어받는다 — 앞 시험의 한도가 새어 들지 않게 비운다.
+    clock: EMPTY_CLOCK,
   });
   g().newGame();
   resetSpies();

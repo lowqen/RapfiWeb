@@ -199,7 +199,12 @@ async function thought(label: string) {
     fail(`${label}: 엔진이 ${why} (MaxTime ${maxMs ?? "?"}ms · Depth ${d})`);
     // 그 수 직전에 무엇을 보냈고 엔진이 무엇을 했는지 — 원인은 여기 있다.
     const from = Math.max(0, (sentAt >= 0 ? sentAt : moveAt) - 12);
-    console.error(lines.slice(from, moveAt + 1).map((l) => `      ${l}`).join("\n"));
+    console.error(
+      lines
+        .slice(from, moveAt + 1)
+        .map((l) => `      ${l}`)
+        .join("\n"),
+    );
   } else {
     const t = maxMs === null ? "" : `MaxTime ${maxMs}ms · `;
     ok(`${label}: ${t}Depth ${d} · ${lines[sentAt]?.slice(2) ?? "timeout_turn ?"}`);
