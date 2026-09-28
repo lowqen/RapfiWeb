@@ -27,7 +27,7 @@
       /*
        * ?mode=page        글루를 **이 페이지 메인 스레드**에서 띄운다
        * ?mode=worker      전용 워커 안에서 importScripts — W0 가 실패한 구성 그대로
-       * ?mode=worker-url  같은 워커 + mainScriptUrlOrBlob 로 글루 주소 명시(가설)
+       * ?mode=worker-pthread  같은 워커 + pthread 가드(worker.js?glue=…) — 2차 런의 해법
        * &variant=multi|single  &threads=1,2,4,8  &stop=1
        *
        * 결과는 window.__w0c 에 놓는다 — run.mjs 가 그걸 기다린다.
@@ -38,6 +38,7 @@
         const variant = q.get("variant") || "multi";
         const threads = (q.get("threads") || "1,2,4,8").split(",").map(Number);
         const stopTest = q.get("stop") === "1";
+        const repeats = Number(q.get("repeats") || 2);
         // 엔진은 이 페이지와 같은 접두사(/iso 또는 /plain) 아래 /engine/ 에 있다.
         const prefix = location.pathname.split("/spike/")[0];
         const baseUrl = `${location.origin}${prefix}/engine/`;
@@ -59,12 +60,18 @@
               factory: window.Rapfi,
               baseUrl,
               glueUrl,
-              useMainScriptUrl: false,
               threads,
               stopTest,
+              repeats,
             });
           } else {
-            const w = new Worker("worker.js");
+            // worker-pthread: 글루 주소를 쿼리로 — 엔진 스레드가 같은 주소로 이 워커를 다시
+            // 열 때 그것을 보고 글루만 읽는다(worker.js 머리 주석).
+            const w = new Worker(
+              mode === "worker-pthread"
+                ? `worker.js?glue=${encodeURIComponent(glueUrl)}`
+                : "worker.js",
+            );
             result = await new Promise((resolve) => {
               w.onmessage = (ev) => resolve(ev.data);
               w.onerror = (ev) =>
@@ -72,9 +79,9 @@
               w.postMessage({
                 glueUrl,
                 baseUrl,
-                useMainScriptUrl: mode === "worker-url",
                 threads,
                 stopTest,
+                repeats,
               });
             });
             w.terminate();

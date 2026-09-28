@@ -11,7 +11,7 @@
  *   single · worker     · 격리   지금 배포 경로 — 기준선(THREAD_NUM 4 는 무시돼야 한다)
  *   multi  · page       · 격리   계획서 W0c 의 1안: 페이지 메인 스레드
  *   multi  · worker     · 격리   W0 가 실패한 구성 재현
- *   multi  · worker-url · 격리   2안: 워커 + mainScriptUrlOrBlob(가설)
+ *   multi  · worker-pthread · 격리  2안: 워커 + pthread 가드(worker.js 머리 주석) — 2차 런의 해법
  *   multi  · page       · 무격리 대조군: 지금 배포 헤더로는 무엇이 일어나는가
  */
 import { chromium, firefox, webkit } from "playwright";
@@ -43,7 +43,7 @@ const CASES = [
   { variant: "single", mode: "worker", iso: true, threads: "1,4", stop: false },
   { variant: "multi", mode: "page", iso: true, threads: "1,2,4,8", stop: true },
   { variant: "multi", mode: "worker", iso: true, threads: "1,2,4,8", stop: true },
-  { variant: "multi", mode: "worker-url", iso: true, threads: "1,2,4,8", stop: true },
+  { variant: "multi", mode: "worker-pthread", iso: true, threads: "1,2,4,8", stop: true },
   { variant: "multi", mode: "page", iso: false, threads: "1", stop: false },
 ].filter((c) => VARIANTS.includes(c.variant));
 const CASE_TIMEOUT_MS = Number(process.env.CASE_TIMEOUT_MS ?? 180_000);
@@ -106,7 +106,7 @@ for (const name of browsers) {
     );
     for (const s of last.scaling ?? []) {
       console.log(
-        `    ${s.threads}t depth=${s.depth} wall=${s.wallMs}ms block=${s.blockMs}ms ` +
+        `    ${s.threads}t rates=${JSON.stringify(s.rates)} depth=${s.depth} block=${s.blockMs}ms ` +
           `end=${JSON.stringify(s.endLines?.slice(-2))}`,
       );
     }
@@ -122,7 +122,7 @@ for (const name of browsers) {
 server.close();
 
 function speeds(r) {
-  return (r.scaling ?? []).map((s) => `${s.threads}t:${s.speed ?? "?"}`).join(" ");
+  return (r.scaling ?? []).map((s) => `${s.threads}t:${s.best ?? "?"}`).join(" ");
 }
 
 // ── 표 ─────────────────────────────────────────────────────────────
@@ -130,17 +130,18 @@ const md = [];
 md.push(`# W0c 결과 — ${new Date().toISOString()}`);
 md.push("");
 md.push(
-  "| 브라우저 | 변형 | 실행 | 격리 | coi | 결과 | 기동 | 1t | 2t | 4t | 8t | 4t/1t | YXNBEST 차단 | YXSTOP | 호스트 최대 지연 |",
+  "| 브라우저 | 변형 | 실행 | 격리 | coi | 결과 | 기동 | 1t | 2t | 4t | 8t | 2t/1t | 4t/1t | YXNBEST 차단 | YXSTOP | 호스트 최대 지연 |",
 );
-md.push("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|");
+md.push("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|");
 for (const r of results) {
   if (r.launchError) {
     md.push(`| ${r.browser} | — | — | — | — | 기동 실패: ${r.launchError} |||||||||`);
     continue;
   }
-  const sp = (n) => r.scaling?.find((s) => s.threads === n)?.speed ?? "—";
-  const s1 = r.scaling?.find((s) => s.threads === 1)?.speed;
-  const s4 = r.scaling?.find((s) => s.threads === 4)?.speed;
+  const sp = (n) => r.scaling?.find((s) => s.threads === n)?.best ?? "—";
+  const s1 = r.scaling?.find((s) => s.threads === 1)?.best;
+  const s2 = r.scaling?.find((s) => s.threads === 2)?.best;
+  const s4 = r.scaling?.find((s) => s.threads === 4)?.best;
   const block = r.scaling?.length ? Math.max(...r.scaling.map((s) => s.blockMs)) : "—";
   md.push(
     [
@@ -155,6 +156,7 @@ for (const r of results) {
       sp(2),
       sp(4),
       sp(8),
+      s1 && s2 ? (s2 / s1).toFixed(2) : "—",
       s1 && s4 ? (s4 / s1).toFixed(2) : "—",
       block === "—" ? block : `${block}ms`,
       r.stop ? `${r.stop.latencyMs}ms` : "—",

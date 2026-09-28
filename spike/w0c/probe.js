@@ -10,7 +10,7 @@
  *   env      crossOriginIsolated · SharedArrayBuffer · hardwareConcurrency
  *   boot     팩토리 resolve 까지 · 첫 응답까지
  *   proto    비대칭 국면의 YXNBEST 답(빈 판의 7,7 이 아니어야 국면이 닿은 것이다)
- *   scaling  INFO THREAD_NUM n 마다 같은 국면 3초 → 엔진이 찍은 Speed(노드/초)
+ *   scaling  INFO THREAD_NUM n 마다 같은 국면 3초 × repeats → TOTALNODES/TOTALTIME(노드/초)
  *   block    YXNBEST 를 보내는 sendCommand 가 호출자를 얼마나 붙드는가
  *            (단일 빌드는 탐색 전체, 멀티는 ~0 이어야 한다)
  *   stop     탐색 2초째에 YXSTOP → 좌표가 돌아오기까지(멀티만)
@@ -31,7 +31,7 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   async function runProbe(opts) {
-    const { factory, baseUrl, glueUrl, useMainScriptUrl, threads, stopTest } = opts;
+    const { factory, baseUrl, threads, stopTest, repeats } = opts;
     const out = {
       ok: false,
       stage: "init",
@@ -109,9 +109,6 @@
         print: () => {},
         printErr: () => {},
       };
-      // 가설: importScripts 로 읽힌 글루는 pthread 워커에 띄울 스크립트를
-      // self.location(= 이 하네스 워커)으로 잡는다. 글루 주소를 명시해 본다.
-      if (useMainScriptUrl) args.mainScriptUrlOrBlob = glueUrl;
       M = await factory(args);
       out.bootMs = Math.round(performance.now() - t0);
       if (typeof M.sendCommand !== "function") throw new Error("sendCommand 없음");
@@ -142,37 +139,58 @@
       out.stage = "scaling";
       const hc = out.env.hardwareConcurrency || 4;
       for (const n of threads.filter((k) => k <= Math.max(2, hc * 2))) {
-        send(`INFO THREAD_NUM ${n}`);
-        send("YXHASHCLEAR");
-        send("INFO timeout_turn 3000");
-        send(POSITION);
-        const from = lines.length;
-        const ts = performance.now();
-        const block = send("YXNBEST 1");
-        const done = await waitFor(MOVE, 30000, `탐색 ${n}스레드`, from);
-        // 매크로태스크로 한 번 양보 — 단일 빌드는 답이 이미 와 있어 await 가 마이크로
-        // 태스크로만 넘어가고, 그러면 호스트 틱이 탐색 사이에 한 번도 돌지 않는다.
-        await sleep(50);
-        const win = lines.slice(from, done.i + 1).map((x) => x.l);
-        const lastOf = (re) => {
-          for (let k = win.length - 1; k >= 0; k--) {
-            const m = re.exec(win[k]);
-            if (m) return m;
-          }
-          return null;
-        };
-        const speed = lastOf(/^MESSAGE Speed (\d+)/);
-        const nodes = lastOf(/^INFO TOTALNODES (\d+)/);
-        const depth = lastOf(/Depth (\d+)-(\d+)/);
+        // 같은 조건을 `repeats` 번 — 공유 러너는 같은 탐색이 두 번에 40% 흔들렸다(2차 런).
+        const runs = [];
+        for (let rep = 0; rep < (repeats || 1); rep++) {
+          send(`INFO THREAD_NUM ${n}`);
+          send("YXHASHCLEAR");
+          send("INFO timeout_turn 3000");
+          send(POSITION);
+          const from = lines.length;
+          const ts = performance.now();
+          const block = send("YXNBEST 1");
+          const done = await waitFor(MOVE, 30000, `탐색 ${n}스레드`, from);
+          // 매크로태스크로 한 번 양보 — 단일 빌드는 답이 이미 와 있어 await 가 마이크로
+          // 태스크로만 넘어가고, 그러면 호스트 틱이 탐색 사이에 한 번도 돌지 않는다.
+          await sleep(50);
+          const win = lines.slice(from, done.i + 1).map((x) => x.l);
+          const lastOf = (re) => {
+            for (let k = win.length - 1; k >= 0; k--) {
+              const m = re.exec(win[k]);
+              if (m) return m;
+            }
+            return null;
+          };
+          // 속도는 **TOTALNODES/TOTALTIME 로 직접** 잰다. 탐색 끝 요약 줄
+          // (`MESSAGE Speed …`)은 멀티 스레드에서 빠지기도 한다 — 2차 런의 4스레드
+          // 탐색은 `MESSAGE Bestline …` 으로 끝났고, 그때 앞 탐색의 줄을 집었다.
+          const nodes = lastOf(/^INFO TOTALNODES (\d+)/);
+          const time = lastOf(/^INFO TOTALTIME (\d+)/);
+          const speed = lastOf(/^MESSAGE Speed (\d+)/);
+          const depth = lastOf(/Depth (\d+)-(\d+)/);
+          runs.push({
+            rate:
+              nodes && time && Number(time[1]) > 0
+                ? Math.round((Number(nodes[1]) * 1000) / Number(time[1]))
+                : null,
+            speed: speed ? Number(speed[1]) : null,
+            depth: depth ? `${depth[1]}-${depth[2]}` : null,
+            wallMs: Math.round(done.t - ts),
+            blockMs: block,
+            // 탐색이 끝났다는 신호로 무엇을 쓸 수 있나 — 좌표 바로 앞 줄들.
+            endLines: win.slice(-3),
+          });
+        }
+        const rates = runs.map((r) => r.rate).filter((x) => x !== null);
         out.scaling.push({
           threads: n,
-          speed: speed ? Number(speed[1]) : null,
-          totalNodes: nodes ? Number(nodes[1]) : null,
-          depth: depth ? `${depth[1]}-${depth[2]}` : null,
-          wallMs: Math.round(done.t - ts),
-          blockMs: block,
-          // 탐색이 끝났다는 신호로 무엇을 쓸 수 있나 — 좌표 바로 앞 줄들.
-          endLines: win.slice(-3),
+          // 잡음은 대개 **느려지는** 쪽이다(이웃 작업이 코어를 가져간다) — 가장 빠른 값을 쓴다.
+          best: rates.length ? Math.max(...rates) : null,
+          rates,
+          blockMs: Math.max(...runs.map((r) => r.blockMs)),
+          depth: runs.at(-1).depth,
+          endLines: runs.at(-1).endLines,
+          runs,
         });
       }
 
