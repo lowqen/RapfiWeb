@@ -198,7 +198,11 @@ async function analysisHealthy(label: string) {
     return m !== null && m[2] === "ms" && Number(m[1]) < 50;
   });
   const after = await stoneCount();
-  if (end < 0) fail(`${label}: 분석 명령을 찾지 못했습니다`);
+  if (end < 0) {
+    fail(`${label}: 분석 명령을 찾지 못했습니다 (콘솔 ${lines.length}줄)`);
+    const sent = lines.filter((l) => l.startsWith(">")).slice(-25);
+    console.error(sent.map((l) => `      ${l}`).join("\n"));
+  }
   else if (boards < slices)
     fail(`${label}: 조각 ${slices}개에 국면은 ${boards}번 — 국면이 흘렀습니다`);
   else if (zero.length) fail(`${label}: ${zero.length}개 조각이 0ms 로 돌았습니다 — ${zero[0]}`);
