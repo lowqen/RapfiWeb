@@ -104,6 +104,13 @@ const SNAPSHOT_MS = 100;
 
 /** 분석 조각의 하한. 엔진이 30ms 를 통신 여유로 떼므로 그보다 넉넉해야 한다. */
 const MIN_SLICE_MS = 100;
+
+/**
+ * 이보다 빨리 끝난 조각은 「즉답」이다 — 엔진이 탐색 없이 뻔한 수를 돌려준 것.
+ * 정상 조각은 예산(≈470ms)의 상당 부분을 쓰고, 외통을 찾아 일찍 끝나도 수십~수백
+ * ms 다(실측 183ms). 즉답은 1ms 안팎이다.
+ */
+const TRIVIAL_SLICE_MS = 20;
 let lastSnapshotAt = 0;
 let snapshotDirty = false;
 
@@ -323,8 +330,18 @@ async function search(msg: Extract<ToWorker, { type: "search" }>) {
     // 안 그러면 조각마다 한 수씩 앞선 국면을 분석한다(메시지 타입의 주석 참고).
     agg.beginSlice();
     sendAll(msg.setup);
-    sendAll(msg.repeat);
+    const s0 = performance.now();
+    sendAll(msg.repeat); // 단일 스레드 빌드에서 탐색은 이 호출 안에서 끝난다
+    const took = performance.now() - s0;
     maybeEmitSnapshot(true);
+    // **즉답이면 더 읽을 것이 없다.** 5목을 완성하는 수·막아야만 하는 수처럼
+    // 뻔한 국면에서 Rapfi 는 탐색 없이 곧바로 답한다(tryTrivialBestmove). 그때
+    // 조각을 계속 돌리면 초당 수백 번 같은 답을 받으며 헛돈다 — 무제한 착수가
+    // 「지금 두기」까지 엔진과 콘솔을 그렇게 덮었다. 착수면 그 수를 바로 둔다.
+    if (took < TRIVIAL_SLICE_MS) {
+      reason = "finished";
+      break;
+    }
     await yieldToLoop(); // ← 정지 요청이 들어올 수 있는 유일한 지점
   }
   if (stopRequested) reason = "stopped";

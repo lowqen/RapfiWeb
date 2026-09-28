@@ -255,6 +255,14 @@ async function thought(label: string) {
   const tm = timeAt < 0 ? null : TIME.exec(lines[timeAt]!);
   const maxMs = tm ? toMsUnit(tm[3]!, tm[4]!) : null;
   const d = depthAt < 0 ? -1 : Number(/Depth (\d+)-/.exec(lines[depthAt]!)?.[1]);
+  // **즉답**: 이 수를 부른 명령과 좌표 사이에 탐색 줄이 하나도 없다. 5목·막는 수
+  // 같은 뻔한 수에 Rapfi 는 탐색 없이 답한다 — 고장이 아니라 정답이다. 0ms 고장은
+  // 다르다: 그때는 `OptiTime 0ms` 와 `Depth 0-0` 이 **찍힌다**.
+  const askAt = lastIndex(/^> (YXNBEST|BOARD|BEGIN)/, moveAt);
+  if (askAt >= 0 && timeAt < askAt && depthAt < askAt) {
+    ok(`${label}: 즉답(뻔한 수 — 탐색 없이 둠)`);
+    return;
+  }
   // 우리가 보낸 차례 예산과 엔진이 실제로 쓴 예산이 맞는가. 명령 흐름이 한 칸
   // 밀리면 엔진은 **앞선** 값(분석 조각 500ms 등)으로 돌고, 돌은 멀쩡히 놓인다 —
   // 깊이만 봐서는 못 잡는다(500ms 로도 Depth 26 이 나온 적이 있다).
@@ -381,19 +389,22 @@ try {
   // 사용자 보고: 무제한인데 대국이 중간에 끊긴다 — 감시견이 15초(예산 5초 + 10초)
   // 뒤에 기다림을 풀어 버렸다. 무제한에서 엔진은 「지금 두기」까지 생각해야 한다.
   // 옛 한도를 넉넉히 넘겨 20초를 기다린다.
-  await tap(0, 7);
-  await waitStones(11, 5_000, "(무제한 대기 전 사람 수)");
+  // **새 대국에서** 한다 — 위의 흩어진 사람 수로는 엔진이 곧 5목을 만들어 대국이
+  // 끝나 있을 수 있고, 5목·막는 수 같은 뻔한 수는 엔진이 즉답한다(기다림이 없다).
+  await click("새 대국");
+  await tap(7, 7);
+  await waitStones(1, 5_000, "(무제한 대기 전 사람 수)");
   await page.waitForTimeout(20_000);
   const nowBtn = page.getByRole("button", { name: "지금 두기", exact: true });
   const cut = await prompt();
   if (cut === "info") fail("무제한인데 감시견이 대국을 끊었습니다");
   else if ((await nowBtn.count()) === 0)
     fail("20초 뒤 엔진이 생각을 멈췄습니다 (「지금 두기」 없음)");
-  else if ((await stoneCount()) !== 11)
+  else if ((await stoneCount()) !== 1)
     fail(`엔진이 저절로 두었습니다 (돌 ${await stoneCount()}개)`);
   else ok("무제한: 20초가 지나도 끊기지 않고 계속 읽는다");
   await nowBtn.click();
-  await waitStones(12, 10_000, "(「지금 두기」 뒤 엔진의 수)");
+  await waitStones(2, 10_000, "(「지금 두기」 뒤 엔진의 수)");
   await page.waitForTimeout(300);
   await thought("「지금 두기」로 둔 수");
 
