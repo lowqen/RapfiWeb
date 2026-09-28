@@ -166,6 +166,28 @@ async function tapNotice(): Promise<string> {
   return `${text} / 엔진 ${badge}`;
 }
 
+/**
+ * 엔진이 방금 둔 수에서 **실제로 생각했는가.**
+ *
+ * 돌이 놓였다는 것만으로는 부족하다 — 시간 예산이 0 으로 넘어가면 엔진은
+ * `OptiTime 0ms | MaxTime 0ms`, `Depth 0-0` 으로 아무 수(구석 C1, A1)나
+ * 즉시 던지고, 그래도 돌은 놓인다. 콘솔의 마지막 시간 줄과 깊이 줄, 그리고
+ * 그 직전에 우리가 보낸 `timeout_turn` 을 함께 본다.
+ */
+async function thought(label: string) {
+  const lines = (await page.locator(".console").innerText()).split("\n");
+  const last = (re: RegExp) => [...lines].reverse().find((l) => re.test(l)) ?? "";
+  const time = last(/OptiTime \d+ms \| MaxTime \d+ms/);
+  const depth = last(/Depth \d+-\d+/);
+  const sent = last(/^> INFO timeout_turn/);
+  const maxMs = Number(/MaxTime (\d+)ms/.exec(time)?.[1] ?? -1);
+  const d = Number(/Depth (\d+)-/.exec(depth)?.[1] ?? -1);
+  const where = `[${sent || "timeout_turn 없음"} | ${time || "시간 줄 없음"} | ${depth}]`;
+  if (maxMs <= 0) fail(`${label}: 엔진에 생각할 시간이 없었습니다 ${where}`);
+  else if (d < 2) fail(`${label}: 엔진이 거의 읽지 않았습니다(Depth ${d}) ${where}`);
+  else ok(`${label}: MaxTime ${maxMs}ms · Depth ${d}`);
+}
+
 /** 칩·버튼은 이름으로 집는다 — 순서는 화면을 손볼 때마다 바뀐다. */
 const click = (name: string) => page.getByRole("button", { name, exact: true }).click();
 
@@ -222,6 +244,8 @@ try {
   await waitStones(1, 5_000, "(사람이 놓은 첫 수)");
   await waitStones(2, 60_000, "(사람 1수 뒤 엔진의 답)");
   ok("사람 → 엔진 → 사람으로 차례가 돌았다");
+  await page.waitForTimeout(300); // 콘솔은 100ms 배치로 온다
+  await thought("무제한 첫 수");
 
   const turn = (await page.locator("dd[data-k=turn]").innerText()).trim();
   if (turn !== "흑") fail(`두 수 뒤 차례가 흑이 아닙니다: ${turn}`);
@@ -233,6 +257,19 @@ try {
   await tap(1, 1);
   await waitStones(4, 60_000, "(둘째 왕복)");
   ok("두 번째 왕복도 정상");
+  await page.waitForTimeout(300);
+  await thought("무제한 둘째 수");
+
+  // 분석을 한 번 돌린 **뒤**의 착수. 분석은 `timeout_turn` 을 조각 단위(마지막
+  // 조각은 몇 ms 일 수도 있다)로 바꿔 두므로, 착수가 자기 예산을 다시 세우지
+  // 않으면 그 찌꺼기로 둔다.
+  await click("분석");
+  await page.locator('.panel__badge[data-status="searching"]').waitFor({ timeout: 10_000 });
+  await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 30_000 });
+  await tap(1, 13);
+  await waitStones(6, 60_000, "(분석 뒤 왕복)");
+  await page.waitForTimeout(300);
+  await thought("분석 뒤 착수");
 
   // ── 2. 시계 ───────────────────────────────────────────────────────
   console.log("\n2. 시계 — 줄어드는가");
@@ -251,6 +288,14 @@ try {
   const active = await page.locator(".clock[data-active]").count();
   if (active !== 1) fail(`도는 시계가 정확히 하나가 아닙니다: ${active}개`);
   else ok("도는 시계는 한 쪽뿐");
+
+  // 시간 제한이 있을 때도 엔진이 생각하는가 — 예산이 시계에서 계산되는 경로다.
+  await click("새 대국");
+  await click("컴퓨터 백");
+  await tap(7, 7);
+  await waitStones(2, 60_000, "(5분 제한에서 엔진의 답)");
+  await page.waitForTimeout(300);
+  await thought("5분 제한 첫 수");
 
   // ── 3. 다크 모드에서 시계 가독성 ──────────────────────────────────
   console.log("\n3. 다크 모드 — 시계가 읽히는가");
@@ -284,6 +329,7 @@ try {
 
   // ── 4. 기권 · 무승부 ──────────────────────────────────────────────
   console.log("\n4. 기권 · 무승부");
+  await click("사람 대 사람"); // 엔진이 끼어들면 기권·무승부가 탐색과 엇갈린다
   await click("새 대국");
   await click("무제한");
   await tap(7, 7);

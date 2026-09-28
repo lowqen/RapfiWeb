@@ -198,7 +198,12 @@ function loadFactory(baseUrl: string, variant: string): ModuleFactory {
  * 국면이 전달됐다는 증거가 아니라 전달되지 **않았다**는 증거였던 셈이다.
  */
 const sendCommand = (lines: readonly string[]) => {
-  if (lines.length) mod?.sendCommand(lines.join("\n"));
+  if (!lines.length) return;
+  // 보낸 것도 콘솔에 남긴다(`> ` 머리). 엔진이 `MaxTime 0ms` 처럼 이상하게
+  // 굴 때 **무엇을 받았는지** 보이지 않으면 원인을 가를 수 없다. 여러 줄
+  // 블록(BOARD 등)은 머리 줄과 줄 수만 적는다 — 돌 좌표로 콘솔을 덮지 않게.
+  pushConsole(`> ${lines[0]}${lines.length > 1 ? ` …(+${lines.length - 1}줄)` : ""}`);
+  mod?.sendCommand(lines.join("\n"));
 };
 
 /** 명령 여러 개를 순서대로. 각각이 자기만의 `sendCommand` 호출이 된다. */
