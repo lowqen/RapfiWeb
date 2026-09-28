@@ -183,10 +183,16 @@ async function thought(label: string) {
   };
   // 마지막 착수 응답(좌표 한 줄)을 기준으로 그 탐색의 줄들을 본다.
   const moveAt = lastIndex(/^\d+,\d+$/);
-  const timeAt = lastIndex(/OptiTime \d+ms \| MaxTime \d+ms/, moveAt);
+  // Rapfi 는 시간을 `4970ms`·`29s`·`3min`·`1h` 로 적는다(utils.cpp timeText).
+  // 처음엔 ms 만 읽어서, 29s 줄을 지나쳐 **앞 수의** 4970ms 줄을 집었다.
+  const TIME = /OptiTime ([\d.]+)(ms|s|min|h) \| MaxTime ([\d.]+)(ms|s|min|h)/;
+  const timeAt = lastIndex(TIME, moveAt);
   const depthAt = lastIndex(/Depth \d+-\d+/, moveAt);
   const sentAt = lastIndex(/^> INFO timeout_turn/, moveAt);
-  const maxMs = timeAt < 0 ? null : Number(/MaxTime (\d+)ms/.exec(lines[timeAt]!)?.[1]);
+  const UNIT: Record<string, number> = { ms: 1, s: 1000, min: 60_000, h: 3_600_000 };
+  const toMsUnit = (v: string, u: string) => Number(v) * (UNIT[u] ?? 1);
+  const tm = timeAt < 0 ? null : TIME.exec(lines[timeAt]!);
+  const maxMs = tm ? toMsUnit(tm[3]!, tm[4]!) : null;
   const d = depthAt < 0 ? -1 : Number(/Depth (\d+)-/.exec(lines[depthAt]!)?.[1]);
   // 우리가 보낸 차례 예산과 엔진이 실제로 쓴 예산이 맞는가. 명령 흐름이 한 칸
   // 밀리면 엔진은 **앞선** 값(분석 조각 500ms 등)으로 돌고, 돌은 멀쩡히 놓인다 —
