@@ -300,6 +300,36 @@ describe("대국 패널의 동작", () => {
 
 // ── 금수 ──────────────────────────────────────────────────────────────
 
+describe("진영 전환", () => {
+  it("컴퓨터의 색을 맞바꾸고, 바꾼 뒤 엔진 차례면 곧바로 둔다", () => {
+    fresh({ computerSide: "white" });
+    g().tap(move(7, 7)); // 사람(흑) → 엔진(백) 차례
+    engineMoves(move(8, 7)); // 엔진이 백으로 두었다 — 이제 흑(사람) 차례
+    resetSpies();
+    g().swapSides(); // 컴퓨터 흑 — 지금 둘 차례가 엔진이다
+    expect(g().computerSide).toBe("black");
+    expect(g().thinking).toBe(true);
+    expect(plays).toHaveLength(1);
+  });
+
+  it("바꾼 뒤에도 사람 차례면 엔진은 기다린다", () => {
+    fresh({ computerSide: "black" });
+    g().swapSides(); // 빈 판 · 흑 차례 · 컴퓨터 백 — 사람이 둘 차례
+    expect(g().computerSide).toBe("white");
+    expect(plays).toHaveLength(0);
+  });
+
+  it("사람 대 사람·양쪽 컴퓨터·생각 중이면 아무 일도 하지 않는다", () => {
+    fresh({ computerSide: "none" });
+    g().swapSides();
+    expect(g().computerSide).toBe("none");
+    fresh({ computerSide: "white" });
+    g().tap(move(7, 7)); // 엔진이 생각 중
+    g().swapSides();
+    expect(g().computerSide).toBe("white");
+  });
+});
+
 describe("금수", () => {
   it("엔진이 놀고 있고 사람이 흑일 때만 묻는다", () => {
     fresh({ computerSide: "white", status: "ready", showForbidden: true });

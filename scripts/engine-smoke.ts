@@ -239,6 +239,9 @@ try {
   const ns = samples.map((s) => s.n);
   if (!ok(ts)) fail(`TIME 이 줄거나 비었습니다: ${ts.join(" → ")}`);
   else if (ts.at(-1)! <= 1000) fail(`TIME 이 조각(0.5초) 천장을 넘지 못합니다: ${ts.join(" → ")}`);
+  // 3.5초를 읽는 동안 시간은 흘러야 한다. 후보 수 1 의 멀티 분석에서 Rapfi 가 깊이
+  // 한 단계 끝날 때만 카운터를 찍어 TIME 이 1.5초에 몇 초씩 멈춘 적이 있다.
+  else if (ts.at(-1)! - ts[0]! < 2000) fail(`TIME 이 멈춰 있습니다: ${ts.join(" → ")}`);
   else if (!ok(ns)) fail(`NODE 가 들쭉날쭉합니다: ${ns.join(" → ")}`);
   else console.log(`실시간 카운터: TIME ${ts[0]}→${ts.at(-1)}ms · NODE ${ns[0]}→${ns.at(-1)}`);
 

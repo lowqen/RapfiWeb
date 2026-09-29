@@ -4,8 +4,9 @@ import { useBoardStore } from "./boardStore";
 import { useGameStore } from "./gameStore";
 import { AnalysisPanel } from "./AnalysisPanel";
 import { EvalBar } from "./EvalBar";
-import { PromptPanel } from "./OpeningPanel";
+import { OpeningProgress, PromptPanel } from "./OpeningPanel";
 import { MoveTransport } from "./MoveTransport";
+import { QuickActions } from "./QuickActions";
 import { useEngineStore } from "../../engine/engine-state";
 import { useSettingsStore } from "../settings/settingsStore";
 import { label, type Move } from "../../core/model/move";
@@ -19,9 +20,11 @@ import { OPENING_LABEL, describeResult } from "../../core/model/game";
  * 금수·차례·협상 단계가 한 곳에서 판단된다 — 보드는 여전히 규칙을 모른다.
  * 「돌을 놓는다」와 「대국의 한 수를 둔다」는 다른 일이고, 그 차이가 이 한 줄이다.
  *
- * **배치.** 왼쪽 칸은 평가 바 · 보드 · 그 바로 밑의 이동 바(`MoveTransport`)뿐이다.
- * 오른쪽 칸(좁은 세로 화면에서는 아래)에는 **엔진 상태 · 국면** 두 카드만 둔다.
- * 대국 설정·조작은 설정 탭, 콘솔은 엔진 탭이 진다. 대국 시계는 없다.
+ * **배치.** 왼쪽 칸은 위에서부터 퀵 액션 바(`QuickActions` — 분석·무르기·되돌리기·
+ * 새 판·진영 전환) · 평가 바와 보드 · 이동 바(`MoveTransport`)다. 오른쪽 칸(좁은 세로
+ * 화면에서는 아래)에는 **엔진 상태 · 국면** 두 카드를 두고, 국면 카드가 개시 진행과
+ * 대국을 끝내는 두 버튼(기권·무승부)을 진다. 대국 **설정**은 설정 탭, 콘솔은 엔진
+ * 탭이다. 대국 시계는 없다.
  */
 export function BoardScreen() {
   const render = useBoardStore((s) => s.render);
@@ -32,6 +35,9 @@ export function BoardScreen() {
   const markBlocked = useBoardStore((s) => s.markBlocked);
   const applyAnalysis = useBoardStore((s) => s.applyAnalysis);
 
+  const resign = useGameStore((s) => s.resign);
+  const offerDraw = useGameStore((s) => s.offerDraw);
+  const playing = !result && render.stones.length > 0;
   const tap = useGameStore((s) => s.tap);
   const refreshForbidden = useGameStore((s) => s.refreshForbidden);
   const snapshot = useEngineStore((s) => s.snapshot);
@@ -74,6 +80,7 @@ export function BoardScreen() {
   return (
     <div className="boardscreen" data-evalbar={showEvalBar || undefined}>
       <div className="boardscreen__stage">
+        <QuickActions />
         <div className="boardscreen__board">
           {/* 평가 바와 판을 한 줄로 — 판은 바 몫을 뺀 정사각형이고, 바는 판과 같은
               높이다(CSS 의 컨테이너 단위). 둘을 묶어 가운데 둔다. */}
@@ -124,6 +131,16 @@ export function BoardScreen() {
               {last ? label(last, render.size) : "—"}
             </dd>
           </dl>
+          <OpeningProgress />
+          {/* 대국을 끝내는 두 버튼 — 결과가 적히는 이 카드에 둔다. 새 판은 보드 위 퀵 바. */}
+          <div className="panel__actions">
+            <button type="button" onClick={resign} disabled={!playing}>
+              기권
+            </button>
+            <button type="button" onClick={offerDraw} disabled={!playing}>
+              무승부
+            </button>
+          </div>
           <p className="panel__hint">
             길게 누르면 그 점을 차단 표시합니다 — 데스크톱의 Ctrl+클릭 자리입니다. 휠이나 두
             손가락으로 확대할 수 있고, ← → Home End 로 수를 옮깁니다.

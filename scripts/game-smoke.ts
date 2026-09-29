@@ -90,17 +90,15 @@ page.on("console", (m) => {
 
 // ── 화면 사이를 오가는 손 ────────────────────────────────────────────
 //
-// 대국 설정·조작(개시·컴퓨터 색·엔진 착수 시간·새 대국·기권·무승부)은 **설정 탭**에
-// 있고, 판·평가 바·엔진 상태·물음·「지금 두기」는 **보드 탭**에 있다. 대국 상태는
+// 대국 설정(개시·컴퓨터 색·엔진 착수 시간)은 **설정 탭**의 「자주 쓰는 설정」에 있고,
+// 판·평가 바·엔진 상태·물음·「지금 두기」·퀵 바(새 판·진영 전환)·기권·무승부는
+// **보드 탭**에 있다. 대국 상태는
 // 스토어에 살아 있으므로 탭을 오가도 판은 그대로다 — 사용자가 하는 그대로 레일로 오간다.
 
 type Screen = "board" | "settings";
 
 /** 설정 탭에 사는 버튼들. 여기 없는 이름은 보드 탭에서 누른다. */
 const ON_SETTINGS = new Set([
-  "새 대국",
-  "기권",
-  "무승부",
   // 엔진 착수 시간 칩. 분석 시간의 「무제한」은 radio 라 버튼 이름과 겹치지 않는다.
   "무제한",
   "1초",
@@ -224,19 +222,19 @@ async function analysisHealthy(label: string) {
   await runAnalysis(3_000);
   await page.waitForTimeout(300);
   const lines = (await page.evaluate(`window.__rapfiConsole()`)) as string[];
-  // 가장 최근 분석: 마지막 `YXNBEST 5` 에서 거슬러 올라가 분석 머리
-  // (`timeout_match 0`)까지. 대국의 무제한 착수는 YXNBEST 1 이라 섞이지 않는다.
-  let end = -1;
+  // 가장 최근 분석: 마지막 탐색 머리(`timeout_match 0` — 워커가 탐색마다 맨 먼저
+  // 보낸다)부터 끝까지. 분석 직후에 읽으므로 그 뒤의 탐색은 없다. 후보 수 기본이 1 이
+  // 되어 대국 착수와 같은 `YXNBEST 1` 이므로 명령의 모양으로는 가를 수 없다.
+  let start = -1;
   for (let i = lines.length - 1; i >= 0; i--) {
-    if (lines[i] === "> YXNBEST 5") {
-      end = i;
+    if (lines[i] === "> INFO timeout_match 0") {
+      start = i;
       break;
     }
   }
-  let start = end;
-  while (start > 0 && lines[start] !== "> INFO timeout_match 0") start--;
-  const win = lines.slice(start, end + 400);
-  const slices = win.filter((l) => l === "> YXNBEST 5").length;
+  const win = start < 0 ? [] : lines.slice(start);
+  const slices = win.filter((l) => l.startsWith("> YXNBEST")).length;
+  const end = slices > 0 ? start : -1;
   const boards = win.filter((l) => l.startsWith("> YXBOARD")).length;
   const TIME = /MaxTime ([\d.]+)(ms|s|min|h)/;
   const zero = win.filter((l) => {
@@ -463,7 +461,7 @@ try {
   // 옛 한도를 넉넉히 넘겨 20초를 기다린다.
   // **새 대국에서** 한다 — 위의 흩어진 사람 수로는 엔진이 곧 5목을 만들어 대국이
   // 끝나 있을 수 있고, 5목·막는 수 같은 뻔한 수는 엔진이 즉답한다(기다림이 없다).
-  await click("새 대국");
+  await click("새 판");
   await tap(7, 7);
   await waitStones(1, 5_000, "(무제한 대기 전 사람 수)");
   await page.waitForTimeout(20_000);
@@ -488,7 +486,7 @@ try {
   await goto("board");
   if ((await page.locator(".clock").count()) !== 0) fail("보드에 시계가 남아 있습니다");
   else ok("보드에 시계가 없다");
-  await click("새 대국");
+  await click("새 판");
   await click("3초");
   await click("컴퓨터 백");
   await tap(7, 7);
@@ -547,7 +545,7 @@ try {
   // ── 4. 기권 · 무승부 ──────────────────────────────────────────────
   console.log("\n4. 기권 · 무승부");
   await click("사람 대 사람"); // 엔진이 끼어들면 기권·무승부가 탐색과 엇갈린다
-  await click("새 대국");
+  await click("새 판");
   await click("무제한");
   await tap(7, 7);
   await click("기권");
@@ -555,7 +553,7 @@ try {
   if (!resigned.includes("기권")) fail(`기권 결과가 표시되지 않습니다: ${resigned}`);
   else ok(`기권 → ${resigned}`);
 
-  await click("새 대국");
+  await click("새 판");
   await tap(7, 7);
   await click("무승부");
   const drawn = (await page.locator(".gameover").innerText()).trim();
@@ -639,7 +637,7 @@ try {
   // (`docs/오프닝-협상-엔진-지원.md`). 화면에 남아 있으면 못 하는 일을 계속
   // 제안하게 되므로 목록에서 내렸다 — **배포본에서 그것을 확인한다.**
   console.log("\n8. 개시 목록");
-  await goto("settings"); // 개시 칩과 안내는 설정 탭의 「개시 규칙」 줄에 있다
+  await goto("settings"); // 개시 칩과 안내는 설정 탭의 「룰셋」 줄(자주 쓰는 설정)에 있다
   const chips = await page.locator('[role=group][aria-label="오프닝"] .chip').allInnerTexts();
   const names = chips.map((c) => c.trim()).sort();
   const want = ["RIF 오프닝", "자유 렌주", "첫 수 이후 교환"].sort();

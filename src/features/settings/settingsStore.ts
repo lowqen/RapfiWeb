@@ -82,6 +82,9 @@ export interface Settings {
   // ── 표시 ──
   /** 보드 옆 평가 바(앱 settings_dev 의 `showEvalBar`). */
   showEvalBar: boolean;
+  // ── 화면 ──
+  /** 설정 화면에서 고급 설정을 펼쳐 둘 것인가. */
+  showAdvanced: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -93,11 +96,22 @@ export const DEFAULT_SETTINGS: Settings = {
   hashAutoClear: false,
   threads: AUTO_THREADS,
   allowThreads: true,
-  // 5 는 W3 부터 분석이 보내 온 `YXNBEST 5` 그대로다 — 스모크가 그 줄로 조각을 센다.
   multiPv: MULTI_PV.initial,
   analysisSec: 0,
   showEvalBar: true,
+  showAdvanced: false,
 };
+
+/**
+ * 저장 형식의 판. **2** 부터 후보 수 기본이 1 이다. 그 전 판(번호 없음)은 기본값 5 를
+ * 그대로 저장해 두었으므로(설정 하나만 바꿔도 전체가 저장된다), 5 는 「고른 값」이
+ * 아니라 「옛 기본값」으로 보고 1 로 옮긴다. 5 가 아닌 값은 사용자가 고른 것이다.
+ */
+export const SETTINGS_VERSION = 2;
+export function migrate(raw: Partial<Settings> & { v?: number }): Partial<Settings> {
+  if ((raw.v ?? 1) < 2 && raw.multiPv === 5) return { ...raw, multiPv: 1 };
+  return raw;
+}
 
 const KEY = "rapfi.settings";
 
@@ -124,13 +138,14 @@ export function sanitize(raw: Partial<Settings>): Settings {
     multiPv: clamp(num(raw.multiPv, d.multiPv), MULTI_PV.min, MULTI_PV.max),
     analysisSec: sec > 0 ? Math.round(sec) : 0,
     showEvalBar: typeof raw.showEvalBar === "boolean" ? raw.showEvalBar : d.showEvalBar,
+    showAdvanced: typeof raw.showAdvanced === "boolean" ? raw.showAdvanced : d.showAdvanced,
   };
 }
 
 function load(): Settings {
   try {
     const text = localStorage.getItem(KEY);
-    return text ? sanitize(JSON.parse(text) as Partial<Settings>) : DEFAULT_SETTINGS;
+    return text ? sanitize(migrate(JSON.parse(text) as Partial<Settings>)) : DEFAULT_SETTINGS;
   } catch {
     return DEFAULT_SETTINGS;
   }
@@ -138,7 +153,7 @@ function load(): Settings {
 
 function save(s: Settings) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(s));
+    localStorage.setItem(KEY, JSON.stringify({ ...s, v: SETTINGS_VERSION }));
   } catch {
     /* 저장이 안 돼도 이번 세션은 정상 동작한다 */
   }
@@ -201,9 +216,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     push(next);
   },
   reset: () => {
-    set(DEFAULT_SETTINGS);
-    save(DEFAULT_SETTINGS);
-    push(DEFAULT_SETTINGS);
+    // 고급 설정 펼침은 값이 아니라 화면 상태다 — 초기화 버튼이 그 안에 있으므로,
+    // 같이 되돌리면 누르자마자 버튼이 접혀 사라진다.
+    const next = { ...DEFAULT_SETTINGS, showAdvanced: get().showAdvanced };
+    set(next);
+    save(next);
+    push(next);
   },
 }));
 
@@ -221,5 +239,6 @@ function pick(s: SettingsState): Settings {
     multiPv: s.multiPv,
     analysisSec: s.analysisSec,
     showEvalBar: s.showEvalBar,
+    showAdvanced: s.showAdvanced,
   };
 }

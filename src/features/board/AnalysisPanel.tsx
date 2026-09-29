@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useEngineStore } from "../../engine/engine-state";
 import type { SearchStats } from "../../engine/engine-types";
@@ -18,6 +18,12 @@ import { useGameStore } from "./gameStore";
  * 실시간으로 바뀌는 숫자(깊이·노드·속도)는 **보간하지 않는다.** 초당 몇 번씩
  * 바뀌는 값을 애니메이션하는 것은 이미 지나간 값에 대한 거짓말이다(`Motion.kt` 규칙).
  * 대신 `tnum` 으로 폭만 고정해 줄이 흔들리지 않게 한다.
+ *
+ * **TIME 만은 예외로 이 화면이 직접 센다**(`useSearchClock`). Rapfi 는 카운터를
+ * 깊이 한 단계가 끝날 때만 찍는데, 후보 수 1 로 멀티스레드 무제한 분석을 하면 깊은
+ * 단계 하나에 몇 초가 걸려 시간이 멈춘 것처럼 보였다. 경과 시간은 추정이 아니라
+ * 벽시계라 보간의 거짓말이 아니다 — 엔진이 말한 값과 벽시계 중 큰 쪽을 그린다.
+ * 노드·속도는 여전히 엔진이 말한 값만.
  *
  * 수치는 `dl.kv` 안에 남긴다 — 엔진 스모크가 «상태 점을 가진 패널의 `.kv dd`»로
  * 스트림 도착을 보고, **마지막 `dd` 를 최선수**로 읽는다. 그래서 BEST 가 맨 끝이다.
@@ -44,6 +50,8 @@ export function AnalysisPanel() {
 
   const { stats, pvs, bestMove } = snapshot;
   const searching = status === "searching";
+  const clockMs = useSearchClock(searching);
+  const timeMs = clockMs === null ? stats.timeMs : Math.max(stats.timeMs ?? 0, clockMs);
 
   if (!caps.variant) {
     return (
@@ -114,7 +122,7 @@ export function AnalysisPanel() {
         </Stat>
         <Stat k="EVAL">{formatEval(stats)}</Stat>
         <Stat k="WINRATE">{stats.winRatePct === null ? "—" : `${stats.winRatePct}%`}</Stat>
-        <Stat k="TIME">{formatTime(stats.timeMs)}</Stat>
+        <Stat k="TIME">{formatTime(timeMs)}</Stat>
         <Stat k="NODE">{compact(stats.nodes)}</Stat>
         <Stat k="SPEED">{stats.speed === null ? "—" : `${compact(stats.speed)}/s`}</Stat>
         <Stat k="BEST" wide>
@@ -153,6 +161,25 @@ export function AnalysisPanel() {
       </p>
     </section>
   );
+}
+
+/**
+ * 이번 탐색이 시작된 뒤 흐른 벽시계 ms(0.1초 간격). 탐색 중이 아니면 null.
+ * 탐색이 끝났다 다시 시작하면(분석 중 착수 등) 0 부터 — 집계기도 그때 0 으로 돈다.
+ */
+function useSearchClock(searching: boolean): number | null {
+  const [ms, setMs] = useState<number | null>(null);
+  useEffect(() => {
+    if (!searching) {
+      setMs(null);
+      return;
+    }
+    const t0 = performance.now();
+    setMs(0);
+    const id = window.setInterval(() => setMs(performance.now() - t0), 100);
+    return () => window.clearInterval(id);
+  }, [searching]);
+  return searching ? ms : null;
 }
 
 function Stat({ k, wide, children }: { k: string; wide?: boolean; children: ReactNode }) {

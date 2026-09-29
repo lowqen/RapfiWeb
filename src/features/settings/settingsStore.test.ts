@@ -3,7 +3,9 @@ import {
   AUTO_THREADS,
   DEFAULT_SETTINGS,
   autoThreads,
+  SETTINGS_VERSION,
   engineInfo,
+  migrate,
   resolveThreads,
   sanitize,
   toEngineConfig,
@@ -36,5 +38,24 @@ describe("스레드 설정", () => {
     const info = engineInfo(DEFAULT_SETTINGS);
     expect(info.some((c) => c.kind === "info" && c.key === "thread_num")).toBe(false);
     expect(toEngineConfig({ ...DEFAULT_SETTINGS, threads: 3 }).threads).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("후보 수 · 고급 설정", () => {
+  it("후보 수 기본은 1 — 한 수를 깊게", () => {
+    expect(DEFAULT_SETTINGS.multiPv).toBe(1);
+  });
+
+  it("옛 저장본(버전 없음)의 기본값 5 는 새 기본 1 로 옮기고, 고른 다른 값은 둔다", () => {
+    expect(sanitize(migrate({ multiPv: 5 })).multiPv).toBe(1);
+    expect(sanitize(migrate({ multiPv: 3 })).multiPv).toBe(3);
+    // 새 버전에서 일부러 5 를 고른 것은 그대로다.
+    expect(sanitize(migrate({ multiPv: 5, v: SETTINGS_VERSION })).multiPv).toBe(5);
+  });
+
+  it("고급 설정은 기본으로 접혀 있고, 타입이 틀리면 접는다", () => {
+    expect(DEFAULT_SETTINGS.showAdvanced).toBe(false);
+    expect(sanitize({ showAdvanced: true }).showAdvanced).toBe(true);
+    expect(sanitize({ showAdvanced: 1 as unknown as boolean }).showAdvanced).toBe(false);
   });
 });

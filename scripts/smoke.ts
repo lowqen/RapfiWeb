@@ -201,9 +201,20 @@ try {
   else if ((await meter.getAttribute("aria-valuenow")) !== "50") {
     fail(`엔진 없이 평가 바가 50 이 아닙니다: ${await meter.getAttribute("aria-valuenow")}`);
   }
-  for (const gone of ["새 대국", "기권", "컴퓨터 백"]) {
+  for (const gone of ["새 대국", "컴퓨터 백"]) {
     const n = await page.getByRole("button", { name: gone, exact: true }).count();
     if (n !== 0) fail(`「${gone}」 이 아직 보드 화면에 있습니다 — 설정 탭의 것입니다`);
+  }
+  // 퀵 액션 바 — 판 위에 자주 누르는 다섯, 국면 카드에 기권·무승부.
+  const quickbar = page.getByRole("navigation", { name: "퀵 액션" });
+  if ((await quickbar.count()) !== 1) fail("보드에 퀵 액션 바가 없습니다");
+  for (const name of ["분석 켜기", "무르기", "되돌리기", "새 판", "진영 전환"]) {
+    const n = await quickbar.getByRole("button", { name, exact: true }).count();
+    if (n !== 1) fail(`퀵 액션 바에 「${name}」 이 하나가 아닙니다: ${n}개`);
+  }
+  for (const name of ["기권", "무승부"]) {
+    const n = await page.getByRole("button", { name, exact: true }).count();
+    if (n !== 1) fail(`보드 국면 카드에 「${name}」 이 하나가 아닙니다: ${n}개`);
   }
   if ((await page.locator(".console").count()) !== 0) fail("콘솔이 아직 보드 화면에 있습니다");
 
@@ -288,10 +299,14 @@ try {
   // 대국 스모크가 이름으로 집는 칩들이 이 화면에 있어야 한다.
   await page.locator(".rail__link", { hasText: "설정" }).click();
   await page.waitForURL("**/settings");
-  const groups = await page.locator(".sgroup").count();
-  const rows = await page.locator(".srow").count();
-  if (groups < 6) fail(`설정 분류 카드가 모자랍니다: ${groups}`);
-  for (const name of ["새 대국", "컴퓨터 백", "RIF 오프닝", "3초", "무제한"]) {
+  // 처음에는 「자주 쓰는 설정」 카드 하나와 고급 설정 스위치만 — 고급은 접혀 있다.
+  const basicGroups = await page.locator(".sgroup").count();
+  const basicRows = await page.locator(".srow").count();
+  if (basicGroups !== 1) fail(`고급을 접었는데 설정 카드가 하나가 아닙니다: ${basicGroups}`);
+  if (basicRows < 5 || basicRows > 9) fail(`자주 쓰는 설정이 엄선되지 않았습니다: ${basicRows}줄`);
+  const advSwitch = page.getByRole("switch", { name: "고급 설정", exact: true });
+  if ((await advSwitch.count()) !== 1) fail("고급 설정 스위치가 없습니다");
+  for (const name of ["컴퓨터 백", "RIF 오프닝", "3초", "무제한"]) {
     const n = await page.getByRole("button", { name, exact: true }).count();
     if (n !== 1) fail(`설정 탭에 「${name}」 이 하나가 아닙니다: ${n}개`);
   }
@@ -299,10 +314,10 @@ try {
   // 격리되지 않은 곳(SMOKE_ISOLATE=0)이면 단일로 계획되고 선택이 잠겨 있어야 한다.
   const isolated = (await page.evaluate("crossOriginIsolated")) as boolean;
   if (isolated !== ISOLATE) fail(`crossOriginIsolated=${isolated} (기대 ${ISOLATE})`);
-  const variantText = (await page.locator(".srow", { hasText: "엔진 변형" }).innerText()).trim();
+  const variantText = (await page.locator('[data-k="engine-variant"]').innerText()).trim();
   const wantVariant = ISOLATE ? "multi-simd128" : "single-simd128";
   if (!variantText.includes(wantVariant))
-    fail(`엔진 변형 줄이 ${wantVariant} 가 아닙니다: ${variantText}`);
+    fail(`스레드 줄의 엔진 변형이 ${wantVariant} 가 아닙니다: ${variantText}`);
   const threadGroup = page.getByRole("radiogroup", { name: "스레드 수" });
   if ((await threadGroup.count()) !== 1) fail("스레드 수 선택이 없습니다");
   else {
@@ -312,16 +327,23 @@ try {
     }
   }
 
+  // 검색은 접힌 고급 설정까지 찾는다.
   await page.getByRole("searchbox", { name: "설정 검색" }).fill("hash_size");
   const filtered = await page.locator(".srow").count();
   if (filtered !== 1) fail(`«hash_size» 검색이 한 줄로 좁혀지지 않습니다: ${filtered}줄`);
   await page.getByRole("searchbox", { name: "설정 검색" }).fill("");
-  // 해시 크기를 바꾸면 새로고침 뒤에도 남는다(localStorage).
+  // 고급을 펼치면 엔진·표시·시스템 카드가 이어진다.
+  await advSwitch.click();
+  const groups = await page.locator(".sgroup").count();
+  const rows = await page.locator(".srow").count();
+  if (groups !== 4) fail(`고급을 펼쳤는데 설정 카드가 넷이 아닙니다: ${groups}`);
+  // 해시 크기를 바꾸면 새로고침 뒤에도 남는다(localStorage) — 고급 펼침도 함께.
   await page.getByRole("radio", { name: "256", exact: true }).click();
   await page.reload({ waitUntil: "networkidle" });
   const kept = await page
     .getByRole("radio", { name: "256", exact: true })
-    .getAttribute("aria-checked");
+    .getAttribute("aria-checked")
+    .catch(() => "없음(고급이 다시 접힘)");
   if (kept !== "true") fail(`해시 크기가 새로고침 뒤 남지 않았습니다: aria-checked=${kept}`);
   await page.evaluate(() => localStorage.removeItem("rapfi.settings"));
   // 좁은 폭에서도 가로로 넘치지 않는가 — 칩·세그먼트가 줄을 밀어내면 여기서 잡힌다.
@@ -350,7 +372,7 @@ try {
     console.log(
       "스모크 통과 — 레일 6 · 연구 탭 4 · 라우팅 · 토큰(라이트/다크) · 좁은 폭 전환\n" +
         "             보드 2레이어 · 나무 렌더 · H8 착수 · 중복 착수 무시 · 다크 나무\n" +
-        `             보드 옆 칸 2장 · 평가 바(판 높이) · 설정 ${rows}줄(검색·저장·좁은 폭) · 엔진 탭`,
+        `             보드 옆 칸 2장 · 퀵 바 · 평가 바(판 높이) · 설정 ${basicRows}+${rows - basicRows}줄(고급 스위치·검색·저장·좁은 폭) · 엔진 탭`,
     );
   }
 } finally {

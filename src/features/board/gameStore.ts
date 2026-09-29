@@ -71,6 +71,12 @@ interface GameState {
   log: readonly string[];
 
   setComputerSide: (s: ComputerSide) => void;
+  /**
+   * 진영 전환 — 컴퓨터가 맡은 색을 맞바꾼다(흑 ↔ 백). 바꾼 뒤 **엔진 차례면 곧바로
+   * 둔다** — 판을 눌러 「두어라」 하던 것을 한 번에(데스크톱의 교환 버튼과 같다).
+   * 사람 대 사람·양쪽 컴퓨터에서는 바꿀 진영이 없어 아무 일도 하지 않는다.
+   */
+  swapSides: () => void;
   setOpening: (o: OpeningProtocol) => void;
   setMoveTime: (ms: number) => void;
   toggleForbidden: () => void;
@@ -294,6 +300,25 @@ export const useGameStore = create<GameState>((set, get) => {
       set({ computerSide });
       log(`컴퓨터: ${computerSide}`);
       refreshForbidden();
+    },
+
+    swapSides: () => {
+      const s = get();
+      if (s.computerSide === "none" || s.computerSide === "both") return;
+      // 엔진이 생각 중이거나 물음이 떠 있으면 판을 누를 때와 같이 받지 않는다.
+      if (s.thinking || s.prompt) return;
+      const next = swappedSide(s.computerSide);
+      set({ computerSide: next });
+      log(`진영 전환: ${next}`);
+      refreshForbidden();
+      const moves = board().render.stones;
+      if (
+        !s.result &&
+        enginePlays(next, sideToMove(moves)) &&
+        openingLetsEngineMove(s.opening, moves.length)
+      ) {
+        engineTurn();
+      }
     },
 
     setOpening: (opening) => {

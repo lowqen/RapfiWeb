@@ -29,6 +29,7 @@ export function EngineScreen() {
   const analyzing = useEngineStore((s) => s.analyzing);
   const start = useEngineStore((s) => s.start);
   const terminate = useEngineStore((s) => s.terminate);
+  const send = useEngineStore((s) => s.send);
   const lines = useEngineStore((s) => s.console);
   const clearConsole = useEngineStore((s) => s.clearConsole);
   const engine = useEngineStore((s) => s.engine);
@@ -79,13 +80,23 @@ export function EngineScreen() {
           <button type="button" onClick={terminate} disabled={status === "idle"}>
             종료
           </button>
+          {/* 한 번 쓰는 동작이라 설정 목록이 아니라 엔진 곁에 둔다. 탐색 중에 보내면
+              읽던 표를 발밑에서 비우게 되므로 대기 중일 때만. */}
+          <button
+            type="button"
+            onClick={() => send({ kind: "raw", line: "YXHASHCLEAR" })}
+            disabled={status !== "ready"}
+            title="YXHASHCLEAR — 치환표를 지금 한 번 비웁니다"
+          >
+            해시 비우기
+          </button>
         </div>
         <p className="panel__hint">
-          탐색 파라미터는{" "}
+          스레드 수는{" "}
           <Link className="inline-link" to="/settings">
-            설정 › 엔진
+            설정
           </Link>
-          에서 바꿉니다.
+          의 자주 쓰는 설정에, 해시·스타일·깊이 등 탐색 파라미터는 고급 설정에 있습니다.
         </p>
       </section>
 

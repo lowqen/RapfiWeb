@@ -30,8 +30,12 @@ import { toEvalView, type EvalView } from "./eval-view";
 /** 콘솔 링버퍼 상한. 앱과 같은 값(계획서 §3). */
 const CONSOLE_MAX = 5000;
 
-/** 후보 수 범위. 기본 5 는 W3 부터 분석이 보내 온 `YXNBEST 5` 그대로다. */
-export const MULTI_PV = { min: 1, max: 10, initial: 5 } as const;
+/**
+ * 후보 수(`YXNBEST n`) 범위. **기본은 1** — 앱(`EngineParams.multiPv`)·데스크톱처럼 최선
+ * 한 수를 깊이 읽는 것이 기본이고, 후보 여럿은 필요할 때 설정에서 늘린다. 후보를
+ * 늘리면 같은 시간에 수마다 나눠 읽어 최선수의 깊이가 얕아진다.
+ */
+export const MULTI_PV = { min: 1, max: 10, initial: 1 } as const;
 
 interface EngineState {
   status: EngineStatus;
