@@ -176,3 +176,18 @@ mkdirSync(OUT, { recursive: true });
 writeFileSync(join(OUT, "w0c.json"), JSON.stringify(results, null, 2));
 writeFileSync(join(OUT, "w0c.md"), md.join("\n") + "\n");
 console.log("\n" + md.join("\n"));
+
+// W0C_REQUIRE="multi:worker-pthread,multi:page" — 이 조합(격리)이 **모든** 브라우저에서
+// 통과해야 한다. 릴리스 관문이 쓴다. 없으면 표만 내고 늘 0 으로 끝난다(실험용).
+const required = (process.env.W0C_REQUIRE ?? "").split(",").filter(Boolean);
+const missed = required.flatMap((spec) => {
+  const [variant, mode] = spec.split(":");
+  return results
+    .filter((r) => r.variant === variant && r.mode === mode && r.iso)
+    .filter((r) => !r.ok)
+    .map((r) => `${r.browser} ${spec}: ${r.stage} ${r.error}`);
+});
+if (missed.length) {
+  console.error(`\n관문 실패:\n  ${missed.join("\n  ")}`);
+  process.exit(1);
+}

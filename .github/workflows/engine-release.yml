@@ -9,12 +9,17 @@ name: 엔진 릴리스 (WASM 산출물)
 # 죽으므로, 웹 CI 와 배포는 여기서 만든 릴리스에서 받아 조립한다.
 #
 # 수동 실행이다 — 엔진 커밋이나 가중치가 바뀔 때만 다시 돌린다.
+#
+# **두 변형을 한 빌드에서 낸다(W0c 이후).** 커밋된 .js 는 같은 빌드의 .wasm·.data 와
+# 짝이어야 한다(글루에 데이터 패키지 목록이 박힌다). 멀티 변형은 COOP/COEP 아래에서
+# 세 브라우저 모두 동작함이 확인됐다(docs/W0c-결과.md) — 앱이 환경을 보고 고른다.
+# 새 태그로 낸다: 앞 릴리스를 지우고 다시 만드는 사이에 web·deploy 가 깨지지 않게.
 on:
   workflow_dispatch:
     inputs:
       tag:
         description: "릴리스 태그"
-        default: "engine-3c94c2a9"
+        default: "engine-3c94c2a9-mt"
         type: string
 
 permissions:
@@ -58,6 +63,18 @@ jobs:
       - name: 웹 회귀 게이트 (single-simd128)
         run: node spike/node-bench.mjs single-simd128
 
+      # 멀티 변형 관문 — 앱과 같은 구성(전용 워커 + pthread 가드)으로 chromium 에서
+      # 기동·왕복·정지가 되는지. 실패하면 릴리스를 내지 않는다.
+      - uses: pnpm/action-setup@v4
+      - run: pnpm install --no-frozen-lockfile
+      - name: 멀티 변형 관문 (W0c 하네스, chromium)
+        env:
+          BROWSERS: chromium
+          W0C_REQUIRE: "multi:worker-pthread,multi:page"
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          node spike/w0c/run.mjs
+
       - name: emsdk 캐시 저장
         if: always()
         uses: actions/cache/save@v4
@@ -75,7 +92,7 @@ jobs:
       - name: 릴리스 본문
         run: |
           {
-            echo "Rapfi WebAssembly 산출물 (배포 경로: single-simd128)."
+            echo "Rapfi WebAssembly 산출물 — single-simd128 + multi-simd128 (앱이 환경을 보고 고른다)."
             echo
             echo '```'
             cat out/engine/ENGINE_VERSION.txt
@@ -105,15 +122,21 @@ jobs:
             out/engine/rapfi-single-simd128.js \
             out/engine/rapfi-single-simd128.wasm \
             out/engine/rapfi-single-simd128.data \
+            out/engine/rapfi-multi-simd128.js \
+            out/engine/rapfi-multi-simd128.wasm \
+            out/engine/rapfi-multi-simd128.data \
             out/engine/ENGINE_VERSION.txt
           gh release view "$TAG" --json assets -q '.assets[] | "\(.name)  \(.size)"'
 
-      # .js/.wasm 은 커밋 대상이라 따로 꺼내 둔다 — 사람이 받아서 public/engine/ 에 넣는다.
+      # .js/.wasm 은 커밋 대상이다 — 릴리스에서 `gh release download` 로 받아
+      # public/engine/ 에 넣는다. 아티팩트는 덤이고, 계정 저장 한도가 차 있으면
+      # 올라가지 않으므로 잡을 깨지 않게 둔다.
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: engine-committable
           path: |
-            out/engine/rapfi-single-simd128.js
-            out/engine/rapfi-single-simd128.wasm
+            out/engine/rapfi-*-simd128.js
+            out/engine/rapfi-*-simd128.wasm
             out/engine/ENGINE_VERSION.txt
           if-no-files-found: error
