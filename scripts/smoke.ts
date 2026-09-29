@@ -163,10 +163,21 @@ try {
     () => (document.querySelector("canvas.board__layer") as HTMLCanvasElement).width,
   );
   await page.setViewportSize({ width: 1100, height: 700 });
-  await page.waitForTimeout(200);
-  const widthAfter = await page.evaluate(
-    () => (document.querySelector("canvas.board__layer") as HTMLCanvasElement).width,
-  );
+  // 고정 200ms 가 아니라 **바뀔 때까지**(최대 3초) 기다린다 — ResizeObserver → 다시
+  // 그리기가 느린 CI 러너에서 200ms 를 넘긴 적이 있다(비격리 런에서 빨갛게 됐다).
+  const widthAfter = await page
+    .waitForFunction(
+      (before) =>
+        (document.querySelector("canvas.board__layer") as HTMLCanvasElement).width !== before,
+      widthBefore,
+      { timeout: 3000 },
+    )
+    .then(() =>
+      page.evaluate(
+        () => (document.querySelector("canvas.board__layer") as HTMLCanvasElement).width,
+      ),
+    )
+    .catch(() => widthBefore);
   if (widthAfter === widthBefore) {
     fail(`리사이즈에도 캔버스 해상도가 그대로입니다: ${widthBefore}`);
   }
