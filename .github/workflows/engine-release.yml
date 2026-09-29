@@ -67,11 +67,17 @@ jobs:
       - name: 웹 회귀 게이트 (single-simd128)
         run: node spike/node-bench.mjs single-simd128
 
-      # relaxed 명령은 명세상 **구현 정의**다. 러너(x86)에서 일반 SIMD 와 BENCH 해시가
-      # 다르면 relaxed 가 결과를 바꾼다는 뜻이라 릴리스를 막는다(web-baseline.json 에 같은
-      # 해시를 적어 두었다). 노드 20 의 V8 은 플래그가 있어야 relaxed 를 읽는다.
-      - name: relaxed 결정성 게이트 (single-simd128-relaxed = single-simd128)
+      # relaxed 명령은 명세상 **구현 정의**다. 두 게이트로 본다(노드 20 의 V8 은 플래그가
+      # 있어야 relaxed 를 읽는다):
+      #   1. 회귀 — relaxed 빌드 자신의 BENCH 기준선(web-baseline.json). 렌주 전용 .data 의
+      #      BENCH 는 국면 7/10 이 classical 폴백으로 돌고 그 경로가 relaxed 에서 갈리므로
+      #      일반 SIMD 와 같은 값을 요구하지 않는다(릴리스 런 36607275266 에서 확인).
+      #   2. 동등성 — 앱이 타는 **렌주·NNUE** 경로에서 relaxed = 일반. 국면 5개를 1 스레드 고정
+      #      깊이로 읽어 노드·평가·수순이 모두 같아야 한다. 다르면 relaxed 를 내지 않는다.
+      - name: relaxed 회귀 게이트 (BENCH)
         run: node --experimental-wasm-relaxed-simd spike/node-bench.mjs single-simd128-relaxed
+      - name: relaxed 동등성 게이트 (렌주 · NNUE — relaxed = 일반)
+        run: node --experimental-wasm-relaxed-simd spike/relaxed-equivalence.mjs
 
       # 멀티 변형 관문 — 앱과 같은 구성(전용 워커 + pthread 가드)으로 chromium 에서
       # 기동·왕복·정지가 되는지. 실패하면 릴리스를 내지 않는다.
