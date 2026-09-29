@@ -38,6 +38,15 @@ NETWORKS_COMMIT="${NETWORKS_COMMIT:-e32ad77a5364363b3e3a02b3f9e8610ade19ea98}"
 # W0 가 통과하면 그때 나온 버전을 여기 고정한다(안드로이드가 NDK r27c 를 박아둔 것과 같은 이유).
 EMSDK_VERSION="${EMSDK_VERSION:-latest}"
 ENABLE_LTO="${ENABLE_LTO:-ON}"
+# 벤치(bench-gomocalc.yml)용 스위치. **기본값은 배포 구성 그대로**다 — 릴리스·스파이크
+# 워크플로는 이 둘을 건드리지 않는다.
+#   PRELOAD_SET=full   upstream 프리로드(가중치 4종, 40.3MB)를 그대로 굽는다. BENCH 의
+#                      자체 국면 10개 중 7개가 프리스타일·스탠다드라, 렌주 전용 .data 로는
+#                      gomocalc 와 BENCH 를 같은 조건으로 잴 수 없다. 25MB 를 넘어 배포 불가.
+#   EXTRA_VARIANTS     공백 구분. multi-simd128-relaxed / single-simd128-relaxed
+#                      (-DUSE_WASM_SIMD_RELAXED=ON — gomocalc 가 멀티에 싣는 변형)
+PRELOAD_SET="${PRELOAD_SET:-renju}"
+EXTRA_VARIANTS="${EXTRA_VARIANTS:-}"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK="${WORK:-$HOME/rapfi-wasm-work}"
@@ -134,6 +143,13 @@ echo ">>> [2.5/6] 프리로드 축소 — **렌주 전용**"
 # 프리로드 목록이 CMakeLists 가 아니라 **Networks 의 데이터 파일**이라는 점이
 # 이걸 값싸게 만든다 — 엔진 소스에는 손대지 않는다.
 cd "$WORK/rapfi"
+if [ "$PRELOAD_SET" = "full" ]; then
+  # 벤치 전용. 캐시된 소스에는 앞선 렌주 빌드가 덮어쓴 목록이 남아 있을 수 있으므로
+  # upstream 원본으로 되돌린다.
+  git -C Networks checkout -- wasm_preloads.txt
+  echo "  . PRELOAD_SET=full — upstream 프리로드 그대로(가중치 4종). **배포 금지**(25MB 초과)"
+  sed "s/^/  | /" Networks/wasm_preloads.txt
+else
 cat > Networks/wasm_preloads.txt << 'PRELOADS'
 config-example/rapfiweb-renju.toml@config.toml
 classical/model210901.bin@/
@@ -163,6 +179,7 @@ pathlib.Path("Networks/config-example/rapfiweb-renju.toml").write_text(src, enco
 print("  . rapfiweb-renju.toml 생성 — 가중치 항목 1개(렌주 흑/백)만 남음")
 PY
 grep -A3 "model.evaluator.weights" Networks/config-example/rapfiweb-renju.toml | sed "s/^/  . /"
+fi
 
 echo ">>> [3/6] 빌드 (SIMD 2종)"
 cd "$WORK/rapfi/Rapfi"
@@ -185,17 +202,17 @@ cd "$WORK/rapfi/Rapfi"
 # 우리가 만들려던 stdin 배관을 preamble.js 가 이미 제공한다.
 
 build_variant () {
-  local name=$1 threads=$2
+  local name=$1 threads=$2 relaxed=${3:-OFF}
   local dir="build-$name"
   local extra=()
   [ "$threads" = "ON" ] || extra+=(-DNO_MULTI_THREADING=ON)
 
-  echo "--- build: $name (threads=$threads) ---"
+  echo "--- build: $name (threads=$threads relaxed=$relaxed) ---"
   emcmake cmake -S . -B "$dir" -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DNO_COMMAND_MODULES=ON \
     -DUSE_WASM_SIMD=ON \
-    -DUSE_WASM_SIMD_RELAXED=OFF \
+    -DUSE_WASM_SIMD_RELAXED="$relaxed" \
     "${extra[@]}"
   cmake --build "$dir" -j"$JOBS"
 }
@@ -208,6 +225,17 @@ build_variant () {
 # Safari 16.4+ 이고, 빠지는 것은 사실상 iOS 16.4 미만이다.
 build_variant single-simd128 OFF
 build_variant multi-simd128  ON
+
+# 벤치용 추가 변형(EXTRA_VARIANTS). 이름이 곧 설정이다.
+VARIANTS=(single-simd128 multi-simd128)
+for v in $EXTRA_VARIANTS; do
+  case "$v" in
+    multi-simd128-relaxed)  build_variant "$v" ON ON ;;
+    single-simd128-relaxed) build_variant "$v" OFF ON ;;
+    *) echo "  X 모르는 변형: $v"; exit 1 ;;
+  esac
+  VARIANTS+=("$v")
+done
 
 echo ">>> [4/6] 수집"
 rm -rf "$OUT"
@@ -241,7 +269,7 @@ collect () {
   # pthread 빌드는 emscripten 버전에 따라 별도 워커 스크립트를 낼 수 있다.
   find "$dir" -maxdepth 2 -name "*.worker.js" -exec cp {} "$OUT/engine/rapfi-$name.worker.js" \; || true
 }
-for n in single-simd128 multi-simd128; do collect "$n"; done
+for n in "${VARIANTS[@]}"; do collect "$n"; done
 # upstream 은 EXPORT_ES6 를 쓰지 않는다 — 글루는 CommonJS 다. 그런데 저장소 루트
 # package.json 에 "type": "module" 이 있어 node 가 이 .js 를 ESM 으로 읽고
 # "require is not defined" 로 죽는다. 이 한 줄이 그 폴더만 예외로 돌린다.
@@ -291,8 +319,12 @@ verify () {
   fi
   echo "  OK $name"
 }
-verify single-simd128 OFF
-verify multi-simd128  ON
+for n in "${VARIANTS[@]}"; do
+  case "$n" in
+    multi-*) verify "$n" ON ;;
+    *) verify "$n" OFF ;;
+  esac
+done
 
 echo ">>> [6/6] BENCH 대조 묶음 + 버전 기록"
 # 안드로이드 스크립트와 **같은 파일들**이어야 대조가 성립한다.
@@ -312,7 +344,8 @@ ls -l "$OUT/bench" | sed "s/^/  . /"
   echo "emscripten : $EMSDK_RESOLVED"
   echo "cmake opts : -DNO_COMMAND_MODULES=ON -DUSE_WASM_SIMD=ON -DUSE_WASM_SIMD_RELAXED=OFF -DCMAKE_BUILD_TYPE=Release"
   echo "link opts  : (upstream CMakeLists 의 EMSCRIPTEN 블록이 전부 정한다 — 우리는 얹지 않는다)"
-  echo "variants   : single-simd128 / multi-simd128"
+  echo "variants   : ${VARIANTS[*]}"
+  echo "preloads   : $PRELOAD_SET"
   echo "note       : SIMD 없는 변형은 eval/mix10nnue.cpp 의 static_assert 때문에 이 커밋에서 빌드되지 않는다"
   echo "built_at   : $(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "build_by   : RapfiWeb/tools/build_engine_wasm.sh"

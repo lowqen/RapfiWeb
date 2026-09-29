@@ -22,7 +22,9 @@ on:
       - "docs/**"
       - "spike/**"
       - "tools/**"
+      - "bench/**"
       - ".github/workflows/w0-*.yml"
+      - ".github/workflows/bench-*.yml"
       - ".github/workflows/tone-dump.yml"
       - ".github/workflows/engine-release.yml"
   workflow_dispatch:

@@ -5,6 +5,10 @@
 /node_modules/
 /results/
 
+# 벤치가 내려받는 엔진(gomocalc 배포본 · 우리 릴리스) — 남의 바이너리이고 60MB 다.
+# bench/gomocalc/fetch-engines.mjs 가 다시 받는다. 측정 결과(results/)는 커밋한다.
+/bench/gomocalc/engines/
+
 # 생성물. src/core/design/{ramps,scheme,tokens}.ts 가 원본이고 dev·build 가 매번 굽는다 —
 # 커밋해 두면 «램프를 고치고 CSS 를 잊는» 어긋남이 생길 수 있어 아예 두지 않는다.
 src/styles/tokens.css

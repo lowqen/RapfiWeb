@@ -9,7 +9,9 @@ on:
       - "docs/**"
       - "spike/**"
       - "tools/**"
+      - "bench/**"
       - ".github/workflows/w0-*.yml"
+      - ".github/workflows/bench-*.yml"
   pull_request:
   workflow_dispatch:
 

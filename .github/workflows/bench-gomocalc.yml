@@ -1,0 +1,113 @@
+name: 엔진 벤치 (gomocalc 대조)
+
+# bench/gomocalc 하네스를 4코어 러너에서 돌린다. 로컬(2코어 Celeron)로는 스레드 확장을
+# 2 까지밖에 못 보고, **같은 가중치**로 BENCH 를 대조하려면 가중치 4종을 구운 우리
+# 엔진이 필요하다(배포 .data 는 렌주 전용이라 BENCH 국면 7/10 이 폴백 평가로 돈다).
+#
+#   rapfiweb       배포 중인 릴리스(렌주 전용 .data)
+#   rapfiweb-full  같은 소스·같은 플래그 + 가중치 4종 + relaxed SIMD 멀티 변형 — 벤치 전용,
+#                  배포·릴리스하지 않는다(.data 40.3MB 는 Cloudflare 25MB 상한 초과)
+#   gomocalc       www.gomocalc.com/build 에 배포된 그대로
+#
+# 결과는 아티팩트가 아니라 **로그와 잡 요약**에 남긴다(아티팩트 저장 한도).
+# 수동 실행이다.
+on:
+  workflow_dispatch:
+    inputs:
+      build_full:
+        description: "rapfiweb-full(가중치 4종 + relaxed) 을 빌드해 함께 잴지"
+        default: true
+        type: boolean
+      threads:
+        description: "멀티 변형 스레드 수"
+        default: "1,2,4"
+        type: string
+      time_ms:
+        description: "국면당 탐색 시간(ms)"
+        default: "10000"
+        type: string
+      repeat:
+        description: "반복"
+        default: "2"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    env:
+      WORK: ${{ github.workspace }}/../rapfi-wasm-work
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: pnpm/action-setup@v4
+      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+
+      - name: 엔진 받기 (gomocalc · 우리 릴리스)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node bench/gomocalc/fetch-engines.mjs
+
+      - name: 시스템 도구
+        if: inputs.build_full
+        run: sudo apt-get update -qq && sudo apt-get install -y ninja-build ccache file
+
+      - name: emsdk 캐시 복원
+        if: inputs.build_full
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.WORK }}/emsdk
+          key: emsdk-latest-v1
+
+      - name: rapfi 소스 캐시 복원
+        if: inputs.build_full
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.WORK }}/rapfi
+          key: rapfi-3c94c2a9-v1
+
+      - name: 실험 빌드 — 가중치 4종 + relaxed SIMD
+        if: inputs.build_full
+        env:
+          PRELOAD_SET: full
+          EXTRA_VARIANTS: multi-simd128-relaxed
+          ENABLE_LTO: "ON"
+        run: |
+          bash tools/build_engine_wasm.sh
+          mkdir -p bench/gomocalc/engines/rapfiweb-full
+          cp out/engine/rapfi-*.js out/engine/rapfi-*.wasm out/engine/rapfi-*.data out/engine/ENGINE_VERSION.txt \
+             bench/gomocalc/engines/rapfiweb-full/
+          ls -l bench/gomocalc/engines/rapfiweb-full
+          # 보고서의 근거 — 컴파일·링크 줄에 실제로 무엇이 붙었는가
+          for v in single-simd128 multi-simd128-relaxed; do
+            nj="$WORK/rapfi/Rapfi/build-$v/build.ninja"
+            echo "--- $v: FLAGS / LINK_FLAGS"
+            grep -m1 -E "^\s+FLAGS = " "$nj" || true
+            grep -m1 -E "^\s+LINK_FLAGS = " "$nj" | cut -c1-600 || true
+          done
+
+      - name: 벤치
+        env:
+          ENGINES: ${{ inputs.build_full && 'gomocalc,rapfiweb,rapfiweb-full' || 'gomocalc,rapfiweb' }}
+          THREADS: ${{ inputs.threads }}
+          TIME_MS: ${{ inputs.time_ms }}
+          REPEAT: ${{ inputs.repeat }}
+          BENCH: single-simd128,multi-simd128-relaxed
+          LABEL: ci
+        run: node bench/gomocalc/run.mjs
+
+      - name: 요약
+        if: always()
+        run: |
+          if [ -f bench/gomocalc/results/ci.json ]; then
+            node bench/gomocalc/report.mjs bench/gomocalc/results/ci.json | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "::group::results/ci.json"
+            cat bench/gomocalc/results/ci.json
+            echo "::endgroup::"
+          fi

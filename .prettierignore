@@ -4,6 +4,7 @@ out-diag
 results
 node_modules
 spike
+bench/gomocalc/engines
 public/engine
 public/weights
 src/styles/tokens.css

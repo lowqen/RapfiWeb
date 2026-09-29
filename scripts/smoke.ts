@@ -205,10 +205,13 @@ try {
     const n = await page.getByRole("button", { name: gone, exact: true }).count();
     if (n !== 0) fail(`「${gone}」 이 아직 보드 화면에 있습니다 — 설정 탭의 것입니다`);
   }
-  // 퀵 액션 바 — 판 위에 자주 누르는 다섯, 국면 카드에 기권·무승부.
+  // 퀵 액션 바 — 판 위에 새 판·진영 전환 둘뿐, 국면 카드에 기권·무승부. 분석·무르기·
+  // 되돌리기는 이동 바의 몫이라 퀵 바에 다시 생기면 여기서 잡는다(위아래 두 벌).
   const quickbar = page.getByRole("navigation", { name: "퀵 액션" });
   if ((await quickbar.count()) !== 1) fail("보드에 퀵 액션 바가 없습니다");
-  for (const name of ["분석 켜기", "무르기", "되돌리기", "새 판", "진영 전환"]) {
+  const quickButtons = await quickbar.getByRole("button").count();
+  if (quickButtons !== 2) fail(`퀵 액션 바 버튼이 둘(새 판·진영 전환)이 아닙니다: ${quickButtons}`);
+  for (const name of ["새 판", "진영 전환"]) {
     const n = await quickbar.getByRole("button", { name, exact: true }).count();
     if (n !== 1) fail(`퀵 액션 바에 「${name}」 이 하나가 아닙니다: ${n}개`);
   }
