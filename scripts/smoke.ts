@@ -221,7 +221,22 @@ try {
   const fits: string[] = [];
   for (const s of screens) {
     await page.setViewportSize({ width: s.width, height: s.height });
-    await page.waitForTimeout(250);
+    // 판이 **새 크기로 자리 잡을 때까지** 기다린다. 평가 바는 CSS 가 곧바로 새 크기로
+    // 정하고 판 캔버스는 ResizeObserver 를 거쳐 한 박자 늦게 따라온다 — 그래서 「판이
+    // 정사각형이고 한 변이 평가 바 높이와 같을 때」다. 고정 250ms 로는 느린 러너에서 옛
+    // 크기가 섞인 판을 잰 적이 있다. 3초 안에 맞지 않으면 아래 검사가 진짜로 실패한다.
+    await page
+      .waitForFunction(
+        `(() => {
+          var r = document.querySelector(".board__view").getBoundingClientRect();
+          var e = document.querySelector(".evalbar");
+          var barH = e ? e.getBoundingClientRect().height : r.height;
+          return Math.abs(r.width - r.height) < 1 && Math.abs(r.height - barH) < 2;
+        })()`,
+        null,
+        { timeout: 3000, polling: 100 },
+      )
+      .catch(() => undefined);
     const m = (await page.evaluate(`(() => {
       var root = document.scrollingElement;
       var content = document.querySelector(".shell__content");
