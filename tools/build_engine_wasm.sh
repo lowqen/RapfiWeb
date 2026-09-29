@@ -38,15 +38,18 @@ NETWORKS_COMMIT="${NETWORKS_COMMIT:-e32ad77a5364363b3e3a02b3f9e8610ade19ea98}"
 # W0 가 통과하면 그때 나온 버전을 여기 고정한다(안드로이드가 NDK r27c 를 박아둔 것과 같은 이유).
 EMSDK_VERSION="${EMSDK_VERSION:-latest}"
 ENABLE_LTO="${ENABLE_LTO:-ON}"
-# 벤치(bench-gomocalc.yml)용 스위치. **기본값은 배포 구성 그대로**다 — 릴리스·스파이크
-# 워크플로는 이 둘을 건드리지 않는다.
-#   PRELOAD_SET=full   upstream 프리로드(가중치 4종, 40.3MB)를 그대로 굽는다. BENCH 의
-#                      자체 국면 10개 중 7개가 프리스타일·스탠다드라, 렌주 전용 .data 로는
-#                      gomocalc 와 BENCH 를 같은 조건으로 잴 수 없다. 25MB 를 넘어 배포 불가.
+# 변형·가중치 스위치. **기본값(둘 다 비움)은 SIMD 두 종·렌주 전용**이다.
 #   EXTRA_VARIANTS     공백 구분. multi-simd128-relaxed / single-simd128-relaxed
-#                      (-DUSE_WASM_SIMD_RELAXED=ON — gomocalc 가 멀티에 싣는 변형)
+#                      (-DUSE_WASM_SIMD_RELAXED=ON). **배포 릴리스는 둘 다 켠다**
+#                      (engine-release.yml) — 같은 소스에서 NPS +23%, BENCH 해시 동일
+#                      (docs/gomocalc-엔진-비교.md). 앱이 지원을 감지해 먼저 띄운다.
+#   PRELOAD_SET=full   벤치 전용(bench-gomocalc.yml). upstream 프리로드(가중치 4종, 40.3MB)를
+#                      그대로 굽는다 — BENCH 국면 10개 중 7개가 프리스타일·스탠다드라서.
+#                      25MB 를 넘어 배포 불가.
 PRELOAD_SET="${PRELOAD_SET:-renju}"
 EXTRA_VARIANTS="${EXTRA_VARIANTS:-}"
+# 릴리스 태그 — engine-manifest.json 에 적힌다(engine-release.yml 이 넘긴다).
+RELEASE_TAG="${RELEASE_TAG:-}"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK="${WORK:-$HOME/rapfi-wasm-work}"
@@ -226,7 +229,7 @@ build_variant () {
 build_variant single-simd128 OFF
 build_variant multi-simd128  ON
 
-# 벤치용 추가 변형(EXTRA_VARIANTS). 이름이 곧 설정이다.
+# 추가 변형(EXTRA_VARIANTS) — relaxed SIMD. 이름이 곧 설정이다.
 VARIANTS=(single-simd128 multi-simd128)
 for v in $EXTRA_VARIANTS; do
   case "$v" in
@@ -270,6 +273,61 @@ collect () {
   find "$dir" -maxdepth 2 -name "*.worker.js" -exec cp {} "$OUT/engine/rapfi-$name.worker.js" \; || true
 }
 for n in "${VARIANTS[@]}"; do collect "$n"; done
+
+# ── 공유 가중치 — 모든 변형이 `rapfi.data` 하나를 쓴다 ─────────────────────
+#
+# .data 는 프리로드 목록의 파일을 이어 붙인 것일 뿐이라 **변형·컴파일러와 무관하게 바이트까지
+# 같아야** 한다. 앱은 그 한 파일을 받아(캐시·해시 검증) 글루에 `getPreloadedPackage` 로
+# 넘긴다(src/engine/weights-cache.ts). 그러려면 두 가지가 참이어야 하고, 여기서 확인한다:
+#   (1) 변형별 .data 의 SHA-256 이 모두 같다
+#   (2) 글루마다 박힌 패키지 목록(`files:[…]` — 파일별 시작·끝 위치)이 모두 같다
+# 하나라도 다르면 공유하면 안 된다 — 한 변형이 다른 변형의 위치로 가중치를 잘라 읽는다.
+# 변형별 .data 도 out/engine 에 남긴다(spike 하네스·node-bench 가 글루 기본 경로로 읽는다).
+DATA_SHA=""
+DATA_LAYOUT=""
+for n in "${VARIANTS[@]}"; do
+  sha="$(sha256sum "$OUT/engine/rapfi-$n.data" | cut -d' ' -f1)"
+  layout="$(grep -oE 'files:\[[^]]*\]' "$OUT/engine/rapfi-$n.js" | head -1)"
+  if [ -z "$layout" ]; then
+    echo "  X $n: 글루에서 패키지 목록(files:[…])을 찾지 못했습니다"
+    exit 1
+  fi
+  if [ -z "$DATA_SHA" ]; then
+    DATA_SHA="$sha"
+    DATA_LAYOUT="$layout"
+  elif [ "$sha" != "$DATA_SHA" ] || [ "$layout" != "$DATA_LAYOUT" ]; then
+    echo "  X $n: .data 또는 패키지 목록이 다른 변형과 다릅니다 — 공유할 수 없습니다"
+    echo "      sha $sha ≠ $DATA_SHA"
+    exit 1
+  fi
+done
+cp "$OUT/engine/rapfi-${VARIANTS[0]}.data" "$OUT/engine/rapfi.data"
+DATA_SIZE="$(stat -c%s "$OUT/engine/rapfi.data")"
+echo "  . rapfi.data (공유) $DATA_SIZE bytes · sha256 $DATA_SHA · 변형 ${#VARIANTS[@]}개가 같다"
+# 앱이 커밋하는 매니페스트(src/engine/engine-manifest.json)의 원본. 변형 순서는 앱의 시도 순서.
+{
+  echo "{"
+  echo "  \"tag\": \"${RELEASE_TAG:-unreleased}\","
+  echo "  \"upstream\": \"$(git -C "$WORK/rapfi" rev-parse HEAD)\","
+  echo "  \"data\": {"
+  echo "    \"file\": \"rapfi.data\","
+  echo "    \"size\": $DATA_SIZE,"
+  echo "    \"sha256\": \"$DATA_SHA\""
+  echo "  },"
+  echo "  \"variants\": ["
+  first=1
+  for v in multi-simd128-relaxed multi-simd128 single-simd128-relaxed single-simd128; do
+    printf '%s\n' "${VARIANTS[@]}" | grep -qx "$v" || continue
+    [ $first -eq 1 ] || echo ","
+    printf '    "%s"' "$v"
+    first=0
+  done
+  echo
+  echo "  ]"
+  echo "}"
+} > "$OUT/engine/engine-manifest.json"
+sed "s/^/  | /" "$OUT/engine/engine-manifest.json"
+
 # upstream 은 EXPORT_ES6 를 쓰지 않는다 — 글루는 CommonJS 다. 그런데 저장소 루트
 # package.json 에 "type": "module" 이 있어 node 가 이 .js 를 ESM 으로 읽고
 # "require is not defined" 로 죽는다. 이 한 줄이 그 폴더만 예외로 돌린다.
@@ -309,6 +367,11 @@ verify () {
   else
     grep -q -- "-pthread" "$nj" && { echo "  X 단일 스레드 변형인데 -pthread 가 있다"; fail=1; }
   fi
+  # relaxed 는 이름과 플래그가 짝이어야 한다 — 앱은 이름을 보고 relaxed 를 아는 브라우저에만 준다.
+  case "$name" in
+    *-relaxed) grep -q -- "-mrelaxed-simd" "$nj" || { echo "  X relaxed 변형인데 -mrelaxed-simd 가 없다"; fail=1; } ;;
+    *) grep -q -- "-mrelaxed-simd" "$nj" && { echo "  X 일반 변형인데 -mrelaxed-simd 가 있다(relaxed 를 모르는 브라우저가 못 읽는다)"; fail=1; } ;;
+  esac
 
   echo "  . js   $(stat -c%s "$OUT/engine/rapfi-$name.js") bytes"
   echo "  . wasm $(stat -c%s "$OUT/engine/rapfi-$name.wasm") bytes"
@@ -338,11 +401,12 @@ ls -l "$OUT/bench" | sed "s/^/  . /"
   # 여기서 upstream 은 **패치되지 않은 dhbloo/rapfi 커밋**이다. 안드로이드의
   # 같은 이름 필드가 패치된 로컬 커밋을 가리켜 혼동을 부른 적이 있으므로
   # (이 파일 상단 주석 참고) 무엇인지 함께 적는다.
-  echo "engine     : Rapfi WebAssembly (SIMD 2종)"
+  echo "engine     : Rapfi WebAssembly (SIMD ${#VARIANTS[@]}종)"
   echo "upstream   : $(git -C "$WORK/rapfi" rev-parse HEAD)  (dhbloo/rapfi, 패치 없음)"
   echo "networks   : $(git -C "$WORK/rapfi/Networks" rev-parse HEAD)"
   echo "emscripten : $EMSDK_RESOLVED"
-  echo "cmake opts : -DNO_COMMAND_MODULES=ON -DUSE_WASM_SIMD=ON -DUSE_WASM_SIMD_RELAXED=OFF -DCMAKE_BUILD_TYPE=Release"
+  echo "cmake opts : -DNO_COMMAND_MODULES=ON -DUSE_WASM_SIMD=ON -DUSE_WASM_SIMD_RELAXED=OFF(-relaxed 변형은 ON) -DCMAKE_BUILD_TYPE=Release"
+  echo "data       : rapfi.data (모든 변형 공유) $DATA_SIZE bytes sha256 $DATA_SHA"
   echo "link opts  : (upstream CMakeLists 의 EMSCRIPTEN 블록이 전부 정한다 — 우리는 얹지 않는다)"
   echo "variants   : ${VARIANTS[*]}"
   echo "preloads   : $PRELOAD_SET"

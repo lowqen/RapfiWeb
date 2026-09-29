@@ -2,24 +2,27 @@ name: 엔진 릴리스 (WASM 산출물)
 
 # 계획서 §8 의 산출물 정책을 실행하는 워크플로.
 #
-#   .js / .wasm   ~1.3MB   저장소에 커밋한다(클론 직후 바로 실행). 여기서는 아티팩트로도 낸다.
-#   .data         ~20MB (렌주 전용)    커밋 금지. **릴리스 자산**으로 낸다.
+#   .js / .wasm   ~1.2MB × 4   저장소에 커밋한다(클론 직후 바로 실행). 여기서는 아티팩트로도 낸다.
+#   rapfi.data    ~20MB (렌주 전용, **모든 변형 공유**)   커밋 금지. **릴리스 자산**으로 낸다.
+#   engine-manifest.json      공유 가중치의 크기·SHA-256 — src/engine/ 에 커밋한다(앱이 검증에 쓴다)
 #
 # .data 는 가중치 프리로드다. 이게 없으면 엔진이 config.toml 을 못 찾아 뜨자마자
 # 죽으므로, 웹 CI 와 배포는 여기서 만든 릴리스에서 받아 조립한다.
 #
 # 수동 실행이다 — 엔진 커밋이나 가중치가 바뀔 때만 다시 돌린다.
 #
-# **두 변형을 한 빌드에서 낸다(W0c 이후).** 커밋된 .js 는 같은 빌드의 .wasm·.data 와
-# 짝이어야 한다(글루에 데이터 패키지 목록이 박힌다). 멀티 변형은 COOP/COEP 아래에서
-# 세 브라우저 모두 동작함이 확인됐다(docs/W0c-결과.md) — 앱이 환경을 보고 고른다.
-# 새 태그로 낸다: 앞 릴리스를 지우고 다시 만드는 사이에 web·deploy 가 깨지지 않게.
+# **네 변형을 한 빌드에서 낸다** — SIMD 멀티·단일과 그 relaxed 판(`-mrelaxed-simd`).
+# 앱이 relaxed 지원을 감지해 relaxed 멀티 → 멀티 → relaxed 단일 → 단일 순으로 띄운다
+# (engine-client.ts). 커밋된 .js 는 같은 빌드의 .wasm·.data 와 짝이어야 한다(글루에 데이터
+# 패키지 목록이 박힌다) — 빌드 스크립트가 네 글루의 목록과 .data 가 모두 같음을 확인하고
+# rapfi.data 하나로 낸다. 새 태그로 낸다: 앞 릴리스를 지우고 다시 만드는 사이에 web·deploy 가
+# 깨지지 않게.
 on:
   workflow_dispatch:
     inputs:
       tag:
         description: "릴리스 태그"
-        default: "engine-3c94c2a9-mt"
+        default: "engine-3c94c2a9-rx"
         type: string
 
 permissions:
@@ -56,12 +59,19 @@ jobs:
           key: rapfi-3c94c2a9-v1
 
       - name: 빌드 + 검증 게이트
+        env:
+          EXTRA_VARIANTS: "multi-simd128-relaxed single-simd128-relaxed"
+          RELEASE_TAG: ${{ inputs.tag }}
         run: bash tools/build_engine_wasm.sh
 
-      # 배포 경로만 낸다. 멀티 변형은 브라우저에서 동작을 확인하지 못했으므로
-      # 릴리스에 넣지 않는다 — 받을 수 있으면 누군가 쓰게 된다.
       - name: 웹 회귀 게이트 (single-simd128)
         run: node spike/node-bench.mjs single-simd128
+
+      # relaxed 명령은 명세상 **구현 정의**다. 러너(x86)에서 일반 SIMD 와 BENCH 해시가
+      # 다르면 relaxed 가 결과를 바꾼다는 뜻이라 릴리스를 막는다(web-baseline.json 에 같은
+      # 해시를 적어 두었다). 노드 20 의 V8 은 플래그가 있어야 relaxed 를 읽는다.
+      - name: relaxed 결정성 게이트 (single-simd128-relaxed = single-simd128)
+        run: node --experimental-wasm-relaxed-simd spike/node-bench.mjs single-simd128-relaxed
 
       # 멀티 변형 관문 — 앱과 같은 구성(전용 워커 + pthread 가드)으로 chromium 에서
       # 기동·왕복·정지가 되는지. 실패하면 릴리스를 내지 않는다.
@@ -95,7 +105,8 @@ jobs:
       - name: 릴리스 본문
         run: |
           {
-            echo "Rapfi WebAssembly 산출물 — single-simd128 + multi-simd128 (앱이 환경을 보고 고른다)."
+            echo "Rapfi WebAssembly 산출물 — multi/single × simd128/simd128-relaxed (앱이 환경을 보고 고른다)."
+            echo "가중치는 모든 변형이 \`rapfi.data\` 하나를 쓴다(크기·SHA-256 은 \`engine-manifest.json\`)."
             echo
             echo '```'
             cat out/engine/ENGINE_VERSION.txt
@@ -124,10 +135,14 @@ jobs:
             --notes-file RELEASE_NOTES.md \
             out/engine/rapfi-single-simd128.js \
             out/engine/rapfi-single-simd128.wasm \
-            out/engine/rapfi-single-simd128.data \
+            out/engine/rapfi-single-simd128-relaxed.js \
+            out/engine/rapfi-single-simd128-relaxed.wasm \
             out/engine/rapfi-multi-simd128.js \
             out/engine/rapfi-multi-simd128.wasm \
-            out/engine/rapfi-multi-simd128.data \
+            out/engine/rapfi-multi-simd128-relaxed.js \
+            out/engine/rapfi-multi-simd128-relaxed.wasm \
+            out/engine/rapfi.data \
+            out/engine/engine-manifest.json \
             out/engine/ENGINE_VERSION.txt
           gh release view "$TAG" --json assets -q '.assets[] | "\(.name)  \(.size)"'
 
@@ -139,7 +154,8 @@ jobs:
         with:
           name: engine-committable
           path: |
-            out/engine/rapfi-*-simd128.js
-            out/engine/rapfi-*-simd128.wasm
+            out/engine/rapfi-*.js
+            out/engine/rapfi-*.wasm
+            out/engine/engine-manifest.json
             out/engine/ENGINE_VERSION.txt
           if-no-files-found: error

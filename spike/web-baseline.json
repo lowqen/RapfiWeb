@@ -39,6 +39,11 @@
       "nodes": "7170518",
       "note": "배포 경로(렌주 전용 .data). 이 값이 바뀌면 CI 실패."
     },
+    "single-simd128-relaxed": {
+      "hash": "2b7c7da9",
+      "nodes": "7170518",
+      "note": "relaxed SIMD 는 결과를 바꾸면 안 된다 — 일반 SIMD 와 **같은 해시**여야 통과. relaxed 명령은 명세상 구현 정의라, 러너(x86)에서 결과가 갈리면 릴리스를 막는다. 2026-09-29 벤치에서 가중치 4종 빌드로 relaxed 해시 = 일반 해시(4100a973)를 확인했다(docs/gomocalc-엔진-비교.md §4.3)."
+    },
     "multi-simd128": {
       "hash": null,
       "note": "미측정. PROXY_TO_PTHREAD 빌드에서 node-bench 가 0.2초 만에 아무 출력 없이 끝났다. 배포 경로가 아니므로 참고로만 잰다."
