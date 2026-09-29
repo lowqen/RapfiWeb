@@ -1,0 +1,360 @@
+{
+  "label": "local-bench-multi",
+  "startedAt": "2026-09-29T16:36:51.285Z",
+  "host": {
+    "cpu": "Intel(R) Celeron(R) N4500 @ 1.10GHz",
+    "logicalCores": 2,
+    "memGB": 3.8,
+    "platform": "win32 10.0.26200",
+    "browser": "151.0.7922.34"
+  },
+  "params": {
+    "TIME_MS": 10000,
+    "REPEAT": 2,
+    "HASH_MB": 128,
+    "THREADS": [
+      1,
+      2
+    ],
+    "COLD_MS": 3000,
+    "WARM_MS": 8000
+  },
+  "runs": [
+    {
+      "engine": "gomocalc",
+      "variant": "multi-simd128",
+      "searches": [],
+      "loadMs": 694,
+      "host": "main-thread",
+      "about": "name=\"Rapfi\", version=\"0.43.01 (clang++ 21.0.0 on Wasm WASM_SIMD)\", author=\"Rapfi developers (see AUTHORS file)\", country=\"China\"",
+      "memAfterStart": 162004992,
+      "cold": {
+        "move": [
+          6,
+          8
+        ],
+        "wallMs": 4038,
+        "nodes": 18021,
+        "engineMs": 668,
+        "nps": 30842,
+        "depth": 15,
+        "selDepth": 45,
+        "eval": "-420",
+        "winrate": 0.147418,
+        "bestline": [
+          [
+            6,
+            8
+          ],
+          [
+            8,
+            5
+          ],
+          [
+            7,
+            8
+          ],
+          [
+            6,
+            5
+          ],
+          [
+            8,
+            8
+          ],
+          [
+            9,
+            8
+          ],
+          [
+            7,
+            5
+          ],
+          [
+            9,
+            6
+          ],
+          [
+            10,
+            7
+          ],
+          [
+            9,
+            5
+          ],
+          [
+            9,
+            4
+          ],
+          [
+            8,
+            3
+          ],
+          [
+            8,
+            4
+          ],
+          [
+            7,
+            4
+          ],
+          [
+            9,
+            2
+          ]
+        ],
+        "depthAt": {
+          "2": {
+            "engineMs": 16,
+            "wallMs": 1063,
+            "nodes": 64
+          },
+          "3": {
+            "engineMs": 24,
+            "wallMs": 1071,
+            "nodes": 144
+          },
+          "4": {
+            "engineMs": 28,
+            "wallMs": 1073,
+            "nodes": 219
+          },
+          "5": {
+            "engineMs": 30,
+            "wallMs": 1075,
+            "nodes": 299
+          },
+          "6": {
+            "engineMs": 40,
+            "wallMs": 1085,
+            "nodes": 371
+          },
+          "7": {
+            "engineMs": 57,
+            "wallMs": 1102,
+            "nodes": 717
+          },
+          "8": {
+            "engineMs": 65,
+            "wallMs": 1110,
+            "nodes": 969
+          },
+          "9": {
+            "engineMs": 68,
+            "wallMs": 1112,
+            "nodes": 1059
+          },
+          "10": {
+            "engineMs": 72,
+            "wallMs": 1118,
+            "nodes": 1175
+          },
+          "11": {
+            "engineMs": 84,
+            "wallMs": 1129,
+            "nodes": 1401
+          },
+          "12": {
+            "engineMs": 104,
+            "wallMs": 1149,
+            "nodes": 1702
+          },
+          "13": {
+            "engineMs": 475,
+            "wallMs": 1521,
+            "nodes": 11504
+          },
+          "14": {
+            "engineMs": 501,
+            "wallMs": 1546,
+            "nodes": 12417
+          },
+          "15": {
+            "engineMs": 668,
+            "wallMs": 1713,
+            "nodes": 18021
+          }
+        },
+        "positionId": "open-direct",
+        "timeMs": 3000
+      },
+      "bench": {
+        "npsComputed": 22172,
+        "wallMs": 166581,
+        "moveBenchMs": 2747,
+        "movesPerSec": 728056,
+        "searchBenchMs": 163672,
+        "nodes": 3628934,
+        "nps": 22171,
+        "hash": "662ab34c"
+      },
+      "memAfterSearch": 233373696,
+      "uaMemory": null,
+      "errors": []
+    },
+    {
+      "engine": "rapfiweb",
+      "variant": "multi-simd128",
+      "searches": [],
+      "loadMs": 388,
+      "host": "main-thread",
+      "about": "name=\"Rapfi\", version=\"0.43.02 (clang++ 24.0.0 on Wasm WASM_SIMD)\", author=\"Rapfi developers (see AUTHORS file)\", country=\"China\"",
+      "memAfterStart": 156565504,
+      "cold": {
+        "move": [
+          6,
+          8
+        ],
+        "wallMs": 4127,
+        "nodes": 42168,
+        "engineMs": 1678,
+        "nps": 25088,
+        "depth": 14,
+        "selDepth": 24,
+        "eval": "-373",
+        "winrate": 0.166589,
+        "bestline": [
+          [
+            6,
+            8
+          ],
+          [
+            8,
+            5
+          ],
+          [
+            8,
+            7
+          ],
+          [
+            6,
+            5
+          ],
+          [
+            7,
+            5
+          ],
+          [
+            7,
+            4
+          ],
+          [
+            8,
+            3
+          ],
+          [
+            6,
+            3
+          ],
+          [
+            5,
+            2
+          ],
+          [
+            9,
+            5
+          ],
+          [
+            8,
+            4
+          ],
+          [
+            6,
+            6
+          ],
+          [
+            6,
+            4
+          ],
+          [
+            5,
+            5
+          ]
+        ],
+        "depthAt": {
+          "2": {
+            "engineMs": 17,
+            "wallMs": 1154,
+            "nodes": 64
+          },
+          "3": {
+            "engineMs": 22,
+            "wallMs": 1157,
+            "nodes": 144
+          },
+          "4": {
+            "engineMs": 25,
+            "wallMs": 1160,
+            "nodes": 219
+          },
+          "5": {
+            "engineMs": 28,
+            "wallMs": 1170,
+            "nodes": 299
+          },
+          "6": {
+            "engineMs": 37,
+            "wallMs": 1172,
+            "nodes": 371
+          },
+          "7": {
+            "engineMs": 53,
+            "wallMs": 1188,
+            "nodes": 717
+          },
+          "8": {
+            "engineMs": 62,
+            "wallMs": 1197,
+            "nodes": 969
+          },
+          "9": {
+            "engineMs": 64,
+            "wallMs": 1199,
+            "nodes": 1059
+          },
+          "10": {
+            "engineMs": 72,
+            "wallMs": 1207,
+            "nodes": 1175
+          },
+          "11": {
+            "engineMs": 87,
+            "wallMs": 1223,
+            "nodes": 1401
+          },
+          "12": {
+            "engineMs": 101,
+            "wallMs": 1237,
+            "nodes": 1702
+          },
+          "13": {
+            "engineMs": 1658,
+            "wallMs": 2794,
+            "nodes": 41269
+          },
+          "14": {
+            "engineMs": 1678,
+            "wallMs": 2813,
+            "nodes": 42168
+          }
+        },
+        "positionId": "open-direct",
+        "timeMs": 3000
+      },
+      "bench": {
+        "npsComputed": 109042,
+        "wallMs": 68648,
+        "moveBenchMs": 2776,
+        "movesPerSec": 720450,
+        "searchBenchMs": 65759,
+        "nodes": 7170518,
+        "nps": 43728,
+        "hash": "2b7c7da9"
+      },
+      "memAfterSearch": 290783232,
+      "uaMemory": null,
+      "errors": []
+    }
+  ],
+  "finishedAt": "2026-09-29T16:41:02.198Z"
+}

@@ -15,6 +15,10 @@
  *                                           Rapfi 내장 BENCH 를 돌릴 변형(비우면 안 돈다)
  *   HASH_MB    128                          두 엔진 같은 해시(gomocalc 기본값)
  *   LABEL      local                        결과 파일 이름
+ *   SEARCH     1                            0 이면 본 측정을 건너뛴다(BENCH 만 보태는 보충 측정)
+ *
+ * 결과 파일 여럿은 report.mjs 가 합친다 — 뒤 파일의 같은 (엔진, 변형) 이 앞의 것을 대신하고,
+ * 본 측정이 없는 보충 런은 BENCH 만 앞의 런에 얹는다.
  *
  * 한 (엔진, 변형) 마다 **브라우저를 새로 띄운다** — 앞 엔진의 메모리·JIT 가 섞이지 않게.
  *
@@ -47,6 +51,7 @@ const HASH_MB = Number(process.env.HASH_MB ?? 128);
 const LABEL = process.env.LABEL ?? "local";
 const COLD_MS = Number(process.env.COLD_MS ?? 3_000);
 const WARM_MS = Number(process.env.WARM_MS ?? 8_000);
+const SEARCH = process.env.SEARCH !== "0";
 
 const { positions } = JSON.parse(await readFile(join(HERE, "positions.json"), "utf8"));
 const exists = (p) =>
@@ -74,7 +79,12 @@ async function runBench(host) {
     return all.map((m) => Number(m[1]));
   };
   const totals = pick(/^MESSAGE Total Time \(ms\): (\d+)/);
+  const nodes = pick(/^MESSAGE Nodes: (\d+)/)[0] ?? null;
   return {
+    // 엔진이 찍는 Nodes/s 는 wasm32 에서 **넘친다** — nodes×1000 을 32비트 size_t 로
+    // 셈해 노드가 약 429만을 넘으면 2^32 로 접힌다(4,391,204 노드 → 1,174 로 찍힘).
+    // 그래서 노드 ÷ 시간으로 직접 셈한 값을 따로 둔다.
+    npsComputed: nodes && totals[1] ? Math.round((nodes * 1000) / totals[1]) : null,
     wallMs: Date.now() - t0,
     moveBenchMs: totals[0] ?? null,
     movesPerSec: pick(/^MESSAGE Moves\/s: (\d+)/)[0] ?? null,
@@ -164,8 +174,8 @@ try {
           await search(host, positions[2]?.moves ?? positions[0].moves, { timeMs: WARM_MS });
         }
 
-        // 4. 본 측정
-        const threads = variant.startsWith("multi") ? THREADS : [1];
+        // 4. 본 측정 (SEARCH=0 이면 건너뛴다 — BENCH 만 보태는 보충 측정용)
+        const threads = !SEARCH ? [] : variant.startsWith("multi") ? THREADS : [1];
         for (const n of threads) {
           await host.post(`INFO THREAD_NUM ${n}`);
           for (const pos of positions) {

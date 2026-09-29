@@ -5,12 +5,32 @@
  */
 import { readFile } from "node:fs/promises";
 
-const file = process.argv[2];
-if (!file) {
-  console.error("사용: node report.mjs <results.json>");
+const files = process.argv.slice(2);
+if (!files.length) {
+  console.error("사용: node report.mjs <results.json> [보충.json …]");
   process.exit(2);
 }
-const R = JSON.parse(await readFile(file, "utf8"));
+// 여러 파일을 합친다. 환경·매개변수는 첫 파일의 것. 뒤 파일의 같은 (엔진, 변형) 런은
+// 앞의 것을 **대신**하되, 본 측정이 없는 보충 런(SEARCH=0)은 BENCH 만 앞 런에 얹는다.
+const [R, ...extra] = await Promise.all(
+  files.map(async (f) => JSON.parse(await readFile(f, "utf8"))),
+);
+R.merged = [];
+for (const X of extra) {
+  for (const run of X.runs) {
+    const i = R.runs.findIndex((r) => r.engine === run.engine && r.variant === run.variant);
+    if (!run.searches.length && run.bench && i >= 0) {
+      R.runs[i].bench = run.bench;
+      R.merged.push(`${run.engine}/${run.variant} BENCH ← ${X.label}`);
+    } else if (i >= 0) {
+      R.runs[i] = run;
+      R.merged.push(`${run.engine}/${run.variant} 전체 ← ${X.label}`);
+    } else {
+      R.runs.push(run);
+      R.merged.push(`${run.engine}/${run.variant} 추가 ← ${X.label}`);
+    }
+  }
+}
 
 const MB = (b) => (b == null ? "—" : `${Math.round(b / 2 ** 20)}`);
 const k = (n) => (n == null ? "—" : n >= 1e4 ? `${(n / 1e3).toFixed(1)}K` : String(n));
@@ -36,6 +56,7 @@ out.push(
   `- 브라우저: Chromium ${R.host.browser ?? "?"} (Playwright, 헤드리스)`,
   `- 탐색 ${R.params.TIME_MS}ms × 반복 ${R.params.REPEAT} · 해시 ${R.params.HASH_MB}MB · 스레드 ${R.params.THREADS.join("/")}`,
   `- 측정 ${R.startedAt} → ${R.finishedAt}`,
+  ...R.merged.map((m) => `- 보충: ${m}`),
   "",
 );
 
@@ -87,10 +108,23 @@ if (benched.length) {
   out.push("### Rapfi 내장 BENCH (결정적 · 1 스레드 · 자체 국면 10개)");
   out.push(
     table(
-      ["엔진/변형", "Move Bench moves/s", "Search Bench nps", "노드", "시간 ms", "Hash"],
+      [
+        "엔진/변형",
+        "Move Bench moves/s",
+        "Search nps (노드÷시간)",
+        "엔진이 찍은 Nodes/s",
+        "노드",
+        "시간 ms",
+        "Hash",
+      ],
       benched.map((r) => [
         name(r),
         r.bench.movesPerSec?.toLocaleString() ?? "—",
+        // 엔진의 Nodes/s 는 wasm32 에서 넘친다(run.mjs runBench 주석) — 직접 셈한 값을 앞에.
+        (r.bench.nodes && r.bench.searchBenchMs
+          ? Math.round((r.bench.nodes * 1000) / r.bench.searchBenchMs)
+          : null
+        )?.toLocaleString() ?? "—",
         r.bench.nps?.toLocaleString() ?? "—",
         r.bench.nodes?.toLocaleString() ?? "—",
         r.bench.searchBenchMs?.toLocaleString() ?? "—",
