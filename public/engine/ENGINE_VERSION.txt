@@ -1,11 +1,11 @@
 engine     : Rapfi WebAssembly (SIMD 2종)
 upstream   : 3c94c2a976f24a0dd1c5517623e9ab6fffe66bd7  (dhbloo/rapfi, 패치 없음)
 networks   : e32ad77a5364363b3e3a02b3f9e8610ade19ea98
-emscripten : emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 6.0.9 (4e4223852a0835923411059a3929907d7df1232e)
+emscripten : emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 6.0.10 (d6c521a7f05449857c76bd99e396895583cf2083)
 cmake opts : -DNO_COMMAND_MODULES=ON -DUSE_WASM_SIMD=ON -DUSE_WASM_SIMD_RELAXED=OFF -DCMAKE_BUILD_TYPE=Release
 link opts  : (upstream CMakeLists 의 EMSCRIPTEN 블록이 전부 정한다 — 우리는 얹지 않는다)
 variants   : single-simd128 / multi-simd128
 note       : SIMD 없는 변형은 eval/mix10nnue.cpp 의 static_assert 때문에 이 커밋에서 빌드되지 않는다
-built_at   : 2026-09-03T04:18:29Z
+built_at   : 2026-09-29T12:45:00Z
 build_by   : RapfiWeb/tools/build_engine_wasm.sh
 bench      : spike/node-bench.mjs 가 두 변형에서 Hash 를 뽑아 e240ab16 과 대조한다

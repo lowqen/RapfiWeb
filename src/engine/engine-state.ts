@@ -4,6 +4,7 @@ import {
   EngineClient,
   detectCapabilities,
   type Capabilities,
+  type EngineVariant,
   type OpeningResponse,
 } from "./engine-client";
 import {
@@ -66,6 +67,18 @@ interface EngineState {
    * 모르면 앞 값을 그대로 둔다(체스닷컴의 바처럼 비지 않는다).
    */
   evalView: EvalView | null;
+  /** 떠 있는 엔진 — 어느 변형인지, 물러섰다면 왜. */
+  engine: RunningEngine;
+  /** 엔진에 실제로 보낸 스레드 수. 아직 안 보냈으면 null. */
+  appliedThreads: number | null;
+  /**
+   * 멀티스레드 변형을 써도 되는가(설정). 끄면 환경이 되어도 단일로 띄운다. 바꾸면
+   * 다음 기동부터 — 떠 있는 엔진은 `restart` 로 다시 띄운다.
+   */
+  allowThreads: boolean;
+  setAllowThreads: (on: boolean) => void;
+  /** 엔진을 내렸다가 다시 띄운다(변형 전환). 해시와 분석 의도는 잃는다. */
+  restart: () => Promise<void>;
   /**
    * 엔진 파라미터(`INFO caution_factor` 등). 기동하면 한 번, 바뀌면 다시 보낸다.
    * **탐색 중에는 보내지 않고 미뤘다가** 다음 탐색 직전에 보낸다 — 워커는 줄에 선
@@ -96,11 +109,62 @@ export interface EngineConfig {
   info: readonly EngineCommand[];
   /** 탐색마다 앞서 `YXHASHCLEAR` 를 보낸다(데스크톱의 「해시 자동 지우기」). */
   hashAutoClear: boolean;
+  /**
+   * 원하는 스레드 수. 실제로 보내는 값은 떠 있는 변형이 정한다(`threadCommand`) —
+   * 단일 변형에는 늘 1 이다.
+   */
+  threads: number;
 }
 
-let config: EngineConfig = { info: [], hashAutoClear: false };
+/** 실제로 떠 있는 엔진. 뜨기 전·종료 뒤에는 변형이 null 이다. */
+export interface RunningEngine {
+  variant: EngineVariant | null;
+  threaded: boolean;
+  maxThreads: number | null;
+  /** 멀티를 시도했다가 단일로 물러섰다면 그 까닭. */
+  fallbackReason: string | null;
+}
+
+const NO_ENGINE: RunningEngine = {
+  variant: null,
+  threaded: false,
+  maxThreads: null,
+  fallbackReason: null,
+};
+
+/**
+ * 엔진이 받아들일 수 있는 스레드 수의 상한. 코어 수와 엔진이 알린 상한 중 작은 쪽,
+ * 그리고 16 을 넘지 않는다 — 코어보다 많은 스레드는 탐색을 늦출 뿐이고, 스레드마다
+ * 스택(2MB)과 워커가 붙는다. 코어 수를 모르면 4.
+ */
+export function threadCap(hardwareConcurrency: number | null, maxThreads: number | null): number {
+  const cores = hardwareConcurrency && hardwareConcurrency > 0 ? hardwareConcurrency : 4;
+  return Math.max(1, Math.min(cores, maxThreads ?? cores, 16));
+}
+
+/**
+ * `INFO THREAD_NUM` 한 줄 — 데스크톱 `set_threadnum`, 앱 `EngineParams.infoPairs()` 의
+ * `thread_num` 과 같은 키다. **단일 변형이면 언제나 1** — 그 빌드는 다른 값을 받고
+ * 무시하는데(W0c 실측), 보내면 설정이 거짓말이 된다.
+ */
+export function threadCommand(
+  threaded: boolean,
+  requested: number,
+  cap: number,
+): { command: EngineCommand; threads: number } {
+  const threads = threaded ? Math.max(1, Math.min(cap, Math.round(requested))) : 1;
+  return { command: { kind: "info", key: "thread_num", value: threads }, threads };
+}
+
+let config: EngineConfig = { info: [], hashAutoClear: false, threads: 1 };
 /** 보내지 못하고 미룬 설정이 있는가. */
 let configDirty = false;
+/**
+ * 이 엔진에 마지막으로 보낸 `INFO` 값(키 → 값). 바뀐 것만 보낸다 — 스레드 수 하나를
+ * 바꿨다고 `hash_size` 까지 다시 보내면 엔진이 해시 표를 다시 잡을 수 있다. 엔진이
+ * 새로 뜰 때마다(`onBooted`) 비운다 — 새 엔진은 아무것도 모른다.
+ */
+const sentInfo = new Map<string, string>();
 /** 마지막으로 분석한 국면 — 밀려 끝난 분석을 다시 이을 때 쓴다. */
 let analysisStones: readonly Placement[] = [];
 /** 마지막 탐색 요청 국면의 돌 수 — 짝수면 흑 차례. 평가 바의 관점을 정한다. */
@@ -148,7 +212,21 @@ export const useEngineStore = create<EngineState>((set, get) => {
   const flushConfig = (c: EngineClient) => {
     if (!configDirty) return;
     configDirty = false;
-    if (config.info.length) c.send(...config.info);
+    // 스레드 수는 **엔진이 놀 때만** 바뀐다 — 이 함수는 기동 직후·탐색 직전·대기 중
+    // 설정 변경에서만 불린다. 탐색 중에 스레드 풀을 다시 세우면 엔진이 도는 스레드를
+    // 허무는 셈이다(워커도 탐색 중에는 YXSTOP 말고 아무것도 보내지 않는다).
+    const e = get().engine;
+    const { command, threads } = threadCommand(
+      e.threaded,
+      config.threads,
+      threadCap(c.capabilities.hardwareConcurrency, e.maxThreads),
+    );
+    const fresh = [...config.info, command].filter(
+      (cmd) => cmd.kind !== "info" || sentInfo.get(cmd.key) !== String(cmd.value),
+    );
+    if (fresh.length) c.send(...fresh);
+    for (const cmd of fresh) if (cmd.kind === "info") sentInfo.set(cmd.key, String(cmd.value));
+    set({ appliedThreads: threads });
   };
 
   /** 분석 요청 하나. 의도(`analyzing`)는 부르는 쪽이 정한다. */
@@ -184,6 +262,24 @@ export const useEngineStore = create<EngineState>((set, get) => {
         gameHandlers.onForbid?.(cells);
       },
       onError: (error) => set({ error }),
+      onBooted: (info) => {
+        sentInfo.clear();
+        set({
+          engine: {
+            variant: info.variant,
+            threaded: info.threaded,
+            maxThreads: info.maxThreads,
+            fallbackReason: info.fallbackReason,
+          },
+        });
+        // 멈춘 멀티 엔진을 단일로 다시 띄웠다 — 새 엔진은 설정을 모르고, 켜 둔 분석은
+        // 끊겼다. 처음 기동은 `start`·`analyze` 가 이 일을 하므로 여기서는 복구만 본다.
+        const c = client;
+        if (!info.recovered || !c) return;
+        configDirty = true;
+        flushConfig(c);
+        if (get().analyzing) runAnalysis(c, analysisStones);
+      },
       onSearchDone: (mode, reason) => {
         if (mode !== "analyze" || !get().analyzing) return;
         const c = client;
@@ -216,6 +312,15 @@ export const useEngineStore = create<EngineState>((set, get) => {
     setAnalysisMs: (ms) => set({ analysisMs: ms > 0 ? ms : Infinity }),
     analyzing: false,
     evalView: null,
+    engine: NO_ENGINE,
+    appliedThreads: null,
+    allowThreads: true,
+    setAllowThreads: (on) => set({ allowThreads: on }),
+
+    restart: async () => {
+      get().terminate();
+      await get().start();
+    },
 
     configure: (next) => {
       config = next;
@@ -229,7 +334,7 @@ export const useEngineStore = create<EngineState>((set, get) => {
       set({ error: null });
       try {
         const c = ensure();
-        await c.start();
+        await c.start(get().allowThreads);
         // 기동 직후 한 번. 엔진은 자기 기본값(스타일·해시…)으로 떠 있다.
         configDirty = true;
         flushConfig(c);
@@ -243,7 +348,7 @@ export const useEngineStore = create<EngineState>((set, get) => {
       set({ error: null, analyzing: true });
       try {
         if (c.currentStatus === "idle" || c.currentStatus === "error") {
-          await c.start();
+          await c.start(get().allowThreads);
           configDirty = true;
         }
         // 기동을 기다리는 사이에 정지·착수가 의도를 껐다면 시작하지 않는다.
@@ -261,7 +366,7 @@ export const useEngineStore = create<EngineState>((set, get) => {
       set({ error: null, analyzing: false });
       try {
         if (c.currentStatus === "idle" || c.currentStatus === "error") {
-          await c.start();
+          await c.start(get().allowThreads);
           configDirty = true;
         }
         flushConfig(c);
@@ -294,12 +399,27 @@ export const useEngineStore = create<EngineState>((set, get) => {
         lastBestMove: null,
         analyzing: false,
         evalView: null,
+        engine: NO_ENGINE,
+        appliedThreads: null,
       });
+      // 다음 기동은 새 엔진이다 — 설정을 처음부터 다시 보낸다.
+      configDirty = true;
     },
 
     clearConsole: () => set({ console: [] }),
   };
 });
+
+/**
+ * 떠 있는 엔진을 꺼내 보는 손잡이 — 스모크가 「멀티로 떴는가」를 이걸로 본다.
+ * 화면은 `engine`·`appliedThreads` 를 구독한다.
+ */
+if (typeof window !== "undefined") {
+  (window as unknown as { __rapfiEngine: () => unknown }).__rapfiEngine = () => {
+    const s = useEngineStore.getState();
+    return { ...s.engine, appliedThreads: s.appliedThreads, status: s.status };
+  };
+}
 
 /**
  * 콘솔 **전체**를 꺼내 보는 손잡이. 화면은 마지막 40줄만 그리므로, 엔진이

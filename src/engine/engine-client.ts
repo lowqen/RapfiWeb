@@ -38,15 +38,35 @@ const SIMD_PROBE = new Uint8Array([
   11,
 ]);
 
+export type EngineVariant = "single-simd128" | "multi-simd128";
+
 export interface Capabilities {
   simd: boolean;
   crossOriginIsolated: boolean;
+  sharedArrayBuffer: boolean;
   hardwareConcurrency: number | null;
-  /** 고를 변형. `null` 이면 이 브라우저에서는 엔진을 돌릴 수 없다. */
-  variant: "single-simd128" | "multi-simd128" | null;
+  /**
+   * 이 환경에서 **먼저 시도할** 변형. `null` 이면 엔진을 돌릴 수 없다.
+   * 멀티를 골라도 기동에 실패하면 클라이언트가 단일로 물러선다(`EngineClient.start`).
+   */
+  variant: EngineVariant | null;
+  /** 멀티스레드 변형을 쓸 수 있는 환경인가. */
+  threads: boolean;
+  /** 멀티를 못 쓰는 까닭(화면이 그대로 말한다). 쓸 수 있으면 null. */
+  threadsNote: string | null;
   note: string | null;
 }
 
+/**
+ * 멀티 변형의 조건 — W0c 에서 잰 그대로다(`docs/W0c-결과.md`):
+ *   - WebAssembly SIMD (두 변형 모두의 하한)
+ *   - `crossOriginIsolated` — COOP/COEP 헤더가 붙어야 켜진다. 없으면 멀티 엔진은
+ *     세 브라우저 모두 **무응답**이었다(대조군).
+ *   - `SharedArrayBuffer` · `Atomics` — pthread 의 메모리와 깨우기
+ *
+ * `?engine=single|multi` 로 강제할 수 있다(진단용). 멀티를 강제해도 조건이 안 되면
+ * 기동 핸드셰이크가 실패해 단일로 물러선다.
+ */
 export function detectCapabilities(): Capabilities {
   let simd = false;
   try {
@@ -55,19 +75,57 @@ export function detectCapabilities(): Capabilities {
     simd = false;
   }
   const isolated = typeof crossOriginIsolated === "boolean" ? crossOriginIsolated : false;
+  const sab = typeof SharedArrayBuffer === "function" && typeof Atomics === "object";
+  const forced = forcedVariant();
+
+  let threadsNote: string | null = null;
+  if (!simd) threadsNote = "WebAssembly SIMD 가 없습니다";
+  else if (forced === "single") threadsNote = "주소의 ?engine=single 로 단일 스레드를 골랐습니다";
+  else if (!isolated) {
+    threadsNote =
+      "교차 출처 격리(COOP/COEP 헤더)가 꺼져 있어 멀티스레드를 쓸 수 없습니다 — " +
+      "헤더를 붙일 수 없는 호스팅(GitHub Pages 등)이거나 개발 서버 설정이 빠졌습니다";
+  } else if (!sab) threadsNote = "이 브라우저는 SharedArrayBuffer 를 허용하지 않습니다";
+  const threads = threadsNote === null || (simd && forced === "multi");
+
   return {
     simd,
     crossOriginIsolated: isolated,
+    sharedArrayBuffer: sab,
     hardwareConcurrency:
       typeof navigator === "undefined" ? null : (navigator.hardwareConcurrency ?? null),
-    // 멀티 변형은 브라우저 워커에서 동작을 확인하지 못했다(W0-1). 살아나면(W0c)
-    // 여기서 isolated 를 보고 고르게 된다. 그때까지는 단일 스레드가 유일한 경로다.
-    variant: simd ? "single-simd128" : null,
+    variant: !simd ? null : threads ? "multi-simd128" : "single-simd128",
+    threads,
+    threadsNote: threads ? null : threadsNote,
     note: simd
       ? null
       : "이 브라우저는 WebAssembly SIMD 를 지원하지 않아 엔진을 실행할 수 없습니다. " +
         "Chrome/Edge 91+, Firefox 89+, Safari 16.4+ 가 필요합니다.",
   };
+}
+
+function forcedVariant(): "single" | "multi" | null {
+  try {
+    const q =
+      typeof location === "undefined" ? null : new URLSearchParams(location.search).get("engine");
+    return q === "single" || q === "multi" ? q : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 기동이 끝나고 알게 된 것 — 실제로 뜬 변형과 그 까닭. */
+export interface BootInfo {
+  variant: EngineVariant;
+  threaded: boolean;
+  maxThreads: number | null;
+  /** 멀티를 시도했다가 단일로 물러섰다면 그 까닭. */
+  fallbackReason: string | null;
+  /**
+   * 떠 있던 멀티 엔진이 멈춰 **다시 띄운** 것인가. 참이면 엔진 스토어가 설정을 다시
+   * 보내고 켜 둔 분석을 잇는다(처음 기동은 스토어의 `start` 가 그 일을 한다).
+   */
+  recovered: boolean;
 }
 
 // ── 클라이언트 ───────────────────────────────────────────────────────
@@ -86,6 +144,8 @@ export interface EngineEvents {
   onSearchDone?: (mode: "analyze" | "move", reason: SearchEndReason) => void;
   /** 오프닝 협상 응답. 대국 상태 기계가 받는다(W4). */
   onOpening?: (r: OpeningResponse) => void;
+  /** 엔진이 떴다 — 어느 변형으로, 물러섰다면 왜. */
+  onBooted?: (info: BootInfo) => void;
 }
 
 export interface EngineOptions extends EngineEvents {
@@ -136,26 +196,148 @@ export class EngineClient {
     }
   }
 
-  /** 엔진을 띄운다. 돌릴 변형이 없으면(SIMD 미지원) 그 사실을 던진다. */
-  async start(): Promise<void> {
-    const variant = this.capabilities.variant;
-    if (!variant) throw new Error(this.capabilities.note ?? "엔진을 실행할 수 없습니다");
+  /** 실제로 떠 있는 변형. 뜨기 전에는 null. */
+  get runningVariant(): EngineVariant | null {
+    return this.variant;
+  }
+
+  /**
+   * 엔진을 띄운다. 돌릴 변형이 없으면(SIMD 미지원) 그 사실을 던진다.
+   *
+   * **멀티를 먼저 시도하고, 실패하면 단일로 물러선다.** 멀티의 실패는 대개 조용하다 —
+   * pthread 를 세우지 못하면 명령에 영원히 답이 없다(W0). 그래서 워커가 기동
+   * 핸드셰이크(START → OK)에 한도를 두고 넘기면 `fatal` 을 올리며, 여기서 그 워커를
+   * 버리고 단일 변형으로 새로 띄운다. 사용자에게는 「기동 중」이 조금 길어질 뿐이다.
+   *
+   * `allowThreads` 가 거짓이면(설정 ▸ 멀티스레드 끔) 처음부터 단일로 띄운다.
+   */
+  async start(allowThreads = true): Promise<void> {
+    const best = this.capabilities.variant;
+    if (!best) throw new Error(this.capabilities.note ?? "엔진을 실행할 수 없습니다");
+    if (this.booting) return this.booting;
     if (this.worker) return this.whenReady();
 
+    const order: EngineVariant[] =
+      best === "multi-simd128" && allowThreads
+        ? ["multi-simd128", "single-simd128"]
+        : ["single-simd128"];
     this.setStatus("starting");
+    this.booting = (async () => {
+      let fallbackReason: string | null = null;
+      for (const variant of order) {
+        try {
+          const booted = await this.spawn(variant);
+          this.variant = variant;
+          this.setStatus("ready");
+          this.events.onBooted?.({
+            variant,
+            threaded: booted.threaded,
+            maxThreads: booted.maxThreads,
+            fallbackReason,
+            recovered: false,
+          });
+          return;
+        } catch (e) {
+          this.worker?.terminate();
+          this.worker = null;
+          const why = e instanceof Error ? e.message : String(e);
+          if (variant === order.at(-1)) {
+            this.events.onError?.(why);
+            this.setStatus("error");
+            throw e instanceof Error ? e : new Error(why);
+          }
+          // 다음 변형으로 — 이 사실은 콘솔과 화면에 남긴다(조용히 느려지면 원인을 모른다).
+          fallbackReason = why;
+          this.events.onConsole?.([`! ${variant} 기동 실패 — 단일 스레드로 물러섭니다: ${why}`]);
+        }
+      }
+    })().finally(() => {
+      this.booting = null;
+    });
+    return this.booting;
+  }
+
+  private variant: EngineVariant | null = null;
+  private booting: Promise<void> | null = null;
+
+  /**
+   * 떠 있던 멀티 엔진이 멈췄을 때 — 그 워커(와 엔진 스레드들)를 버리고 단일 스레드
+   * 엔진을 새로 띄운다. 사용자에게는 「기동 중」이 잠깐 보이고 분석이 이어진다
+   * (엔진 스토어가 `recovered` 를 보고 잇는다). 해시와 도는 탐색은 잃는다.
+   *
+   * 대국에서 엔진이 제 수를 생각하던 중이었다면 그 수는 오지 않는다 — 대국 쪽 감시견
+   * (시간제)이나 사용자의 무르기·지금 두기가 판을 푼다.
+   */
+  private async recoverToSingle(reason: string): Promise<void> {
+    this.worker?.terminate();
+    this.worker = null;
+    this.variant = null;
+    this.snapshot = EMPTY_SNAPSHOT;
+    this.events.onConsole?.([`! 멀티스레드 엔진이 멈춰 단일 스레드로 다시 띄웁니다: ${reason}`]);
+    this.setStatus("starting");
+    try {
+      const booted = await this.spawn("single-simd128");
+      this.variant = "single-simd128";
+      this.setStatus("ready");
+      this.events.onBooted?.({
+        variant: "single-simd128",
+        threaded: booted.threaded,
+        maxThreads: booted.maxThreads,
+        fallbackReason: `멀티스레드 엔진이 동작 중 멈췄습니다 — ${reason}`,
+        recovered: true,
+      });
+    } catch (e) {
+      // `spawn` 이 새 워커를 this.worker 에 넣었다 — 위에서 null 로 좁혀진 타입을 푼다.
+      (this.worker as Worker | null)?.terminate();
+      this.worker = null;
+      this.events.onError?.(e instanceof Error ? e.message : String(e));
+      this.setStatus("error");
+    }
+  }
+
+  /**
+   * 워커 하나를 띄워 기동 결과를 기다린다. `booted` 면 풀리고, 기동 중의 `fatal`·워커
+   * 오류·시간 초과면 거부한다(그러면 `start` 가 다음 변형을 시도한다).
+   */
+  private spawn(variant: EngineVariant): Promise<Extract<FromWorker, { type: "booted" }>> {
     // **클래식 워커다.** 이유는 vite.config.ts 의 worker.format 주석에 있다 —
     // upstream 글루를 읽는 유일한 방법인 importScripts 가 모듈 워커에는 없다.
+    // 멀티 변형의 엔진 스레드도 **이 워커 번들을 다시 연다** — 거기서 글루만 읽고
+    // 비키는 가드가 워커 머리에 있다(engine-worker.ts 「pthread 가드」).
     const worker = new Worker(new URL("./engine-worker.ts", import.meta.url), {
       type: "classic",
       name: "rapfi-engine",
     });
     this.worker = worker;
 
+    let settle: {
+      resolve: (b: Extract<FromWorker, { type: "booted" }>) => void;
+      reject: (e: Error) => void;
+    } | null = null;
+    const booted = new Promise<Extract<FromWorker, { type: "booted" }>>((resolve, reject) => {
+      settle = { resolve, reject };
+    });
+    // 가중치(~20MB) 내려받기가 기동에 들어간다 — 느린 회선을 위해 넉넉히. 멀티가 조용히
+    // 멈추는 경우는 워커의 핸드셰이크 한도(15초, 내려받기 **뒤**부터)가 먼저 잡는다.
+    const timer = setTimeout(
+      () => settle?.reject(new Error(`${variant} 엔진이 120초 안에 기동하지 않았습니다`)),
+      120_000,
+    );
+    const failBoot = (why: string): boolean => {
+      if (!settle) return false;
+      clearTimeout(timer);
+      settle.reject(new Error(why));
+      settle = null;
+      return true;
+    };
+
     worker.onmessage = (ev: MessageEvent<FromWorker>) => {
       const m = ev.data;
       switch (m.type) {
         case "booted":
-          this.setStatus("ready");
+          clearTimeout(timer);
+          settle?.resolve(m);
+          settle = null;
           break;
         case "snapshot":
           // 밀려난 탐색이 마지막으로 올린 스냅샷은 **옛 국면**의 값이다. 받으면 보드의
@@ -185,9 +367,17 @@ export class EngineClient {
           this.events.onSearchDone?.(m.mode, m.reason);
           break;
         case "exit":
+          if (failBoot(`${variant} 엔진이 기동 중에 종료했습니다 (${m.code})`)) break;
           this.setStatus("idle");
           break;
         case "fatal":
+          // 기동 중의 오류는 `start` 가 받아 다음 변형을 시도한다.
+          if (failBoot(m.message)) break;
+          // 떠 있던 멀티 엔진이 멈췄다(입력 경합·정지 무응답 등) — 단일로 다시 띄운다.
+          if (this.variant === "multi-simd128" && this.worker === worker) {
+            void this.recoverToSingle(m.message);
+            break;
+          }
           this.events.onError?.(m.message);
           this.setStatus("error");
           break;
@@ -198,10 +388,12 @@ export class EngineClient {
     worker.onerror = (e) => {
       const where = e.filename ? ` (${e.filename}:${e.lineno}:${e.colno})` : "";
       const what = e.message || e.type || "알 수 없는 워커 오류";
+      if (failBoot(`워커 오류: ${what}${where}`)) return;
       this.events.onError?.(`워커 오류: ${what}${where}`);
       this.setStatus("error");
     };
     worker.onmessageerror = () => {
+      if (failBoot("워커 메시지를 복제하지 못했습니다(구조화 복제 실패)")) return;
       this.events.onError?.("워커 메시지를 복제하지 못했습니다(구조화 복제 실패)");
       this.setStatus("error");
     };
@@ -213,11 +405,12 @@ export class EngineClient {
       sliceMs: this.sliceMs,
       size: this.size,
     });
-    return this.whenReady();
+    return booted;
   }
 
   whenReady(timeoutMs = 60_000): Promise<void> {
     if (this.status === "ready") return Promise.resolve();
+    if (this.booting) return this.booting;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(
         () => reject(new Error(`엔진이 ${timeoutMs}ms 안에 기동하지 않았습니다`)),
@@ -323,8 +516,10 @@ export class EngineClient {
    * 다만 조각 경계에서도 반응하지 않을 때는 이것뿐이다 — 재기동은 수백 ms 다.
    */
   terminate(): void {
+    // 멀티 변형이면 엔진 스레드(중첩 워커)도 이 워커와 함께 사라진다.
     this.worker?.terminate();
     this.worker = null;
+    this.variant = null;
     this.snapshot = EMPTY_SNAPSHOT;
     this.setStatus("idle");
   }

@@ -24,6 +24,7 @@
  */
 import { chromium, type Page } from "playwright";
 import { createServer } from "node:http";
+import { ISOLATION_HEADERS, ISOLATE, expectedVariant } from "./isolation.ts";
 import { readFileSync, existsSync } from "node:fs";
 import { extname, join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -60,7 +61,10 @@ const server = createServer((req, res) => {
   let file = join(DIST, decodeURIComponent(url.pathname));
   if (!existsSync(file) || extname(file) === "") file = join(DIST, "index.html");
   try {
-    res.writeHead(200, { "content-type": MIME[extname(file)] ?? "application/octet-stream" });
+    res.writeHead(200, {
+      ...ISOLATION_HEADERS,
+      "content-type": MIME[extname(file)] ?? "application/octet-stream",
+    });
     res.end(readFileSync(file));
   } catch {
     res.writeHead(404).end("not found");
@@ -386,7 +390,22 @@ try {
   const t0 = Date.now();
   await click("엔진 시작");
   await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 180_000 });
-  console.log(`엔진 기동 ${Date.now() - t0}ms\n`);
+  console.log(`엔진 기동 ${Date.now() - t0}ms`);
+  // 대국 전체를 **어느 변형으로** 도는지 — 멀티면 착수·분석이 비동기 경로를 탄다.
+  const engineInfo = (await page.evaluate(`window.__rapfiEngine()`)) as {
+    variant: string;
+    appliedThreads: number | null;
+    fallbackReason: string | null;
+  };
+  const wantVariant = expectedVariant(DIST);
+  console.log(
+    `엔진 변형 ${engineInfo.variant} · 스레드 ${engineInfo.appliedThreads} · 격리 ${ISOLATE}\n`,
+  );
+  if (engineInfo.variant !== wantVariant) {
+    fail(
+      `${wantVariant} 가 떠야 하는데 ${engineInfo.variant} 입니다 (${engineInfo.fallbackReason ?? ""})`,
+    );
+  }
 
   // ── 1. 렌주 자유 규칙으로 대국 ────────────────────────────────────
   console.log("1. 자유 렌주 — 차례가 오가는가");

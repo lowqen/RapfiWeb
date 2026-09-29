@@ -29,6 +29,8 @@ beforeAll(async () => {
       // 단일 스레드 빌드처럼 **호출 안에서** 답한다.
       if (head.startsWith("YXNBEST")) opts.onReceiveStdout("7,8");
       if (head === "ABOUT") opts.onReceiveStdout('name="Rapfi", version="test"');
+      // 기동 핸드셰이크 — 실제 엔진은 START 에 OK 로 답한다(워커가 이걸 기다린다).
+      if (head.startsWith("START")) opts.onReceiveStdout("OK");
     },
     terminate() {},
   });

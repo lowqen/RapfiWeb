@@ -31,6 +31,8 @@ export function EngineScreen() {
   const terminate = useEngineStore((s) => s.terminate);
   const lines = useEngineStore((s) => s.console);
   const clearConsole = useEngineStore((s) => s.clearConsole);
+  const engine = useEngineStore((s) => s.engine);
+  const applied = useEngineStore((s) => s.appliedThreads);
   const hashMb = useSettingsStore((s) => s.hashMb);
   const style = useSettingsStore((s) => s.style);
 
@@ -43,9 +45,14 @@ export function EngineScreen() {
         </h2>
         <dl className="kv">
           <dt>변형</dt>
-          <dd className="tnum">{caps.variant ?? "실행 불가"}</dd>
+          <dd className="tnum" data-k="variant">
+            {engine.variant ?? (caps.variant ? `${caps.variant} (뜨기 전)` : "실행 불가")}
+          </dd>
           <dt>스레드</dt>
-          <dd className="tnum">1</dd>
+          <dd className="tnum" data-k="threads">
+            {applied ?? "—"}
+            {engine.variant ? (engine.threaded ? " · 멀티스레드" : " · 단일 스레드") : ""}
+          </dd>
           <dt>해시</dt>
           <dd className="tnum">{hashMb} MB</dd>
           <dt>스타일</dt>
@@ -54,6 +61,14 @@ export function EngineScreen() {
           <dd>{analyzing ? "켜짐 — 국면을 따라 읽는 중" : "꺼짐"}</dd>
         </dl>
         {!caps.variant && caps.note && <p className="panel__hint">{caps.note}</p>}
+        {engine.fallbackReason && (
+          <p className="panel__hint">
+            멀티스레드 기동에 실패해 단일 스레드로 물러섰습니다 — {engine.fallbackReason}
+          </p>
+        )}
+        {!engine.variant && caps.threadsNote && caps.variant && (
+          <p className="panel__hint">{caps.threadsNote}</p>
+        )}
         {error && <p className="panel__error">{error}</p>}
         <div className="panel__actions">
           {status === "idle" || status === "error" ? (

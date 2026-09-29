@@ -10,6 +10,7 @@
  */
 import { chromium } from "playwright";
 import { createServer } from "node:http";
+import { ISOLATION_HEADERS, ISOLATE, expectedVariant } from "./isolation.ts";
 import { readFileSync, existsSync } from "node:fs";
 import { extname, join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -53,7 +54,10 @@ const server = createServer((req, res) => {
   if (!existsSync(file) || extname(file) === "") file = join(DIST, "index.html");
   try {
     const body = readFileSync(file);
-    res.writeHead(200, { "content-type": MIME[extname(file)] ?? "application/octet-stream" });
+    res.writeHead(200, {
+      ...ISOLATION_HEADERS,
+      "content-type": MIME[extname(file)] ?? "application/octet-stream",
+    });
     res.end(body);
   } catch {
     res.writeHead(404).end("not found");
@@ -123,6 +127,28 @@ try {
   await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 120_000 });
   const bootMs = Date.now() - t0;
   console.log(`엔진 기동 ${bootMs}ms`);
+
+  // 1b. **어느 변형으로 떴는가.** 격리돼 있고 멀티 산출물이 있으면 멀티여야 한다 —
+  // 조용히 단일로 물러섰다면(핸드셰이크 실패) 여기서 잡는다. 격리가 없으면 단일.
+  const engineInfo = (await page.evaluate(`window.__rapfiEngine()`)) as {
+    variant: string;
+    threaded: boolean;
+    appliedThreads: number | null;
+    fallbackReason: string | null;
+  };
+  const wantVariant = expectedVariant(DIST);
+  console.log(
+    `엔진 변형 ${engineInfo.variant} · 스레드 ${engineInfo.appliedThreads} · 격리 ${ISOLATE}` +
+      (engineInfo.fallbackReason ? ` · 물러섬: ${engineInfo.fallbackReason}` : ""),
+  );
+  if (engineInfo.variant !== wantVariant) {
+    fail(
+      `${wantVariant} 가 떠야 하는데 ${engineInfo.variant} 입니다 (${engineInfo.fallbackReason ?? ""})`,
+    );
+  }
+  if (engineInfo.threaded !== (wantVariant === "multi-simd128")) {
+    fail(`threaded=${engineInfo.threaded} — 변형과 어긋납니다`);
+  }
 
   // 콘솔에 엔진이 실제로 말한 줄이 있어야 한다 — 파서가 아니라 엔진이 살아 있다는 증거.
   await page.waitForTimeout(300); // 콘솔은 100ms 배치로 온다
@@ -236,6 +262,10 @@ try {
   const stopMs = Date.now() - tStop;
   console.log(`정지까지 ${stopMs}ms`);
   if (stopMs > 3000) fail(`정지가 너무 늦습니다: ${stopMs}ms`);
+  // 멀티 변형은 YXSTOP 이 탐색 도중에 닿는다(W0c 실측 1~9ms) — 조각 경계를 기다리지 않는다.
+  else if (engineInfo.threaded && stopMs > 1000) {
+    fail(`멀티 변형인데 정지가 ${stopMs}ms 걸렸습니다 — 조각 경계를 기다리는 것 같습니다`);
+  }
 
   // 6. 보드에 실제로 그려졌는가 — 동적 레이어에 빈 캔버스가 아닌 픽셀이 있어야 한다.
   const painted = await page.evaluate(() => {

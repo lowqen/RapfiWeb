@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { useEngineStore, MULTI_PV, type EngineConfig } from "../../engine/engine-state";
+import { useEngineStore, MULTI_PV, threadCap, type EngineConfig } from "../../engine/engine-state";
 import type { EngineCommand } from "../../engine/engine-types";
 import { DEFAULT_SIZE } from "../../core/model/move";
 
@@ -41,6 +41,29 @@ export type VcThread = 0 | 1 | 2;
 /** 분석 한 번의 예산(초). 0 = 무제한 — 정지나 새 국면까지 읽는다. */
 export const ANALYSIS_SEC_CHOICES = [0, 5, 10, 30, 60] as const;
 
+/**
+ * 스레드 수 `0` = **자동**: 코어 하나는 화면과 브라우저에 남기고(코어 − 1), 4 를 넘기지
+ * 않는다 — 휴대폰의 작은 코어와 발열은 스레드를 늘려도 노드를 늘려 주지 않는다
+ * (앱 `LocalEngineProfile` 이 기본 3 에 멈춘 것과 같은 판단). 코어 수를 모르면 2.
+ */
+export const AUTO_THREADS = 0;
+export function autoThreads(hardwareConcurrency: number | null): number {
+  if (!hardwareConcurrency || hardwareConcurrency < 1) return 2;
+  return Math.max(1, Math.min(4, hardwareConcurrency - 1));
+}
+
+/** 이 기기의 코어 수 — 모르면 null. */
+export const deviceCores = (): number | null =>
+  typeof navigator === "undefined" ? null : (navigator.hardwareConcurrency ?? null);
+
+/** 설정값(0 = 자동)을 실제 스레드 수로. 상한은 코어 수(`threadCap`). */
+export function resolveThreads(setting: number, cores: number | null): number {
+  const cap = threadCap(cores, null);
+  return setting === AUTO_THREADS
+    ? Math.min(cap, autoThreads(cores))
+    : Math.min(cap, Math.max(1, setting));
+}
+
 export interface Settings {
   // ── 엔진 ──
   style: number;
@@ -49,6 +72,10 @@ export interface Settings {
   maxNode: number;
   vcThread: VcThread;
   hashAutoClear: boolean;
+  /** 원하는 스레드 수(0 = 자동). 멀티 변형에서만 엔진에 닿는다. */
+  threads: number;
+  /** 멀티스레드 변형을 써도 되는가. 끄면 환경이 되어도 단일로 띄운다. */
+  allowThreads: boolean;
   // ── 분석 ──
   multiPv: number;
   analysisSec: number;
@@ -64,6 +91,8 @@ export const DEFAULT_SETTINGS: Settings = {
   maxNode: -1,
   vcThread: 0,
   hashAutoClear: false,
+  threads: AUTO_THREADS,
+  allowThreads: true,
   // 5 는 W3 부터 분석이 보내 온 `YXNBEST 5` 그대로다 — 스모크가 그 줄로 조각을 센다.
   multiPv: MULTI_PV.initial,
   analysisSec: 0,
@@ -90,6 +119,8 @@ export function sanitize(raw: Partial<Settings>): Settings {
     maxNode: node <= 0 ? -1 : Math.round(node),
     vcThread: (vct === 1 || vct === 2 ? vct : 0) as VcThread,
     hashAutoClear: typeof raw.hashAutoClear === "boolean" ? raw.hashAutoClear : d.hashAutoClear,
+    threads: clamp(num(raw.threads, d.threads), 0, 16),
+    allowThreads: typeof raw.allowThreads === "boolean" ? raw.allowThreads : d.allowThreads,
     multiPv: clamp(num(raw.multiPv, d.multiPv), MULTI_PV.min, MULTI_PV.max),
     analysisSec: sec > 0 ? Math.round(sec) : 0,
     showEvalBar: typeof raw.showEvalBar === "boolean" ? raw.showEvalBar : d.showEvalBar,
@@ -118,10 +149,9 @@ function save(s: Settings) {
  * 뺀 것이다 — 규칙은 워커가 START 앞에서 렌주로 고정하고(가중치가 렌주뿐이다),
  * DB 는 DB 화면(W6)이 열릴 때 붙는다.
  *
- * `thread_num` 은 언제나 1 이다 — 배포 변형이 단일 스레드 빌드라서다. 실측(0.43.02
- * single-simd128): 이 빌드는 `INFO THREAD_NUM 4`·`8` 을 오류 없이 **받고 무시한다**
- * (속도·출력이 1 과 같다). 그러니 1 이 아닌 값은 해롭지는 않지만 거짓 설정이 된다.
- * 스레드 조절은 멀티 변형이 브라우저에서 살아난 뒤의 일이다(W0c).
+ * `thread_num` 은 여기 없다 — **떠 있는 변형**이 정하므로 엔진 스토어가 붙인다
+ * (`threadCommand`: 단일 변형이면 언제나 1. 그 빌드는 1 이 아닌 값을 받고 무시해
+ * 설정이 거짓말이 된다 — W0c 실측).
  */
 export function engineInfo(s: Settings): EngineCommand[] {
   const info = (key: string, value: string | number): EngineCommand => ({
@@ -131,7 +161,6 @@ export function engineInfo(s: Settings): EngineCommand[] {
   });
   return [
     info("caution_factor", s.style),
-    info("thread_num", 1),
     // main.c `set_hashsize`: 메가바이트를 킬로바이트로 밀어 보낸다(MB << 10).
     info("hash_size", s.hashMb * 1024),
     info("max_depth", s.maxDepth),
@@ -143,11 +172,13 @@ export function engineInfo(s: Settings): EngineCommand[] {
 export const toEngineConfig = (s: Settings): EngineConfig => ({
   info: engineInfo(s),
   hashAutoClear: s.hashAutoClear,
+  threads: resolveThreads(s.threads, deviceCores()),
 });
 
 /** 엔진 스토어로 흘려보낸다. 엔진이 놀고 있으면 곧바로, 아니면 다음 탐색 직전에 닿는다. */
 function push(s: Settings) {
   const e = useEngineStore.getState();
+  e.setAllowThreads(s.allowThreads);
   e.configure(toEngineConfig(s));
   e.setMultiPv(s.multiPv);
   e.setAnalysisMs(s.analysisSec > 0 ? s.analysisSec * 1000 : Infinity);
@@ -185,6 +216,8 @@ function pick(s: SettingsState): Settings {
     maxNode: s.maxNode,
     vcThread: s.vcThread,
     hashAutoClear: s.hashAutoClear,
+    threads: s.threads,
+    allowThreads: s.allowThreads,
     multiPv: s.multiPv,
     analysisSec: s.analysisSec,
     showEvalBar: s.showEvalBar,

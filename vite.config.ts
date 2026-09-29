@@ -3,22 +3,24 @@ import react from "@vitejs/plugin-react";
 import { fileURLToPath, URL } from "node:url";
 
 /**
- * Vite 설정.
+ * 교차 출처 격리 헤더 — `public/_headers` 와 **같은 두 줄**이다. 멀티스레드 엔진
+ * (multi-simd128)은 SharedArrayBuffer 가 있어야 돌고, 그것은 이 헤더로 격리됐을 때만
+ * 열린다(docs/W0c-결과.md). 개발 서버·미리보기도 배포와 같은 엔진을 띄우도록 붙인다.
+ * 격리가 안 되는 곳에서는 앱이 단일 스레드 엔진으로 물러선다.
  *
- * **COOP/COEP 헤더는 여기 없다.** W0 이전 계획서는 이 헤더를 필수로 잡았지만,
- * 근거 둘(SharedArrayBuffer stdin, 멀티스레드 빌드)이 모두 사라졌다 —
- * upstream 이 sendCommand 펌프를 제공하고, 배포 경로는 단일 스레드 변형이다
- * (`docs/W0-결과.md`, 계획서 §8). 헤더가 없어야 개발 서버에서 외부 리소스
- * 제약도 함께 사라진다.
- *
- * 멀티스레드 변형을 되살릴 때(W0c)만 아래 주석을 켠다:
- *
- *   server: { headers: {
- *     "Cross-Origin-Opener-Policy": "same-origin",
- *     "Cross-Origin-Embedder-Policy": "require-corp",
- *   } },
+ * 단일 스레드만으로 개발하려면 `RAPFIWEB_ISOLATE=0 pnpm dev`.
  */
+const ISOLATION_HEADERS =
+  process.env.RAPFIWEB_ISOLATE === "0"
+    ? {}
+    : {
+        "Cross-Origin-Opener-Policy": "same-origin",
+        "Cross-Origin-Embedder-Policy": "require-corp",
+      };
+
 export default defineConfig({
+  server: { headers: ISOLATION_HEADERS },
+  preview: { headers: ISOLATION_HEADERS },
   // GitHub Pages 는 저장소 이름이 경로에 붙는다(https://lowqen.github.io/RapfiWeb/).
   // 기본값은 "/" 로 두어 로컬 개발·스모크가 그대로 돌고, 배포 잡만 이 값을 준다.
   base: process.env.RAPFIWEB_BASE ?? "/",

@@ -70,16 +70,28 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p dist/engine
-          if gh release view engine-3c94c2a9 > /dev/null 2>&1; then
-            gh release download engine-3c94c2a9 --dir dist/engine --pattern 'rapfi-single-simd128.*' --clobber
+          if gh release view engine-3c94c2a9-mt > /dev/null 2>&1; then
+            gh release download engine-3c94c2a9-mt --dir dist/engine --pattern 'rapfi-*-simd128.*' --clobber
             echo '{ "type": "commonjs" }' > dist/engine/package.json
             ls -la dist/engine | sed 's/^/  /'
           else
             echo "릴리스가 아직 없습니다 — 엔진 스모크는 건너뜁니다."
           fi
 
-      - name: 엔진 스모크 — 클릭 -> 분석 -> 보드
+      # 두 번 돈다: 격리(배포와 같은 COOP/COEP) → 멀티스레드 엔진이 떠야 하고,
+      # 비격리(헤더를 못 붙이는 호스팅) → 단일 스레드로 물러서야 한다.
+      - name: 엔진 스모크 — 클릭 -> 분석 -> 보드 (격리 · 멀티스레드)
         run: pnpm exec tsx scripts/engine-smoke.ts
+
+      - name: 엔진 스모크 — 비격리 → 단일 스레드 폴백
+        env:
+          SMOKE_ISOLATE: "0"
+        run: pnpm exec tsx scripts/engine-smoke.ts
+
+      - name: 스모크 — 비격리 화면(스레드 선택 잠김)
+        env:
+          SMOKE_ISOLATE: "0"
+        run: pnpm exec tsx scripts/smoke.ts
 
       # W4 부터: 분석이 아니라 **대국**을 돈다. 협상은 엔진이 실제로 무엇을
       # 말하는지가 답이라, 우리가 답을 만들어 넣는 단위 시험으로는 닿지 않는다.

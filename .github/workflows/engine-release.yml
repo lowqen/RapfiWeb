@@ -70,9 +70,10 @@ jobs:
       - name: 멀티 변형 관문 (W0c 하네스, chromium)
         env:
           BROWSERS: chromium
-          # 앱이 쓰는 구성만 관문으로 — 페이지 구성은 첫 관문 런에서 탐색 직후 다음
-          # 탐색이 간헐적으로 멈췄다(원인은 로컬 재현으로 조사). 표에는 그대로 남는다.
-          W0C_REQUIRE: "multi:worker-pthread"
+          # 첫 관문 런에서 페이지 구성이 멈춘 것은 하네스가 좌표 직후 곧바로 명령을
+          # 보낸 입력 경합이었다(docs/W0c-결과.md 「입력 경합」) — 하네스에 앱과 같은
+          # 정착 대기를 넣었으므로 두 구성 모두 관문으로 본다.
+          W0C_REQUIRE: "multi:worker-pthread,multi:page"
         run: |
           pnpm exec playwright install --with-deps chromium
           node spike/w0c/run.mjs

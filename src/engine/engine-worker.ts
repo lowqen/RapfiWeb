@@ -42,7 +42,18 @@ import type { Move } from "../core/model/move";
  * 변경·새 명령은 **그 경계에서** 처리된다. 해시 테이블이 유지되므로 재탐색 비용은
  * 크지 않다. 대가는 「즉시 정지」가 「최대 한 조각 뒤 정지」가 되는 것이다.
  *
- * 멀티스레드 변형이 브라우저에서 살아나면(W0c) `sliceMs = 0` 하나로 분할이 꺼진다.
+ * ## 멀티스레드 변형에서는 반대다 (W0c, `docs/W0c-결과.md`)
+ *
+ * 엔진이 자기 pthread 에서 돌고 `sendCommand` 는 **즉시** 돌아온다. 답은 엔진
+ * 스레드가 이 워커로 되돌려 보내는 줄로 **비동기로** 온다. 그래서 멀티 변형은
+ * 조각으로 나누지 않고 탐색 하나를 통째로 보낸 뒤,
+ *   - 끝은 **좌표 줄**로 판정하고(요약 줄 `MESSAGE Speed …` 은 빠지기도 한다),
+ *   - 정지는 `YXSTOP` 을 곧바로 보낸다(실측 1~9ms 에 닿는다),
+ *   - 탐색이 도는 동안에는 `YXSTOP` 말고는 아무것도 보내지 않는다 — 요청 줄이
+ *     앞 탐색의 좌표를 받은 뒤에야 다음 명령을 낸다(아래 `searchThreaded`).
+ *
+ * 어느 변형인지는 기동 때 정해지고(`threaded`) 탐색 경로만 가른다. 명령 직렬화·
+ * 파싱·집계는 두 변형이 같은 길을 쓴다.
  *
  * ## 파싱과 집계는 여기서 끝낸다
  *
@@ -61,6 +72,40 @@ interface EmscriptenModule {
 type ModuleFactory = (opts: Partial<EmscriptenModule>) => Promise<EmscriptenModule>;
 
 const post = (m: FromWorker) => self.postMessage(m);
+
+// ── pthread 가드 ─────────────────────────────────────────────────────
+//
+// 멀티 변형의 글루는 엔진 스레드마다 워커를 **자기 주소로** 연다:
+//
+//     ba && (_scriptName = self.location.href)          // 워커 안이면 = 이 번들의 주소
+//     new Worker(_scriptName, { name: "em-pthread" })
+//
+// importScripts 로 읽힌 글루에게 self.location 은 **이 워커 번들**이다. 그래서 엔진
+// 스레드마다 이 파일이 다시 열린다. 그때 호스트 코드(onmessage 등)를 걸면 글루의
+// 부트스트랩(`isPthread && Rapfi()`)이 가로막혀 엔진이 영원히 무응답이 된다 — W0 에서
+// 워커 구성이 실패한 원인이다(W0c 에서 확정). 이 판의 글루에는 주소를 바꿀
+// `mainScriptUrlOrBlob` 가 없다.
+//
+// 해법: 이름이 em-pthread 면 **글루만 읽고 비킨다.** 글루 끝이 스레드를 세우고 제
+// onmessage 를 건다. 이 파일의 나머지는 선언뿐이고 부작용(onmessage)은 맨 아래에서
+// `IS_PTHREAD` 로 막는다.
+//
+// 글루 주소는 빌드 때 정해진 엔진 기본 경로로 만든다 — 엔진 스레드에게는 기동
+// 메시지가 오지 않으므로 그것밖에 알 길이 없다. 클라이언트가 같은 기본값을 쓴다
+// (`engine-client.ts`). 다른 경로로 띄우면 여기서 글루를 못 찾고, 기동 핸드셰이크가
+// 시간을 넘겨 클라이언트가 단일 변형으로 물러선다.
+
+/** 엔진 스레드로 열렸는가. */
+export const IS_PTHREAD =
+  typeof self !== "undefined" && (self as unknown as { name?: string }).name === "em-pthread";
+
+/** 멀티 변형 글루의 주소 — 엔진 스레드가 읽는다. */
+export function pthreadGlueUrl(): string {
+  const base = import.meta.env?.VITE_ENGINE_BASE_URL ?? "/engine/";
+  return new URL(`${base}rapfi-multi-simd128.js`, self.location.href).href;
+}
+
+if (IS_PTHREAD) importScripts(pthreadGlueUrl());
 
 /**
  * 이 웹앱은 **렌주 전용**이다. `.data` 에 렌주 가중치만 구워져 있고
@@ -104,6 +149,129 @@ let searching = false;
 let forwardMoves = false;
 /** 분할 탐색에서 가장 최근 조각이 고른 수. 무제한 착수가 끝에 이걸 둔다. */
 let sliceMoves: readonly Move[] | null = null;
+
+/** 엔진이 제 pthread 에서 도는가(멀티 변형). 기동 때 정해진다. */
+let threaded = false;
+
+/**
+ * 멀티 변형에서 엔진이 **탐색 중**인가 — 탐색 명령을 보낸 뒤부터 좌표 줄이 올
+ * 때까지. 이 사이에 `YXSTOP` 말고 다른 명령이 나가면 엔진의 프로토콜 스레드가
+ * 탐색과 경합한다. 설계상 일어나지 않지만(요청 줄) 일어나면 콘솔에 남긴다.
+ */
+let engineBusy = false;
+
+/** 멀티 변형: 엔진이 정지에 이만큼 안에 좌표로 답하지 않으면 고장으로 본다(실측 1~9ms). */
+const STOP_GRACE_MS = 5_000;
+/** 멀티 변형: 기동 핸드셰이크(START → OK) 한도. 넘기면 클라이언트가 단일로 물러선다. */
+const HANDSHAKE_MS = 15_000;
+/**
+ * 무제한 탐색의 `timeout_turn`. Rapfi 에게 「시간 무제한」은 따로 없으므로 사실상
+ * 끝나지 않는 값을 준다(약 11.5일 — 32비트 정수 안). 끝은 정지나 새 요청이 정한다.
+ */
+const UNLIMITED_TURN_MS = 1_000_000_000;
+
+/**
+ * **좌표 뒤 정착 대기(ms) — 멀티 변형의 동시성 사고를 막는 핵심.**
+ *
+ * 엔진은 좌표 줄을 찍은 **뒤에도** 탐색 스레드가 잠깐 표준입력을 계속 읽는다
+ * (탐색 중 `YXSTOP` 감시). 그 틈에 다음 명령을 보내면 두 스레드가 입력을 나눠 먹는다:
+ * `INFO THREAD_NUM 2` 가 `ERROR Unknown command: THREAD_NUM` · `… : 2` 로 토막 나고,
+ * 다음 `YXNBEST` 가 통째로 사라져 **엔진이 영원히 무응답**이 된다(YXSTOP 도 안 듣는다).
+ *
+ * 실측(로컬 2코어, 워커+pthread 가드와 페이지 둘 다): 좌표 직후 곧바로 보내면 첫 몇
+ * 번 안에 엔진이 죽는다. 5ms 만 기다려도 120회 연속 0건. 여기서는 그 10배를 둔다 —
+ * 사람이 느낄 수 없고, 느린 기기의 여유가 된다.
+ */
+const SETTLE_MS = 50;
+/** 마지막 좌표 줄(탐색의 끝)이 온 때. 멀티 변형은 여기서 `SETTLE_MS` 가 지나야 다음 명령을 낸다. */
+let lastMoveAt = -Infinity;
+/** 마지막으로 엔진 줄을 받은 때 — 탐색 명령이 삼켜졌는지 보는 데 쓴다. */
+let lastLineAt = 0;
+/**
+ * 탐색 명령을 보낸 뒤 이만큼 **한 줄도** 오지 않으면 명령이 엔진 입력에서 사라진 것으로
+ * 본다. 정상 탐색은 수 ms 안에 `INFO PV`·`MESSAGE Depth` 를 낸다(캡처).
+ */
+const FIRST_LINE_MS = 5_000;
+
+/** 좌표 뒤 정착 대기. 이미 지났으면 곧바로. 멀티 변형에서만 기다린다. */
+async function quiet(): Promise<void> {
+  if (!threaded) return;
+  const left = lastMoveAt + SETTLE_MS - performance.now();
+  if (left > 0) await new Promise((r) => setTimeout(r, left));
+}
+
+/**
+ * 탐색 명령 뒤 첫 줄 감시 — `FIRST_LINE_MS` 동안 한 줄도 없으면 풀린다. 탐색이 끝나면
+ * (`cancel`) 조용히 멈춘다.
+ */
+function firstLineWatch(since: number): { silent: Promise<"silent">; cancel: () => void } {
+  let id: ReturnType<typeof setInterval> | null = null;
+  const silent = new Promise<"silent">((resolve) => {
+    id = setInterval(() => {
+      if (lastLineAt > since) {
+        if (id !== null) clearInterval(id);
+        return;
+      }
+      if (performance.now() - since > FIRST_LINE_MS) {
+        if (id !== null) clearInterval(id);
+        resolve("silent");
+      }
+    }, 250);
+  });
+  return { silent, cancel: () => id !== null && clearInterval(id) };
+}
+
+/** 다음 좌표 줄(탐색의 끝)을 기다리는 쪽. */
+let moveWaiter: ((moves: readonly Move[]) => void) | null = null;
+const nextMove = () =>
+  new Promise<readonly Move[]>((resolve) => {
+    moveWaiter = resolve;
+  });
+
+/** 특정 줄을 기다리는 쪽들 — 기동 핸드셰이크가 쓴다. */
+const lineWaiters: { re: RegExp; resolve: (line: string) => void }[] = [];
+function waitLine(re: RegExp, ms: number, what: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const w = { re, resolve };
+    lineWaiters.push(w);
+    setTimeout(() => {
+      const i = lineWaiters.indexOf(w);
+      if (i >= 0) {
+        lineWaiters.splice(i, 1);
+        reject(new Error(`${what}: ${ms}ms 안에 답이 없습니다`));
+      }
+    }, ms);
+  });
+}
+
+/** 정지·새 요청을 기다리는 쪽. `interrupt()` 가 깨운다. */
+let stopWaiter: (() => void) | null = null;
+const stopSignal = () =>
+  new Promise<void>((resolve) => {
+    if (stopRequested) resolve();
+    else stopWaiter = resolve;
+  });
+
+/** 이만큼만 기다리고, 넘기면 null. */
+const settle = <T>(p: Promise<T | null>, ms: number): Promise<T | null> =>
+  Promise.race([p, new Promise<null>((r) => setTimeout(() => r(null), ms))]);
+
+/** 기다림에 한도를 둔다. 넘기면 던진다 — 멀티 엔진이 멈춘 것이다. */
+function within<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const id = setTimeout(() => reject(new Error(`${what}: ${ms}ms 안에 답이 없습니다`)), ms);
+    p.then(
+      (v) => {
+        clearTimeout(id);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(id);
+        reject(e);
+      },
+    );
+  });
+}
 
 /** 스냅샷은 ~10Hz 로만 올린다. 그보다 잦으면 메인이 그리는 것보다 받는 게 많아진다. */
 const SNAPSHOT_MS = 100;
@@ -183,6 +351,13 @@ function drain(chunk: string) {
     const line = part.replace(/\r$/, "");
     if (!line) continue;
     pushConsole(line);
+    lastLineAt = performance.now();
+    for (const w of lineWaiters.slice()) {
+      if (w.re.test(line)) {
+        lineWaiters.splice(lineWaiters.indexOf(w), 1);
+        w.resolve(line);
+      }
+    }
     const r = parse(line, coord);
     if (agg.consume(r)) snapshotDirty = true;
     if (r.kind === "bestMove") {
@@ -191,6 +366,12 @@ function drain(chunk: string) {
       // 분석 조각의 수를 엔진의 착수로 받아 둔다.
       sliceMoves = r.moves;
       if (forwardMoves) post({ type: "bestMove", moves: r.moves });
+      // 멀티 변형: 좌표 줄이 곧 탐색의 끝이다. 다음 명령은 정착 대기 뒤(`quiet`).
+      engineBusy = false;
+      lastMoveAt = performance.now();
+      const w = moveWaiter;
+      moveWaiter = null;
+      w?.(r.moves);
     } else if (r.kind === "forbid") post({ type: "forbid", cells: r.cells });
     else if (r.kind === "openingMove" || r.kind === "openingSwap" || r.kind === "soosorvFifth") {
       post({ type: "opening", response: r });
@@ -244,7 +425,17 @@ const sendCommand = (lines: readonly string[]) => {
   // 굴 때 **무엇을 받았는지** 보이지 않으면 원인을 가를 수 없다. 여러 줄
   // 블록(BOARD 등)은 머리 줄과 줄 수만 적는다 — 돌 좌표로 콘솔을 덮지 않게.
   pushConsole(`> ${lines[0]}${lines.length > 1 ? ` …(+${lines.length - 1}줄)` : ""}`);
+  if (engineBusy && lines[0] !== "YXSTOP") {
+    // 설계상 오지 않는 자리다(요청 줄이 앞 탐색의 끝을 기다린다). 오면 흔적을 남긴다.
+    pushConsole(`! 탐색 중에 보낸 명령: ${lines[0]}`);
+  }
   mod?.sendCommand(lines.join("\n"));
+};
+
+/** 멀티 변형: 탐색을 거는 명령. 좌표 줄이 올 때까지 엔진은 바쁘다. */
+const sendSearch = (cmds: readonly EngineCommand[]) => {
+  sendAll(cmds);
+  if (threaded) engineBusy = true;
 };
 
 /** 명령 여러 개를 순서대로. 각각이 자기만의 `sendCommand` 호출이 된다. */
@@ -254,7 +445,9 @@ const sendAll = (cmds: readonly EngineCommand[]) => {
 
 async function boot(msg: Extract<ToWorker, { type: "boot" }>) {
   const t0 = performance.now();
-  sliceMs = msg.sliceMs;
+  threaded = msg.variant.startsWith("multi");
+  // 멀티 변형은 조각으로 나누지 않는다 — 정지가 탐색 도중에 닿는다.
+  sliceMs = threaded ? 0 : msg.sliceMs;
   coord = new CoordMapper(msg.size);
   agg = new SearchAggregator(msg.size);
 
@@ -268,6 +461,15 @@ async function boot(msg: Extract<ToWorker, { type: "boot" }>) {
   if (typeof mod.sendCommand !== "function") {
     throw new Error("Module.sendCommand 가 없습니다 — preamble.js 가 빠진 빌드입니다");
   }
+
+  // 답을 기다릴 자리를 **보내기 전에** 건다. 단일 변형은 답이 sendCommand 안에서
+  // 동기로 와 버리고, 멀티 변형은 엔진 스레드에서 나중에 온다 — 둘 다 이 순서면 잡힌다.
+  // START 의 OK 가 핸드셰이크다: 멀티 엔진이 떠 있지 않으면(pthread 를 못 세웠다 등)
+  // 여기서 시간이 넘고, 클라이언트가 단일 변형으로 물러선다.
+  const hs = msg.handshakeMs ?? HANDSHAKE_MS;
+  const ok = waitLine(/^OK$/, hs, `${msg.variant} 기동 핸드셰이크(START)`);
+  const aboutLine = waitLine(/version\s*=/i, HANDSHAKE_MS, "ABOUT").catch(() => null);
+  const maxLine = waitLine(/MAX_THREAD_NUM/, HANDSHAKE_MS, "yxshowinfo").catch(() => null);
 
   // 기동 직후 상세 모드로 바꾼다. 이걸 안 보내면 INFO PV/DEPTH/EVAL/WINRATE 가
   // 한 줄도 오지 않고 분석 UI 가 통째로 빈다(데스크톱도 init_engine 에서 같은 짝을 보낸다).
@@ -283,17 +485,23 @@ async function boot(msg: Extract<ToWorker, { type: "boot" }>) {
     { kind: "about" },
   ]);
 
-  // ABOUT 응답이 위 drain 을 지나 콘솔에 들어가 있다. 버전만 뽑아 올린다.
-  const about =
-    consoleBuffer
-      .map((l) => parse(l, coord))
-      .find((r): r is Extract<typeof r, { kind: "about" }> => r.kind === "about")?.fields ?? {};
+  await ok;
+  // ABOUT·MAX_THREAD_NUM 은 있으면 좋은 정보다 — OK 뒤에는 잠깐만 기다린다.
+  const aboutRaw = await settle(aboutLine, 2_000);
+  const aboutParsed = aboutRaw === null ? null : parse(aboutRaw, coord);
+  const about = aboutParsed?.kind === "about" ? aboutParsed.fields : {};
+  // `MESSAGE INFO MAX_THREAD_NUM 256` — 단일 빌드도 256 이라고 답하므로(실측) 능력의
+  // 신호로는 쓰지 않고 상한으로만 쓴다.
+  const maxRaw = await settle(maxLine, 500);
+  const maxThreads = maxRaw === null ? null : Number(/(\d+)\s*$/.exec(maxRaw)?.[1] ?? NaN);
 
   post({
     type: "booted",
     version: msg.variant,
     bootMs: Math.round(performance.now() - t0),
     about,
+    threaded,
+    maxThreads: maxThreads !== null && Number.isFinite(maxThreads) ? maxThreads : null,
   });
   flushConsole();
 }
@@ -347,7 +555,14 @@ async function search(msg: Extract<ToWorker, { type: "search" }>, epoch: number)
   // 된다 — 사용자가 분석에서 본 그대로다. 무제한으로 되돌리고 조각이 시간을 정한다.
   sendCommand(["INFO timeout_match 0"]);
 
-  // sliceMs = 0 은 「분할하지 않는다」 — 멀티스레드 변형이 살아난 뒤의 설정이다.
+  if (threaded) {
+    const reason = await searchThreaded(msg);
+    finishSearch(msg, reason, t0);
+    return;
+  }
+
+  // sliceMs = 0 은 「분할하지 않는다」(단일 변형에서 조각을 끄는 설정 — 정지는 탐색이
+  // 끝나야 닿는다).
   if (sliceMs <= 0) {
     sendAll(msg.setup);
     sendAll(msg.repeat);
@@ -407,6 +622,57 @@ async function search(msg: Extract<ToWorker, { type: "search" }>, epoch: number)
   finishSearch(msg, reason, t0);
 }
 
+/**
+ * 멀티 변형의 탐색 하나 — 조각 없이 통째로.
+ *
+ * 먼저 오는 쪽이 끝을 정한다:
+ *   - **좌표 줄** → 엔진이 스스로 끝냈다(예산 소진·증명·즉답).
+ *   - **정지/새 요청** → `YXSTOP` 을 보내고 그 탐색의 좌표 줄을 기다린다. 좌표가 오기
+ *     전에는 다음 명령을 내지 않는다 — 엔진의 프로토콜 스레드가 탐색과 경합하지 않게.
+ *
+ * 무제한 분석이 스스로 끝나면(증명 완료·즉답) 그 결과는 확정이므로 되묻지 않고
+ * **정지나 새 국면까지 그대로 둔다** — 단일 변형이 즉답에 쉬어 가며 기다리는 것과
+ * 같은 뜻이다. 분석의 끝은 사용자나 새 국면이 정한다.
+ */
+async function searchThreaded(
+  msg: Extract<ToWorker, { type: "search" }>,
+): Promise<SearchEndReason> {
+  const unlimited = !Number.isFinite(msg.totalMs);
+  const budget = unlimited ? UNLIMITED_TURN_MS : Math.max(MIN_SLICE_MS, Math.round(msg.totalMs));
+  sendCommand([`INFO timeout_turn ${budget}`]);
+  agg.beginSlice();
+  sendAll(msg.setup);
+  const done = nextMove();
+  const since = performance.now();
+  sendSearch(msg.repeat);
+  const watch = firstLineWatch(since);
+
+  const first = await Promise.race([
+    done.then(() => "done" as const),
+    stopSignal().then(() => "stop" as const),
+    watch.silent,
+  ]);
+  watch.cancel();
+  if (first === "silent") {
+    // 탐색 명령이 엔진 입력에서 사라졌다 — 정착 대기가 막아야 할 사고다. 이 엔진은
+    // 믿을 수 없으므로 올려 보내고, 클라이언트가 단일 스레드 엔진으로 다시 띄운다.
+    throw new Error("멀티스레드 엔진이 탐색 명령에 답하지 않습니다(입력 경합)");
+  }
+  if (first === "stop") {
+    if (engineBusy) {
+      sendAll([{ kind: "stop" }]);
+      await within(done, STOP_GRACE_MS, "멀티스레드 엔진이 정지(YXSTOP)에 좌표로 답하지 않습니다");
+    }
+    return "stopped";
+  }
+  maybeEmitSnapshot(true);
+  if (msg.mode === "analyze" && unlimited) {
+    await stopSignal();
+    return "stopped";
+  }
+  return msg.mode === "analyze" ? "timeout" : "finished";
+}
+
 function finishSearch(
   msg: Extract<ToWorker, { type: "search" }>,
   reason: SearchEndReason,
@@ -457,35 +723,55 @@ let stopEpoch = 0;
  */
 let pending = 0;
 
-/** 즉답 분석이 쉬는 중이면 깨운다 — 정지·새 요청이 쉼이 끝나기를 기다리지 않게. */
+/**
+ * 정지·새 요청을 알린다. 즉답 분석이 쉬는 중이면 깨우고, 멀티 변형의 탐색이 기다리는
+ * 정지 신호를 울린다(그쪽이 `YXSTOP` 을 보낸다 — 여기서 직접 보내지 않는 것은, 탐색을
+ * 거는 명령과 정지가 엇갈려 **아무도 멈추지 않는 탐색**이 남지 않게 하기 위해서다).
+ */
 function interrupt() {
   stopRequested = true;
   const w = wakeIdle;
   wakeIdle = null;
   w?.();
+  const s = stopWaiter;
+  stopWaiter = null;
+  s?.();
 }
 
-self.onmessage = (ev: MessageEvent<ToWorker>) => {
-  const msg = ev.data;
-  if (msg.type === "stop") {
-    stopEpoch++;
-    interrupt();
-    // 탐색 중이 아닐 때만 곧바로 닿는다. 탐색 중이면 조각 경계에서 루프가 본다.
-    if (!searching) sendAll([{ kind: "stop" }]);
-    return;
-  }
-  // 분석이 돌고 있으면 비켜 달라고 한다 — 착수·새 대국·국면 변경이 기다린다.
-  if (msg.type !== "boot" && searching) interrupt();
-  const epoch = stopEpoch;
-  pending++;
-  queue = queue.then(() => {
-    pending--;
-    return handle(msg, epoch);
-  });
-};
+/** 명시적 정지(「정지」·「지금 두기」·무르기) 알림 — 시간제 착수는 이것만 끊는다. */
+let explicitStopWaiter: (() => void) | null = null;
+
+if (!IS_PTHREAD) {
+  self.onmessage = (ev: MessageEvent<ToWorker>) => {
+    const msg = ev.data;
+    if (msg.type === "stop") {
+      stopEpoch++;
+      interrupt();
+      const e = explicitStopWaiter;
+      explicitStopWaiter = null;
+      e?.();
+      // 탐색 중이 아닐 때만 곧바로 닿는다. 탐색 중이면 조각 경계(단일) 또는
+      // 탐색 루프(멀티)가 본다. 멀티는 놀 때 멈출 것이 없고, 줄 밖에서 보내면 좌표 뒤
+      // 정착 대기를 건너뛰어 입력 경합을 부를 수 있으므로 보내지 않는다.
+      if (!searching && !threaded) sendAll([{ kind: "stop" }]);
+      return;
+    }
+    // 분석이 돌고 있으면 비켜 달라고 한다 — 착수·새 대국·국면 변경이 기다린다.
+    if (msg.type !== "boot" && searching) interrupt();
+    const epoch = stopEpoch;
+    pending++;
+    queue = queue.then(() => {
+      pending--;
+      return handle(msg, epoch);
+    });
+  };
+}
 
 async function handle(msg: ToWorker, epoch: number): Promise<void> {
   try {
+    // 멀티 변형: 앞 탐색의 좌표 뒤 정착 대기를 **모든 요청 앞에서** 지킨다(`SETTLE_MS`).
+    // 요청 줄이 하나라서 여기 한 곳이면 설정·금수 조회·다음 탐색이 다 덮인다.
+    if (msg.type !== "boot") await quiet();
     switch (msg.type) {
       case "boot":
         await boot(msg);
@@ -512,7 +798,36 @@ async function handle(msg: ToWorker, epoch: number): Promise<void> {
         }
         forwardMoves = true;
         try {
-          sendAll(msg.commands);
+          if (!threaded) {
+            sendAll(msg.commands); // 단일 변형: 탐색이 이 호출 안에서 끝나고 좌표가 올라간다
+          } else {
+            // 멀티 변형: 좌표는 나중에 온다. 명시적 정지(지금 두기·무르기)만 이것을
+            // 끊는다 — 뒤에 선 요청은 시간제 착수를 기다린다(단일과 같다).
+            const done = nextMove();
+            const stop = new Promise<"stop">((r) => {
+              explicitStopWaiter = () => r("stop");
+            });
+            const since = performance.now();
+            sendSearch(msg.commands);
+            const watch = firstLineWatch(since);
+            const ceiling = Math.max(100, Math.round(msg.turnMs)) + STOP_GRACE_MS;
+            const first = await Promise.race([
+              done.then(() => "done" as const),
+              stop,
+              watch.silent,
+              new Promise<"late">((r) => setTimeout(() => r("late"), ceiling)),
+            ]);
+            watch.cancel();
+            explicitStopWaiter = null;
+            if (first === "silent") {
+              throw new Error("멀티스레드 엔진이 착수 명령에 답하지 않습니다(입력 경합)");
+            }
+            if (first !== "done" && engineBusy) {
+              // 정지이거나, 예산을 넉넉히 넘겼다 — 멈춰 세우고 그때의 최선수를 받는다.
+              sendAll([{ kind: "stop" }]);
+              await within(done, STOP_GRACE_MS, "멀티스레드 엔진이 착수 정지에 답하지 않습니다");
+            }
+          }
         } finally {
           forwardMoves = false;
         }
@@ -543,6 +858,9 @@ async function handle(msg: ToWorker, epoch: number): Promise<void> {
     // 탐색 도중에 던졌으면 `searching` 이 켜진 채로 남는다 — 그러면 뒤이은 모든
     // 요청이 「돌고 있는 분석」을 멈추려 들며 헛돈다.
     searching = false;
+    engineBusy = false;
+    forwardMoves = false;
+    explicitStopWaiter = null;
     post({ type: "fatal", message: describe(e) });
   }
 }

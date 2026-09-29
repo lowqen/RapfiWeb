@@ -222,7 +222,15 @@ export const EMPTY_SNAPSHOT: AnalysisSnapshot = {
 export type EngineStatus = "idle" | "starting" | "ready" | "searching" | "error";
 
 export type ToWorker =
-  | { type: "boot"; engineBaseUrl: string; variant: string; sliceMs: number; size: number }
+  | {
+      type: "boot";
+      engineBaseUrl: string;
+      variant: string;
+      sliceMs: number;
+      size: number;
+      /** 기동 핸드셰이크 한도(ms). 기본 15초 — 시험이 줄여 쓴다. */
+      handshakeMs?: number;
+    }
   | { type: "send"; commands: readonly EngineCommand[] }
   /**
    * 시간 분할 탐색. 조각 사이에 워커의 이벤트 루프가 돌아온다 — 그 틈에만
@@ -285,7 +293,16 @@ export type ToWorker =
 export type SearchEndReason = "finished" | "stopped" | "timeout";
 
 export type FromWorker =
-  | { type: "booted"; version: string; bootMs: number; about: Record<string, string> }
+  | {
+      type: "booted";
+      version: string;
+      bootMs: number;
+      about: Record<string, string>;
+      /** 엔진이 제 pthread 에서 도는가(멀티 변형). */
+      threaded: boolean;
+      /** `MESSAGE INFO MAX_THREAD_NUM` — 단일 빌드도 256 을 답하므로 상한으로만 쓴다. */
+      maxThreads: number | null;
+    }
   /**
    * 집계된 스냅샷. 메인 스레드는 원시 줄이 아니라 이것을 받는다. `id` 는 그 스냅샷을
    * 만든 탐색 요청의 번호다 — 밀려난 탐색이 마지막으로 올린 것(옛 국면의 값)을

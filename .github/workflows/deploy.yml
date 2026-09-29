@@ -45,7 +45,7 @@ concurrency:
 env:
   TARGET: ${{ inputs.target || 'cloudflare' }}
   PROJECT: rapfiweb
-  ENGINE_TAG: engine-3c94c2a9
+  ENGINE_TAG: engine-3c94c2a9-mt
 
 jobs:
   build:
@@ -71,7 +71,7 @@ jobs:
           mkdir -p dist/engine
           if gh release view "$ENGINE_TAG" > /dev/null 2>&1; then
             gh release download "$ENGINE_TAG" --dir dist/engine \
-              --pattern 'rapfi-single-simd128.*' --clobber
+              --pattern 'rapfi-*-simd128.*' --clobber
             echo '{ "type": "commonjs" }' > dist/engine/package.json
             ls -la dist/engine | sed 's/^/  /'
           else

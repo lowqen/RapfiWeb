@@ -10,6 +10,7 @@
  */
 import { chromium } from "playwright";
 import { createServer } from "node:http";
+import { ISOLATION_HEADERS, ISOLATE } from "./isolation.ts";
 import { readFileSync, existsSync } from "node:fs";
 import { extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -38,7 +39,10 @@ const server = createServer((req, res) => {
   if (!existsSync(file) || extname(file) === "") file = join(DIST, "index.html");
   try {
     const body = readFileSync(file);
-    res.writeHead(200, { "content-type": MIME[extname(file)] ?? "application/octet-stream" });
+    res.writeHead(200, {
+      ...ISOLATION_HEADERS,
+      "content-type": MIME[extname(file)] ?? "application/octet-stream",
+    });
     res.end(body);
   } catch {
     res.writeHead(404).end("not found");
@@ -265,6 +269,23 @@ try {
     const n = await page.getByRole("button", { name, exact: true }).count();
     if (n !== 1) fail(`설정 탭에 「${name}」 이 하나가 아닙니다: ${n}개`);
   }
+  // 스레드 조절 — 격리된 곳이면 멀티 변형이 계획되고 스레드 선택이 켜져 있어야 한다.
+  // 격리되지 않은 곳(SMOKE_ISOLATE=0)이면 단일로 계획되고 선택이 잠겨 있어야 한다.
+  const isolated = (await page.evaluate("crossOriginIsolated")) as boolean;
+  if (isolated !== ISOLATE) fail(`crossOriginIsolated=${isolated} (기대 ${ISOLATE})`);
+  const variantText = (await page.locator(".srow", { hasText: "엔진 변형" }).innerText()).trim();
+  const wantVariant = ISOLATE ? "multi-simd128" : "single-simd128";
+  if (!variantText.includes(wantVariant))
+    fail(`엔진 변형 줄이 ${wantVariant} 가 아닙니다: ${variantText}`);
+  const threadGroup = page.getByRole("radiogroup", { name: "스레드 수" });
+  if ((await threadGroup.count()) !== 1) fail("스레드 수 선택이 없습니다");
+  else {
+    const locked = (await threadGroup.getByRole("radio").first().isDisabled()) === true;
+    if (locked === ISOLATE) {
+      fail(`스레드 수 선택이 ${ISOLATE ? "잠겨" : "열려"} 있습니다 (격리 ${ISOLATE})`);
+    }
+  }
+
   await page.getByRole("searchbox", { name: "설정 검색" }).fill("hash_size");
   const filtered = await page.locator(".srow").count();
   if (filtered !== 1) fail(`«hash_size» 검색이 한 줄로 좁혀지지 않습니다: ${filtered}줄`);

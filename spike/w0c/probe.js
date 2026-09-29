@@ -134,6 +134,9 @@
       at = lines.length;
       const pBlock = send("YXNBEST 1");
       const pm = await waitFor(MOVE, 30000, "첫 탐색", at);
+      // 좌표 뒤 정착 대기 — 멀티 엔진은 좌표를 찍은 뒤에도 잠깐 입력을 읽어, 곧바로 보낸
+      // 명령을 토막 내거나 삼킨다(docs/W0c-결과.md 「입력 경합」). 앱과 같은 50ms.
+      await sleep(50);
       out.proto = { bestmove: pm.l, blockMs: pBlock, notCenter: pm.l !== "7,7" };
 
       out.stage = "scaling";

@@ -2,7 +2,8 @@ import { useMemo, useState, type ComponentType } from "react";
 import { MOVE_TIME_CHOICES, useGameStore } from "../board/gameStore";
 import { useBoardStore } from "../board/boardStore";
 import { OpeningProgress } from "../board/OpeningPanel";
-import { useEngineStore, MULTI_PV } from "../../engine/engine-state";
+import { useEngineStore, MULTI_PV, threadCap } from "../../engine/engine-state";
+import type { EngineVariant } from "../../engine/engine-client";
 import { useThemeStore, type ThemeMode } from "../../app/theme";
 import {
   COMPUTER_SIDE_LABEL,
@@ -19,8 +20,12 @@ import {
   HASH_CHOICES_MB,
   MAX_DEPTH_LIMIT,
   MAX_NODE_CHOICES,
+  AUTO_THREADS,
   MIN_DEPTH,
   STYLE_RANGE,
+  autoThreads,
+  deviceCores,
+  resolveThreads,
   useSettingsStore,
   type VcThread,
 } from "./settingsStore";
@@ -181,18 +186,112 @@ function MoveTimeControl() {
   );
 }
 
+const VARIANT_LABEL: Record<EngineVariant, string> = {
+  "multi-simd128": "멀티스레드",
+  "single-simd128": "단일 스레드",
+};
+
+/**
+ * 어느 변형이 떠 있는가(또는 뜰 것인가)와 그 까닭. 멀티를 못 쓰는 환경이면 **왜**를
+ * 말한다 — 「1 스레드」만 보여 주면 설정이 고장 난 것으로 읽힌다.
+ */
 function VariantControl() {
   const caps = useEngineStore((s) => s.capabilities);
   const status = useEngineStore((s) => s.status);
+  const engine = useEngineStore((s) => s.engine);
+  const allow = useSettingsStore((s) => s.allowThreads);
+  const planned: EngineVariant | null =
+    caps.variant === "multi-simd128" && !allow ? "single-simd128" : caps.variant;
+  const shown = engine.variant ?? planned;
+  const why = engine.fallbackReason
+    ? `멀티스레드 기동에 실패해 단일 스레드로 물러섰습니다 — ${engine.fallbackReason}`
+    : caps.threadsNote;
   return (
-    <span className="pill tnum" data-status={status}>
-      {caps.variant ?? "실행 불가"}
-    </span>
+    <div className="stack">
+      <span className="pill tnum" data-status={status}>
+        {shown ? `${shown} · ${VARIANT_LABEL[shown]}` : "실행 불가"}
+        {engine.variant ? "" : status === "idle" ? " (엔진을 띄우면)" : ""}
+      </span>
+      {why && <p className="srow__hint">{why}</p>}
+    </div>
   );
 }
 
+/** 멀티스레드 변형을 쓸지. 떠 있는 엔진과 어긋나면 다시 띄우는 버튼을 낸다. */
+function AllowThreadsControl() {
+  const caps = useEngineStore((s) => s.capabilities);
+  const status = useEngineStore((s) => s.status);
+  const engine = useEngineStore((s) => s.engine);
+  const restart = useEngineStore((s) => s.restart);
+  const allow = useSettingsStore((s) => s.allowThreads);
+  const update = useSettingsStore((s) => s.update);
+  const running = status === "ready" || status === "searching";
+  // 떠 있는 변형이 지금 설정과 다르다(물러선 경우는 다시 띄워도 같으므로 제외).
+  const stale =
+    running &&
+    ((allow && caps.threads && !engine.threaded && !engine.fallbackReason) ||
+      (!allow && engine.threaded));
+  return (
+    <div className="actions">
+      <Switch
+        label="멀티스레드 사용"
+        on={allow && caps.threads}
+        disabled={!caps.threads}
+        onChange={(v) => update({ allowThreads: v })}
+      />
+      {stale && (
+        <button type="button" className="btn" onClick={() => void restart()}>
+          엔진 다시 띄우기
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * 스레드 수 선택 — 자동 · 1 … 코어 수. 멀티 변형이 떠 있을 때만 엔진에 닿고, 탐색
+ * 중에 바꾸면 **다음 탐색부터**다(엔진 스토어가 탐색 중에는 보내지 않는다). 아래 줄이
+ * 지금 엔진이 실제로 쓰는 값을 말한다.
+ */
 function ThreadControl() {
-  return <span className="pill tnum">1 · 단일 스레드</span>;
+  const caps = useEngineStore((s) => s.capabilities);
+  const status = useEngineStore((s) => s.status);
+  const engine = useEngineStore((s) => s.engine);
+  const applied = useEngineStore((s) => s.appliedThreads);
+  const allow = useSettingsStore((s) => s.allowThreads);
+  const v = useSettingsStore((s) => s.threads);
+  const update = useSettingsStore((s) => s.update);
+
+  const cores = deviceCores();
+  const cap = threadCap(cores, engine.maxThreads);
+  const usable = caps.threads && allow && engine.variant !== "single-simd128";
+  const wanted = resolveThreads(v, cores);
+  const options = [{ value: AUTO_THREADS, label: `자동 (${Math.min(cap, autoThreads(cores))})` }];
+  for (let n = 1; n <= cap; n++) options.push({ value: n, label: String(n) });
+
+  let line: string;
+  if (!caps.threads) line = "이 환경에서는 단일 스레드 엔진이라 1 입니다.";
+  else if (!allow) line = "멀티스레드를 꺼 두어 1 입니다.";
+  else if (engine.variant === "single-simd128") line = "단일 스레드 엔진으로 떠 있어 1 입니다.";
+  else if (status === "idle" || status === "error" || applied === null) {
+    line = `엔진을 띄우면 ${wanted} 스레드로 시작합니다.`;
+  } else if (applied === wanted) line = `적용됨 — ${applied} 스레드로 탐색합니다.`;
+  else line = `다음 탐색부터 ${wanted} 스레드 (지금 ${applied}).`;
+
+  return (
+    <div className="stack">
+      <Segmented
+        label="스레드 수"
+        value={Math.min(v, cap)}
+        options={options}
+        disabled={!usable}
+        onChange={(threads) => update({ threads })}
+      />
+      <p className="srow__hint tnum" data-k="threads-status">
+        {line} {cores ? `이 기기의 논리 코어 ${cores}개.` : ""}
+      </p>
+    </div>
+  );
 }
 
 function HashControl() {
@@ -443,16 +542,27 @@ const ROWS: readonly RowSpec[] = [
     id: "variant",
     cat: "engine",
     label: "엔진 변형",
-    note: "WebAssembly SIMD 빌드. 멀티스레드 변형은 COOP/COEP 를 켤 수 있을 때 살아납니다.",
-    keywords: "wasm simd rapfi",
+    note: "WebAssembly SIMD 빌드. 교차 출처 격리(COOP/COEP)가 켜진 환경이면 멀티스레드 변형을 먼저 띄우고, 실패하면 단일 스레드로 물러섭니다.",
+    keywords: "wasm simd rapfi multi single 멀티 단일",
+    wide: true,
     Control: VariantControl,
+  },
+  {
+    id: "allowThreads",
+    cat: "engine",
+    label: "멀티스레드 사용",
+    note: "끄면 환경이 되어도 단일 스레드 엔진을 씁니다. 바꾸면 엔진을 다시 띄워야 적용됩니다.",
+    keywords: "multi-simd128 pthread 멀티",
+    Control: AllowThreadsControl,
   },
   {
     id: "threads",
     cat: "engine",
     label: "스레드 수",
-    note: "단일 스레드 빌드라 1로 고정입니다.",
+    note: "자동은 코어 하나를 화면에 남기고(코어 − 1) 4 를 넘기지 않습니다. 탐색 중에 바꾸면 다음 탐색부터 적용됩니다.",
     engineKey: "thread_num",
+    keywords: "threads 코어 cpu",
+    wide: true,
     Control: ThreadControl,
   },
   {
@@ -504,7 +614,7 @@ const ROWS: readonly RowSpec[] = [
     id: "pondering",
     cat: "engine",
     label: "사색",
-    note: "단일 스레드 빌드에서는 켤 수 없습니다 — 상대 차례에 엔진이 읽기 시작하면 정지가 닿을 틈이 없습니다.",
+    note: "아직 켜지 않습니다 — 단일 스레드 엔진에서는 상대 차례에 읽기 시작하면 정지가 닿을 틈이 없고, 멀티스레드 엔진에서도 대국 쪽이 사색 중의 수를 받을 준비가 되어 있지 않습니다.",
     engineKey: "pondering",
     keywords: "ponder",
     Control: PonderingControl,
