@@ -71,13 +71,15 @@ jobs:
       #   - BENCH 는 **기록만** 한다. 렌주 전용 .data 의 BENCH 는 국면 7/10 이 classical 폴백으로
       #     도는데 그 경로가 relaxed 에서 **러너마다** 다른 해시를 낸다(dd5e1c73 · b63e6b5f —
       #     web-baseline.json). 고정 해시로 막을 수 없다. node-bench 는 기준선이 없으면 3(미판정).
-      #   - **게이트는 동등성이다** — 앱이 타는 렌주·NNUE 경로에서 relaxed = 일반. 국면 5개를
-      #     1 스레드 고정 깊이로 읽어 노드·평가·수순이 모두 같아야 한다. 다르면 relaxed 를 내지 않는다.
+      #   - **게이트는 렌주·NNUE 경로의 건전성이다** — 국면 5개를 1 스레드 고정 깊이로 두 빌드에
+      #     읽혀, 필승은 같은 쪽 필승으로·점수는 평가 차 150 안으로 나와야 한다. 비트 동일은 요구하지
+      #     않는다: AMD EPYC 9V74 러너(36715254077)에서 5개 중 1개가 반올림 차로 갈렸다(최선수는 같음).
+      #     비트 차이는 경고로 남는다. relaxed 가 고장 나면(필승을 놓치거나 평가가 크게 튀면) 막는다.
       - name: relaxed BENCH (기록 — 판정 안 함)
         run: |
           grep -m1 "model name" /proc/cpuinfo || true
           node --experimental-wasm-relaxed-simd spike/node-bench.mjs single-simd128-relaxed || [ $? -eq 3 ]
-      - name: relaxed 동등성 게이트 (렌주 · NNUE — relaxed = 일반)
+      - name: relaxed 건전성 게이트 (렌주 · NNUE)
         run: node --experimental-wasm-relaxed-simd spike/relaxed-equivalence.mjs
 
       # 멀티 변형 관문 — 앱과 같은 구성(전용 워커 + pthread 가드)으로 chromium 에서

@@ -16,9 +16,22 @@
  * ## 무엇을 비교하나
  *
  * bench/gomocalc/positions.json 의 렌주 국면 5개(개시 2 · 중반 · VCF · VCT)를 두 빌드로
- * 1 스레드 · 해시 비움 · **고정 깊이**(시간 무제한)로 읽고, 국면마다 총 노드 수 · 평가값 ·
- * 최선 수순 · 최선수가 **모두 같아야** 통과한다. 1 스레드 고정 깊이 탐색은 결정적이라, 하나라도
- * 다르면 relaxed 명령이 평가를 바꾼 것이다.
+ * 1 스레드 · 해시 비움 · **고정 깊이**(시간 무제한)로 읽는다. 1 스레드 고정 깊이 탐색은
+ * 결정적이라, 무엇이든 다르면 relaxed 명령이 평가를 바꾼 것이다.
+ *
+ * ## 판정 — 비트 동일이 아니라 **건전성**
+ *
+ * 처음엔 노드·평가·수순이 모두 같아야 통과시켰다. 릴리스 런 36715254077(AMD EPYC 9V74)에서
+ * 5개 중 4개가 비트까지 같고 직접 개시 하나가 달랐다(최선수는 같은 g7, 평가 −352 ↔ −404,
+ * 노드 114,126 ↔ 58,895) — 전날 Intel Xeon 에서는 가중치 4종 BENCH 가 비트까지 같았다.
+ * relaxed 명령(부동소수 곱합 등)이 CPU 에 따라 반올림을 달리하는 것으로, 명세가 허용하는
+ * 차이다. 웹은 이미 「폰과 비트 단위 동일」을 게이트에서 내렸으므로(web-baseline.json),
+ * 여기서 막을 것은 **relaxed 빌드가 고장 난 경우**다:
+ *
+ *   - 필승(±M)이 있는 국면은 relaxed 도 **같은 쪽의 필승**을 찾아야 한다(VCF·VCT 를 놓치면 고장)
+ *   - 점수 국면은 평가 차이가 `EVAL_TOL`(기본 150) 이하
+ *
+ * 비트까지 같지 않은 국면은 경고로 남긴다(`STRICT=1` 이면 그것도 실패).
  */
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
@@ -91,23 +104,59 @@ async function run(variant) {
   return { variant, version: lines.find((l) => /Rapfi \d/.test(l)) ?? null, results: out };
 }
 
+const EVAL_TOL = Number(process.env.EVAL_TOL ?? 150);
+const STRICT = process.env.STRICT === "1";
+const mate = (e) => (/^[+-]M\d+$/i.test(e ?? "") ? (e.startsWith("-") ? -1 : 1) : 0);
+
+/** 한 국면의 판정 — 비트 동일(identical), 건전(sane), 까닭. */
+function judge(r, s) {
+  const identical = ["move", "nodes", "depth", "eval", "bestline"].every((k) => r[k] === s[k]);
+  if (identical) return { identical, sane: true, why: "비트 동일" };
+  const [ma, mb] = [mate(r.eval), mate(s.eval)];
+  if (ma || mb) {
+    return ma === mb
+      ? { identical, sane: true, why: `같은 쪽 필승(${r.eval} ↔ ${s.eval})` }
+      : { identical, sane: false, why: `필승 판정이 갈림(${r.eval} ↔ ${s.eval})` };
+  }
+  const d = Math.abs(Number(r.eval) - Number(s.eval));
+  return Number.isFinite(d) && d <= EVAL_TOL
+    ? { identical, sane: true, why: `평가 차 ${d} ≤ ${EVAL_TOL} · 최선수 ${r.move} ↔ ${s.move}` }
+    : { identical, sane: false, why: `평가 차 ${d} > ${EVAL_TOL} (${r.eval} ↔ ${s.eval})` };
+}
+
 const [a, b] = await Promise.all(PAIR.map(run));
-let same = true;
 const rows = a.results.map((r, i) => {
   const s = b.results[i];
-  const eq = ["move", "nodes", "depth", "eval", "bestline"].every((k) => r[k] === s[k]);
-  if (!eq) same = false;
-  return { id: r.id, eq, [a.variant]: r, [b.variant]: s };
+  return { id: r.id, ...judge(r, s), [a.variant]: r, [b.variant]: s };
 });
+const sane = rows.every((r) => r.sane);
+const identical = rows.filter((r) => r.identical).length;
+const pass = sane && (!STRICT || identical === rows.length);
 console.log(
   JSON.stringify(
-    { test: "relaxed 동등성(렌주 · NNUE · 1 스레드 · 고정 깊이)", depth: DEPTH, pass: same, versions: [a.version, b.version], rows },
+    {
+      test: "relaxed 건전성(렌주 · NNUE · 1 스레드 · 고정 깊이)",
+      depth: DEPTH,
+      evalTol: EVAL_TOL,
+      strict: STRICT,
+      pass,
+      identical: `${identical}/${rows.length}`,
+      versions: [a.version, b.version],
+      rows,
+    },
     null,
     2,
   ),
 );
-if (!same) {
-  console.error("✗ relaxed 빌드가 렌주 국면에서 다른 탐색을 했습니다 — relaxed 를 배포하면 안 된다");
+for (const r of rows.filter((x) => !x.identical)) {
+  // GitHub 경고 — 통과해도 비트 차이가 있었음을 잡 요약에 남긴다.
+  console.log(`::warning::relaxed ≠ 일반 (${r.id}): ${r.why}`);
+}
+if (!pass) {
+  console.error("✗ relaxed 빌드가 렌주 국면에서 건전하지 않습니다 — relaxed 를 배포하면 안 된다");
+  for (const r of rows.filter((x) => !x.sane)) console.error(`  ${r.id}: ${r.why}`);
   process.exit(1);
 }
-console.log(`✓ 렌주 국면 ${rows.length}개에서 ${a.variant} = ${b.variant} (깊이 ${DEPTH})`);
+console.log(
+  `✓ 렌주 국면 ${rows.length}개 건전 — 비트 동일 ${identical}/${rows.length} (깊이 ${DEPTH}, 평가 허용 ${EVAL_TOL})`,
+);
