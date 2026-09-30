@@ -18,13 +18,24 @@ export const ISOLATION_HEADERS: Record<string, string> = ISOLATE
     }
   : {};
 
+/** dist 에 그 변형의 글루·wasm 이 있는가(가중치는 모든 변형이 rapfi.data 하나를 쓴다). */
+const hasVariant = (dist: string, v: string) =>
+  ["js", "wasm"].every((ext) => existsSync(join(dist, `engine/rapfi-${v}.${ext}`)));
+
 /**
- * 이 조건에서 떠야 할 엔진 변형. 격리돼 있고 dist 에 멀티 산출물이 있으면 멀티,
- * 아니면 단일(앱이 물러선다).
+ * 이 조건에서 떠야 할 엔진 변형. 스모크의 Chromium 은 relaxed SIMD 를 알므로(114+) 산출물이
+ * 있으면 relaxed 가 먼저다. 격리돼 있으면 멀티, 아니면 단일(앱이 물러선다).
+ * `SMOKE_RELAXED=0` 이면 relaxed 를 기대하지 않는다(앱을 `?relaxed=0` 으로 연다).
  */
-export function expectedVariant(dist: string): "multi-simd128" | "single-simd128" {
-  const multi = ["js", "wasm", "data"].every((ext) =>
-    existsSync(join(dist, `engine/rapfi-multi-simd128.${ext}`)),
-  );
-  return ISOLATE && multi ? "multi-simd128" : "single-simd128";
+export const RELAXED = process.env.SMOKE_RELAXED !== "0";
+
+export function expectedVariant(dist: string): string {
+  const threads = ISOLATE && hasVariant(dist, "multi-simd128");
+  const base = threads ? "multi-simd128" : "single-simd128";
+  return RELAXED && hasVariant(dist, `${base}-relaxed`) ? `${base}-relaxed` : base;
+}
+
+/** 엔진이 돌 수 있는 산출물이 dist 에 있는가 — 공유 가중치 + 가장 낮은 변형. */
+export function hasEngine(dist: string): boolean {
+  return existsSync(join(dist, "engine/rapfi.data")) && hasVariant(dist, "single-simd128");
 }

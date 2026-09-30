@@ -125,8 +125,13 @@ export interface RunningEngine {
   variant: EngineVariant | null;
   threaded: boolean;
   maxThreads: number | null;
-  /** 멀티를 시도했다가 단일로 물러섰다면 그 까닭. */
+  /** 앞선 변형(relaxed·멀티)을 시도했다가 물러섰다면 그 까닭. */
   fallbackReason: string | null;
+  /** 가중치를 어디서 얻었나 — `cache` 면 내려받지 않았다. 뜨기 전에는 null. */
+  weightsSource: "cache" | "network" | "glue" | null;
+  weightsMs: number | null;
+  /** 기동 예열 탐색의 시간(가중치 풀기 포함). 건너뛰었거나 뜨기 전이면 null. */
+  warmupMs: number | null;
 }
 
 const NO_ENGINE: RunningEngine = {
@@ -134,6 +139,9 @@ const NO_ENGINE: RunningEngine = {
   threaded: false,
   maxThreads: null,
   fallbackReason: null,
+  weightsSource: null,
+  weightsMs: null,
+  warmupMs: null,
 };
 
 /**
@@ -274,6 +282,9 @@ export const useEngineStore = create<EngineState>((set, get) => {
             threaded: info.threaded,
             maxThreads: info.maxThreads,
             fallbackReason: info.fallbackReason,
+            weightsSource: info.weights.source,
+            weightsMs: info.weights.ms,
+            warmupMs: info.warmupMs,
           },
         });
         // 멈춘 멀티 엔진을 단일로 다시 띄웠다 — 새 엔진은 설정을 모르고, 켜 둔 분석은

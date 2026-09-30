@@ -1,0 +1,10 @@
+{
+  "tag": "engine-3c94c2a9-rx",
+  "upstream": "3c94c2a976f24a0dd1c5517623e9ab6fffe66bd7",
+  "data": {
+    "file": "rapfi.data",
+    "size": 19865582,
+    "sha256": "c2a4c4e788cc3e4e805166ea1198c08d6ca492e5f5e57ba78313bcbab054482a"
+  },
+  "variants": ["multi-simd128-relaxed", "multi-simd128", "single-simd128-relaxed", "single-simd128"]
+}

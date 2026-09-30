@@ -10,7 +10,7 @@
  */
 import { chromium } from "playwright";
 import { createServer } from "node:http";
-import { ISOLATION_HEADERS, ISOLATE, expectedVariant } from "./isolation.ts";
+import { ISOLATION_HEADERS, ISOLATE, expectedVariant, hasEngine } from "./isolation.ts";
 import { readFileSync, existsSync } from "node:fs";
 import { extname, join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -26,12 +26,10 @@ const PORT = Number(process.env.SMOKE_PORT ?? 4181);
 const REMOTE = process.env.SMOKE_BASE_URL?.replace(/\/$/, "") ?? "";
 const BASE = REMOTE || `http://localhost:${PORT}`;
 
-const GLUE = join(DIST, "engine/rapfi-single-simd128.js");
-const WASM = join(DIST, "engine/rapfi-single-simd128.wasm");
-const DATA = join(DIST, "engine/rapfi-single-simd128.data");
-
-if (!REMOTE && (!existsSync(GLUE) || !existsSync(WASM) || !existsSync(DATA))) {
-  console.log("엔진 산출물이 없어 건너뜁니다 (dist/engine/rapfi-single-simd128.{js,wasm,data}).");
+if (!REMOTE && !hasEngine(DIST)) {
+  console.log(
+    "엔진 산출물이 없어 건너뜁니다 (dist/engine/rapfi.data · rapfi-single-simd128.{js,wasm}).",
+  );
   console.log("  engine-release.yml 을 한 번 돌리면 채워집니다.");
   process.exit(0);
 }
@@ -130,12 +128,16 @@ try {
 
   // 1b. **어느 변형으로 떴는가.** 격리돼 있고 멀티 산출물이 있으면 멀티여야 한다 —
   // 조용히 단일로 물러섰다면(핸드셰이크 실패) 여기서 잡는다. 격리가 없으면 단일.
-  const engineInfo = (await page.evaluate(`window.__rapfiEngine()`)) as {
+  type EngineInfo = {
     variant: string;
     threaded: boolean;
     appliedThreads: number | null;
     fallbackReason: string | null;
+    weightsSource: "cache" | "network" | "glue" | null;
+    weightsMs: number | null;
+    warmupMs: number | null;
   };
+  let engineInfo = (await page.evaluate(`window.__rapfiEngine()`)) as EngineInfo;
   const wantVariant = expectedVariant(DIST);
   console.log(
     `엔진 변형 ${engineInfo.variant} · 스레드 ${engineInfo.appliedThreads} · 격리 ${ISOLATE}` +
@@ -146,9 +148,33 @@ try {
       `${wantVariant} 가 떠야 하는데 ${engineInfo.variant} 입니다 (${engineInfo.fallbackReason ?? ""})`,
     );
   }
-  if (engineInfo.threaded !== (wantVariant === "multi-simd128")) {
+  if (engineInfo.threaded !== wantVariant.startsWith("multi")) {
     fail(`threaded=${engineInfo.threaded} — 변형과 어긋납니다`);
   }
+
+  // 1c. **공유 가중치 · 캐시 · 예열.** 새 브라우저의 첫 기동은 가중치를 내려받고(해시 확인),
+  // 예열 탐색을 마친 뒤에 「대기」가 된다. 새로고침 뒤 다시 띄우면 **캐시에서** 읽어야 한다 —
+  // 재방문·엔진 전환(멀티 → 단일 폴백 포함)에 20MB 를 다시 받지 않는다는 뜻이다.
+  const firstWeights = `${engineInfo.weightsSource} ${engineInfo.weightsMs}ms`;
+  if (!REMOTE && engineInfo.weightsSource !== "network") {
+    fail(`첫 기동의 가중치가 내려받은 것이 아닙니다: ${firstWeights}`);
+  }
+  if (engineInfo.warmupMs === null) fail("예열 탐색이 돌지 않았습니다");
+  await page.reload({ waitUntil: "networkidle" });
+  const t1 = Date.now();
+  await page.getByRole("button", { name: "엔진 시작" }).click();
+  await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 120_000 });
+  const rebootMs = Date.now() - t1;
+  engineInfo = (await page.evaluate(`window.__rapfiEngine()`)) as EngineInfo;
+  if (engineInfo.weightsSource !== "cache") {
+    fail(`새로고침 뒤 기동이 캐시를 쓰지 않았습니다: ${engineInfo.weightsSource}`);
+  } else {
+    console.log(
+      `가중치: 첫 기동 ${firstWeights} → 재기동 cache ${engineInfo.weightsMs}ms · ` +
+        `예열 ${engineInfo.warmupMs}ms · 재기동 ${rebootMs}ms`,
+    );
+  }
+  if (engineInfo.variant !== wantVariant) fail(`재기동 변형이 ${engineInfo.variant} 입니다`);
 
   // 콘솔에 엔진이 실제로 말한 줄이 있어야 한다 — 파서가 아니라 엔진이 살아 있다는 증거.
   await page.waitForTimeout(300); // 콘솔은 100ms 배치로 온다

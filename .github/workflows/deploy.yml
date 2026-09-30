@@ -47,7 +47,8 @@ concurrency:
 env:
   TARGET: ${{ inputs.target || 'cloudflare' }}
   PROJECT: rapfiweb
-  ENGINE_TAG: engine-3c94c2a9-mt
+  # src/engine/engine-manifest.json 의 tag 와 같아야 한다(verify-engine.ts 가 본다).
+  ENGINE_TAG: engine-3c94c2a9-rx
 
 jobs:
   build:
@@ -64,18 +65,21 @@ jobs:
       - run: pnpm install --no-frozen-lockfile
       - run: pnpm build
 
-      # 엔진 산출물 조립. .js/.wasm 은 저장소에 있고 .data(20MB)만 릴리스에서 받는다
-      # (계획서 §8). 릴리스는 engine-release.yml 이 만든다.
+      # 엔진 산출물 조립. .js/.wasm 은 저장소에 있고 가중치(rapfi.data, 모든 변형 공유)만
+      # 릴리스에서 받는다(계획서 §8). 릴리스는 engine-release.yml 이 만든다. 커밋된 매니페스트
+      # ·글루와 짝이 아니면 **배포하지 않는다** — 앱의 가중치 무결성 검사가 전원 실패한다.
       - name: 엔진 조립
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p dist/engine
           if gh release view "$ENGINE_TAG" > /dev/null 2>&1; then
-            gh release download "$ENGINE_TAG" --dir dist/engine \
-              --pattern 'rapfi-*-simd128.*' --clobber
+            gh release download "$ENGINE_TAG" --dir dist/engine --clobber \
+              --pattern 'rapfi-*.js' --pattern 'rapfi-*.wasm' \
+              --pattern 'rapfi.data' --pattern 'engine-manifest.json'
             echo '{ "type": "commonjs" }' > dist/engine/package.json
             ls -la dist/engine | sed 's/^/  /'
+            pnpm exec tsx scripts/verify-engine.ts
           else
             echo "::warning::릴리스 $ENGINE_TAG 이 없습니다 — 엔진 없이 배포합니다."
             echo "  engine-release.yml 을 한 번 돌리면 채워집니다."

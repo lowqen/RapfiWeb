@@ -10,7 +10,9 @@ import {
   type Placement,
   type SearchEndReason,
   type ToWorker,
+  type WeightsSpec,
 } from "./engine-types";
+import engineManifest from "./engine-manifest.json";
 
 /**
  * 메인 스레드에서 엔진을 다루는 유일한 창구.
@@ -38,10 +40,57 @@ const SIMD_PROBE = new Uint8Array([
   11,
 ]);
 
-export type EngineVariant = "single-simd128" | "multi-simd128";
+/**
+ * relaxed SIMD 프로브 — `() -> v128` 함수가 `i8x16.relaxed_swizzle`(0xfd 0x100) 을 쓴다.
+ * wasm-feature-detect 의 `relaxedSimd()` 와 같은 바이트열이다. 명령을 모르는 엔진은
+ * 검증에서 거짓을 낸다(Chromium 114+ 참, Firefox·Safari 는 아직 거짓).
+ */
+export const RELAXED_SIMD_PROBE = new Uint8Array([
+  0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 15, 1, 13, 0, 65, 1, 253, 15,
+  65, 2, 253, 15, 253, 128, 2, 11,
+]);
+
+/**
+ * 엔진 변형. `-relaxed` 는 `-mrelaxed-simd` 빌드다 — 같은 소스에서 NPS +23%, BENCH 해시·
+ * 노드 수 동일(docs/gomocalc-엔진-비교.md §4.3). relaxed 명령은 명세상 **구현 정의**라
+ * 기동 뒤 예열 탐색까지 통과해야 쓴다(워커 `warmup`). 실패하면 일반 SIMD 로 물러선다.
+ */
+export type EngineVariant =
+  "multi-simd128-relaxed" | "multi-simd128" | "single-simd128-relaxed" | "single-simd128";
+
+export const isMultiVariant = (v: EngineVariant | null | undefined): boolean =>
+  v?.startsWith("multi") ?? false;
+export const isRelaxedVariant = (v: EngineVariant | null | undefined): boolean =>
+  v?.endsWith("-relaxed") ?? false;
+
+/**
+ * 시도할 변형의 순서 — 앞에서부터 띄워 보고, 기동(핸드셰이크·예열)에 실패하면 다음으로.
+ *
+ *   relaxed 멀티 → 멀티 → relaxed 단일 → 단일
+ *
+ * relaxed 가 먼저인 것은 빠르기 때문이고, 같은 스레드 방식 안에서 relaxed → 일반 순으로
+ * 물러서는 것은 relaxed 만의 문제(구현 정의 명령)면 스레드를 포기할 까닭이 없어서다.
+ */
+export function planVariants(o: {
+  simd: boolean;
+  relaxed: boolean;
+  threads: boolean;
+}): EngineVariant[] {
+  if (!o.simd) return [];
+  const out: EngineVariant[] = [];
+  if (o.threads) {
+    if (o.relaxed) out.push("multi-simd128-relaxed");
+    out.push("multi-simd128");
+  }
+  if (o.relaxed) out.push("single-simd128-relaxed");
+  out.push("single-simd128");
+  return out;
+}
 
 export interface Capabilities {
   simd: boolean;
+  /** WebAssembly relaxed SIMD 를 검증하는가. */
+  relaxedSimd: boolean;
   crossOriginIsolated: boolean;
   sharedArrayBuffer: boolean;
   hardwareConcurrency: number | null;
@@ -50,6 +99,8 @@ export interface Capabilities {
    * 멀티를 골라도 기동에 실패하면 클라이언트가 단일로 물러선다(`EngineClient.start`).
    */
   variant: EngineVariant | null;
+  /** 기동에 실패하면 차례로 물러설 순서(첫 항목이 `variant`). `planVariants` 참고. */
+  variants: EngineVariant[];
   /** 멀티스레드 변형을 쓸 수 있는 환경인가. */
   threads: boolean;
   /** 멀티를 못 쓰는 까닭(화면이 그대로 말한다). 쓸 수 있으면 null. */
@@ -74,6 +125,15 @@ export function detectCapabilities(): Capabilities {
   } catch {
     simd = false;
   }
+  // relaxed 는 SIMD 위에만 선다. 검증이 던지는 오래된 엔진도 있어 거짓으로 받는다.
+  // `?relaxed=0` 으로 끌 수 있다(진단용 — relaxed 가 의심스러울 때 대조).
+  let relaxedSimd = false;
+  try {
+    relaxedSimd = simd && WebAssembly.validate(RELAXED_SIMD_PROBE);
+  } catch {
+    relaxedSimd = false;
+  }
+  const relaxedOff = queryParam("relaxed") === "0";
   const isolated = typeof crossOriginIsolated === "boolean" ? crossOriginIsolated : false;
   const sab = typeof SharedArrayBuffer === "function" && typeof Atomics === "object";
   const forced = forcedVariant();
@@ -87,14 +147,17 @@ export function detectCapabilities(): Capabilities {
       "헤더를 붙일 수 없는 호스팅(GitHub Pages 등)이거나 개발 서버 설정이 빠졌습니다";
   } else if (!sab) threadsNote = "이 브라우저는 SharedArrayBuffer 를 허용하지 않습니다";
   const threads = threadsNote === null || (simd && forced === "multi");
+  const variants = planVariants({ simd, relaxed: relaxedSimd && !relaxedOff, threads });
 
   return {
     simd,
+    relaxedSimd,
     crossOriginIsolated: isolated,
     sharedArrayBuffer: sab,
     hardwareConcurrency:
       typeof navigator === "undefined" ? null : (navigator.hardwareConcurrency ?? null),
-    variant: !simd ? null : threads ? "multi-simd128" : "single-simd128",
+    variant: variants[0] ?? null,
+    variants,
     threads,
     threadsNote: threads ? null : threadsNote,
     note: simd
@@ -104,14 +167,32 @@ export function detectCapabilities(): Capabilities {
   };
 }
 
-function forcedVariant(): "single" | "multi" | null {
+function queryParam(name: string): string | null {
   try {
-    const q =
-      typeof location === "undefined" ? null : new URLSearchParams(location.search).get("engine");
-    return q === "single" || q === "multi" ? q : null;
+    return typeof location === "undefined" ? null : new URLSearchParams(location.search).get(name);
   } catch {
     return null;
   }
+}
+
+function forcedVariant(): "single" | "multi" | null {
+  const q = queryParam("engine");
+  return q === "single" || q === "multi" ? q : null;
+}
+
+/**
+ * 공유 가중치의 위치와 기대값 — 빌드가 낸 `engine-manifest.json`(릴리스와 같은 짝으로
+ * 커밋된다). URL 에 해시 앞자리를 붙여 **버전마다 다른 주소**가 되게 한다 — 엔진 파일은
+ * `immutable` 로 1년 캐시되므로(public/_headers) 같은 주소에 새 내용을 두면 옛 것이 나온다.
+ */
+export function weightsSpec(engineBaseUrl: string, origin: string): WeightsSpec | null {
+  const d = engineManifest.data;
+  if (!d?.file || !d.sha256 || !d.size) return null;
+  return {
+    url: new URL(`${engineBaseUrl}${d.file}?v=${d.sha256.slice(0, 16)}`, origin).href,
+    size: d.size,
+    sha256: d.sha256,
+  };
 }
 
 /** 기동이 끝나고 알게 된 것 — 실제로 뜬 변형과 그 까닭. */
@@ -119,8 +200,12 @@ export interface BootInfo {
   variant: EngineVariant;
   threaded: boolean;
   maxThreads: number | null;
-  /** 멀티를 시도했다가 단일로 물러섰다면 그 까닭. */
+  /** 앞선 변형을 시도했다가 물러섰다면 그 까닭. */
   fallbackReason: string | null;
+  /** 가중치를 어디서 얻었나(캐시·네트워크·글루)와 걸린 시간. */
+  weights: { source: "cache" | "network" | "glue"; ms: number };
+  /** 기동 때 돈 예열 탐색의 시간. 건너뛰었으면 null. */
+  warmupMs: number | null;
   /**
    * 떠 있던 멀티 엔진이 멈춰 **다시 띄운** 것인가. 참이면 엔진 스토어가 설정을 다시
    * 보내고 켜 둔 분석을 잇는다(처음 기동은 스토어의 `start` 가 그 일을 한다).
@@ -152,7 +237,15 @@ export interface EngineOptions extends EngineEvents {
   engineBaseUrl?: string;
   sliceMs?: number;
   size?: number;
+  /** 기동 예열 탐색(ms). 0 이면 건너뛴다. 기본 `VITE_ENGINE_WARMUP_MS` 또는 400. */
+  warmupMs?: number;
 }
+
+/**
+ * 예열 탐색의 기본 길이. 가중치 풀기(첫 탐색에서 일어난다)는 이와 따로 들고, 이 시간은
+ * 뜨거운 함수들이 TurboFan 으로 승격될 만큼만 — 사용자에게는 「기동 중」이 그만큼 길어진다.
+ */
+const DEFAULT_WARMUP_MS = 400;
 
 /** 협상 응답 세 갈래만 골라 낸 것 — 화면과 상태 기계가 이 타입으로 받는다. */
 export type OpeningResponse = Extract<FromWorker, { type: "opening" }>["response"];
@@ -171,11 +264,13 @@ export class EngineClient {
   readonly engineBaseUrl: string;
   readonly sliceMs: number;
   readonly size: number;
+  readonly warmupMs: number;
 
   constructor(private readonly events: EngineOptions = {}) {
     this.engineBaseUrl = events.engineBaseUrl ?? env.VITE_ENGINE_BASE_URL ?? "/engine/";
     this.sliceMs = events.sliceMs ?? Number(env.VITE_ENGINE_SLICE_MS ?? 500);
     this.size = events.size ?? DEFAULT_SIZE;
+    this.warmupMs = events.warmupMs ?? Number(env.VITE_ENGINE_WARMUP_MS ?? DEFAULT_WARMUP_MS);
   }
 
   get currentStatus(): EngineStatus {
@@ -204,12 +299,15 @@ export class EngineClient {
   /**
    * 엔진을 띄운다. 돌릴 변형이 없으면(SIMD 미지원) 그 사실을 던진다.
    *
-   * **멀티를 먼저 시도하고, 실패하면 단일로 물러선다.** 멀티의 실패는 대개 조용하다 —
-   * pthread 를 세우지 못하면 명령에 영원히 답이 없다(W0). 그래서 워커가 기동
-   * 핸드셰이크(START → OK)에 한도를 두고 넘기면 `fatal` 을 올리며, 여기서 그 워커를
-   * 버리고 단일 변형으로 새로 띄운다. 사용자에게는 「기동 중」이 조금 길어질 뿐이다.
+   * **`capabilities.variants` 의 순서대로 시도하고, 실패하면 다음으로 물러선다**
+   * (relaxed 멀티 → 멀티 → relaxed 단일 → 단일). 멀티의 실패는 대개 조용하다 — pthread 를
+   * 세우지 못하면 명령에 영원히 답이 없다(W0). 그래서 워커가 기동 핸드셰이크(START → OK)
+   * 와 예열 탐색에 한도를 두고 넘기면 `fatal` 을 올리며, 여기서 그 워커를 버리고 다음
+   * 변형으로 새로 띄운다. relaxed 가 이 기기에서 이상하면(글루·wasm 을 못 읽거나 예열에서
+   * 멈추면) 같은 방식으로 일반 SIMD 로 간다. 가중치는 캐시에서 다시 쓰므로 물러설 때 다시
+   * 받지 않는다(`weights-cache.ts`).
    *
-   * `allowThreads` 가 거짓이면(설정 ▸ 멀티스레드 끔) 처음부터 단일로 띄운다.
+   * `allowThreads` 가 거짓이면(설정 ▸ 멀티스레드 끔) 멀티 변형을 빼고 시작한다.
    */
   async start(allowThreads = true): Promise<void> {
     const best = this.capabilities.variant;
@@ -217,10 +315,7 @@ export class EngineClient {
     if (this.booting) return this.booting;
     if (this.worker) return this.whenReady();
 
-    const order: EngineVariant[] =
-      best === "multi-simd128" && allowThreads
-        ? ["multi-simd128", "single-simd128"]
-        : ["single-simd128"];
+    const order = this.capabilities.variants.filter((v) => allowThreads || !isMultiVariant(v));
     this.setStatus("starting");
     this.booting = (async () => {
       let fallbackReason: string | null = null;
@@ -235,6 +330,8 @@ export class EngineClient {
             maxThreads: booted.maxThreads,
             fallbackReason,
             recovered: false,
+            weights: booted.weights,
+            warmupMs: booted.warmupMs,
           });
           return;
         } catch (e) {
@@ -247,8 +344,9 @@ export class EngineClient {
             throw e instanceof Error ? e : new Error(why);
           }
           // 다음 변형으로 — 이 사실은 콘솔과 화면에 남긴다(조용히 느려지면 원인을 모른다).
-          fallbackReason = why;
-          this.events.onConsole?.([`! ${variant} 기동 실패 — 단일 스레드로 물러섭니다: ${why}`]);
+          const next = order[order.indexOf(variant) + 1];
+          fallbackReason = `${variant} 기동 실패 — ${why}`;
+          this.events.onConsole?.([`! ${variant} 기동 실패 — ${next} 로 물러섭니다: ${why}`]);
         }
       }
     })().finally(() => {
@@ -275,24 +373,33 @@ export class EngineClient {
     this.snapshot = EMPTY_SNAPSHOT;
     this.events.onConsole?.([`! 멀티스레드 엔진이 멈춰 단일 스레드로 다시 띄웁니다: ${reason}`]);
     this.setStatus("starting");
-    try {
-      const booted = await this.spawn("single-simd128");
-      this.variant = "single-simd128";
-      this.setStatus("ready");
-      this.events.onBooted?.({
-        variant: "single-simd128",
-        threaded: booted.threaded,
-        maxThreads: booted.maxThreads,
-        fallbackReason: `멀티스레드 엔진이 동작 중 멈췄습니다 — ${reason}`,
-        recovered: true,
-      });
-    } catch (e) {
-      // `spawn` 이 새 워커를 this.worker 에 넣었다 — 위에서 null 로 좁혀진 타입을 푼다.
-      (this.worker as Worker | null)?.terminate();
-      this.worker = null;
-      this.events.onError?.(e instanceof Error ? e.message : String(e));
-      this.setStatus("error");
+    // 단일 변형도 relaxed 부터 — 실패하면 일반 단일로.
+    const singles = this.capabilities.variants.filter((v) => !isMultiVariant(v));
+    let last: unknown = null;
+    for (const variant of singles) {
+      try {
+        const booted = await this.spawn(variant);
+        this.variant = variant;
+        this.setStatus("ready");
+        this.events.onBooted?.({
+          variant,
+          threaded: booted.threaded,
+          maxThreads: booted.maxThreads,
+          fallbackReason: `멀티스레드 엔진이 동작 중 멈췄습니다 — ${reason}`,
+          recovered: true,
+          weights: booted.weights,
+          warmupMs: booted.warmupMs,
+        });
+        return;
+      } catch (e) {
+        // `spawn` 이 새 워커를 this.worker 에 넣었다 — 위에서 null 로 좁혀진 타입을 푼다.
+        (this.worker as Worker | null)?.terminate();
+        this.worker = null;
+        last = e;
+      }
     }
+    this.events.onError?.(last instanceof Error ? last.message : String(last));
+    this.setStatus("error");
   }
 
   /**
@@ -303,11 +410,19 @@ export class EngineClient {
     // **클래식 워커다.** 이유는 vite.config.ts 의 worker.format 주석에 있다 —
     // upstream 글루를 읽는 유일한 방법인 importScripts 가 모듈 워커에는 없다.
     // 멀티 변형의 엔진 스레드도 **이 워커 번들을 다시 연다** — 거기서 글루만 읽고
-    // 비키는 가드가 워커 머리에 있다(engine-worker.ts 「pthread 가드」).
-    const worker = new Worker(new URL("./engine-worker.ts", import.meta.url), {
-      type: "classic",
-      name: "rapfi-engine",
-    });
+    // 비키는 가드가 워커 머리에 있다(engine-worker.ts 「pthread 가드」). 그 가드가 읽을
+    // 글루가 번들마다 정해지므로 relaxed 멀티는 제 번들로 띄운다(engine-worker-relaxed.ts).
+    // Vite 가 워커를 번들로 알아보려면 `new Worker(new URL(…))` 가 이 모양 그대로여야 한다.
+    const worker =
+      variant === "multi-simd128-relaxed"
+        ? new Worker(new URL("./engine-worker-relaxed.ts", import.meta.url), {
+            type: "classic",
+            name: "rapfi-engine",
+          })
+        : new Worker(new URL("./engine-worker.ts", import.meta.url), {
+            type: "classic",
+            name: "rapfi-engine",
+          });
     this.worker = worker;
 
     let settle: {
@@ -374,7 +489,7 @@ export class EngineClient {
           // 기동 중의 오류는 `start` 가 받아 다음 변형을 시도한다.
           if (failBoot(m.message)) break;
           // 떠 있던 멀티 엔진이 멈췄다(입력 경합·정지 무응답 등) — 단일로 다시 띄운다.
-          if (this.variant === "multi-simd128" && this.worker === worker) {
+          if (isMultiVariant(this.variant) && this.worker === worker) {
             void this.recoverToSingle(m.message);
             break;
           }
@@ -398,13 +513,20 @@ export class EngineClient {
       this.setStatus("error");
     };
 
-    this.post({
+    const boot: Extract<ToWorker, { type: "boot" }> = {
       type: "boot",
       engineBaseUrl: this.engineBaseUrl,
       variant,
       sliceMs: this.sliceMs,
       size: this.size,
-    });
+      warmupMs: this.warmupMs,
+    };
+    // 공유 가중치 — 워커가 캐시 계층으로 받아 해시를 확인한다. 기본 경로가 절대 주소가
+    // 아니면 이 페이지 기준으로 푼다(워커 안의 상대 주소는 워커 번들 기준이 된다).
+    const weights =
+      typeof location === "undefined" ? null : weightsSpec(this.engineBaseUrl, location.href);
+    if (weights) boot.weights = weights;
+    this.post(boot);
     return booted;
   }
 

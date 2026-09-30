@@ -221,6 +221,15 @@ export const EMPTY_SNAPSHOT: AnalysisSnapshot = {
 
 export type EngineStatus = "idle" | "starting" | "ready" | "searching" | "error";
 
+/** 모든 변형이 함께 쓰는 가중치 파일 하나 — `engine-manifest.json` 이 값을 준다. */
+export interface WeightsSpec {
+  /** 절대 URL(버전 쿼리 포함 — HTTP 캐시가 옛 파일을 내주지 않게). */
+  url: string;
+  size: number;
+  /** 소문자 16진 SHA-256. 캐시에서 꺼낸 것도, 새로 받은 것도 이 값과 맞아야 쓴다. */
+  sha256: string;
+}
+
 export type ToWorker =
   | {
       type: "boot";
@@ -230,6 +239,17 @@ export type ToWorker =
       size: number;
       /** 기동 핸드셰이크 한도(ms). 기본 15초 — 시험이 줄여 쓴다. */
       handshakeMs?: number;
+      /**
+       * 공유 가중치(.data) — 있으면 워커가 **직접** 받아(캐시 계층, 해시 검증) 글루에
+       * `getPreloadedPackage` 로 넘긴다. 없으면 예전처럼 글루가 `rapfi-<변형>.data` 를
+       * 스스로 받는다(시험·스파이크 하네스).
+       */
+      weights?: WeightsSpec;
+      /**
+       * 기동 직후 예열 탐색 시간(ms). 0·없음이면 건너뛴다. 가중치 풀기(첫 탐색에서 일어난다)와
+       * JIT 승격을 사용자의 첫 요청 **앞으로** 당긴다.
+       */
+      warmupMs?: number;
     }
   | { type: "send"; commands: readonly EngineCommand[] }
   /**
@@ -302,6 +322,10 @@ export type FromWorker =
       threaded: boolean;
       /** `MESSAGE INFO MAX_THREAD_NUM` — 단일 빌드도 256 을 답하므로 상한으로만 쓴다. */
       maxThreads: number | null;
+      /** 가중치를 어디서 얻었나 — `glue` 는 공유 가중치 없이 글루가 받은 것. */
+      weights: { source: "cache" | "network" | "glue"; ms: number };
+      /** 예열 탐색에 든 시간(가중치 풀기 포함). 건너뛰었으면 null. */
+      warmupMs: number | null;
     }
   /**
    * 집계된 스냅샷. 메인 스레드는 원시 줄이 아니라 이것을 받는다. `id` 는 그 스냅샷을

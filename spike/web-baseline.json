@@ -44,7 +44,8 @@
       "note": "**판정하지 않는다(기록만).** 렌주 전용 .data 의 BENCH 는 국면 7/10 이 classical 폴백 평가로 도는데, 그 경로가 relaxed 명령에서 **기계마다** 값이 갈린다: 릴리스 런 36607275266 → dd5e1c73(7,387,373 노드), 36713443997 → b63e6b5f(7,301,332) — 같은 소스·같은 플래그, 일반 SIMD 는 두 번 다 2b7c7da9. relaxed 명령이 명세상 구현 정의라는 것 그대로다. 가중치 4종 빌드(10개 모두 NNUE)에서는 relaxed = 일반(4100a973). 앱이 타는 렌주·NNUE 경로의 동등성은 spike/relaxed-equivalence.mjs 가 게이트한다.",
       "history": [
         { "hash": "dd5e1c73", "nodes": "7387373", "run": "36607275266" },
-        { "hash": "b63e6b5f", "nodes": "7301332", "run": "36713443997" }
+        { "hash": "b63e6b5f", "nodes": "7301332", "run": "36713443997" },
+        { "hash": "eb9af422", "run": "36716534226", "cpu": "AMD EPYC 7763 — 릴리스 engine-3c94c2a9-rx 를 낸 런" }
       ]
     },
     "multi-simd128": {

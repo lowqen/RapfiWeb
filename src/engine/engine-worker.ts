@@ -5,9 +5,11 @@ import {
   toSerializable,
   type EngineCommand,
   type FromWorker,
+  type Placement,
   type SearchEndReason,
   type ToWorker,
 } from "./engine-types";
+import { loadWeights } from "./weights-cache";
 import type { Move } from "../core/model/move";
 
 /**
@@ -68,6 +70,11 @@ interface EmscriptenModule {
   onReceiveStderr?: (chunk: string) => void;
   locateFile?: (path: string) => string;
   onExit?: (code: number) => void;
+  /**
+   * file_packager 의 훅 — 버퍼를 돌려주면 글루가 `.data` 를 내려받지 않고 그것을 쓴다.
+   * **동기**이고 `ArrayBuffer`(SharedArrayBuffer 아님)여야 한다(글루가 생성자 이름을 본다).
+   */
+  getPreloadedPackage?: (name: string, size: number) => ArrayBuffer | null;
 }
 type ModuleFactory = (opts: Partial<EmscriptenModule>) => Promise<EmscriptenModule>;
 
@@ -99,10 +106,24 @@ const post = (m: FromWorker) => self.postMessage(m);
 export const IS_PTHREAD =
   typeof self !== "undefined" && (self as unknown as { name?: string }).name === "em-pthread";
 
+/**
+ * 이 번들의 엔진 스레드가 읽을 멀티 변형. **번들마다 정해진다** — 엔진 스레드에게는 기동
+ * 메시지가 오지 않고, 워커 주소도 바꿀 수 없으므로(`new Worker(new URL(…))` 는 빌드 때
+ * 고정된다) 알 길이 이것뿐이다. relaxed 멀티는 제 진입점(`engine-worker-relaxed.ts`)을
+ * 따로 두어 이 값을 먼저 심고 이 파일을 불러온다 — 그 번들의 엔진 스레드는 그 번들을
+ * 다시 열므로 relaxed 글루를 읽는다.
+ */
+export function pthreadVariant(): string {
+  return (
+    (globalThis as { __RAPFI_PTHREAD_VARIANT__?: string }).__RAPFI_PTHREAD_VARIANT__ ??
+    "multi-simd128"
+  );
+}
+
 /** 멀티 변형 글루의 주소 — 엔진 스레드가 읽는다. */
 export function pthreadGlueUrl(): string {
   const base = import.meta.env?.VITE_ENGINE_BASE_URL ?? "/engine/";
-  return new URL(`${base}rapfi-multi-simd128.js`, self.location.href).href;
+  return new URL(`${base}rapfi-${pthreadVariant()}.js`, self.location.href).href;
 }
 
 if (IS_PTHREAD) importScripts(pthreadGlueUrl());
@@ -152,6 +173,12 @@ let sliceMoves: readonly Move[] | null = null;
 
 /** 엔진이 제 pthread 에서 도는가(멀티 변형). 기동 때 정해진다. */
 let threaded = false;
+
+/**
+ * 예열 탐색 중인가. 이때의 줄은 콘솔에만 남기고 **집계·스냅샷·좌표는 올리지 않는다** —
+ * 올리면 사용자가 두지도 않은 예열 국면의 수순이 보드와 평가 바에 뜬다.
+ */
+let warming = false;
 
 /**
  * 멀티 변형에서 엔진이 **탐색 중**인가 — 탐색 명령을 보낸 뒤부터 좌표 줄이 올
@@ -359,19 +386,23 @@ function drain(chunk: string) {
       }
     }
     const r = parse(line, coord);
-    if (agg.consume(r)) snapshotDirty = true;
+    if (!warming && agg.consume(r)) snapshotDirty = true;
     if (r.kind === "bestMove") {
       // 좌표 한 줄은 **착수 요청의 답일 때만** 대국에 올린다. 분석의 조각도
       // 끝날 때마다 좌표를 찍는데(YXNBEST), 그걸 올리면 마침 엔진 차례인 대국이
-      // 분석 조각의 수를 엔진의 착수로 받아 둔다.
-      sliceMoves = r.moves;
-      if (forwardMoves) post({ type: "bestMove", moves: r.moves });
+      // 분석 조각의 수를 엔진의 착수로 받아 둔다. 예열의 좌표는 어디에도 올리지 않는다.
+      if (!warming) {
+        sliceMoves = r.moves;
+        if (forwardMoves) post({ type: "bestMove", moves: r.moves });
+      }
       // 멀티 변형: 좌표 줄이 곧 탐색의 끝이다. 다음 명령은 정착 대기 뒤(`quiet`).
       engineBusy = false;
       lastMoveAt = performance.now();
       const w = moveWaiter;
       moveWaiter = null;
       w?.(r.moves);
+    } else if (warming) {
+      // 예열 중의 나머지 줄은 콘솔에만.
     } else if (r.kind === "forbid") post({ type: "forbid", cells: r.cells });
     else if (r.kind === "openingMove" || r.kind === "openingSwap" || r.kind === "soosorvFifth") {
       post({ type: "opening", response: r });
@@ -451,13 +482,42 @@ async function boot(msg: Extract<ToWorker, { type: "boot" }>) {
   coord = new CoordMapper(msg.size);
   agg = new SearchAggregator(msg.size);
 
+  // **가중치 선적재.** 공유 가중치가 있으면 글루를 읽기 **전에** 받기 시작한다 — 20MB
+  // 내려받기(또는 캐시 읽기·해시 검증)가 글루 파싱과 겹친다. 글루는 인스턴스를 만들 때
+  // 이 버퍼를 `getPreloadedPackage` 로 받아 내려받기를 건너뛴다.
+  const weightsP = msg.weights ? loadWeights(msg.weights) : null;
+  weightsP?.catch(() => undefined); // 아래에서 기다린다 — 그 전에 거부돼도 처리되지 않은 거부로 새지 않게
   const factory = loadFactory(msg.engineBaseUrl, msg.variant);
-  mod = await factory({
-    locateFile: (p: string) => msg.engineBaseUrl + p,
+  let weights: Extract<FromWorker, { type: "booted" }>["weights"] = { source: "glue", ms: 0 };
+  let preloaded: ArrayBuffer | null = null;
+  if (weightsP && msg.weights) {
+    const w = await weightsP;
+    for (const n of w.notes) pushConsole(`! ${n}`);
+    const how = w.source === "cache" ? "캐시에서" : "네트워크에서";
+    pushConsole(
+      `· 가중치 ${how} ${(w.buffer.byteLength / 2 ** 20).toFixed(1)}MB · ${w.ms}ms · SHA-256 확인`,
+    );
+    weights = { source: w.source, ms: w.ms };
+    preloaded = w.buffer;
+  }
+  const shared = msg.weights?.url;
+  const opts: Partial<EmscriptenModule> = {
+    // 공유 가중치를 쓰면 `.data` 요청은 어느 변형이든 그 한 파일로 간다(훅이 먼저 답하므로
+    // 실제로는 요청이 나가지 않는다 — 훅이 없는 글루를 위한 안전망).
+    locateFile: (p: string) => (shared && p.endsWith(".data") ? shared : msg.engineBaseUrl + p),
     onReceiveStdout: drain,
     onReceiveStderr: drain,
     onExit: (code: number) => post({ type: "exit", code }),
-  });
+  };
+  if (preloaded) {
+    opts.getPreloadedPackage = () => {
+      // 한 번만 넘긴다 — 글루가 MEMFS 에 붙들고, 워커는 참조를 놓는다.
+      const b = preloaded;
+      preloaded = null;
+      return b;
+    };
+  }
+  mod = await factory(opts);
   if (typeof mod.sendCommand !== "function") {
     throw new Error("Module.sendCommand 가 없습니다 — preamble.js 가 빠진 빌드입니다");
   }
@@ -495,6 +555,12 @@ async function boot(msg: Extract<ToWorker, { type: "boot" }>) {
   const maxRaw = await settle(maxLine, 500);
   const maxThreads = maxRaw === null ? null : Number(/(\d+)\s*$/.exec(maxRaw)?.[1] ?? NaN);
 
+  // 예열 — 「떴다」를 알리기 **전에** 돈다. 첫 탐색이 치르던 가중치 풀기(0.4~0.9초)와
+  // JIT 승격 전 구간(첫 탐색 10~26% 느림, docs/gomocalc-엔진-비교.md §4.2)을 여기서
+  // 치르고, 이 변형이 **실제로 탐색하는지**까지 확인한다 — 여기서 던지면 클라이언트가 다음
+  // 변형으로 물러선다(relaxed 가 이 기기에서 이상하면 일반 SIMD 로).
+  const warmupMs = msg.warmupMs && msg.warmupMs > 0 ? await warmup(msg.warmupMs) : null;
+
   post({
     type: "booted",
     version: msg.variant,
@@ -502,8 +568,68 @@ async function boot(msg: Extract<ToWorker, { type: "boot" }>) {
     about,
     threaded,
     maxThreads: maxThreads !== null && Number.isFinite(maxThreads) ? maxThreads : null,
+    weights,
+    warmupMs,
   });
   flushConsole();
+}
+
+/**
+ * 예열 국면 — 3수 직접 개시(흑 h8 · 백 h9 · 흑 i9, 백 차례). 빈 판은 엔진이 탐색 없이
+ * 천원을 두므로(즉답) 가중치도 JIT 도 데우지 못한다.
+ */
+const WARMUP_STONES: readonly Placement[] = [
+  { move: { x: 7, y: 7 }, own: false },
+  { move: { x: 7, y: 6 }, own: true },
+  { move: { x: 8, y: 6 }, own: false },
+];
+/** 예열의 상한 — 가중치 풀기가 느린 기기를 위해 예산에 더해 기다리는 몫. */
+const WARMUP_GRACE_MS = 20_000;
+
+/**
+ * 짧은 탐색 하나. 결과는 버린다(`warming` — 집계·스냅샷·좌표를 올리지 않는다). 끝나면
+ * 해시를 비워 예열의 흔적이 사용자의 첫 탐색에 섞이지 않게 한다. 걸린 시간을 돌려준다.
+ */
+async function warmup(budgetMs: number): Promise<number> {
+  const t = performance.now();
+  const turn = Math.max(MIN_SLICE_MS, Math.round(budgetMs));
+  pushConsole(`· 예열 탐색 ${turn}ms — 가중치 풀기와 JIT 승격을 첫 요청 앞으로 당긴다`);
+  warming = true;
+  try {
+    sendCommand(["INFO timeout_match 0"]);
+    sendCommand([`INFO timeout_turn ${turn}`]);
+    sendAll([{ kind: "yxboard", stones: WARMUP_STONES }]);
+    if (!threaded) {
+      sendAll([{ kind: "yxnbest", n: 1 }]); // 단일 변형: 이 호출 안에서 끝난다
+    } else {
+      const done = nextMove();
+      const since = performance.now();
+      sendSearch([{ kind: "yxnbest", n: 1 }]);
+      const watch = firstLineWatch(since);
+      const first = await Promise.race([
+        done.then(() => "done" as const),
+        watch.silent,
+        new Promise<"late">((r) => setTimeout(() => r("late"), turn + WARMUP_GRACE_MS)),
+      ]);
+      watch.cancel();
+      if (first === "silent") {
+        throw new Error("멀티스레드 엔진이 예열 탐색에 답하지 않습니다(입력 경합)");
+      }
+      if (first === "late") {
+        sendAll([{ kind: "stop" }]);
+        await within(done, STOP_GRACE_MS, "멀티스레드 엔진이 예열 정지에 답하지 않습니다");
+      }
+      await quiet(); // 좌표 뒤 정착 대기 — 다음 명령(해시 비우기)이 입력 경합에 휘말리지 않게
+    }
+    sendAll([{ kind: "raw", line: "YXHASHCLEAR" }]);
+  } finally {
+    warming = false;
+    agg.reset();
+    sliceMoves = null;
+  }
+  const ms = Math.round(performance.now() - t);
+  pushConsole(`· 예열 끝 — ${ms}ms`);
+  return ms;
 }
 
 /** 이벤트 루프에 한 번 양보한다 — 이 틈에만 `stop` 이 도착할 수 있다. */

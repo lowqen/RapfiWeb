@@ -368,6 +368,29 @@ relaxed 로도 못 닿는 명령과 wasm 실행 자체의 비용이다.
 
 우선순위는 **측정된 이득 ÷ 위험**으로 매겼다. 모두 `bench-gomocalc.yml` 로 전후를 다시 잴 수 있다.
 
+> **①②③ 적용됨 (2026-09-30, 릴리스 `engine-3c94c2a9-rx`)** — 변형 4종(relaxed 멀티·단일 추가),
+> 감지·순서·폴백(`engine-client.ts` `planVariants`), relaxed 멀티 전용 워커 번들
+> (`engine-worker-relaxed.ts` — 엔진 스레드가 relaxed 글루를 읽게), 공유 가중치 `rapfi.data` +
+> Cache Storage 캐시 계층·SHA-256 검증(`weights-cache.ts`, `engine-manifest.json`), 기동 때
+> 예열 탐색(`engine-worker.ts` `warmup`). 배포 게이트: 받은 `rapfi.data` 가 커밋된 매니페스트와
+> 같은가(`scripts/verify-engine.ts`).
+>
+> **릴리스 때 새로 알게 된 것 — relaxed 는 classical 평가 경로에서 기계마다 값이 갈린다.**
+> 렌주 전용 .data 로 BENCH 를 돌리면 국면 7/10 이 classical 폴백으로 도는데, relaxed 단일의
+> 해시가 두 릴리스 런에서 dd5e1c73(7,387,373 노드) · b63e6b5f(7,301,332)로 **서로도** 달랐다
+> (일반 SIMD 는 두 번 다 2b7c7da9). §4.3 의 「relaxed 해시 = 일반 해시」는 가중치 4종 빌드 —
+> 10개 모두 NNUE — 에서, 그것도 **그 Intel Xeon 에서만** 참이었다. 렌주·NNUE 국면 5개를
+> 1 스레드 고정 깊이로 두 빌드에 읽힌 결과(`spike/relaxed-equivalence.mjs`), AMD EPYC 9V74
+> 러너에서는 4개가 비트까지 같고 **직접 개시 하나가 갈렸다** — 최선수는 같은 g7, 평가 −352 ↔
+> −404, 노드 114,126 ↔ 58,895. relaxed 의 부동소수 연산(곱합 등)이 CPU 에 따라 반올림을 달리하는
+> 것으로, 명세가 허용하는 차이다.
+>
+> **결정: relaxed 는 싣는다, 「결과 불변」은 약속하지 않는다.** 웹은 이미 「폰과 비트 단위
+> 동일」을 게이트에서 내렸다(spike/web-baseline.json). 그래서 릴리스 게이트는 비트 동일이 아니라
+> **건전성**이다 — 필승 국면은 같은 쪽 필승을 찾고, 점수 국면은 평가 차 150 안. 비트 차이는
+> 경고로 남는다. 기기 사이 재현이 필요하면 `?relaxed=0` 으로 일반 SIMD 를 쓴다. §6-① 의 「결과
+> 불변」은 이 단서와 함께 읽어야 한다. ARM 기기에서의 확인은 아직이다.
+
 ### ① relaxed SIMD 변형을 싣는다 — **측정된 +23~31%, 결과 불변**
 
 - 근거: §4.3·4.4. 같은 소스에서 NPS +23.1%, BENCH 1.31배, 해시·노드 동일.

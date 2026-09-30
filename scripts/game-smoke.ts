@@ -24,7 +24,7 @@
  */
 import { chromium, type Page } from "playwright";
 import { createServer } from "node:http";
-import { ISOLATION_HEADERS, ISOLATE, expectedVariant } from "./isolation.ts";
+import { ISOLATION_HEADERS, ISOLATE, expectedVariant, hasEngine } from "./isolation.ts";
 import { readFileSync, existsSync } from "node:fs";
 import { extname, join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -36,10 +36,7 @@ const PORT = Number(process.env.SMOKE_PORT ?? 4182);
 const REMOTE = process.env.SMOKE_BASE_URL?.replace(/\/$/, "") ?? "";
 const BASE = REMOTE || `http://localhost:${PORT}`;
 
-const GLUE = join(DIST, "engine/rapfi-single-simd128.js");
-const DATA = join(DIST, "engine/rapfi-single-simd128.data");
-
-if (!REMOTE && (!existsSync(GLUE) || !existsSync(DATA))) {
+if (!REMOTE && !hasEngine(DIST)) {
   console.log("엔진 산출물이 없어 건너뜁니다 (dist/engine/).");
   process.exit(0);
 }

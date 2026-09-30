@@ -2,7 +2,7 @@ import { useMemo, useState, type ComponentType } from "react";
 import { MOVE_TIME_CHOICES, useGameStore } from "../board/gameStore";
 import { useBoardStore } from "../board/boardStore";
 import { useEngineStore, MULTI_PV, threadCap } from "../../engine/engine-state";
-import type { EngineVariant } from "../../engine/engine-client";
+import { isMultiVariant, type EngineVariant } from "../../engine/engine-client";
 import { useThemeStore, type ThemeMode } from "../../app/theme";
 import {
   COMPUTER_SIDE_LABEL,
@@ -146,7 +146,9 @@ function MoveTimeControl() {
 }
 
 const VARIANT_LABEL: Record<EngineVariant, string> = {
+  "multi-simd128-relaxed": "멀티스레드 · relaxed SIMD",
   "multi-simd128": "멀티스레드",
+  "single-simd128-relaxed": "단일 스레드 · relaxed SIMD",
   "single-simd128": "단일 스레드",
 };
 
@@ -169,7 +171,8 @@ function ThreadControl() {
 
   const cores = deviceCores();
   const cap = threadCap(cores, engine.maxThreads);
-  const usable = caps.threads && allow && engine.variant !== "single-simd128";
+  const single = engine.variant !== null && !isMultiVariant(engine.variant);
+  const usable = caps.threads && allow && !single;
   const wanted = resolveThreads(v, cores);
   const options = [{ value: AUTO_THREADS, label: `자동 (${Math.min(cap, autoThreads(cores))})` }];
   for (let n = 1; n <= cap; n++) options.push({ value: n, label: String(n) });
@@ -177,17 +180,18 @@ function ThreadControl() {
   let line: string;
   if (!caps.threads) line = "이 환경에서는 단일 스레드 엔진이라 1 입니다.";
   else if (!allow) line = "멀티스레드를 꺼 두어 1 입니다(고급 설정).";
-  else if (engine.variant === "single-simd128") line = "단일 스레드 엔진으로 떠 있어 1 입니다.";
+  else if (single) line = "단일 스레드 엔진으로 떠 있어 1 입니다.";
   else if (status === "idle" || status === "error" || applied === null) {
     line = `엔진을 띄우면 ${wanted} 스레드로 시작합니다.`;
   } else if (applied === wanted) line = `적용됨 — ${applied} 스레드로 탐색합니다.`;
   else line = `다음 탐색부터 ${wanted} 스레드 (지금 ${applied}).`;
 
+  // 띄우면 무엇이 뜰지 — 멀티를 꺼 두었으면 순서에서 멀티를 뺀 첫 변형.
   const planned: EngineVariant | null =
-    caps.variant === "multi-simd128" && !allow ? "single-simd128" : caps.variant;
+    caps.variants.find((x) => allow || !isMultiVariant(x)) ?? null;
   const shown = engine.variant ?? planned;
   const why = engine.fallbackReason
-    ? `멀티스레드 기동에 실패해 단일 스레드로 물러섰습니다 — ${engine.fallbackReason}`
+    ? `앞선 변형이 기동에 실패해 물러섰습니다 — ${engine.fallbackReason}`
     : caps.threadsNote;
 
   return (

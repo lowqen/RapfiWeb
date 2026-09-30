@@ -14,6 +14,13 @@ import { useSettingsStore } from "../settings/settingsStore";
 /** 화면에 그리는 줄 수. 전체(최대 5,000줄)는 `__rapfiConsole()` 로 꺼낸다. */
 const VISIBLE_LINES = 400;
 
+/** 가중치를 어디서 얻었나 — 캐시면 이번 기동에 20MB 를 받지 않았다. */
+const WEIGHTS_SOURCE: Record<"cache" | "network" | "glue", string> = {
+  cache: "캐시(해시 확인)",
+  network: "내려받음(해시 확인)",
+  glue: "글루가 받음",
+};
+
 const STATUS_TEXT: Record<string, string> = {
   idle: "꺼짐",
   starting: "기동 중",
@@ -53,6 +60,16 @@ export function EngineScreen() {
           <dd className="tnum" data-k="threads">
             {applied ?? "—"}
             {engine.variant ? (engine.threaded ? " · 멀티스레드" : " · 단일 스레드") : ""}
+          </dd>
+          <dt>가중치</dt>
+          <dd className="tnum" data-k="weights">
+            {engine.weightsSource === null
+              ? "—"
+              : `${WEIGHTS_SOURCE[engine.weightsSource]} · ${engine.weightsMs ?? 0}ms`}
+          </dd>
+          <dt>예열</dt>
+          <dd className="tnum" data-k="warmup">
+            {engine.warmupMs === null ? "—" : `${engine.warmupMs}ms`}
           </dd>
           <dt>해시</dt>
           <dd className="tnum">{hashMb} MB</dd>
