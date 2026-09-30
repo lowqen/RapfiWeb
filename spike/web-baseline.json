@@ -40,9 +40,12 @@
       "note": "배포 경로(렌주 전용 .data). 이 값이 바뀌면 CI 실패."
     },
     "single-simd128-relaxed": {
-      "hash": "dd5e1c73",
-      "nodes": "7387373",
-      "note": "relaxed 빌드 **자신의** 회귀 기준선이다(일반 SIMD 와 같은 값이 아니다). 2026-09-30 릴리스 런(36607275266)에서 처음엔 일반 해시(2b7c7da9)를 기대했다가 dd5e1c73 이 나왔다 — 렌주 전용 .data 에서 BENCH 국면 7/10 이 타는 **classical 폴백 평가**가 relaxed 명령에서 값이 갈리기 때문이다(가중치 4종 빌드는 10개 모두 NNUE 라 relaxed = 일반, 4100a973). 앱이 타는 렌주·NNUE 경로의 동등성은 spike/relaxed-equivalence.mjs 가 따로 게이트한다."
+      "hash": null,
+      "note": "**판정하지 않는다(기록만).** 렌주 전용 .data 의 BENCH 는 국면 7/10 이 classical 폴백 평가로 도는데, 그 경로가 relaxed 명령에서 **기계마다** 값이 갈린다: 릴리스 런 36607275266 → dd5e1c73(7,387,373 노드), 36713443997 → b63e6b5f(7,301,332) — 같은 소스·같은 플래그, 일반 SIMD 는 두 번 다 2b7c7da9. relaxed 명령이 명세상 구현 정의라는 것 그대로다. 가중치 4종 빌드(10개 모두 NNUE)에서는 relaxed = 일반(4100a973). 앱이 타는 렌주·NNUE 경로의 동등성은 spike/relaxed-equivalence.mjs 가 게이트한다.",
+      "history": [
+        { "hash": "dd5e1c73", "nodes": "7387373", "run": "36607275266" },
+        { "hash": "b63e6b5f", "nodes": "7301332", "run": "36713443997" }
+      ]
     },
     "multi-simd128": {
       "hash": null,

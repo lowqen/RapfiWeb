@@ -67,15 +67,16 @@ jobs:
       - name: 웹 회귀 게이트 (single-simd128)
         run: node spike/node-bench.mjs single-simd128
 
-      # relaxed 명령은 명세상 **구현 정의**다. 두 게이트로 본다(노드 20 의 V8 은 플래그가
-      # 있어야 relaxed 를 읽는다):
-      #   1. 회귀 — relaxed 빌드 자신의 BENCH 기준선(web-baseline.json). 렌주 전용 .data 의
-      #      BENCH 는 국면 7/10 이 classical 폴백으로 돌고 그 경로가 relaxed 에서 갈리므로
-      #      일반 SIMD 와 같은 값을 요구하지 않는다(릴리스 런 36607275266 에서 확인).
-      #   2. 동등성 — 앱이 타는 **렌주·NNUE** 경로에서 relaxed = 일반. 국면 5개를 1 스레드 고정
-      #      깊이로 읽어 노드·평가·수순이 모두 같아야 한다. 다르면 relaxed 를 내지 않는다.
-      - name: relaxed 회귀 게이트 (BENCH)
-        run: node --experimental-wasm-relaxed-simd spike/node-bench.mjs single-simd128-relaxed
+      # relaxed 명령은 명세상 **구현 정의**다(노드 20 의 V8 은 플래그가 있어야 relaxed 를 읽는다).
+      #   - BENCH 는 **기록만** 한다. 렌주 전용 .data 의 BENCH 는 국면 7/10 이 classical 폴백으로
+      #     도는데 그 경로가 relaxed 에서 **러너마다** 다른 해시를 낸다(dd5e1c73 · b63e6b5f —
+      #     web-baseline.json). 고정 해시로 막을 수 없다. node-bench 는 기준선이 없으면 3(미판정).
+      #   - **게이트는 동등성이다** — 앱이 타는 렌주·NNUE 경로에서 relaxed = 일반. 국면 5개를
+      #     1 스레드 고정 깊이로 읽어 노드·평가·수순이 모두 같아야 한다. 다르면 relaxed 를 내지 않는다.
+      - name: relaxed BENCH (기록 — 판정 안 함)
+        run: |
+          grep -m1 "model name" /proc/cpuinfo || true
+          node --experimental-wasm-relaxed-simd spike/node-bench.mjs single-simd128-relaxed || [ $? -eq 3 ]
       - name: relaxed 동등성 게이트 (렌주 · NNUE — relaxed = 일반)
         run: node --experimental-wasm-relaxed-simd spike/relaxed-equivalence.mjs
 
