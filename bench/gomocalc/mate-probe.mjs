@@ -28,6 +28,8 @@ const THREADS = Number(process.env.THREADS ?? 1);
 const TIME_MS = Number(process.env.TIME_MS ?? 30_000);
 const PROBES = list(process.env.PROBES, "midgame,midgame+l9m10,midgame+l9l8");
 const LABEL = process.env.LABEL ?? "mate-probe";
+/** 탐색 앞에 보낼 명령(세미콜론 구분) — 예: `INFO SEARCH_TYPE MCTS`. */
+const PRE = list(process.env.PRE?.replaceAll(";", ","), "");
 
 const { positions } = JSON.parse(await readFile(join(HERE, "positions.json"), "utf8"));
 
@@ -45,7 +47,14 @@ function resolveProbe(name) {
 const probes = PROBES.map(resolveProbe);
 const port = 4700 + Math.floor(Math.random() * 200);
 const server = await serve(port);
-const out = { label: LABEL, variant: VARIANT, threads: THREADS, timeMs: TIME_MS, runs: [] };
+const out = {
+  label: LABEL,
+  pre: PRE,
+  variant: VARIANT,
+  threads: THREADS,
+  timeMs: TIME_MS,
+  runs: [],
+};
 try {
   for (const engine of ENGINES) {
     const browser = await chromium.launch();
@@ -56,6 +65,7 @@ try {
       await host.load(engine, VARIANT);
       await setup(host);
       await host.post(`INFO THREAD_NUM ${THREADS}`);
+      for (const c of PRE) await host.post(c);
       // 예열 — 가중치 풀기·JIT 승격을 측정에서 뺀다.
       await search(host, positions[0].moves, { timeMs: 3000 });
       for (const p of probes) {

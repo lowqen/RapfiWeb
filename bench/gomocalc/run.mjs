@@ -42,7 +42,10 @@ const list = (v, d) =>
     .map((s) => s.trim())
     .filter(Boolean);
 const ENGINES = list(process.env.ENGINES, "gomocalc,rapfiweb");
-const VARIANTS = list(process.env.VARIANTS, "single-simd128,multi-simd128,multi-simd128-relaxed");
+const VARIANTS = list(
+  process.env.VARIANTS,
+  "single-simd128,single-simd128-relaxed,multi-simd128,multi-simd128-relaxed",
+);
 const THREADS = list(process.env.THREADS, "1,2").map(Number);
 const TIME_MS = Number(process.env.TIME_MS ?? 10_000);
 const REPEAT = Number(process.env.REPEAT ?? 2);

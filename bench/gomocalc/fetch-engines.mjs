@@ -10,12 +10,19 @@
  * 이미 있는 파일은 크기만 맞으면 건너뛴다.
  */
 import { execFileSync } from "node:child_process";
-import { mkdir, stat, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const ENGINE_TAG = process.env.ENGINE_TAG ?? "engine-3c94c2a9-mt";
+// 배포 중인 릴리스 — 변형 4종(relaxed 포함)과 공유 가중치 rapfi.data 하나.
+const ENGINE_TAG = process.env.ENGINE_TAG ?? "engine-3c94c2a9-rx";
+const RX_VARIANTS = [
+  "multi-simd128",
+  "multi-simd128-relaxed",
+  "single-simd128",
+  "single-simd128-relaxed",
+];
 
 const SOURCES = {
   gomocalc: {
@@ -33,12 +40,8 @@ const SOURCES = {
   rapfiweb: {
     base: null,
     files: [
-      "rapfi-multi-simd128.js",
-      "rapfi-multi-simd128.wasm",
-      "rapfi-multi-simd128.data",
-      "rapfi-single-simd128.js",
-      "rapfi-single-simd128.wasm",
-      "rapfi-single-simd128.data",
+      ...RX_VARIANTS.flatMap((v) => [`rapfi-${v}.js`, `rapfi-${v}.wasm`]),
+      "rapfi.data",
       "ENGINE_VERSION.txt",
     ],
   },
@@ -80,6 +83,9 @@ for (const [name, src] of Object.entries(SOURCES)) {
   if (name === "rapfiweb") {
     await mkdir(dir, { recursive: true });
     ghDownload(ENGINE_TAG, src.files, dir);
+    // 하네스는 변형마다 rapfi-<변형>.data 를 찾는다(글루 기본 이름) — 공유 파일을 그 이름들로 둔다.
+    for (const v of RX_VARIANTS)
+      await copyFile(join(dir, "rapfi.data"), join(dir, `rapfi-${v}.data`));
     for (const f of src.files) {
       const s = await stat(join(dir, f));
       manifest[name].push({ file: f, bytes: s.size, lastModified: null });

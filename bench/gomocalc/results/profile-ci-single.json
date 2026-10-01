@@ -1,0 +1,235 @@
+{
+  "label": "profile-single",
+  "engine": "rapfiweb-prof",
+  "variant": "single-simd128",
+  "timeMs": 5000,
+  "totalMs": 20032,
+  "nodes": 1451638,
+  "rows": [
+    {
+      "name": "Evaluation::mix9svq::Accumulator::move(Evaluation::mix9svq::Weight const&, Color, int, int)",
+      "ms": 6534,
+      "pct": 32.62
+    },
+    {
+      "name": "void (anonymous namespace)::starBlock<64, 64>(signed char*, signed char*, Evaluation::mix9svq::StarBlockWeight<64, 64> const&)",
+      "ms": 6029,
+      "pct": 30.1
+    },
+    {
+      "name": "Evaluation::mix9svq::Evaluator::evaluatePolicy(Board const&, Evaluation::PolicyBuffer&, Evaluation::AccLevel)",
+      "ms": 2316,
+      "pct": 11.56
+    },
+    {
+      "name": "void Board::move<(Rule)2, (Board::MoveType)0>(Pos)",
+      "ms": 982,
+      "pct": 4.9
+    },
+    {
+      "name": "Evaluation::mix9svq::Evaluator::evaluateValue(Board const&, Evaluation::AccLevel)",
+      "ms": 592,
+      "pct": 2.96
+    },
+    {
+      "name": "Value (anonymous namespace)::search<(Rule)2, ((anonymous namespace)::NodeType)2>(Board&, Search::AB::SearchStack*, Value, Value, float, bool)",
+      "ms": 552,
+      "pct": 2.75
+    },
+    {
+      "name": "void (anonymous namespace)::fastPartialSort<ScoredMove::ScoreComparator>(ScoredMove*, ScoredMove*, short, ScoredMove::ScoreComparator)",
+      "ms": 484,
+      "pct": 2.42
+    },
+    {
+      "name": "Search::MovePicker::operator()()",
+      "ms": 446,
+      "pct": 2.22
+    },
+    {
+      "name": "void std::__2::__introsort<std::__2::_ClassicAlgPolicy, ScoredMove::ScoreComparator&, ScoredMove*, false>(ScoredMove*, ScoredMove*, ScoredMove::ScoreComparator&, std::__2::iterator_traits<ScoredMove*>::difference_type, bool)",
+      "ms": 374,
+      "pct": 1.87
+    },
+    {
+      "name": "wasm-to-js",
+      "ms": 348,
+      "pct": 1.74
+    },
+    {
+      "name": "void Board::undo<(Rule)1, (Board::MoveType)0>()",
+      "ms": 183,
+      "pct": 0.92
+    },
+    {
+      "name": "js-to-wasm:i:i",
+      "ms": 115,
+      "pct": 0.57
+    },
+    {
+      "name": "W",
+      "ms": 86,
+      "pct": 0.43
+    },
+    {
+      "name": "(idle)",
+      "ms": 85,
+      "pct": 0.42
+    },
+    {
+      "name": "vc",
+      "ms": 66,
+      "pct": 0.33
+    },
+    {
+      "name": "ScoredMove* generate<(GenType)19>(Board const&, ScoredMove*)",
+      "ms": 56,
+      "pct": 0.28
+    },
+    {
+      "name": "Cc",
+      "ms": 42,
+      "pct": 0.21
+    },
+    {
+      "name": "ScoredMove* generate<(GenType)248>(Board const&, ScoredMove*)",
+      "ms": 42,
+      "pct": 0.21
+    },
+    {
+      "name": "emscripten_stack_get_current",
+      "ms": 41,
+      "pct": 0.2
+    },
+    {
+      "name": "Evaluation::mix9svq::Evaluator::beforeMove(Board const&, Pos)",
+      "ms": 37,
+      "pct": 0.18
+    },
+    {
+      "name": "Value Evaluation::evaluate<(Rule)2>(Board const&, Value, Value)",
+      "ms": 33,
+      "pct": 0.16
+    },
+    {
+      "name": "void Board::move<(Rule)2, (Board::MoveType)2>(Pos)",
+      "ms": 33,
+      "pct": 0.16
+    },
+    {
+      "name": "Search::HashTable::store(unsigned long long, Value, Value, bool, Bound, Pos, int, int)",
+      "ms": 31,
+      "pct": 0.15
+    },
+    {
+      "name": "Board::checkForbiddenPoint(Pos) const",
+      "ms": 31,
+      "pct": 0.15
+    },
+    {
+      "name": "Value quickWinCheck<(Rule)2>(Board const&, int, Value)",
+      "ms": 22,
+      "pct": 0.11
+    },
+    {
+      "name": "Search::HashTable::probe(unsigned long long, Value&, Value&, bool&, Bound&, Pos&, int&, int)",
+      "ms": 21,
+      "pct": 0.11
+    },
+    {
+      "name": "(program)",
+      "ms": 21,
+      "pct": 0.1
+    },
+    {
+      "name": "void Search::MovePicker::scoreAllMoves<(Search::MovePicker::ScoreType)15>()",
+      "ms": 20,
+      "pct": 0.1
+    },
+    {
+      "name": "Zc",
+      "ms": 18,
+      "pct": 0.09
+    },
+    {
+      "name": "js-to-wasm:i:",
+      "ms": 18,
+      "pct": 0.09
+    },
+    {
+      "name": "js-to-wasm:ii:",
+      "ms": 17,
+      "pct": 0.09
+    },
+    {
+      "name": "Search::AB::ABSearcher::clear(Search::SearchEngine&, bool)",
+      "ms": 17,
+      "pct": 0.08
+    },
+    {
+      "name": "(anonymous)",
+      "ms": 16,
+      "pct": 0.08
+    },
+    {
+      "name": "(garbage collector)",
+      "ms": 16,
+      "pct": 0.08
+    },
+    {
+      "name": "ia",
+      "ms": 16,
+      "pct": 0.08
+    },
+    {
+      "name": "Search::AB::HistoryTracker::updateBestmoveStats(float, Pos, Value)",
+      "ms": 16,
+      "pct": 0.08
+    },
+    {
+      "name": "Tc",
+      "ms": 15,
+      "pct": 0.08
+    },
+    {
+      "name": "Value (anonymous namespace)::vcfsearch<(Rule)2, ((anonymous namespace)::NodeType)2>(Board&, Search::AB::SearchStack*, Value, Value, float)",
+      "ms": 13,
+      "pct": 0.07
+    },
+    {
+      "name": "Oc",
+      "ms": 13,
+      "pct": 0.07
+    },
+    {
+      "name": "logf",
+      "ms": 13,
+      "pct": 0.07
+    },
+    {
+      "name": "ScoredMove* generateNeighbors<(GenType)16>(Board const&, ScoredMove*, Pos, Direction const*, unsigned long)",
+      "ms": 13,
+      "pct": 0.06
+    },
+    {
+      "name": "Evaluation::mix9svq::Evaluator::flushMoveCache(Color)",
+      "ms": 13,
+      "pct": 0.06
+    },
+    {
+      "name": "js-to-wasm:iiiiifli:",
+      "ms": 12,
+      "pct": 0.06
+    },
+    {
+      "name": "powf",
+      "ms": 11,
+      "pct": 0.05
+    },
+    {
+      "name": "ScoredMove* generate<(GenType)1027>(Board const&, ScoredMove*)",
+      "ms": 10,
+      "pct": 0.05
+    }
+  ]
+}
