@@ -177,6 +177,7 @@ export async function search(host, moves, { timeMs, clearHash = true, settleMs =
                   engineMs: rec.totaltime ?? null,
                   wallMs: Math.round(t - tSend),
                   nodes: rec.totalnodes ?? null,
+                  eval: rec.eval ?? null,
                 });
               }
             }

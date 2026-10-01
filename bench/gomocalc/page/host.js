@@ -53,14 +53,18 @@
       bench.lines.push({ t: performance.now(), line });
     },
 
-    /** engineDir: "/engines/gomocalc/" 등. dataName: 그 변형이 찾는 .data 를 돌릴 이름(없으면 그대로). */
-    async load(engineDir, variant, dataName) {
+    /**
+     * engineDir: "/engines/gomocalc/" 등. dataName: 그 변형이 찾는 .data 를 돌릴 이름(없으면 그대로).
+     * inline: 단일 변형도 **페이지 메인 스레드**에서 띄운다 — CPU 프로파일(profile.mjs)이
+     * 페이지의 CDP 세션 하나로 엔진을 잴 수 있게. 단일 변형의 탐색 동안 페이지가 멈춘다.
+     */
+    async load(engineDir, variant, dataName, inline = false) {
       const url = `${engineDir}rapfi-${variant}.js`;
       const locateFile = (f) => engineDir + (dataName && /^rapfi.*\.data$/.test(f) ? dataName : f);
       const t0 = performance.now();
-      if (variant.startsWith("multi")) {
+      if (variant.startsWith("multi") || inline) {
         bench.kind = "main-thread";
-        const { memory, maxMb } = makeMemory(true);
+        const { memory, maxMb } = makeMemory(variant.startsWith("multi"));
         bench._memory = memory;
         bench.maxMb = maxMb;
         await new Promise((ok, fail) => {

@@ -50,6 +50,10 @@ PRELOAD_SET="${PRELOAD_SET:-renju}"
 EXTRA_VARIANTS="${EXTRA_VARIANTS:-}"
 # 릴리스 태그 — engine-manifest.json 에 적힌다(engine-release.yml 이 넘긴다).
 RELEASE_TAG="${RELEASE_TAG:-}"
+# 측정 전용 링크 플래그(예: --profiling-funcs — wasm 이름 섹션을 남겨 V8 CPU 프로파일에 함수
+# 이름이 찍히게). **배포 빌드는 비워 둔다.** upstream LINK_FLAGS 보다 앞에 놓이지만, 이름 섹션
+# 같은 순서 무관 플래그만 넣는다(-s 설정은 뒤의 upstream 값에 덮인다 — 아래 [3/6] 주석).
+EXTRA_LDFLAGS="${EXTRA_LDFLAGS:-}"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK="${WORK:-$HOME/rapfi-wasm-work}"
@@ -216,6 +220,7 @@ build_variant () {
     -DNO_COMMAND_MODULES=ON \
     -DUSE_WASM_SIMD=ON \
     -DUSE_WASM_SIMD_RELAXED="$relaxed" \
+    -DCMAKE_EXE_LINKER_FLAGS="$EXTRA_LDFLAGS" \
     "${extra[@]}"
   cmake --build "$dir" -j"$JOBS"
 }

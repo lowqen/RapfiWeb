@@ -1,0 +1,77 @@
+name: 엔진 프로파일 (wasm 핫패스)
+
+# 배포와 **같은 소스·같은 플래그**에 `--profiling-funcs`(wasm 이름 섹션 유지 — 최적화는 그대로)만
+# 더해 빌드하고, bench/gomocalc/profile.mjs 로 V8 CPU 프로파일을 함수 이름별 자기 시간으로 모은다.
+# docs/최적화-마스터플랜.md 의 핫패스 표가 이 결과다. 결과는 로그·잡 요약에 남긴다(아티팩트 없음).
+# 수동 실행이다. 산출물은 배포·릴리스하지 않는다.
+on:
+  workflow_dispatch:
+    inputs:
+      time_ms:
+        description: "국면당 탐색 시간(ms) — positions.json 5개"
+        default: "5000"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  profile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      WORK: ${{ github.workspace }}/../rapfi-wasm-work
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: pnpm/action-setup@v4
+      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: 시스템 도구
+        run: sudo apt-get update -qq && sudo apt-get install -y ninja-build ccache file
+      - name: emsdk 캐시 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.WORK }}/emsdk
+          key: emsdk-latest-v1
+      - name: rapfi 소스 캐시 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.WORK }}/rapfi
+          key: rapfi-3c94c2a9-v1
+
+      - name: 이름 섹션을 남긴 빌드 (single · single-relaxed)
+        env:
+          EXTRA_VARIANTS: single-simd128-relaxed
+          EXTRA_LDFLAGS: --profiling-funcs
+        run: |
+          bash tools/build_engine_wasm.sh
+          mkdir -p bench/gomocalc/engines/rapfiweb-prof
+          cp out/engine/rapfi-single-simd128*.js out/engine/rapfi-single-simd128*.wasm \
+             out/engine/rapfi-single-simd128*.data bench/gomocalc/engines/rapfiweb-prof/
+          ls -l bench/gomocalc/engines/rapfiweb-prof
+          grep -m1 "model name" /proc/cpuinfo || true
+
+      - name: 프로파일 — single-simd128
+        env:
+          TIME_MS: ${{ inputs.time_ms }}
+          TOP: "45"
+          LABEL: profile-single
+        run: node bench/gomocalc/profile.mjs rapfiweb-prof single-simd128
+
+      - name: 프로파일 — single-simd128-relaxed
+        env:
+          TIME_MS: ${{ inputs.time_ms }}
+          TOP: "45"
+          LABEL: profile-single-relaxed
+        run: node bench/gomocalc/profile.mjs rapfiweb-prof single-simd128-relaxed
+
+      - name: 결과
+        if: always()
+        run: |
+          for f in bench/gomocalc/results/profile-*.json; do
+            [ -f "$f" ] || continue
+            echo "::group::$f"; cat "$f"; echo "::endgroup::"
+          done
