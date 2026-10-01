@@ -555,6 +555,12 @@ async function boot(msg: Extract<ToWorker, { type: "boot" }>) {
   const maxRaw = await settle(maxLine, 500);
   const maxThreads = maxRaw === null ? null : Number(/(\d+)\s*$/.exec(maxRaw)?.[1] ?? NaN);
 
+  // 기동 설정 — **예열 전에.** 스레드 수가 바뀌면 엔진이 스레드를 전부 다시 세우며
+  // 평가기(가중치)를 버린다(`SearchEngine::setNumThreads`). 예열 뒤에 보내면 예열이 푼
+  // 가중치가 버려지고 첫 사용자 탐색이 다시 푼다 — 확정된 스레드·해시에서 한 번만 데운다.
+  // 아직 탐색 전이라 멀티 변형의 입력 경합(좌표 뒤 정착 대기)도 없다.
+  if (msg.settings?.length) sendAll(msg.settings);
+
   // 예열 — 「떴다」를 알리기 **전에** 돈다. 첫 탐색이 치르던 가중치 풀기(0.4~0.9초)와
   // JIT 승격 전 구간(첫 탐색 10~26% 느림, docs/gomocalc-엔진-비교.md §4.2)을 여기서
   // 치르고, 이 변형이 **실제로 탐색하는지**까지 확인한다 — 여기서 던지면 클라이언트가 다음

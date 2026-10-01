@@ -207,6 +207,11 @@ export interface BootInfo {
   /** 기동 때 돈 예열 탐색의 시간. 건너뛰었으면 null. */
   warmupMs: number | null;
   /**
+   * 기동 메시지에 실려 **예열 전에** 엔진에 들어간 설정(`EngineOptions.bootSettings`).
+   * 엔진 스토어가 이것을 「이미 보냄」으로 적어 두어 기동 뒤에 같은 값을 다시 보내지 않는다.
+   */
+  settings: readonly EngineCommand[];
+  /**
    * 떠 있던 멀티 엔진이 멈춰 **다시 띄운** 것인가. 참이면 엔진 스토어가 설정을 다시
    * 보내고 켜 둔 분석을 잇는다(처음 기동은 스토어의 `start` 가 그 일을 한다).
    */
@@ -239,6 +244,12 @@ export interface EngineOptions extends EngineEvents {
   size?: number;
   /** 기동 예열 탐색(ms). 0 이면 건너뛴다. 기본 `VITE_ENGINE_WARMUP_MS` 또는 400. */
   warmupMs?: number;
+  /**
+   * 띄울 변형에 맞춘 기동 설정(`INFO thread_num`·`hash_size` …). 변형마다 다시 묻는다 —
+   * 멀티에서 단일로 물러서면 스레드 수가 1 이 되어야 하기 때문이다. 워커가 START 뒤·예열
+   * 전에 보내므로 예열이 확정된 스레드 수에서 한 번만 돈다.
+   */
+  bootSettings?: (variant: EngineVariant) => readonly EngineCommand[];
 }
 
 /**
@@ -321,7 +332,8 @@ export class EngineClient {
       let fallbackReason: string | null = null;
       for (const variant of order) {
         try {
-          const booted = await this.spawn(variant);
+          const settings = this.bootSettingsFor(variant);
+          const booted = await this.spawn(variant, settings);
           this.variant = variant;
           this.setStatus("ready");
           this.events.onBooted?.({
@@ -332,6 +344,7 @@ export class EngineClient {
             recovered: false,
             weights: booted.weights,
             warmupMs: booted.warmupMs,
+            settings,
           });
           return;
         } catch (e) {
@@ -358,6 +371,11 @@ export class EngineClient {
   private variant: EngineVariant | null = null;
   private booting: Promise<void> | null = null;
 
+  /** 이 변형으로 띄울 때 예열 전에 보낼 설정. */
+  private bootSettingsFor(variant: EngineVariant): readonly EngineCommand[] {
+    return this.events.bootSettings?.(variant) ?? [];
+  }
+
   /**
    * 떠 있던 멀티 엔진이 멈췄을 때 — 그 워커(와 엔진 스레드들)를 버리고 단일 스레드
    * 엔진을 새로 띄운다. 사용자에게는 「기동 중」이 잠깐 보이고 분석이 이어진다
@@ -378,7 +396,8 @@ export class EngineClient {
     let last: unknown = null;
     for (const variant of singles) {
       try {
-        const booted = await this.spawn(variant);
+        const settings = this.bootSettingsFor(variant);
+        const booted = await this.spawn(variant, settings);
         this.variant = variant;
         this.setStatus("ready");
         this.events.onBooted?.({
@@ -389,6 +408,7 @@ export class EngineClient {
           recovered: true,
           weights: booted.weights,
           warmupMs: booted.warmupMs,
+          settings,
         });
         return;
       } catch (e) {
@@ -406,7 +426,10 @@ export class EngineClient {
    * 워커 하나를 띄워 기동 결과를 기다린다. `booted` 면 풀리고, 기동 중의 `fatal`·워커
    * 오류·시간 초과면 거부한다(그러면 `start` 가 다음 변형을 시도한다).
    */
-  private spawn(variant: EngineVariant): Promise<Extract<FromWorker, { type: "booted" }>> {
+  private spawn(
+    variant: EngineVariant,
+    settings: readonly EngineCommand[] = [],
+  ): Promise<Extract<FromWorker, { type: "booted" }>> {
     // **클래식 워커다.** 이유는 vite.config.ts 의 worker.format 주석에 있다 —
     // upstream 글루를 읽는 유일한 방법인 importScripts 가 모듈 워커에는 없다.
     // 멀티 변형의 엔진 스레드도 **이 워커 번들을 다시 연다** — 거기서 글루만 읽고
@@ -521,6 +544,7 @@ export class EngineClient {
       size: this.size,
       warmupMs: this.warmupMs,
     };
+    if (settings.length) boot.settings = settings;
     // 공유 가중치 — 워커가 캐시 계층으로 받아 해시를 확인한다. 기본 경로가 절대 주소가
     // 아니면 이 페이지 기준으로 푼다(워커 안의 상대 주소는 워커 번들 기준이 된다).
     const weights =

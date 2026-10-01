@@ -250,6 +250,12 @@ export type ToWorker =
        * JIT 승격을 사용자의 첫 요청 **앞으로** 당긴다.
        */
       warmupMs?: number;
+      /**
+       * 기동 설정(`INFO thread_num`·`hash_size` 등) — START 의 OK 뒤, **예열 전에** 보낸다.
+       * 예열 뒤에 스레드 수를 바꾸면 엔진이 스레드를 모두 다시 세우며 예열이 푼 가중치를
+       * 버리고 다음 탐색에서 다시 푼다(T1: 0.73~0.85초, docs/최적화-마스터플랜.md §3.2-①).
+       */
+      settings?: readonly EngineCommand[];
     }
   | { type: "send"; commands: readonly EngineCommand[] }
   /**

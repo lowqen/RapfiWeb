@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { detectCapabilities } from "./engine-client";
-import { threadCap, threadCommand } from "./engine-state";
+import { bootCommands, threadCap, threadCommand } from "./engine-state";
 
 /**
  * 멀티/단일 변형 선택과 스레드 명령 — 브라우저 없이 전역만 바꿔 본다.
@@ -74,5 +74,33 @@ describe("스레드 수 명령", () => {
     expect(threadCap(8, 4)).toBe(4);
     expect(threadCap(null, null)).toBe(4);
     expect(threadCap(1, 256)).toBe(1);
+  });
+});
+
+describe("기동 설정(예열 전에 보낼 것)", () => {
+  const config = {
+    info: [{ kind: "info" as const, key: "hash_size", value: 262144 }],
+    hashAutoClear: false,
+    threads: 6,
+  };
+
+  it("INFO 목록 뒤에 이 변형의 thread_num — 멀티는 코어 수 안에서", () => {
+    expect(bootCommands(config, true, 4)).toEqual([
+      { kind: "info", key: "hash_size", value: 262144 },
+      { kind: "info", key: "thread_num", value: 4 },
+    ]);
+    expect(bootCommands(config, true, 8).at(-1)).toEqual({
+      kind: "info",
+      key: "thread_num",
+      value: 6,
+    });
+  });
+
+  it("단일 변형이면 thread_num 1 — 폴백한 엔진에 멀티 값을 보내지 않는다", () => {
+    expect(bootCommands(config, false, 8).at(-1)).toEqual({
+      kind: "info",
+      key: "thread_num",
+      value: 1,
+    });
   });
 });

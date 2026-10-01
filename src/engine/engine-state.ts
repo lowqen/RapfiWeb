@@ -3,6 +3,7 @@ import type { Move } from "../core/model/move";
 import {
   EngineClient,
   detectCapabilities,
+  isMultiVariant,
   type Capabilities,
   type EngineVariant,
   type OpeningResponse,
@@ -168,13 +169,32 @@ export function threadCommand(
   return { command: { kind: "info", key: "thread_num", value: threads }, threads };
 }
 
+/**
+ * 기동 메시지에 실을 설정 — `INFO` 목록(`hash_size` 등)과 이 변형의 `thread_num`.
+ * 워커가 START 뒤·**예열 전에** 보낸다(docs/최적화-마스터플랜.md P1-1). 예열 뒤에 스레드
+ * 수가 바뀌면 엔진이 스레드를 다시 세우며 예열이 푼 가중치를 버린다(0.73~0.85초).
+ *
+ * 엔진이 알릴 상한(`MAX_THREAD_NUM`)은 아직 모르므로 코어 수로만 자른다. 기동 뒤
+ * `flushConfig` 가 엔진의 상한으로 다시 셈해 값이 같으면 보내지 않는다.
+ */
+export function bootCommands(
+  c: EngineConfig,
+  threaded: boolean,
+  hardwareConcurrency: number | null,
+): EngineCommand[] {
+  return [
+    ...c.info,
+    threadCommand(threaded, c.threads, threadCap(hardwareConcurrency, null)).command,
+  ];
+}
+
 let config: EngineConfig = { info: [], hashAutoClear: false, threads: 1 };
 /** 보내지 못하고 미룬 설정이 있는가. */
 let configDirty = false;
 /**
  * 이 엔진에 마지막으로 보낸 `INFO` 값(키 → 값). 바뀐 것만 보낸다 — 스레드 수 하나를
  * 바꿨다고 `hash_size` 까지 다시 보내면 엔진이 해시 표를 다시 잡을 수 있다. 엔진이
- * 새로 뜰 때마다(`onBooted`) 비운다 — 새 엔진은 아무것도 모른다.
+ * 새로 뜰 때마다(`onBooted`) 기동 메시지로 보낸 설정만 남기고 비운다.
  */
 const sentInfo = new Map<string, string>();
 /** 마지막으로 분석한 국면 — 밀려 끝난 분석을 다시 이을 때 쓴다. */
@@ -274,8 +294,16 @@ export const useEngineStore = create<EngineState>((set, get) => {
         gameHandlers.onForbid?.(cells);
       },
       onError: (error) => set({ error }),
+      // 띄울 변형마다 — 멀티에서 단일로 물러서면 thread_num 은 1 이 된다.
+      bootSettings: (variant) =>
+        bootCommands(config, isMultiVariant(variant), get().capabilities.hardwareConcurrency),
       onBooted: (info) => {
+        // 새 엔진은 기동 메시지로 받은 설정만 안다 — 그것을 「보냄」으로 적어 둬야 아래
+        // `flushConfig` 가 같은 thread_num 을 다시 보내 스레드를 재구성하지 않는다.
         sentInfo.clear();
+        for (const cmd of info.settings) {
+          if (cmd.kind === "info") sentInfo.set(cmd.key, String(cmd.value));
+        }
         set({
           engine: {
             variant: info.variant,
@@ -350,7 +378,7 @@ export const useEngineStore = create<EngineState>((set, get) => {
       try {
         const c = ensure();
         await c.start(get().allowThreads);
-        // 기동 직후 한 번. 엔진은 자기 기본값(스타일·해시…)으로 떠 있다.
+        // 기동 직후 한 번. 기동 메시지의 설정은 이미 들어갔으므로 기동 중에 바뀐 값만 나간다.
         configDirty = true;
         flushConfig(c);
       } catch (e) {

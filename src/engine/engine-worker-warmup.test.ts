@@ -83,6 +83,10 @@ const boot = (weights: WeightsSpec, warmupMs: number): ToWorker => ({
   size: 15,
   weights,
   warmupMs,
+  settings: [
+    { kind: "info", key: "hash_size", value: 65536 },
+    { kind: "info", key: "thread_num", value: 1 },
+  ],
 });
 
 describe("기동 — 공유 가중치와 예열", () => {
@@ -122,6 +126,13 @@ describe("기동 — 공유 가중치와 예열", () => {
       expect.arrayContaining(["INFO timeout_turn 150", "YXBOARD", "YXNBEST 1", "YXHASHCLEAR"]),
     );
     expect(sent.indexOf("YXHASHCLEAR")).toBeGreaterThan(warm);
+    // 기동 설정은 START 뒤·예열 전에 한 번 — 예열이 확정된 스레드·해시에서 돈다.
+    const hash = sent.indexOf("INFO hash_size 65536");
+    const threads = sent.indexOf("INFO thread_num 1");
+    expect(hash).toBeGreaterThan(start);
+    expect(threads).toBeGreaterThan(start);
+    expect(Math.max(hash, threads)).toBeLessThan(sent.indexOf("INFO timeout_turn 150"));
+    expect(sent.filter((s) => s.startsWith("INFO thread_num"))).toHaveLength(1);
     // 예열의 수순·좌표는 스냅샷이나 착수로 새지 않는다.
     expect(of("snapshot")).toHaveLength(0);
     expect(of("bestMove")).toHaveLength(0);

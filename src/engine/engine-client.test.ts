@@ -304,6 +304,44 @@ describe("기동 메시지 — 공유 가중치와 예열", () => {
     expect(booted[0]).toMatchObject({ weights: { source: "cache" }, warmupMs: boot.warmupMs });
   });
 
+  it("기동 설정을 변형마다 물어 싣는다 — 단일로 물러서면 thread_num 1 로 다시", async () => {
+    vi.stubGlobal("crossOriginIsolated", true);
+    vi.stubGlobal("Worker", FakeWorker);
+    failMulti = "fatal";
+    const asked: string[] = [];
+    const booted: BootInfo[] = [];
+    const c = new EngineClient({
+      onBooted: (b) => booted.push(b),
+      bootSettings: (variant) => {
+        asked.push(variant);
+        return [
+          { kind: "info", key: "hash_size", value: 65536 },
+          { kind: "info", key: "thread_num", value: variant.startsWith("multi") ? 4 : 1 },
+        ];
+      },
+    });
+    await c.start(true);
+    expect(asked).toEqual(["multi-simd128", "single-simd128"]);
+    expect(spawned[0]!.boot!.settings).toContainEqual({
+      kind: "info",
+      key: "thread_num",
+      value: 4,
+    });
+    const single = spawned[1]!.boot!.settings!;
+    expect(single).toContainEqual({ kind: "info", key: "thread_num", value: 1 });
+    // 실제로 뜬 엔진이 받은 설정이 BootInfo 로 올라간다 — 스토어가 「보냄」으로 적는다.
+    expect(booted[0]!.settings).toEqual(single);
+  });
+
+  it("기동 설정이 없으면 기동 메시지에 키를 싣지 않는다", async () => {
+    vi.stubGlobal("crossOriginIsolated", false);
+    vi.stubGlobal("Worker", FakeWorker);
+    const { c, booted } = client();
+    await c.start(true);
+    expect(spawned[0]!.boot!).not.toHaveProperty("settings");
+    expect(booted[0]!.settings).toEqual([]);
+  });
+
   it("매니페스트는 64자리 SHA-256 과 크기를 갖는다 — 변형마다 다른 파일을 두지 않는다", () => {
     expect(manifest.data.file).toBe("rapfi.data");
     expect(manifest.data.sha256).toMatch(/^[0-9a-f]{64}$/);

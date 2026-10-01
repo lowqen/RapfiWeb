@@ -65,6 +65,10 @@ const boot: ToWorker = {
   size: 15,
   handshakeMs: 2000,
   warmupMs: 120,
+  settings: [
+    { kind: "info", key: "hash_size", value: 65536 },
+    { kind: "info", key: "thread_num", value: 4 },
+  ],
 };
 
 describe("멀티 변형의 예열", () => {
@@ -80,6 +84,20 @@ describe("멀티 변형의 예열", () => {
     const clear = sent.find((s) => s.head === "YXHASHCLEAR")!;
     expect(clear.at - fake.coordAt).toBeGreaterThanOrEqual(45); // SETTLE_MS(50) — 타이머 오차 허용
     expect(of("snapshot")).toHaveLength(0);
+  });
+
+  it("thread_num·hash_size 는 START 뒤·예열 탐색 전에 — 예열이 푼 가중치를 버리지 않게", () => {
+    const heads = sent.map((s) => s.head);
+    const start = heads.indexOf("START 15");
+    const threads = heads.indexOf("INFO thread_num 4");
+    const hash = heads.indexOf("INFO hash_size 65536");
+    const warm = heads.indexOf("YXNBEST 1");
+    expect(threads).toBeGreaterThan(start);
+    expect(hash).toBeGreaterThan(start);
+    expect(Math.max(threads, hash)).toBeLessThan(warm);
+    // 엔진이 놀 때 나갔다 — 탐색과 입력을 다투지 않는다.
+    expect(sent[threads]!.busy).toBe(false);
+    expect(heads.filter((h) => h.startsWith("INFO thread_num"))).toHaveLength(1);
   });
 
   it("예열 탐색이 삼켜지면(입력 경합) 기동 실패 — 다음 변형으로 물러설 신호", async () => {
