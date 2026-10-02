@@ -1,6 +1,6 @@
 name: 엔진 패치 검증 (Phase 2 · 결과 불변)
 
-# upstream 패치(tools/patches/*.patch)를 얹어 빌드하고 **결과가 그대로인지**만 본다 —
+# upstream 패치(tools/patches/*.patch) 그리고/또는 wasm-opt 후처리(wasm_opt)를 얹어 빌드하고 **결과가 그대로인지**만 본다 —
 # docs/최적화-마스터플랜.md §4 Phase 2 의 게이트(BENCH 해시 2b7c7da9 · 7,170,518 노드 불변).
 #
 #   1. tools/build_engine_wasm.sh 에 RAPFI_PATCHES 로 패치를 넘겨 빌드(검증 게이트·호스트 기준선 포함)
@@ -17,6 +17,10 @@ on:
       patches:
         description: "적용할 패치(공백 구분, 저장소 루트 기준)"
         default: "tools/patches/p2-1-codebook-pipeline.patch"
+        type: string
+      wasm_opt:
+        description: "wasm-opt 후처리 패스(예: -O4 --converge — 비우면 하지 않음)"
+        default: ""
         type: string
       extra_variants:
         description: "추가 변형(예: single-simd128-relaxed)"
@@ -58,6 +62,7 @@ jobs:
       - name: 빌드 (패치 적용)
         env:
           RAPFI_PATCHES: ${{ inputs.patches }}
+          WASM_OPT_POST: ${{ inputs.wasm_opt }}
           EXTRA_VARIANTS: ${{ inputs.extra_variants }}
         run: bash tools/build_engine_wasm.sh
 

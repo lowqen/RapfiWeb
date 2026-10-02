@@ -59,6 +59,10 @@ EXTRA_LDFLAGS="${EXTRA_LDFLAGS:-}"
 # 결과 불변 패치를 BENCH 해시로 판정할 때 켠다(docs/최적화-마스터플랜.md §4 Phase 2,
 # engine-patch.yml). 적용한 패치는 ENGINE_VERSION.txt 에 적힌다.
 RAPFI_PATCHES="${RAPFI_PATCHES:-}"
+# .wasm 후처리 패스(예: "-O4 --converge" — docs/최적화-마스터플랜.md 2-i · P2-6). **기본값은 비움 = 하지
+# 않음.** emcc 가 링크 때 이미 wasm-opt 를 돌리므로 이것은 그 위에 얹는 추가 패스다. 켜면 [4.5/6] 에서
+# 변형마다 그 변형이 쓰는 기능만 켜고 돌린다(wasm_features). 적용 여부는 ENGINE_VERSION.txt 에 적힌다.
+WASM_OPT_POST="${WASM_OPT_POST:-}"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK="${WORK:-$HOME/rapfi-wasm-work}"
@@ -304,6 +308,49 @@ collect () {
 }
 for n in "${VARIANTS[@]}"; do collect "$n"; done
 
+# ── [4.5/6] wasm-opt 후처리(선택) ─────────────────────────────────────────────
+#
+# **기능 플래그는 빌드 타깃마다 명시한다.** emcc 는 배포 빌드에서 target_features 섹션을 지우므로
+# wasm-opt 는 모듈이 무엇을 쓰는지 모른다. 그래서 --mvp-features 에서 출발해 그 변형이 실제로 쓰는
+# 기능만 켠다 — 빠지면 입력 검증에서 크게 실패하고(조용히 깨진 바이너리가 나오지 않는다), 켜지
+# 않은 기능은 최적화가 새로 끼워 넣을 수 없다(브라우저 지원 범위를 넓히지 않는다).
+#
+# 목록은 배포 4변형에서 잰 것이다(2026-10-03, binaryen 133): 기능을 하나씩 끄고 검증해 깨지는 것.
+#   공통   simd · sign-ext · nontrapping-float-to-int · reference-types · bulk-memory-opt
+#   멀티   + threads · bulk-memory (passive 세그먼트 memory.init)
+#   relaxed + relaxed-simd
+# exception-handling 은 쓰이지 않는다(끄고도 검증이 통과한다).
+wasm_features () {
+  local f=(--mvp-features --enable-simd --enable-sign-ext --enable-nontrapping-float-to-int
+           --enable-reference-types --enable-bulk-memory-opt)
+  case "$1" in multi-*) f+=(--enable-threads --enable-bulk-memory) ;; esac
+  case "$1" in *-relaxed) f+=(--enable-relaxed-simd) ;; esac
+  echo "${f[@]}"
+}
+WASM_OPT_NOTE="없음"
+if [ -n "$WASM_OPT_POST" ]; then
+  echo ">>> [4.5/6] wasm-opt 후처리: $WASM_OPT_POST"
+  # emsdk 의 binaryen — emcc 가 링크 때 쓰는 바로 그 wasm-opt 다.
+  WASM_OPT="${WASM_OPT:-$(dirname "$(command -v emcc)")/../bin/wasm-opt}"
+  [ -x "$WASM_OPT" ] || { echo "  X wasm-opt 를 찾지 못했습니다: $WASM_OPT"; exit 1; }
+  echo "  . $("$WASM_OPT" --version)"
+  for n in "${VARIANTS[@]}"; do
+    w="$OUT/engine/rapfi-$n.wasm"
+    # shellcheck disable=SC2207
+    feats=($(wasm_features "$n"))
+    before="$(stat -c%s "$w")"
+    t0=$(date +%s)
+    # shellcheck disable=SC2086
+    "$WASM_OPT" "${feats[@]}" $WASM_OPT_POST "$w" -o "$w.opt"
+    # 출력도 같은 기능 집합으로 다시 읽어 검증한다(패스 없이 읽기만 — 실패하면 set -e 로 멈춘다).
+    # 「no passes specified」 경고 한 줄은 정상이다.
+    "$WASM_OPT" "${feats[@]}" "$w.opt" -o /dev/null
+    mv "$w.opt" "$w"
+    echo "  . $n: $before → $(stat -c%s "$w") bytes · $(( $(date +%s) - t0 ))s · ${feats[*]:1}"
+  done
+  WASM_OPT_NOTE="$WASM_OPT_POST ($("$WASM_OPT" --version | awk '{print $3}'))"
+fi
+
 # ── 공유 가중치 — 모든 변형이 `rapfi.data` 하나를 쓴다 ─────────────────────
 #
 # .data 는 프리로드 목록의 파일을 이어 붙인 것일 뿐이라 **변형·컴파일러와 무관하게 바이트까지
@@ -438,6 +485,7 @@ ls -l "$OUT/bench" | sed "s/^/  . /"
   echo "cmake opts : -DNO_COMMAND_MODULES=ON -DUSE_WASM_SIMD=ON -DUSE_WASM_SIMD_RELAXED=OFF(-relaxed 변형은 ON) -DCMAKE_BUILD_TYPE=Release"
   echo "data       : rapfi.data (모든 변형 공유) $DATA_SIZE bytes sha256 $DATA_SHA"
   echo "link opts  : (upstream CMakeLists 의 EMSCRIPTEN 블록이 전부 정한다 — 우리는 얹지 않는다)"
+  echo "wasm-opt   : 추가 후처리 $WASM_OPT_NOTE"
   echo "variants   : ${VARIANTS[*]}"
   echo "preloads   : $PRELOAD_SET"
   echo "note       : SIMD 없는 변형은 eval/mix10nnue.cpp 의 static_assert 때문에 이 커밋에서 빌드되지 않는다"

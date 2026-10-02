@@ -37,8 +37,12 @@ on:
         description: "Phase 2 패치 대조 — 주면 패치 없음 ↔ 패치를 이 러너에서 둘 다 빌드해 둘만 잰다(공백 구분)"
         default: ""
         type: string
+      wasm_opt:
+        description: "Phase 2 후처리 대조 — 주면 B 빌드의 .wasm 에 이 wasm-opt 패스를 얹는다(예: -O4 --converge)"
+        default: ""
+        type: string
       patch_first:
-        description: "패치 대조에서 패치 빌드를 먼저 잴지(두 번째 실행은 순서를 뒤집어 순서 편향을 지운다)"
+        description: "대조에서 B(패치·후처리) 빌드를 먼저 잴지(두 번째 실행은 순서를 뒤집어 순서 편향을 지운다)"
         default: false
         type: boolean
       variants:
@@ -70,18 +74,18 @@ jobs:
         run: node bench/gomocalc/fetch-engines.mjs
 
       - name: 시스템 도구
-        if: inputs.build_full || inputs.patches != ''
+        if: inputs.build_full || (inputs.patches != '' || inputs.wasm_opt != '')
         run: sudo apt-get update -qq && sudo apt-get install -y ninja-build ccache file
 
       - name: emsdk 캐시 복원
-        if: inputs.build_full || inputs.patches != ''
+        if: inputs.build_full || (inputs.patches != '' || inputs.wasm_opt != '')
         uses: actions/cache/restore@v4
         with:
           path: ${{ env.WORK }}/emsdk
           key: emsdk-latest-v1
 
       - name: rapfi 소스 캐시 복원
-        if: inputs.build_full || inputs.patches != ''
+        if: inputs.build_full || (inputs.patches != '' || inputs.wasm_opt != '')
         uses: actions/cache/restore@v4
         with:
           path: ${{ env.WORK }}/rapfi
@@ -108,13 +112,15 @@ jobs:
           done
 
       # Phase 2 패치 대조(docs/최적화-마스터플랜.md §5.3 「결과 불변 변경」) — 배포 릴리스가 아니라
-      # **이 러너에서 같은 툴체인으로** 패치 없음·패치 두 빌드를 만들어 그 둘만 잰다. 배포 렌주
-      # 구성(PRELOAD_SET=renju) 그대로다. 패치 빌드는 BENCH 해시 게이트를 먼저 통과해야 한다.
-      - name: 패치 대조 빌드 — 패치 없음 ↔ 패치 (같은 러너 · 같은 툴체인)
-        if: inputs.patches != ''
+      # **이 러너에서 같은 툴체인으로** A(그대로)·B(패치 그리고/또는 wasm-opt 후처리) 두 빌드를 만들어
+      # 그 둘만 잰다 — 엔진 이름은 rapfiweb-base(A) · rapfiweb-patch(B). 배포 렌주 구성
+      # (PRELOAD_SET=renju) 그대로다. B 빌드는 BENCH 해시 게이트를 먼저 통과해야 한다.
+      - name: 대조 빌드 — A(그대로) ↔ B(패치·후처리) (같은 러너 · 같은 툴체인)
+        if: (inputs.patches != '' || inputs.wasm_opt != '')
         env:
           ENABLE_LTO: "ON"
           PATCHES: ${{ inputs.patches }}
+          WASM_OPT_B: ${{ inputs.wasm_opt }}
         run: |
           grep -m1 "model name" /proc/cpuinfo || true
           take () {
@@ -123,21 +129,21 @@ jobs:
                out/engine/ENGINE_VERSION.txt "bench/gomocalc/engines/$1/"
             grep upstream "bench/gomocalc/engines/$1/ENGINE_VERSION.txt"
           }
-          RAPFI_PATCHES="" bash tools/build_engine_wasm.sh
+          RAPFI_PATCHES="" WASM_OPT_POST="" bash tools/build_engine_wasm.sh
           take rapfiweb-base
-          RAPFI_PATCHES="$PATCHES" bash tools/build_engine_wasm.sh
+          RAPFI_PATCHES="$PATCHES" WASM_OPT_POST="$WASM_OPT_B" bash tools/build_engine_wasm.sh
           node spike/node-bench.mjs single-simd128   # 결과 불변 게이트 — 해시가 다르면 여기서 멈춘다
           take rapfiweb-patch
 
       - name: 벤치
         env:
           # 패치 대조면 두 빌드만(순서는 patch_first), 아니면 예전 구성.
-          ENGINES: ${{ inputs.patches != '' && (inputs.patch_first && 'rapfiweb-patch,rapfiweb-base' || 'rapfiweb-base,rapfiweb-patch') || (inputs.build_full && 'gomocalc,rapfiweb,rapfiweb-full' || 'gomocalc,rapfiweb') }}
+          ENGINES: ${{ (inputs.patches != '' || inputs.wasm_opt != '') && (inputs.patch_first && 'rapfiweb-patch,rapfiweb-base' || 'rapfiweb-base,rapfiweb-patch') || (inputs.build_full && 'gomocalc,rapfiweb,rapfiweb-full' || 'gomocalc,rapfiweb') }}
           VARIANTS: ${{ inputs.variants || 'single-simd128,single-simd128-relaxed,multi-simd128,multi-simd128-relaxed' }}
           THREADS: ${{ inputs.threads }}
           TIME_MS: ${{ inputs.time_ms }}
           REPEAT: ${{ inputs.repeat }}
-          BENCH: ${{ inputs.patches != '' && 'single-simd128' || 'single-simd128,multi-simd128-relaxed' }}
+          BENCH: ${{ (inputs.patches != '' || inputs.wasm_opt != '') && 'single-simd128' || 'single-simd128,multi-simd128-relaxed' }}
           LABEL: ci
         run: |
           grep -m1 "model name" /proc/cpuinfo || true
