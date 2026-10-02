@@ -1,0 +1,88 @@
+diff --git a/Rapfi/emscripten/preamble.js b/Rapfi/emscripten/preamble.js
+index bb3d35d..c57adba 100644
+--- a/Rapfi/emscripten/preamble.js
++++ b/Rapfi/emscripten/preamble.js
+@@ -42,12 +42,83 @@ Module["preRun"].push(function () {
+ 
+   // Redirect stdin, stdout, stderr
+   FS.init(stdin, stdout, stderr);
++
++  // Line-buffered output. The devices FS.init creates call the callbacks above once per byte:
++  // every write() loops over its buffer and the callback grows a string one character at a
++  // time. Replace the write op of the stdout/stderr devices with one that scans the whole
++  // chunk for line breaks and decodes each line at once. Lines, their order, the byte-to-char
++  // mapping (String.fromCharCode, as above) and NUL acting as a flush are all unchanged.
++  // A trailing line without "\n" is kept until the next write, and flushed when the device
++  // is closed (exit / FS.quit) or on terminate(), so output is not lost at the end.
++  const decode_chunk = 8192; // keep String.fromCharCode.apply below the argument limit
++  function decode(buffer, start, end) {
++    let s = "";
++    for (let i = start; i < end; i += decode_chunk) {
++      const j = Math.min(end, i + decode_chunk);
++      const part = buffer.subarray
++        ? buffer.subarray(i, j)
++        : Array.prototype.slice.call(buffer, i, j);
++      s += String.fromCharCode.apply(null, part);
++    }
++    return s;
++  }
++  const flushers = [];
++  function lineBuffered(fd, emit) {
++    const stream = FS.getStream(fd);
++    const ops = stream && stream.stream_ops;
++    if (!ops || typeof ops.write !== "function") return; // keep the per-byte callbacks
++    let pending = "";
++    // Like the per-byte device, a throwing callback becomes EIO for the writer.
++    const deliver = function (line) {
++      try {
++        emit(line);
++      } catch (e) {
++        throw new FS.ErrnoError(29 /* EIO */);
++      }
++    };
++    const flush = function () {
++      if (pending) {
++        const line = pending;
++        pending = "";
++        deliver(line);
++      }
++    };
++    ops.write = function (stream, buffer, offset, length, pos) {
++      const end = offset + length;
++      let start = offset;
++      for (let i = offset; i < end; i++) {
++        const c = buffer[i];
++        if (c === newline_charcode || c === 0) {
++          const line = pending + decode(buffer, start, i);
++          pending = "";
++          start = i + 1;
++          deliver(line);
++        }
++      }
++      if (start < end) pending += decode(buffer, start, end);
++      if (length) stream.node.mtime = stream.node.ctime = Date.now();
++      return length;
++    };
++    const close = ops.close;
++    ops.close = function (stream) {
++      flush();
++      if (close) close(stream);
++    };
++    flushers.push(flush);
++  }
++  lineBuffered(1, (line) => stdout_fn(line));
++  lineBuffered(2, (line) => stderr_fn(line));
++  function flushOutput() {
++    for (const flush of flushers) flush();
++  }
++
+   const execute_command = Module["cwrap"]("gomocupLoopOnce", "number", []);
+   Module["sendCommand"] = function (data) {
+     stdin_queue.push(data + "\n");
+     execute_command();
+   };
+   Module["terminate"] = function () {
++    flushOutput();
+     Module["_emscripten_force_exit"](0);
+   };
+ });
