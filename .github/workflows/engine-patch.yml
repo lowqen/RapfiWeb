@@ -1,0 +1,93 @@
+name: 엔진 패치 검증 (Phase 2 · 결과 불변)
+
+# upstream 패치(tools/patches/*.patch)를 얹어 빌드하고 **결과가 그대로인지**만 본다 —
+# docs/최적화-마스터플랜.md §4 Phase 2 의 게이트(BENCH 해시 2b7c7da9 · 7,170,518 노드 불변).
+#
+#   1. tools/build_engine_wasm.sh 에 RAPFI_PATCHES 로 패치를 넘겨 빌드(검증 게이트·호스트 기준선 포함)
+#   2. 웹 회귀 게이트: node spike/node-bench.mjs single-simd128 — 기준선과 다르면 실패
+#   3. 렌주 NNUE 경로 비트 대조: 같은 러너에서 **패치 없는** 배포 릴리스와 고정 깊이로 맞대 본다
+#      (BENCH 는 10국면 중 렌주가 3개뿐이라 이 경로의 신호가 약하다)
+#   4. 산출물(.js/.wasm, 며칠만)을 아티팩트로 — 로컬에서 같은 대조를 다시 돌릴 수 있게
+#
+# 릴리스는 만들지 않는다. 캐시는 **복원만** 한다 — 패치된 작업 트리를 rapfi 소스 캐시로 저장하면
+# 다음 릴리스 빌드가 그것을 물려받는다(빌드 스크립트가 되돌리지만, 캐시를 더럽힐 이유가 없다).
+on:
+  workflow_dispatch:
+    inputs:
+      patches:
+        description: "적용할 패치(공백 구분, 저장소 루트 기준)"
+        default: "tools/patches/p2-1-codebook-pipeline.patch"
+        type: string
+      extra_variants:
+        description: "추가 변형(예: single-simd128-relaxed)"
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      WORK: ${{ github.workspace }}/../rapfi-wasm-work
+      ENABLE_LTO: "ON"
+      ENGINE_TAG: engine-3c94c2a9-rx
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "26"
+
+      - name: 시스템 도구
+        run: sudo apt-get update -qq && sudo apt-get install -y ninja-build ccache file
+
+      - name: emsdk 캐시 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.WORK }}/emsdk
+          key: emsdk-latest-v1
+
+      - name: rapfi 소스 캐시 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.WORK }}/rapfi
+          key: rapfi-3c94c2a9-v1
+
+      - name: 빌드 (패치 적용)
+        env:
+          RAPFI_PATCHES: ${{ inputs.patches }}
+          EXTRA_VARIANTS: ${{ inputs.extra_variants }}
+        run: bash tools/build_engine_wasm.sh
+
+      - name: 웹 회귀 게이트 (single-simd128 · BENCH 해시)
+        run: node spike/node-bench.mjs single-simd128
+
+      - name: 렌주 NNUE 비트 대조 (패치 없는 릴리스 ↔ 패치)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -o pipefail   # 아래 `| tail -1` 이 대조 실패(종료 코드 1)를 삼키지 않게
+          mkdir -p base
+          gh release download "$ENGINE_TAG" --dir base --pattern 'rapfi-single-simd128.*' --pattern 'rapfi.data'
+          mv base/rapfi.data base/rapfi-single-simd128.data
+          echo '{ "type": "commonjs" }' > base/package.json
+          cmp base/rapfi-single-simd128.data out/engine/rapfi-single-simd128.data \
+            && echo "  . 가중치(.data) 바이트 동일"
+          for set in bench/gomocalc/positions.json bench/gomocalc/mate-suite.json; do
+            echo "--- $set ---"
+            ENGINE_DIR=base ENGINE_DIR_B=out/engine PAIR=single-simd128,single-simd128 STRICT=1 \
+              POSITIONS="$set" node spike/relaxed-equivalence.mjs | tail -1
+          done
+
+      - name: 산출물
+        uses: actions/upload-artifact@v4
+        with:
+          name: engine-patched
+          retention-days: 3
+          path: |
+            out/engine/*.js
+            out/engine/*.wasm
+            out/engine/ENGINE_VERSION.txt
+            out/engine/engine-manifest.json

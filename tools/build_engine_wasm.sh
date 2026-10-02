@@ -54,6 +54,11 @@ RELEASE_TAG="${RELEASE_TAG:-}"
 # 이름이 찍히게). **배포 빌드는 비워 둔다.** upstream LINK_FLAGS 보다 앞에 놓이지만, 이름 섹션
 # 같은 순서 무관 플래그만 넣는다(-s 설정은 뒤의 upstream 값에 덮인다 — 아래 [3/6] 주석).
 EXTRA_LDFLAGS="${EXTRA_LDFLAGS:-}"
+# upstream 패치(공백 구분, 저장소 루트 기준 경로 — 예: tools/patches/p2-1-codebook-pipeline.patch).
+# **기본값은 비움 = 패치 없음**(배포 릴리스의 「dhbloo/rapfi 그대로」를 지킨다). Phase 2 의
+# 결과 불변 패치를 BENCH 해시로 판정할 때 켠다(docs/최적화-마스터플랜.md §4 Phase 2,
+# engine-patch.yml). 적용한 패치는 ENGINE_VERSION.txt 에 적힌다.
+RAPFI_PATCHES="${RAPFI_PATCHES:-}"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK="${WORK:-$HOME/rapfi-wasm-work}"
@@ -104,6 +109,26 @@ if ! git cat-file -e "${RAPFI_COMMIT}^{commit}" 2> /dev/null; then
 fi
 git checkout -q "$RAPFI_COMMIT"
 git submodule update -q --init --depth 1 Networks
+
+# 엔진 소스를 커밋 그대로 되돌린다 — 캐시된 작업 트리에 앞선 런의 패치가 남아 있을 수 있다
+# (checkout 은 수정된 파일을 그대로 둔다). 빌드 디렉터리는 추적되지 않아 건드리지 않는다.
+git checkout -q -- Rapfi
+PATCH_NOTE="패치 없음"
+if [ -n "$RAPFI_PATCHES" ]; then
+  applied=()
+  for p in $RAPFI_PATCHES; do
+    if ! git apply --check "$ROOT/$p" 2> /dev/null; then
+      echo "  X 패치가 $(git rev-parse --short HEAD) 에 적용되지 않습니다: $p"
+      git apply --check "$ROOT/$p" || true
+      exit 1
+    fi
+    git apply "$ROOT/$p"
+    applied+=("$(basename "$p")")
+    echo "  . 패치 적용: $p"
+  done
+  git diff --stat -- Rapfi | sed "s/^/  | /"
+  PATCH_NOTE="패치: ${applied[*]}"
+fi
 
 NET_ACTUAL="$(git -C Networks rev-parse HEAD)"
 echo "  . rapfi    $(git rev-parse --short HEAD)"
@@ -407,7 +432,7 @@ ls -l "$OUT/bench" | sed "s/^/  . /"
   # 같은 이름 필드가 패치된 로컬 커밋을 가리켜 혼동을 부른 적이 있으므로
   # (이 파일 상단 주석 참고) 무엇인지 함께 적는다.
   echo "engine     : Rapfi WebAssembly (SIMD ${#VARIANTS[@]}종)"
-  echo "upstream   : $(git -C "$WORK/rapfi" rev-parse HEAD)  (dhbloo/rapfi, 패치 없음)"
+  echo "upstream   : $(git -C "$WORK/rapfi" rev-parse HEAD)  (dhbloo/rapfi, $PATCH_NOTE)"
   echo "networks   : $(git -C "$WORK/rapfi/Networks" rev-parse HEAD)"
   echo "emscripten : $EMSDK_RESOLVED"
   echo "cmake opts : -DNO_COMMAND_MODULES=ON -DUSE_WASM_SIMD=ON -DUSE_WASM_SIMD_RELAXED=OFF(-relaxed 변형은 ON) -DCMAKE_BUILD_TYPE=Release"

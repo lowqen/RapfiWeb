@@ -1,0 +1,2 @@
+# upstream 패치는 git apply 가 줄 끝까지 맞춰 읽는다 — 어느 OS 에서 받아도 LF 로.
+*.patch text eol=lf

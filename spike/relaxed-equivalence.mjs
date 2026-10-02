@@ -34,6 +34,16 @@
  *   - 점수 국면은 평가 차이가 `EVAL_TOL`(기본 150) 이하
  *
  * 비트까지 같지 않은 국면은 경고로 남긴다(`STRICT=1` 이면 그것도 실패).
+ *
+ * ## 패치 전후 대조(Phase 2 의 결과 불변 게이트)
+ *
+ * 같은 변형을 **두 빌드 폴더**에서 읽어 비교할 수도 있다 — upstream 패치가 탐색을 바꾸지
+ * 않았는지 렌주 NNUE 경로에서 비트 단위로 본다(BENCH 해시는 10국면 중 렌주가 3개뿐이다):
+ *
+ *   ENGINE_DIR=<패치 전> ENGINE_DIR_B=<패치 후> PAIR=single-simd128,single-simd128 STRICT=1 \
+ *     POSITIONS=bench/gomocalc/mate-suite.json node spike/relaxed-equivalence.mjs
+ *
+ * `POSITIONS` 를 주면 그 파일의 국면(positions 배열)을 쓴다. 기본은 positions.json 의 5개.
  */
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
@@ -45,9 +55,12 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE_DIR = resolve(process.env.ENGINE_DIR ?? resolve(HERE, "../out/engine"));
 const DEPTH = Number(process.env.DEPTH ?? 16);
 const PAIR = (process.env.PAIR ?? "single-simd128,single-simd128-relaxed").split(",");
-const { positions } = JSON.parse(
-  readFileSync(resolve(HERE, "../bench/gomocalc/positions.json"), "utf8"),
+/** 두 번째 빌드를 읽을 폴더 — 패치 전후 대조. 없으면 같은 폴더. */
+const ENGINE_DIR_B = resolve(process.env.ENGINE_DIR_B ?? ENGINE_DIR);
+const POSITIONS = resolve(
+  process.env.POSITIONS ?? resolve(HERE, "../bench/gomocalc/positions.json"),
 );
+const { positions } = JSON.parse(readFileSync(POSITIONS, "utf8"));
 
 /** 수순 → YXBOARD 한 덩어리(1 = 둘 차례의 돌). 단일 빌드는 받자마자 돌리므로 한 번에. */
 function boardBlock(moves) {
@@ -57,14 +70,14 @@ function boardBlock(moves) {
   );
 }
 
-async function run(variant) {
-  const js = resolve(ENGINE_DIR, `rapfi-${variant}.js`);
+async function run(variant, dir = ENGINE_DIR, tag = variant) {
+  const js = resolve(dir, `rapfi-${variant}.js`);
   if (!existsSync(js)) throw new Error(`없음: ${js}`);
   const require = createRequire(import.meta.url);
   const lines = [];
   const Module = await startEngine({
     factory: require(js),
-    baseUrl: ENGINE_DIR + "/",
+    baseUrl: dir + "/",
     onLine: (l) => lines.push(l),
   });
   for (const c of [
@@ -103,7 +116,7 @@ async function run(variant) {
       ms: Date.now() - t0,
     });
   }
-  return { variant, version: lines.find((l) => /Rapfi \d/.test(l)) ?? null, results: out };
+  return { variant: tag, version: lines.find((l) => /Rapfi \d/.test(l)) ?? null, results: out };
 }
 
 const EVAL_TOL = Number(process.env.EVAL_TOL ?? 150);
@@ -126,7 +139,10 @@ function judge(r, s) {
     : { identical, sane: false, why: `평가 차 ${d} > ${EVAL_TOL} (${r.eval} ↔ ${s.eval})` };
 }
 
-const [a, b] = await Promise.all(PAIR.map(run));
+// 같은 변형을 두 폴더에서 읽으면 결과 키가 겹치므로 A/B 를 붙인다.
+const twoDirs = ENGINE_DIR_B !== ENGINE_DIR;
+const a = await run(PAIR[0], ENGINE_DIR, twoDirs ? `${PAIR[0]}@A` : PAIR[0]);
+const b = await run(PAIR[1], ENGINE_DIR_B, twoDirs ? `${PAIR[1]}@B` : PAIR[1]);
 const rows = a.results.map((r, i) => {
   const s = b.results[i];
   return { id: r.id, ...judge(r, s), [a.variant]: r, [b.variant]: s };

@@ -1,0 +1,79 @@
+diff --git a/Rapfi/eval/mix9svqnnue.cpp b/Rapfi/eval/mix9svqnnue.cpp
+index 587a6f3..2c18fd1 100644
+--- a/Rapfi/eval/mix9svqnnue.cpp
++++ b/Rapfi/eval/mix9svqnnue.cpp
+@@ -442,9 +442,45 @@ void Accumulator::move(const Weight &w, Color pieceColor, int x, int y)
+             for (int b = 0; b < VSumB::NumBatch; b++)
+                 vSumGroup[i][j][b] = I32Op::setzero();
+ 
++#ifdef USE_WASM_SIMD
++    // WebAssembly has no prefetch instruction: __builtin_prefetch compiles to nothing, so the
++    // multiPrefetch below is a no-op and every codebook gather (two 128-byte rows out of a 16MB
++    // table per change) stalls on its own cache misses. Software-pipeline the gather instead:
++    // while change i is being processed, load the first vector of each 64-byte cache line of
++    // change i+1's two codebook rows and carry those vectors into the next iteration, where they
++    // stand in for the corresponding loads. Only one vector per cache line is carried (4 vectors,
++    // 64 bytes), not the full 2 x 128-byte rows, so the pipeline does not add register spills.
++    // Same addresses, same values, same arithmetic order: the result is bit-identical.
++    constexpr int CodebookLineBatch = 64 / int(sizeof(int16_t) * FeatB::RegWidth);
++    constexpr int CodebookNumLines  = FeatB::NumBatch / CodebookLineBatch;
++    static_assert(CodebookLineBatch >= 1 && FeatB::NumBatch % CodebookLineBatch == 0);
++    struct CodebookLines
++    {
++        I16Op::R oldLine[CodebookNumLines];
++        I16Op::R newLine[CodebookNumLines];
++    };
++    auto loadCodebookLines = [&](const OnePointChange &cc) {
++        CodebookLines lines;
++        for (int l = 0; l < CodebookNumLines; l++) {
++            const int offset = l * CodebookLineBatch * FeatB::RegWidth;
++            lines.oldLine[l] = I16LS::load(w.codebook[cc.mappingIdx][cc.oldCodebookIdx] + offset);
++            lines.newLine[l] = I16LS::load(w.codebook[cc.mappingIdx][cc.newCodebookIdx] + offset);
++        }
++        return lines;
++    };
++    CodebookLines nextLines;
++    if (changeCount > 0)
++        nextLines = loadCodebookLines(changeTable[0]);
++#endif
++
+     // Incremental update feature sum
+     for (int i = 0; i < changeCount; i++) {
+         const OnePointChange &c = changeTable[i];
++#ifdef USE_WASM_SIMD
++        const CodebookLines curLines = nextLines;
++        if (i + 1 < changeCount)
++            nextLines = loadCodebookLines(changeTable[i + 1]);
++#else
+         if (i + 1 < changeCount) {
+             const OnePointChange &cnext = changeTable[i + 1];
+             multiPrefetch<sizeof(int16_t) * FeatureDim>(
+@@ -452,15 +488,28 @@ void Accumulator::move(const Weight &w, Color pieceColor, int x, int y)
+             multiPrefetch<sizeof(int16_t) * FeatureDim>(
+                 w.codebook[cnext.mappingIdx][cnext.newCodebookIdx]);
+         }
++#endif
+ 
+         // Update mapSum
+         I16Op::R oldFeats[FeatB::NumBatch];
+         I16Op::R newFeats[FeatB::NumBatch];
+         for (int b = 0; b < FeatB::NumBatch; b++) {
++#ifdef USE_WASM_SIMD
++            // The first vector of each cache line was loaded one iteration ahead.
++            const int16_t *oldRow   = w.codebook[c.mappingIdx][c.oldCodebookIdx];
++            const int16_t *newRow   = w.codebook[c.mappingIdx][c.newCodebookIdx];
++            const bool     lineHead = b % CodebookLineBatch == 0;
++            const int      line     = b / CodebookLineBatch;
++            auto           oldMapFeat =
++                lineHead ? curLines.oldLine[line] : I16LS::load(oldRow + b * FeatB::RegWidth);
++            auto newMapFeat =
++                lineHead ? curLines.newLine[line] : I16LS::load(newRow + b * FeatB::RegWidth);
++#else
+             auto oldMapFeat =
+                 I16LS::load(w.codebook[c.mappingIdx][c.oldCodebookIdx] + b * FeatB::RegWidth);
+             auto newMapFeat =
+                 I16LS::load(w.codebook[c.mappingIdx][c.newCodebookIdx] + b * FeatB::RegWidth);
++#endif
+             oldFeats[b] = I16LS::load(mapSum[c.oldMapIdx].data() + b * FeatB::RegWidth);
+             newFeats[b] = I16Op::sub(oldFeats[b], oldMapFeat);
+             newFeats[b] = I16Op::add(newFeats[b], newMapFeat);
