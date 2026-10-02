@@ -29,17 +29,17 @@ RapfiDroid(안드로이드 오목·렌주 분석반)의 **웹 이식**. Rapfi �
 
 ## 로컬 개발 환경
 
-필요한 것은 **Node 20.11 이상**과 **pnpm 9** 둘뿐이다.
+필요한 것은 **Node**(CI 는 26, 최소 20.11)와 **pnpm** 둘뿐이다.
 
 ```bash
-# 1. Node 20 LTS
-#    Windows:  winget install OpenJS.NodeJS.LTS
-#    macOS:    brew install node@20
+# 1. Node 26 — CI(.github/workflows/*)와 같은 주 버전
+#    Windows:  winget install OpenJS.NodeJS
+#    macOS:    brew install node
 #    Linux:    https://github.com/nodesource/distributions
 
-# 2. pnpm (Node 에 딸려 오는 corepack 이 가장 간단하다)
-corepack enable
-corepack prepare pnpm@9 --activate
+# 2. pnpm — 노드 25+ 에는 corepack 이 딸려 오지 않는다. pnpm 10+ 는 package.json 의
+#    packageManager(pnpm@9.12.3)를 읽어 그 판으로 스스로 바꿔 돈다.
+npm install -g pnpm
 
 # 3. 의존성
 pnpm install

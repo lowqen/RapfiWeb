@@ -39,7 +39,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "26"
 
       - name: 시스템 도구
         run: sudo apt-get update -qq && sudo apt-get install -y ninja-build ccache file
@@ -67,7 +67,8 @@ jobs:
       - name: 웹 회귀 게이트 (single-simd128)
         run: node spike/node-bench.mjs single-simd128
 
-      # relaxed 명령은 명세상 **구현 정의**다(노드 20 의 V8 은 플래그가 있어야 relaxed 를 읽는다).
+      # relaxed 명령은 명세상 **구현 정의**다. 노드 22+ 는 relaxed 를 기본으로 읽고, 노드 26 은
+      # 예전 플래그 `--experimental-wasm-relaxed-simd` 를 `bad option` 으로 거부한다 — 붙이지 않는다.
       #   - BENCH 는 **기록만** 한다. 렌주 전용 .data 의 BENCH 는 국면 7/10 이 classical 폴백으로
       #     도는데 그 경로가 relaxed 에서 **러너마다** 다른 해시를 낸다(dd5e1c73 · b63e6b5f —
       #     web-baseline.json). 고정 해시로 막을 수 없다. node-bench 는 기준선이 없으면 3(미판정).
@@ -78,9 +79,9 @@ jobs:
       - name: relaxed BENCH (기록 — 판정 안 함)
         run: |
           grep -m1 "model name" /proc/cpuinfo || true
-          node --experimental-wasm-relaxed-simd spike/node-bench.mjs single-simd128-relaxed || [ $? -eq 3 ]
+          node spike/node-bench.mjs single-simd128-relaxed || [ $? -eq 3 ]
       - name: relaxed 건전성 게이트 (렌주 · NNUE)
-        run: node --experimental-wasm-relaxed-simd spike/relaxed-equivalence.mjs
+        run: node spike/relaxed-equivalence.mjs
 
       # 멀티 변형 관문 — 앱과 같은 구성(전용 워커 + pthread 가드)으로 chromium 에서
       # 기동·왕복·정지가 되는지. 실패하면 릴리스를 내지 않는다.

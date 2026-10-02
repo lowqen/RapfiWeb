@@ -2,7 +2,9 @@
  * relaxed SIMD 동등성 게이트 — **앱이 실제로 타는 경로(렌주 · mix9svq NNUE)** 에서 relaxed
  * 빌드가 일반 SIMD 빌드와 **같은 탐색**을 하는가.
  *
- *   node --experimental-wasm-relaxed-simd spike/relaxed-equivalence.mjs
+ *   node spike/relaxed-equivalence.mjs        (노드 22+ — relaxed 를 기본으로 읽는다.
+ *                                              노드 20 은 --experimental-wasm-relaxed-simd 가 필요하고,
+ *                                              노드 26 은 그 플래그를 bad option 으로 거부한다)
  *
  * ## 왜 BENCH 해시로는 안 되는가
  *

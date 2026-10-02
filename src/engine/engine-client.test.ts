@@ -9,6 +9,16 @@ import {
 } from "./engine-client";
 import manifest from "./engine-manifest.json";
 import type { FromWorker, ToWorker } from "./engine-types";
+import { RUNTIME_RELAXED, RUNTIME_RELAXED_MADD, chainOf, firstOf } from "./testing/relaxed-runtime";
+
+/**
+ * 기대 변형은 **이 런타임의 relaxed 지원에서** 만든다(`testing/relaxed-runtime.ts`).
+ * 노드 20 은 relaxed 를 모르고 노드 22+ 는 안다 — 멀티 → 단일 폴백 시험이 그 차이로
+ * 갈리면 안 된다. relaxed 갈래 자체는 아래 `pretendRelaxed`/`pretendNoRelaxed` 로 고정해 본다.
+ */
+const MULTI = firstOf("multi-simd128");
+const SINGLE = firstOf("single-simd128");
+const MULTI_CHAIN = chainOf("multi-simd128");
 
 /**
  * 멀티 → 단일 폴백 — 가짜 Worker 로 클라이언트의 기동 순서만 본다.
@@ -87,13 +97,17 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-/** relaxed SIMD 를 아는 브라우저인 척 — 노드 20 의 V8 은 플래그 없이 relaxed 를 모른다. */
-function pretendRelaxed() {
+/** 프로브의 답만 고정한다 — 다른 모듈(SIMD 프로브 등)은 런타임이 그대로 답한다. */
+function pretendRelaxedProbe(answer: boolean) {
   const real = WebAssembly.validate.bind(WebAssembly);
   vi.spyOn(WebAssembly, "validate").mockImplementation((b) =>
-    b === RELAXED_SIMD_PROBE ? true : real(b),
+    b === RELAXED_SIMD_PROBE ? answer : real(b),
   );
 }
+/** relaxed SIMD 를 아는 런타임인 척(Chromium 114+ · 노드 22+). */
+const pretendRelaxed = () => pretendRelaxedProbe(true);
+/** relaxed SIMD 를 모르는 런타임인 척(Firefox · Safari · 노드 20). */
+const pretendNoRelaxed = () => pretendRelaxedProbe(false);
 
 function client() {
   const booted: BootInfo[] = [];
@@ -114,10 +128,12 @@ describe("엔진 기동 — 멀티 우선, 실패하면 단일로", () => {
     failMulti = "fatal";
     const { c, booted, consoleLines, statuses } = client();
     await c.start(true);
-    expect(spawned.map((w) => w.variant)).toEqual(["multi-simd128", "single-simd128"]);
-    expect(spawned[0]!.terminated).toBe(true); // 실패한 멀티 워커(와 그 엔진 스레드)는 내린다
-    expect(c.runningVariant).toBe("single-simd128");
-    expect(booted[0]).toMatchObject({ variant: "single-simd128", threaded: false });
+    // 멀티(relaxed 를 알면 relaxed 멀티부터)가 모두 실패하고 첫 단일이 뜬다.
+    expect(spawned.map((w) => w.variant)).toEqual([...MULTI_CHAIN, SINGLE]);
+    // 실패한 멀티 워커(와 그 엔진 스레드)는 내린다
+    expect(spawned.slice(0, -1).every((w) => w.terminated)).toBe(true);
+    expect(c.runningVariant).toBe(SINGLE);
+    expect(booted[0]).toMatchObject({ variant: SINGLE, threaded: false });
     expect(booted[0]!.fallbackReason).toContain("핸드셰이크");
     expect(consoleLines.join("\n")).toContain("물러섭니다");
     // 물러서는 동안 「오류」를 거치지 않는다 — 사용자에게는 기동이 조금 길 뿐이다.
@@ -131,7 +147,7 @@ describe("엔진 기동 — 멀티 우선, 실패하면 단일로", () => {
     failMulti = "error";
     const { c, booted } = client();
     await c.start(true);
-    expect(c.runningVariant).toBe("single-simd128");
+    expect(c.runningVariant).toBe(SINGLE);
     expect(booted[0]!.fallbackReason).toContain("SharedArrayBuffer");
   });
 
@@ -143,7 +159,7 @@ describe("엔진 기동 — 멀티 우선, 실패하면 단일로", () => {
     await c.start(true);
     expect(spawned).toHaveLength(1);
     expect(booted[0]).toMatchObject({
-      variant: "multi-simd128",
+      variant: MULTI,
       threaded: true,
       fallbackReason: null,
     });
@@ -155,7 +171,7 @@ describe("엔진 기동 — 멀티 우선, 실패하면 단일로", () => {
     failMulti = false;
     const { c } = client();
     await c.start(false);
-    expect(spawned.map((w) => w.variant)).toEqual(["single-simd128"]);
+    expect(spawned.map((w) => w.variant)).toEqual([SINGLE]);
   });
 
   it("격리가 없으면 멀티를 시도하지도 않는다", async () => {
@@ -163,7 +179,7 @@ describe("엔진 기동 — 멀티 우선, 실패하면 단일로", () => {
     vi.stubGlobal("Worker", FakeWorker);
     const { c } = client();
     await c.start(true);
-    expect(spawned.map((w) => w.variant)).toEqual(["single-simd128"]);
+    expect(spawned.map((w) => w.variant)).toEqual([SINGLE]);
   });
 
   it("떠 있던 멀티 엔진이 멈추면(fatal) 단일로 다시 띄우고 recovered 로 알린다", async () => {
@@ -172,16 +188,16 @@ describe("엔진 기동 — 멀티 우선, 실패하면 단일로", () => {
     failMulti = false;
     const { c, booted, statuses } = client();
     await c.start(true);
-    expect(c.runningVariant).toBe("multi-simd128");
+    expect(c.runningVariant).toBe(MULTI);
     // 기동 뒤 멀티 워커가 입력 경합으로 멈췄다.
     spawned[0]!.onmessage?.({
       data: { type: "fatal", message: "멀티스레드 엔진이 탐색 명령에 답하지 않습니다(입력 경합)" },
     });
     await new Promise((r) => setTimeout(r, 30));
     expect(spawned[0]!.terminated).toBe(true);
-    expect(spawned[1]!.variant).toBe("single-simd128");
-    expect(c.runningVariant).toBe("single-simd128");
-    expect(booted.at(-1)).toMatchObject({ variant: "single-simd128", recovered: true });
+    expect(spawned[1]!.variant).toBe(SINGLE);
+    expect(c.runningVariant).toBe(SINGLE);
+    expect(booted.at(-1)).toMatchObject({ variant: SINGLE, recovered: true });
     expect(booted.at(-1)!.fallbackReason).toContain("입력 경합");
     expect(statuses).not.toContain("error");
   });
@@ -215,7 +231,19 @@ describe("relaxed SIMD — 최우선, 안 되면 같은 스레드 방식의 일�
     expect(planVariants({ simd: false, relaxed: true, threads: true })).toEqual([]);
   });
 
-  it("프로브는 relaxed 를 모르는 엔진(노드 20)에서 거짓 — 그러면 예전 순서 그대로", () => {
+  it("프로브는 런타임의 실제 relaxed 지원과 맞는다 — 다른 relaxed 명령(relaxed_madd)으로 대조", () => {
+    // 런타임마다 답이 다를 수 있다(노드 20 거짓 · 노드 22+/Chromium 참 · Firefox/Safari 거짓).
+    // 시험이 요구하는 것은 「어느 쪽이든 프로브가 런타임과 같은 답을 한다」이다.
+    expect(RUNTIME_RELAXED).toBe(RUNTIME_RELAXED_MADD);
+    vi.stubGlobal("crossOriginIsolated", true);
+    const caps = detectCapabilities();
+    expect(caps.simd).toBe(true);
+    expect(caps.relaxedSimd).toBe(RUNTIME_RELAXED_MADD);
+    expect(caps.variants).toEqual([...MULTI_CHAIN, ...chainOf("single-simd128")]);
+  });
+
+  it("프로브가 거짓이면(relaxed 를 모르는 런타임) 예전 순서 그대로", () => {
+    pretendNoRelaxed();
     vi.stubGlobal("crossOriginIsolated", true);
     const caps = detectCapabilities();
     expect(caps.simd).toBe(true);
@@ -321,13 +349,11 @@ describe("기동 메시지 — 공유 가중치와 예열", () => {
       },
     });
     await c.start(true);
-    expect(asked).toEqual(["multi-simd128", "single-simd128"]);
-    expect(spawned[0]!.boot!.settings).toContainEqual({
-      kind: "info",
-      key: "thread_num",
-      value: 4,
-    });
-    const single = spawned[1]!.boot!.settings!;
+    expect(asked).toEqual([...MULTI_CHAIN, SINGLE]);
+    for (const multi of spawned.slice(0, -1)) {
+      expect(multi.boot!.settings).toContainEqual({ kind: "info", key: "thread_num", value: 4 });
+    }
+    const single = spawned.at(-1)!.boot!.settings!;
     expect(single).toContainEqual({ kind: "info", key: "thread_num", value: 1 });
     // 실제로 뜬 엔진이 받은 설정이 BootInfo 로 올라간다 — 스토어가 「보냄」으로 적는다.
     expect(booted[0]!.settings).toEqual(single);

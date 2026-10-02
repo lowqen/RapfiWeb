@@ -21,7 +21,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "26"
 
       - name: 시스템 도구
         run: sudo apt-get update -qq && sudo apt-get install -y ninja-build ccache file

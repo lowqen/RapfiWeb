@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { detectCapabilities } from "./engine-client";
 import { bootCommands, threadCap, threadCommand } from "./engine-state";
+import { firstOf } from "./testing/relaxed-runtime";
 
 /**
  * 멀티/단일 변형 선택과 스레드 명령 — 브라우저 없이 전역만 바꿔 본다.
- * (node 20 은 WebAssembly SIMD 를 검증하므로 SIMD 는 참으로 나온다.)
+ * (노드 20+ 는 WebAssembly SIMD 를 검증하므로 SIMD 는 참으로 나온다. relaxed SIMD 는 런타임마다
+ * 다르므로 — 노드 20 거짓, 노드 22+ 참 — 기대 변형은 런타임의 답에서 만든다.)
  */
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -15,7 +17,7 @@ describe("변형 자동 선택", () => {
     vi.stubGlobal("crossOriginIsolated", true);
     const c = detectCapabilities();
     expect(c.simd).toBe(true);
-    expect(c.variant).toBe("multi-simd128");
+    expect(c.variant).toBe(firstOf("multi-simd128"));
     expect(c.threads).toBe(true);
     expect(c.threadsNote).toBeNull();
   });
@@ -23,7 +25,7 @@ describe("변형 자동 선택", () => {
   it("격리가 없으면(COOP/COEP 헤더 없음) 단일로, 까닭을 말한다", () => {
     vi.stubGlobal("crossOriginIsolated", false);
     const c = detectCapabilities();
-    expect(c.variant).toBe("single-simd128");
+    expect(c.variant).toBe(firstOf("single-simd128"));
     expect(c.threads).toBe(false);
     expect(c.threadsNote).toContain("COOP/COEP");
   });
@@ -32,14 +34,14 @@ describe("변형 자동 선택", () => {
     vi.stubGlobal("crossOriginIsolated", true);
     vi.stubGlobal("SharedArrayBuffer", undefined);
     const c = detectCapabilities();
-    expect(c.variant).toBe("single-simd128");
+    expect(c.variant).toBe(firstOf("single-simd128"));
     expect(c.threadsNote).toContain("SharedArrayBuffer");
   });
 
   it("?engine=single 로 단일을 강제한다", () => {
     vi.stubGlobal("crossOriginIsolated", true);
     vi.stubGlobal("location", { search: "?engine=single" });
-    expect(detectCapabilities().variant).toBe("single-simd128");
+    expect(detectCapabilities().variant).toBe(firstOf("single-simd128"));
   });
 
   it("SIMD 가 없으면 아무것도 못 돌린다", () => {
