@@ -147,6 +147,9 @@ export function mateOf(raw) {
  * 그 깊이 안에서 최선수가 바뀔 때 모두 `INFO DEPTH` 를 낸다.
  * 두 시계를 함께 둔다: 엔진이 말한 TOTALTIME 과 명령을 보낸 뒤의 벽시계.
  *
+ * `firstMate` 는 **처음으로 ±M 을 보고한 PV 블록**이다 — 깊이마다 첫 보고만 적는 `depthAt` 으로
+ * 고르면, 한 깊이 안에서 최선수가 바뀌며 뒤늦게 나온 필승은 다음 깊이에야 잡힌다.
+ *
  * 멀티 빌드는 좌표를 찍은 뒤에도 탐색 스레드가 잠깐 stdin 을 읽는다(앱의 입력 경합,
  * docs/W0c-결과.md). 그래서 끝나면 `settleMs` 만큼 쉰 뒤 돌아온다.
  */
@@ -164,6 +167,7 @@ export async function search(host, moves, { timeMs, clearHash = true, settleMs =
   let rec = {};
   let last = null;
   let summary = null;
+  let firstMate = null;
   for (const { t, line } of lines) {
     const info = parseInfo(line);
     if (info) {
@@ -172,6 +176,15 @@ export async function search(host, moves, { timeMs, clearHash = true, settleMs =
           if (info.raw === "DONE") {
             if (rec.depth != null) {
               last = { ...rec };
+              if (!firstMate && /^[+-]M\d+$/i.test(rec.eval ?? "")) {
+                firstMate = {
+                  depth: rec.depth,
+                  engineMs: rec.totaltime ?? null,
+                  wallMs: Math.round(t - tSend),
+                  nodes: rec.totalnodes ?? null,
+                  eval: rec.eval,
+                };
+              }
               if (!depthAt.has(rec.depth)) {
                 depthAt.set(rec.depth, {
                   engineMs: rec.totaltime ?? null,
@@ -230,6 +243,7 @@ export async function search(host, moves, { timeMs, clearHash = true, settleMs =
     winrate: last?.winrate ?? null,
     bestline: last?.bestline ?? [],
     depthAt: Object.fromEntries([...depthAt.entries()].sort((a, b) => a[0] - b[0])),
+    firstMate,
   };
 }
 

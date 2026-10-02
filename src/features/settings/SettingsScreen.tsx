@@ -21,8 +21,10 @@ import {
   AUTO_THREADS,
   MIN_DEPTH,
   STYLE_RANGE,
+  THREAD_RELOAD_COST,
   autoThreads,
   deviceCores,
+  planThreadChange,
   resolveThreads,
   useSettingsStore,
   type VcThread,
@@ -159,6 +161,12 @@ const VARIANT_LABEL: Record<EngineVariant, string> = {
  * 밑의 두 줄이 지금 엔진이 실제로 쓰는 값과 **어느 변형이 왜** 떠 있는지를 말한다.
  * 멀티를 못 쓰는 환경에서 「1」만 보여 주면 설정이 고장 난 것으로 읽힌다 — 그래서
  * 따로 있던 「엔진 변형」 줄을 여기에 접어 넣었다.
+ *
+ * **떠 있는 멀티 엔진의 스레드 수는 곧바로 바꾸지 않는다**(P1-2). 바꿀 때마다 엔진이
+ * 스레드를 다시 세우고 다음 탐색이 가중치를 다시 푼다(`THREAD_RELOAD_COST`). 1 → 2 → 3 을
+ * 차례로 누르면 그 비용을 거듭 치렀다. 고른 값은 「대기」로 두고 비용을 알린 뒤 「적용」
+ * 한 번에 보낸다. 엔진이 없을 때는 곧바로 저장한다 — 다음 기동의 기동 메시지로 예열 전에
+ * 들어가므로(P1-1) 비용이 없다.
  */
 function ThreadControl() {
   const caps = useEngineStore((s) => s.capabilities);
@@ -168,8 +176,24 @@ function ThreadControl() {
   const allow = useSettingsStore((s) => s.allowThreads);
   const v = useSettingsStore((s) => s.threads);
   const update = useSettingsStore((s) => s.update);
+  /** 확정을 기다리는 선택(설정값 — 0 = 자동). */
+  const [draft, setDraft] = useState<number | null>(null);
 
   const cores = deviceCores();
+  const live = engine.threaded && (status === "ready" || status === "searching");
+  const choose = (threads: number) => {
+    const plan = planThreadChange({ next: threads, current: v, cores, applied, live });
+    if (plan === "confirm") {
+      setDraft(threads);
+      return;
+    }
+    setDraft(null);
+    if (plan === "apply") update({ threads });
+  };
+  const commit = () => {
+    if (draft !== null) update({ threads: draft });
+    setDraft(null);
+  };
   const cap = threadCap(cores, engine.maxThreads);
   const single = engine.variant !== null && !isMultiVariant(engine.variant);
   const usable = caps.threads && allow && !single;
@@ -198,11 +222,28 @@ function ThreadControl() {
     <div className="stack">
       <Segmented
         label="스레드 수"
-        value={Math.min(v, cap)}
+        value={Math.min(draft ?? v, cap)}
         options={options}
         disabled={!usable}
-        onChange={(threads) => update({ threads })}
+        onChange={choose}
       />
+      {draft !== null && (
+        <div className="stack" data-k="threads-confirm">
+          <p className="srow__hint tnum" role="status">
+            {resolveThreads(draft, cores)} 스레드로 바꾸면 엔진이 스레드를 다시 세우고 가중치를 다시
+            풀어 다음 탐색이 {THREAD_RELOAD_COST} 늦게 시작합니다.
+            {status === "searching" ? " 지금 탐색은 그대로 두고 다음 탐색부터 적용됩니다." : ""}
+          </p>
+          <div className="actions">
+            <button type="button" className="btn btn--tonal" onClick={commit}>
+              적용
+            </button>
+            <button type="button" className="btn" onClick={() => setDraft(null)}>
+              취소
+            </button>
+          </div>
+        </div>
+      )}
       <p className="srow__hint tnum" data-k="threads-status">
         {line} {cores ? `이 기기의 논리 코어 ${cores}개.` : ""}
       </p>
@@ -473,7 +514,7 @@ const ROWS: readonly RowSpec[] = [
     id: "threads",
     sec: "basic",
     label: "스레드 수",
-    note: "자동은 코어 하나를 화면에 남기고(코어 − 1) 4 를 넘기지 않습니다. 탐색 중에 바꾸면 다음 탐색부터 적용됩니다.",
+    note: "자동은 코어 하나를 화면에 남기고(코어 − 1) 4 를 넘기지 않습니다. 엔진이 떠 있을 때 바꾸면 가중치를 다시 푸는 비용(약 0.8초)을 알리고 「적용」을 눌러야 바뀝니다. 탐색 중이면 다음 탐색부터입니다.",
     engineKey: "thread_num",
     keywords: "threads 코어 cpu wasm simd rapfi multi single 멀티 단일 변형",
     wide: true,

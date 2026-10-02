@@ -6,6 +6,7 @@ import {
   SETTINGS_VERSION,
   engineInfo,
   migrate,
+  planThreadChange,
   resolveThreads,
   sanitize,
   toEngineConfig,
@@ -38,6 +39,29 @@ describe("스레드 설정", () => {
     const info = engineInfo(DEFAULT_SETTINGS);
     expect(info.some((c) => c.kind === "info" && c.key === "thread_num")).toBe(false);
     expect(toEngineConfig({ ...DEFAULT_SETTINGS, threads: 3 }).threads).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("스레드 수 변경의 확정 시점(P1-2)", () => {
+  const live = { cores: 8, applied: 4, live: true };
+
+  it("떠 있는 멀티 엔진의 실제 스레드 수가 바뀌면 확정을 받는다", () => {
+    expect(planThreadChange({ ...live, current: 4, next: 2 })).toBe("confirm");
+    expect(planThreadChange({ ...live, current: AUTO_THREADS, next: 6 })).toBe("confirm");
+  });
+
+  it("실제 스레드 수가 같으면 곧바로 — 자동(코어 8 → 4) ↔ 4 는 엔진에 아무것도 안 간다", () => {
+    expect(planThreadChange({ ...live, current: 4, next: AUTO_THREADS })).toBe("apply");
+    expect(planThreadChange({ ...live, current: AUTO_THREADS, next: 4 })).toBe("apply");
+  });
+
+  it("엔진이 없거나 단일이면 곧바로 — 다음 기동의 기동 메시지로 들어가 비용이 없다", () => {
+    expect(planThreadChange({ ...live, live: false, current: 4, next: 2 })).toBe("apply");
+    expect(planThreadChange({ ...live, applied: null, current: 4, next: 2 })).toBe("apply");
+  });
+
+  it("같은 값을 다시 고르면 아무것도 하지 않는다", () => {
+    expect(planThreadChange({ ...live, current: 2, next: 2 })).toBe("noop");
   });
 });
 

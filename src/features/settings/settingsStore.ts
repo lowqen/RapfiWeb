@@ -64,6 +64,37 @@ export function resolveThreads(setting: number, cores: number | null): number {
     : Math.min(cap, Math.max(1, setting));
 }
 
+/**
+ * 떠 있는 멀티 엔진의 스레드 수를 바꿀 때 치르는 비용. 엔진은 스레드를 **모두** 다시
+ * 세우며 평가기를 버리고(`SearchEngine::setNumThreads`), 다음 탐색이 가중치를 다시 푼다
+ * — T1 실측 0.73~0.85초(docs/최적화-마스터플랜.md §3.2-①).
+ */
+export const THREAD_RELOAD_COST = "약 0.8초";
+
+/**
+ * 스레드 수 선택을 언제 엔진에 보낼지(P1-2).
+ *
+ *   - `noop`    같은 값을 다시 골랐다
+ *   - `apply`   곧바로 — 엔진이 없거나(다음 기동의 기동 메시지로 들어가 비용이 없다) 단일이거나,
+ *               설정값은 달라도 실제 스레드 수가 지금과 같다(자동(2) ↔ 2 — 엔진에 아무것도 안 간다)
+ *   - `confirm` 떠 있는 멀티 엔진의 실제 스레드 수가 바뀐다 — 비용을 알리고 확정을 받는다.
+ *               한 번 누를 때마다 재구성되던 것을 「적용」 한 번으로 묶는다
+ */
+export type ThreadChange = "noop" | "apply" | "confirm";
+export function planThreadChange(o: {
+  next: number;
+  current: number;
+  cores: number | null;
+  /** 엔진에 실제로 보낸 스레드 수(없으면 null). */
+  applied: number | null;
+  /** 멀티 변형이 떠 있는가(대기·탐색 중). */
+  live: boolean;
+}): ThreadChange {
+  if (o.next === o.current) return "noop";
+  if (!o.live || o.applied === null) return "apply";
+  return resolveThreads(o.next, o.cores) === o.applied ? "apply" : "confirm";
+}
+
 export interface Settings {
   // ── 엔진 ──
   style: number;
