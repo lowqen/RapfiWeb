@@ -33,6 +33,18 @@ on:
         description: "반복"
         default: "2"
         type: string
+      patches:
+        description: "Phase 2 패치 대조 — 주면 패치 없음 ↔ 패치를 이 러너에서 둘 다 빌드해 둘만 잰다(공백 구분)"
+        default: ""
+        type: string
+      patch_first:
+        description: "패치 대조에서 패치 빌드를 먼저 잴지(두 번째 실행은 순서를 뒤집어 순서 편향을 지운다)"
+        default: false
+        type: boolean
+      variants:
+        description: "잴 변형(비우면 run.mjs 기본 — 없는 파일은 건너뛴다)"
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -58,18 +70,18 @@ jobs:
         run: node bench/gomocalc/fetch-engines.mjs
 
       - name: 시스템 도구
-        if: inputs.build_full
+        if: inputs.build_full || inputs.patches != ''
         run: sudo apt-get update -qq && sudo apt-get install -y ninja-build ccache file
 
       - name: emsdk 캐시 복원
-        if: inputs.build_full
+        if: inputs.build_full || inputs.patches != ''
         uses: actions/cache/restore@v4
         with:
           path: ${{ env.WORK }}/emsdk
           key: emsdk-latest-v1
 
       - name: rapfi 소스 캐시 복원
-        if: inputs.build_full
+        if: inputs.build_full || inputs.patches != ''
         uses: actions/cache/restore@v4
         with:
           path: ${{ env.WORK }}/rapfi
@@ -95,15 +107,41 @@ jobs:
             grep -m1 -E "^\s+LINK_FLAGS = " "$nj" | cut -c1-600 || true
           done
 
+      # Phase 2 패치 대조(docs/최적화-마스터플랜.md §5.3 「결과 불변 변경」) — 배포 릴리스가 아니라
+      # **이 러너에서 같은 툴체인으로** 패치 없음·패치 두 빌드를 만들어 그 둘만 잰다. 배포 렌주
+      # 구성(PRELOAD_SET=renju) 그대로다. 패치 빌드는 BENCH 해시 게이트를 먼저 통과해야 한다.
+      - name: 패치 대조 빌드 — 패치 없음 ↔ 패치 (같은 러너 · 같은 툴체인)
+        if: inputs.patches != ''
+        env:
+          ENABLE_LTO: "ON"
+          PATCHES: ${{ inputs.patches }}
+        run: |
+          grep -m1 "model name" /proc/cpuinfo || true
+          take () {
+            mkdir -p "bench/gomocalc/engines/$1"
+            cp out/engine/rapfi-*.js out/engine/rapfi-*.wasm out/engine/rapfi-*.data \
+               out/engine/ENGINE_VERSION.txt "bench/gomocalc/engines/$1/"
+            grep upstream "bench/gomocalc/engines/$1/ENGINE_VERSION.txt"
+          }
+          RAPFI_PATCHES="" bash tools/build_engine_wasm.sh
+          take rapfiweb-base
+          RAPFI_PATCHES="$PATCHES" bash tools/build_engine_wasm.sh
+          node spike/node-bench.mjs single-simd128   # 결과 불변 게이트 — 해시가 다르면 여기서 멈춘다
+          take rapfiweb-patch
+
       - name: 벤치
         env:
-          ENGINES: ${{ inputs.build_full && 'gomocalc,rapfiweb,rapfiweb-full' || 'gomocalc,rapfiweb' }}
+          # 패치 대조면 두 빌드만(순서는 patch_first), 아니면 예전 구성.
+          ENGINES: ${{ inputs.patches != '' && (inputs.patch_first && 'rapfiweb-patch,rapfiweb-base' || 'rapfiweb-base,rapfiweb-patch') || (inputs.build_full && 'gomocalc,rapfiweb,rapfiweb-full' || 'gomocalc,rapfiweb') }}
+          VARIANTS: ${{ inputs.variants || 'single-simd128,single-simd128-relaxed,multi-simd128,multi-simd128-relaxed' }}
           THREADS: ${{ inputs.threads }}
           TIME_MS: ${{ inputs.time_ms }}
           REPEAT: ${{ inputs.repeat }}
-          BENCH: single-simd128,multi-simd128-relaxed
+          BENCH: ${{ inputs.patches != '' && 'single-simd128' || 'single-simd128,multi-simd128-relaxed' }}
           LABEL: ci
-        run: node bench/gomocalc/run.mjs
+        run: |
+          grep -m1 "model name" /proc/cpuinfo || true
+          node bench/gomocalc/run.mjs
 
       - name: 요약
         if: always()
