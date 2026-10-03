@@ -1,0 +1,63 @@
+name: 균형 개시 묶음 만들기 (SPRT 용)
+
+# bench/sprt/make-openings.mjs 를 네이티브 엔진으로 돌려 bench/sprt/openings-balanced.json 을 만든다.
+# 26개 표준 3수 개시에서 넷째 · 다섯째 수를 넓히고 노드 고정 평가로 흑 승률이 0.5 에 가까운 것만 고른다 —
+# 노드 고정 · 해시 비움 · 1 스레드라 다시 돌려도 같은 결과가 나온다(같은 엔진 빌드라면).
+# 산출물(JSON)을 내려받아 저장소에 커밋한다 — 그 뒤 sprt.yml 의 openings_file 로 쓴다.
+on:
+  workflow_dispatch:
+    inputs:
+      screen_nodes:
+        default: "20000"
+        type: string
+      final_nodes:
+        default: "500000"
+        type: string
+      max_gap:
+        description: "|흑 승률 − 0.5| 상한(0.08 ≈ eval ±65)"
+        default: "0.08"
+        type: string
+      keep:
+        default: "60"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  openings:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      WORK: ${{ github.workspace }}/../rapfi-wasm-work
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "26"
+      - name: 시스템 도구
+        run: sudo apt-get update -qq && sudo apt-get install -y ninja-build ccache
+      - name: rapfi 소스 캐시 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.WORK }}/rapfi
+          key: rapfi-3c94c2a9-v1
+      - name: 네이티브 빌드(패치 없음 — 평가는 결과 불변 패치와 무관)
+        run: OUT_DIR=bench/sprt/engines/base bash tools/build_host_engine.sh
+      - name: 균형 개시 추출
+        run: |
+          set -o pipefail
+          grep -m1 "model name" /proc/cpuinfo || true
+          E=bench/sprt/engines/base
+          node bench/sprt/make-openings.mjs --engine "$PWD/$E/pbrain-rapfi" --cwd "$E" --concurrency 2 \
+            --screen-nodes "${{ inputs.screen_nodes }}" --final-nodes "${{ inputs.final_nodes }}" \
+            --max-gap "${{ inputs.max_gap }}" --keep "${{ inputs.keep }}" \
+            --out bench/sprt/openings-balanced.json | tee openings.log
+          { echo '```'; sed -n '/^\[4\]/,$p' openings.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openings-balanced
+          retention-days: 14
+          path: |
+            bench/sprt/openings-balanced.json
+            openings.log

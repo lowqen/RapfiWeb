@@ -17,6 +17,7 @@
  *            nodes 수당 노드(INFO MAX_NODE — 시간과 무관하게 재현 가능한 초속기) · grace 시간 초과 판정 유예
  *        --games N               최대 판 수(쌍 단위로 올림, 기본 200) · --concurrency C 동시 대국(기본 1)
  *        --openings a,b,…        개시 이름(기본 26개 모두 — `--list-openings`) · --seed S 개시 순서 섞기
+ *        --openings-file f.json  개시 묶음 파일(make-openings.mjs — 예: bench/sprt/openings-balanced.json). 없으면 26개 표준 개시
  *        --max-plies N           수 제한(넘으면 비김, 기본 225) · --hash-mb M (기본 64) · --threads T (기본 1)
  *        --max-minutes M         시간 예산 — 넘으면 새 쌍을 시작하지 않고 마저 둔 뒤 요약(CI 잡 시간 제한 전에 끝내려고)
  * SPRT   --elo0 0 --elo1 5 --alpha 0.05 --beta 0.05     (로지스틱 Elo · stats.mjs)
@@ -25,11 +26,11 @@
  * 종료 코드: 0 = 끝까지 돎(SPRT 결정 여부와 무관), 1 = 치명적 오류(엔진을 띄울 수 없음 · 심판 고장 · 프로세스 누수),
  *            2 = 인자 오류, 130 = 사용자 중단.
  */
-import { appendFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { appendFileSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { Engine, EngineError, LIVE } from "./engine.mjs";
 import { BLACK, Board, WHITE, judgeMove } from "./referee.mjs";
-import { label, standardOpenings } from "./openings.mjs";
+import { label, loadOpenings, standardOpenings } from "./openings.mjs";
 import { summarize } from "./stats.mjs";
 
 // ── 인자 ────────────────────────────────────────────────────────────────
@@ -120,7 +121,15 @@ const opts = (() => {
   }
 })();
 
-const OPENINGS = standardOpenings();
+const OPENINGS = (() => {
+  if (!opts["openings-file"]) return standardOpenings();
+  try {
+    return loadOpenings(JSON.parse(readFileSync(opts["openings-file"], "utf8")));
+  } catch (e) {
+    console.error(`--openings-file: ${e.message}`);
+    process.exit(2);
+  }
+})();
 if (opts["list-openings"]) {
   for (const [n, m] of Object.entries(OPENINGS))
     console.log(`${n.padEnd(16)} ${m.map(label).join(" ")}`);

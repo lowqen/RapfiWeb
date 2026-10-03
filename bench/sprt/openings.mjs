@@ -31,3 +31,49 @@ export function standardOpenings() {
   }
   return out;
 }
+
+/**
+ * 개시 묶음 파일(make-openings.mjs 가 만든 JSON — `{ openings: [{ name, moves }] }`)을 읽는다.
+ * @returns {Record<string, [number, number][]>}
+ */
+export function loadOpenings(json) {
+  const list = Array.isArray(json) ? json : json.openings;
+  if (!Array.isArray(list) || !list.length) throw new Error("개시 파일에 openings 가 없습니다");
+  const out = {};
+  for (const o of list) {
+    if (!o.name || !Array.isArray(o.moves) || !o.moves.length)
+      throw new Error(`개시 형식이 아닙니다: ${JSON.stringify(o)}`);
+    if (out[o.name]) throw new Error(`개시 이름이 겹칩니다: ${o.name}`);
+    out[o.name] = o.moves.map(([x, y]) => [x, y]);
+  }
+  return out;
+}
+
+/** 판 가운데(7, 7)를 지키는 8가지 대칭 */
+export const SYMMETRIES = [
+  ([x, y]) => [x, y],
+  ([x, y]) => [14 - x, y],
+  ([x, y]) => [x, 14 - y],
+  ([x, y]) => [14 - x, 14 - y],
+  ([x, y]) => [y, x],
+  ([x, y]) => [14 - y, x],
+  ([x, y]) => [y, 14 - x],
+  ([x, y]) => [14 - y, 14 - x],
+];
+
+/** 국면의 대칭 대표 키 — 흑 · 백 돌 집합만 본다(두어진 순서는 무시) */
+export function canonicalKey(moves) {
+  let best = null;
+  for (const t of SYMMETRIES) {
+    const tm = moves.map(t);
+    const side = (c) =>
+      tm
+        .filter((_, i) => i % 2 === c)
+        .map(([x, y]) => y * 15 + x)
+        .sort((a, b) => a - b)
+        .join(",");
+    const k = `${side(0)}|${side(1)}`;
+    if (best === null || k < best) best = k;
+  }
+  return best;
+}

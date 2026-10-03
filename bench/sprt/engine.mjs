@@ -34,6 +34,7 @@ export class Engine {
     this.name = spec.name;
     this.tail = [];
     this.waiters = [];
+    this.taps = new Set();
     this.exitCode = undefined;
     this.about = null;
     this.child = null;
@@ -115,6 +116,7 @@ export class Engine {
   #onLine(line) {
     if (!line) return;
     this.#note(line);
+    for (const t of this.taps) t(line);
     for (let i = 0; i < this.waiters.length; i++) {
       const w = this.waiters[i];
       if (w.match(line)) {
@@ -187,6 +189,46 @@ export class Engine {
    * @param {[number, number][]} moves 지금까지의 수(첫 수가 흑)
    * @returns {Promise<{ move: [number, number], ms: number }>}
    */
+  /** 지나가는 줄을 모두 본다(탐색 중 INFO EVAL 등). 돌려준 함수로 뗀다. */
+  tap(fn) {
+    this.taps.add(fn);
+    return () => this.taps.delete(fn);
+  }
+
+  /**
+   * 고정 노드로 국면을 평가한다 — 해시를 비우고 MAX_NODE 만큼 생각시켜 **마지막 요약 줄**
+   * (`MESSAGE Speed … | Eval X | …`)의 평가를 읽는다. 마지막 `INFO EVAL` 은 앞 반복의 값일 수 있어 쓰지 않는다
+   * (요약 284 ↔ 마지막 INFO EVAL 388 을 실제로 봤다). 1 스레드 + 해시 비움 + 노드 제한이라 CPU 속도와 무관하게
+   * 같은 값이 나온다. 평가 · 승률은 둘 차례 쪽에서 본 값이다. 승률은 엔진 자신의 환산
+   * 1 / (1 + e^(−eval/200))(엔진이 찍는 INFO EVAL · WINRATE 쌍에서 확인 — −211 ↔ 0.258, 126 ↔ 0.652).
+   * 필승(±M)이면 eval 은 그 문자열, 승률은 1 · 0.
+   * @returns {Promise<{ move: [number, number], eval: string | null, winrate: number | null }>}
+   */
+  async evaluate(moves, { nodes, timeoutMs = 120_000 }) {
+    let ev = null;
+    let last = null;
+    const untap = this.tap((l) => {
+      const s = /^MESSAGE Speed .*\| Eval ([+-]?M?\d+) \|/.exec(l);
+      if (s) ev = s[1];
+      const i = /^INFO EVAL (\S+)/.exec(l);
+      if (i) last = i[1];
+    });
+    try {
+      await this.send("YXHASHCLEAR");
+      await this.send(`INFO MAX_NODE ${nodes}`);
+      await this.send("INFO TIMEOUT_TURN 3600000");
+      const { move } = await this.play(moves, { timeoutMs });
+      const e = ev ?? last;
+      let winrate = null;
+      if (/^-?\d+$/.test(e ?? "")) winrate = 1 / (1 + Math.exp(-Number(e) / 200));
+      else if (/^\+?M/.test(e ?? "")) winrate = 1;
+      else if (/^-M/.test(e ?? "")) winrate = 0;
+      return { move, eval: e, winrate };
+    } finally {
+      untap();
+    }
+  }
+
   async play(moves, { timeLeftMs, timeoutMs }) {
     const toMove = moves.length % 2;
     const rows = moves.map(([x, y], i) => `${x},${y},${i % 2 === toMove ? 1 : 2}`);
