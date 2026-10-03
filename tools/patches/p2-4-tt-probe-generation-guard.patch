@@ -1,0 +1,21 @@
+diff --git a/Rapfi/search/hashtable.cpp b/Rapfi/search/hashtable.cpp
+index 473a4ec..62461e2 100644
+--- a/Rapfi/search/hashtable.cpp
++++ b/Rapfi/search/hashtable.cpp
+@@ -193,9 +193,13 @@ bool HashTable::probe(HashKey hashKey,
+         TTEntry tte = entry[i];  // Copy tte from shared memory to stack
+ 
+         if (tte.key() == key32) {
+-            // Update current entry's generation, as well as key32
+-            entry[i].generation8 = generation;
+-            entry[i].key32 ^= tte.data[1] ^ entry[i].data[1];
++            // Update current entry's generation, as well as key32. Only write when the
++            // generation differs: with the same generation both writes store the values
++            // already there, but they still dirty a cache line shared by all threads.
++            if (tte.generation8 != generation) {
++                entry[i].generation8 = generation;
++                entry[i].key32 ^= tte.data[1] ^ entry[i].data[1];
++            }
+ 
+             ttValue = storedValueToSearchValue(tte.value16, ply);
+             ttEval  = Value(tte.eval16);

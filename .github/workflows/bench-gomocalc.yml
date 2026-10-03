@@ -41,6 +41,14 @@ on:
         description: "Phase 2 후처리 대조 — 주면 B 빌드의 .wasm 에 이 wasm-opt 패스를 얹는다(예: -O4 --converge)"
         default: ""
         type: string
+      base_patches:
+        description: "대조의 A·B 둘 다에 얹을 패치(배포 구성 위에서 잴 때 — 예: 채택된 P2-2). B 는 이것 + patches"
+        default: ""
+        type: string
+      base_wasm_opt:
+        description: "대조의 A·B 둘 다에 얹을 wasm-opt 패스(배포 구성 — -O4 --converge). wasm_opt 를 주면 B 는 그것"
+        default: ""
+        type: string
       patch_first:
         description: "대조에서 B(패치·후처리) 빌드를 먼저 잴지(두 번째 실행은 순서를 뒤집어 순서 편향을 지운다)"
         default: false
@@ -115,12 +123,16 @@ jobs:
       # **이 러너에서 같은 툴체인으로** A(그대로)·B(패치 그리고/또는 wasm-opt 후처리) 두 빌드를 만들어
       # 그 둘만 잰다 — 엔진 이름은 rapfiweb-base(A) · rapfiweb-patch(B). 배포 렌주 구성
       # (PRELOAD_SET=renju) 그대로다. B 빌드는 BENCH 해시 게이트를 먼저 통과해야 한다.
-      - name: 대조 빌드 — A(그대로) ↔ B(패치·후처리) (같은 러너 · 같은 툴체인)
+      # base_patches·base_wasm_opt 를 주면 A 가 「그대로」가 아니라 그 구성(예: 배포 릴리스와 같은
+      # P2-2 + -O4 --converge)이 되고, B 는 그 위에 patches 를 더한다 — 채택된 것 위에서 다음 것을 잰다.
+      - name: 대조 빌드 — A(그대로·기준 구성) ↔ B(패치·후처리) (같은 러너 · 같은 툴체인)
         if: (inputs.patches != '' || inputs.wasm_opt != '')
         env:
           ENABLE_LTO: "ON"
           PATCHES: ${{ inputs.patches }}
-          WASM_OPT_B: ${{ inputs.wasm_opt }}
+          WASM_OPT_B: ${{ inputs.wasm_opt || inputs.base_wasm_opt }}
+          BASE_PATCHES: ${{ inputs.base_patches }}
+          BASE_WASM_OPT: ${{ inputs.base_wasm_opt }}
         run: |
           grep -m1 "model name" /proc/cpuinfo || true
           take () {
@@ -129,9 +141,9 @@ jobs:
                out/engine/ENGINE_VERSION.txt "bench/gomocalc/engines/$1/"
             grep upstream "bench/gomocalc/engines/$1/ENGINE_VERSION.txt"
           }
-          RAPFI_PATCHES="" WASM_OPT_POST="" bash tools/build_engine_wasm.sh
+          RAPFI_PATCHES="$BASE_PATCHES" WASM_OPT_POST="$BASE_WASM_OPT" bash tools/build_engine_wasm.sh
           take rapfiweb-base
-          RAPFI_PATCHES="$PATCHES" WASM_OPT_POST="$WASM_OPT_B" bash tools/build_engine_wasm.sh
+          RAPFI_PATCHES="$(echo $BASE_PATCHES $PATCHES)" WASM_OPT_POST="$WASM_OPT_B" bash tools/build_engine_wasm.sh
           node spike/node-bench.mjs single-simd128   # 결과 불변 게이트 — 해시가 다르면 여기서 멈춘다
           take rapfiweb-patch
 
