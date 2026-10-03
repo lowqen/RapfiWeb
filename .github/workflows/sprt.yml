@@ -44,6 +44,10 @@ on:
         description: "대국 시간 예산(분) — 넘으면 시작한 쌍만 마저 두고 요약(잡 제한 360분 전에 끝내려고)"
         default: "330"
         type: string
+      threads:
+        description: "엔진마다 탐색 스레드(INFO THREAD_NUM). 2 이상이면 동시 대국 × 스레드 ≤ 논리 코어(러너 2)로"
+        default: "1"
+        type: string
       concurrency:
         description: "동시 대국"
         default: "2"
@@ -106,7 +110,7 @@ jobs:
           node bench/sprt/runner.mjs "${per[@]}" \
             --a "$PWD/$E/test/pbrain-rapfi" --a-cwd "$E/test" --a-name test \
             --b "$PWD/$E/base/pbrain-rapfi" --b-cwd "$E/base" --b-name base \
-            --games "${{ inputs.games }}" --tc "${{ inputs.tc }}" --concurrency "${{ inputs.concurrency }}" --max-minutes "${{ inputs.max_minutes }}" \
+            --games "${{ inputs.games }}" --tc "${{ inputs.tc }}" --concurrency "${{ inputs.concurrency }}" --max-minutes "${{ inputs.max_minutes }}" --threads "${{ inputs.threads }}" \
             --elo0 "${{ inputs.elo0 }}" --elo1 "${{ inputs.elo1 }}" \
             --out sprt/games.jsonl --summary sprt/summary.json | tee sprt.log
           {

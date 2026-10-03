@@ -1,0 +1,30 @@
+diff --git a/Rapfi/search/ab/search.cpp b/Rapfi/search/ab/search.cpp
+index 1346b90..5c5f31d 100644
+--- a/Rapfi/search/ab/search.cpp
++++ b/Rapfi/search/ab/search.cpp
+@@ -348,9 +348,15 @@ bool ABSearcher::checkTimeupCondition(const TimeControl &timectl)
+ 
+ int ABSearcher::pickNextDepth(SearchEngine &threads, uint32_t thisId, int lastDepth) const
+ {
+-    if (thisId == 0 || threads.size() < 3)
++    if (thisId == 0 || threads.size() < 2)
+         return lastDepth + 1;
+ 
++    // A helper skips a depth once more than half of the threads are already on it. With two
++    // threads that can never happen (the one other thread is not more than half of two), so the
++    // helper would always search the same depth as the main thread. For two threads, skip a
++    // depth as soon as the main thread is on it, so that the helper searches one depth ahead.
++    const size_t maxThreadsAboveNextDepth = threads.size() == 2 ? 0 : threads.size() / 2;
++
+     for (int nextDepth = lastDepth + 1;; nextDepth++) {
+         size_t numThreadsAboveNextDepth = 0;
+ 
+@@ -362,7 +368,7 @@ int ABSearcher::pickNextDepth(SearchEngine &threads, uint32_t thisId, int lastDe
+ 
+         // If more than half of all threads are already searching depth above
+         // the next depth, skip and find another next depth.
+-        if (numThreadsAboveNextDepth > threads.size() / 2)
++        if (numThreadsAboveNextDepth > maxThreadsAboveNextDepth)
+             continue;
+         else
+             return nextDepth;
