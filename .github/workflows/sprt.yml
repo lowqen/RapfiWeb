@@ -28,6 +28,14 @@ on:
         description: "시간 제어(runner.mjs --tc)"
         default: "turn=100"
         type: string
+      tc_a:
+        description: "시험(A)만의 시간 제어 — 비우면 tc(시간 핸디캡으로 러너를 검증할 때)"
+        default: ""
+        type: string
+      tc_b:
+        description: "기준(B)만의 시간 제어 — 비우면 tc"
+        default: ""
+        type: string
       concurrency:
         description: "동시 대국"
         default: "2"
@@ -76,10 +84,16 @@ jobs:
           OUT_DIR=bench/sprt/engines/test RAPFI_PATCHES="$(echo $BASE $TEST)" bash tools/build_host_engine.sh
 
       - name: SPRT
+        env:
+          TC_A: ${{ inputs.tc_a }}
+          TC_B: ${{ inputs.tc_b }}
         run: |
           set -o pipefail
           E=bench/sprt/engines
-          node bench/sprt/runner.mjs \
+          per=()
+          if [ -n "$TC_A" ]; then per+=(--a-tc "$TC_A"); fi
+          if [ -n "$TC_B" ]; then per+=(--b-tc "$TC_B"); fi
+          node bench/sprt/runner.mjs "${per[@]}" \
             --a "$PWD/$E/test/pbrain-rapfi" --a-cwd "$E/test" --a-name test \
             --b "$PWD/$E/base/pbrain-rapfi" --b-cwd "$E/base" --b-name base \
             --games "${{ inputs.games }}" --tc "${{ inputs.tc }}" --concurrency "${{ inputs.concurrency }}" \

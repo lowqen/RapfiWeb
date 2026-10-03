@@ -132,3 +132,16 @@ test("띄울 수 없는 엔진 — 치명적 오류로 1 을 돌려준다(매달
   assert.match(r.stderr, /띄우지 못했습니다/);
   noLeak(r);
 });
+
+test("엔진별 시간 제어 — 같은 느린 엔진이 넉넉한 A 는 버티고 빠듯한 B 는 시간 초과로 진다", () => {
+  const slow = `${FAKE} --slow 300`;
+  const r = run(slow, slow, ["--games", "2", "--a-tc", "turn=2000", "--b-tc", "turn=50,grace=100"]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.games.length, 2);
+  for (const g of r.games) {
+    assert.equal(g.reason, "timeout");
+    assert.equal(g.loser, "B");
+  }
+  assert.match(r.stdout, /A 수당 2000ms · 유예 2000ms \/ B 수당 50ms · 유예 100ms/);
+  noLeak(r);
+});

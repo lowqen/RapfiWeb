@@ -9,6 +9,7 @@
  *        --a-cwd / --b-cwd <dir>   엔진이 config.toml · 가중치를 찾는 곳(네이티브 Rapfi 는 cwd 에서 찾는다)
  *        --a-name / --b-name       보고용 이름(기본 A · B)
  *        --a-init / --b-init "<명령>"  START 뒤에 보낼 명령(여러 번 줄 수 있음, 예: "INFO THREAD_NUM 1")
+ *        --a-tc / --b-tc "<tc>"    그 엔진만의 시간 제어(--tc 를 덮는다) — 예: 시간 핸디캡으로 러너 · SPRT 를 검증할 때
  *        --referee "<명령줄>"|none  금수(3-3·4-4) 판정용 엔진(기본: --b 와 같은 것을 따로 하나 더 띄움)
  *        --referee-cwd <dir>
  * 대국   --tc "turn=200,match=0,grace=1000" | "nodes=20000"
@@ -131,9 +132,10 @@ if (opts.help || !opts.a || !opts.b) {
   process.exit(opts.help ? 0 : 2);
 }
 
-let tc, cfg;
+let TC, cfg;
 try {
-  tc = parseTc(opts.tc ?? "turn=200,match=0");
+  const base = opts.tc ?? "turn=200,match=0";
+  TC = { A: parseTc(opts["a-tc"] ?? base), B: parseTc(opts["b-tc"] ?? base) };
   const names = opts.openings
     ? opts.openings.split(",").map((s) => s.trim())
     : Object.keys(OPENINGS);
@@ -188,7 +190,7 @@ const SPEC_REF =
 
 /** 엔진에 넘길 INFO — START 앞(규칙 · 메모리)과 뒤(시간) */
 const START_INFO = [`INFO HASH_SIZE ${cfg.hashKb}`, `INFO THREAD_NUM ${cfg.threads}`];
-const GAME_INFO = [
+const gameInfo = (tc) => [
   `INFO TIMEOUT_TURN ${tc.turn}`,
   `INFO TIMEOUT_MATCH ${tc.match}`,
   ...(tc.nodes > 0 ? [`INFO MAX_NODE ${tc.nodes}`] : []),
@@ -278,12 +280,16 @@ function record(job, result) {
 /** @returns {Promise<{ winner, reason, loser?, moves, ms, detail? }>} */
 async function playGame(job, eng, referee) {
   const players = { [BLACK]: job.aBlack ? eng.A : eng.B, [WHITE]: job.aBlack ? eng.B : eng.A };
+  const tcs = { [BLACK]: job.aBlack ? TC.A : TC.B, [WHITE]: job.aBlack ? TC.B : TC.A };
   const board = new Board(OPENINGS[job.opening]);
-  const clock = { [BLACK]: tc.match, [WHITE]: tc.match };
+  const clock = { [BLACK]: tcs[BLACK].match, [WHITE]: tcs[WHITE].match };
   const t0 = performance.now();
-  for (const e of [eng.A, eng.B]) {
+  for (const [e, tc] of [
+    [eng.A, TC.A],
+    [eng.B, TC.B],
+  ]) {
     await e.newGame();
-    for (const c of GAME_INFO) await e.send(c);
+    for (const c of gameInfo(tc)) await e.send(c);
   }
   const judge = {
     forbidden: referee
@@ -299,6 +305,7 @@ async function playGame(job, eng, referee) {
   for (;;) {
     const side = board.toMove;
     const p = players[side];
+    const tc = tcs[side];
     const limit = tc.match > 0 ? Math.min(tc.turn, clock[side]) : tc.turn;
     let reply;
     try {
@@ -434,9 +441,18 @@ console.log(
 );
 console.log(
   `  ${jobs.length}판(${nPairs}쌍 · 개시 ${cfg.openings.length}개 순환) · 동시 ${cfg.concurrency} · ` +
-    (tc.nodes > 0 ? `수당 ${tc.nodes}노드` : `수당 ${tc.turn}ms`) +
-    (tc.match > 0 ? ` · 판당 ${tc.match}ms` : "") +
-    ` · 유예 ${tc.grace}ms · 심판 ${SPEC_REF ? SPEC_REF.cmd + " " + SPEC_REF.args.join(" ") : "없음(장목만 판정)"}`,
+    ["A", "B"]
+      .map((k) => {
+        const tc = TC[k];
+        return (
+          `${k} ` +
+          (tc.nodes > 0 ? `수당 ${tc.nodes}노드` : `수당 ${tc.turn}ms`) +
+          (tc.match > 0 ? ` · 판당 ${tc.match}ms` : "") +
+          ` · 유예 ${tc.grace}ms`
+        );
+      })
+      .join(" / ") +
+    ` · 심판 ${SPEC_REF ? SPEC_REF.cmd + " " + SPEC_REF.args.join(" ") : "없음(장목만 판정)"}`,
 );
 const tStart = performance.now();
 await Promise.all(
@@ -505,7 +521,7 @@ if (opts.summary) {
     JSON.stringify(
       {
         engines: { A: SPEC.A, B: SPEC.B, referee: SPEC_REF },
-        tc,
+        tc: TC,
         cfg,
         summary: s,
         reasons,
