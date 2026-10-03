@@ -53,9 +53,7 @@ function quantile(xs, q) {
 function summarize(rows) {
   const solved = rows.filter((r) => r.solved);
   const ms = solved.map((r) => r.firstMate.engineMs ?? r.firstMate.wallMs);
-  const all = rows.map((r) =>
-    r.solved ? (r.firstMate.engineMs ?? r.firstMate.wallMs) : Infinity,
-  );
+  const all = rows.map((r) => (r.solved ? (r.firstMate.engineMs ?? r.firstMate.wallMs) : Infinity));
   return {
     n: rows.length,
     solved: solved.length,
@@ -107,7 +105,18 @@ function renderMarkdown(results) {
       `스레드 ${first.threads} · 국면당 ${first.timeMs}ms`,
     "",
     table(
-      ["엔진", "국면", "풀었다", "실패율", "부호 틀림", "첫 필승 중앙값", "p90", "전체 중앙값", "깊이 중앙값", "노드 중앙값"],
+      [
+        "엔진",
+        "국면",
+        "풀었다",
+        "실패율",
+        "부호 틀림",
+        "첫 필승 중앙값",
+        "p90",
+        "전체 중앙값",
+        "깊이 중앙값",
+        "노드 중앙값",
+      ],
       cols.map(({ name, R, rows }) => {
         const s = summarize(rows);
         return [
