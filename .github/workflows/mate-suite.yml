@@ -24,6 +24,10 @@ on:
         description: "두 빌드 모두에 얹을 wasm-opt 후처리(배포 구성 = -O4 --converge)"
         default: "-O4 --converge"
         type: string
+      suite:
+        description: "묶음 파일 — 하드 묶음은 bench/gomocalc/mate-suite-hard.json(그때는 time_ms 를 60000 이상으로)"
+        default: "bench/gomocalc/mate-suite.json"
+        type: string
       time_ms:
         description: "국면당 탐색 시간(ms)"
         default: "10000"
@@ -95,6 +99,7 @@ jobs:
         env:
           VARIANT: ${{ inputs.variant }}
           TIME_MS: ${{ inputs.time_ms }}
+          SUITE: ${{ inputs.suite }}
         run: |
           grep -m1 "model name" /proc/cpuinfo || true
           ENGINES=rapfiweb-base LABEL=mate-base node bench/gomocalc/mate-probe.mjs

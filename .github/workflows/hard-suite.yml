@@ -1,0 +1,116 @@
+name: 하드 필승 묶음 만들기 (mate-suite-hard)
+
+# bench/sprt/make-hard-suite.mjs — SPRT 기보(bench/sprt/results/*.jsonl)에서 CI WASM 10~60초에 첫 +M 이 나오는
+# 국면을 고른다. 1단계(네이티브)가 노드로 고르고, 2단계(WASM · 배포 구성)가 실제 시간을 재서 묶는다.
+# 산출물 bench/gomocalc/mate-suite-hard.json 을 내려받아 커밋한다 — 그 뒤 mate-suite.yml 의 suite 로 쓴다.
+on:
+  workflow_dispatch:
+    inputs:
+      offsets:
+        description: "판 끝에서 몇 수 앞(홀수 — 이긴 쪽 차례)"
+        default: "11,15,19,23,27,31"
+        type: string
+      deep:
+        description: "B 단계(최대 1,100만 노드)로 보낼 국면 수"
+        default: "600"
+        type: string
+      max_out:
+        description: "WASM 확인으로 보낼 최대 국면 수(국면당 최대 60초)"
+        default: "90"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    env:
+      WORK: ${{ github.workspace }}/../rapfi-wasm-work
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "26"
+      - name: 시스템 도구
+        run: sudo apt-get update -qq && sudo apt-get install -y ninja-build ccache
+      - name: rapfi 소스 캐시 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.WORK }}/rapfi
+          key: rapfi-3c94c2a9-v1
+      - name: 네이티브 빌드(배포 구성의 탐색 — P2-2 는 1 스레드 결과 불변)
+        run: OUT_DIR=bench/sprt/engines/base RAPFI_PATCHES=tools/patches/p2-2-keep-evaluators-on-rebuild.patch bash tools/build_host_engine.sh
+      - name: 후보 고르기(A · B)
+        run: |
+          set -o pipefail
+          grep -m1 "model name" /proc/cpuinfo || true
+          E=bench/sprt/engines/base
+          node bench/sprt/make-hard-suite.mjs extract --engine "$PWD/$E/pbrain-rapfi" --cwd "$E" --concurrency 2 \
+            --offsets "${{ inputs.offsets }}" --deep "${{ inputs.deep }}" --max-out "${{ inputs.max_out }}" \
+            --out hard-candidates.json | tee extract.log
+          { echo '```'; grep -E '^\[|^→' extract.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hard-candidates
+          retention-days: 14
+          path: |
+            hard-candidates.json
+            extract.log
+
+  verify:
+    needs: extract
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    env:
+      WORK: ${{ github.workspace }}/../rapfi-wasm-work
+      ENABLE_LTO: "ON"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "26"
+      - uses: pnpm/action-setup@v4
+      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: 시스템 도구
+        run: sudo apt-get update -qq && sudo apt-get install -y ninja-build ccache file
+      - name: emsdk 캐시 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.WORK }}/emsdk
+          key: emsdk-latest-v1
+      - name: rapfi 소스 캐시 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.WORK }}/rapfi
+          key: rapfi-3c94c2a9-v1
+      - name: WASM 빌드 — 배포 구성(P2-2 + -O4 --converge), BENCH 2b7c7da9 게이트
+        run: |
+          set -o pipefail
+          RAPFI_PATCHES=tools/patches/p2-2-keep-evaluators-on-rebuild.patch WASM_OPT_POST="-O4 --converge" bash tools/build_engine_wasm.sh
+          node spike/node-bench.mjs single-simd128 | grep -E '"(hash|nodes|pass)"'
+          mkdir -p bench/gomocalc/engines/rapfiweb-base
+          cp out/engine/rapfi-*.js out/engine/rapfi-*.wasm out/engine/rapfi-*.data out/engine/ENGINE_VERSION.txt bench/gomocalc/engines/rapfiweb-base/
+      - uses: actions/download-artifact@v4
+        with:
+          name: hard-candidates
+      - name: WASM 으로 60초씩 풀기 → 묶기
+        run: |
+          set -o pipefail
+          grep -m1 "model name" /proc/cpuinfo || true
+          ENGINES=rapfiweb-base SUITE=hard-candidates.json TIME_MS=60000 LABEL=hard-probe node bench/gomocalc/mate-probe.mjs | tail -40
+          node bench/sprt/make-hard-suite.mjs finalize --candidates hard-candidates.json \
+            --probe bench/gomocalc/results/hard-probe.json --out bench/gomocalc/mate-suite-hard.json | tee finalize.log
+          { echo '```'; cat finalize.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mate-suite-hard
+          retention-days: 14
+          path: |
+            bench/gomocalc/mate-suite-hard.json
+            bench/gomocalc/results/hard-probe.*
+            finalize.log
