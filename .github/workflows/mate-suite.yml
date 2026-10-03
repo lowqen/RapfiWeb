@@ -1,0 +1,119 @@
+name: 필승 국면 묶음 대조 (mate suite)
+
+# 트리를 바꾸는 탐색 변경(Phase 3)의 전술 지표 — docs/최적화-마스터플랜.md §5.1 「첫 필승 시간」 · §5.3.
+# SPRT(sprt.yml)는 짧은 시간 제어(수당 100ms ≈ 깊이 10~11)로 돌아서, 깊은 탐색(d18~20)에서만 드러나는 변경을
+# 못 볼 수 있다. 이 워크플로는 같은 러너에서 WASM 두 빌드를 만들어 mate-suite.json 50국면을 국면당 TIME_MS 로 푼다.
+#
+#   A = rapfiweb-base  base_patches(+ wasm_opt) — 배포 구성이면 BENCH 2b7c7da9 를 내야 한다(게이트)
+#   B = rapfiweb-test  base_patches + test_patches(+ wasm_opt) — 트리가 바뀌므로 해시는 기록만
+#
+# 지표: 국면별 첫 +M 의 깊이 · 노드 · 엔진 시간, 실패율, 중앙값 · p90. 1 스레드 + 국면마다 YXHASHCLEAR 라
+# **첫 필승까지의 깊이 · 노드는 CPU 속도와 무관**하다(10초 안에 닿느냐만 속도에 달림) — 잡음 없는 쪽은 노드다.
+on:
+  workflow_dispatch:
+    inputs:
+      base_patches:
+        description: "기준(A)에 얹을 패치 — 배포 구성은 P2-2"
+        default: "tools/patches/p2-2-keep-evaluators-on-rebuild.patch"
+        type: string
+      test_patches:
+        description: "시험(B)에 더 얹을 패치"
+        default: ""
+        type: string
+      wasm_opt:
+        description: "두 빌드 모두에 얹을 wasm-opt 후처리(배포 구성 = -O4 --converge)"
+        default: "-O4 --converge"
+        type: string
+      time_ms:
+        description: "국면당 탐색 시간(ms)"
+        default: "10000"
+        type: string
+      variant:
+        description: "변형(1 스레드 결정성 때문에 기본은 single-simd128)"
+        default: "single-simd128"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  mate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      WORK: ${{ github.workspace }}/../rapfi-wasm-work
+      ENABLE_LTO: "ON"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "26"
+      - uses: pnpm/action-setup@v4
+      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+
+      - name: 시스템 도구
+        run: sudo apt-get update -qq && sudo apt-get install -y ninja-build ccache file
+
+      - name: emsdk 캐시 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.WORK }}/emsdk
+          key: emsdk-latest-v1
+
+      - name: rapfi 소스 캐시 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.WORK }}/rapfi
+          key: rapfi-3c94c2a9-v1
+
+      - name: WASM 빌드 — A(기준) · B(시험)
+        env:
+          BASE: ${{ inputs.base_patches }}
+          TEST: ${{ inputs.test_patches }}
+          WASM_OPT: ${{ inputs.wasm_opt }}
+        run: |
+          set -o pipefail   # 셸을 안 적은 run 은 pipefail 이 없다 — A 의 해시 게이트가 `| grep` 에 삼켜지지 않게
+          grep -m1 "model name" /proc/cpuinfo || true
+          take () {
+            mkdir -p "bench/gomocalc/engines/$1"
+            cp out/engine/rapfi-*.js out/engine/rapfi-*.wasm out/engine/rapfi-*.data \
+               out/engine/ENGINE_VERSION.txt "bench/gomocalc/engines/$1/"
+            grep upstream "bench/gomocalc/engines/$1/ENGINE_VERSION.txt"
+          }
+          RAPFI_PATCHES="$BASE" WASM_OPT_POST="$WASM_OPT" bash tools/build_engine_wasm.sh
+          echo "--- A: BENCH(배포 구성이면 2b7c7da9 여야 함 — 다르면 여기서 멈춘다)"
+          node spike/node-bench.mjs single-simd128 | grep -E '"(hash|nodes|pass)"'
+          take rapfiweb-base
+          RAPFI_PATCHES="$(echo $BASE $TEST)" WASM_OPT_POST="$WASM_OPT" bash tools/build_engine_wasm.sh
+          echo "--- B: BENCH(트리를 바꾸는 변경이면 달라지는 것이 정상 — 기록만)"
+          node spike/node-bench.mjs single-simd128 | grep -E '"(hash|nodes|pass)"' || true
+          take rapfiweb-test
+
+      - name: 필승 국면 묶음 — A · B
+        env:
+          VARIANT: ${{ inputs.variant }}
+          TIME_MS: ${{ inputs.time_ms }}
+        run: |
+          grep -m1 "model name" /proc/cpuinfo || true
+          ENGINES=rapfiweb-base LABEL=mate-base node bench/gomocalc/mate-probe.mjs
+          ENGINES=rapfiweb-test LABEL=mate-test node bench/gomocalc/mate-probe.mjs
+          R=bench/gomocalc/results
+          node bench/gomocalc/mate-probe.mjs --report $R/mate-base.json $R/mate-test.json | tee $R/mate-compare.md
+          {
+            echo "### mate suite — base(\`${{ inputs.base_patches }}\`) ↔ test(+\`${{ inputs.test_patches }}\`)"
+            cat $R/mate-compare.md
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 결과
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: mate-suite
+          retention-days: 14
+          path: |
+            bench/gomocalc/results/mate-base.*
+            bench/gomocalc/results/mate-test.*
+            bench/gomocalc/results/mate-compare.md
+            bench/gomocalc/engines/*/ENGINE_VERSION.txt
