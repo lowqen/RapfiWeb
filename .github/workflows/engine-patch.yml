@@ -7,7 +7,9 @@ name: 엔진 패치 검증 (Phase 2 · 결과 불변)
 #   2. 웹 회귀 게이트: node spike/node-bench.mjs single-simd128 — 기준선과 다르면 실패
 #   3. 렌주 NNUE 경로 비트 대조: 같은 러너에서 **패치 없는** 배포 릴리스와 고정 깊이로 맞대 본다
 #      (BENCH 는 10국면 중 렌주가 3개뿐이라 이 경로의 신호가 약하다)
-#   4. 산출물(.js/.wasm, 며칠만)을 아티팩트로 — 로컬에서 같은 대조를 다시 돌릴 수 있게
+#   4. 스레드 재구성 재적재 탐침(multi-simd128): 같은 러너에서 패치 없는 릴리스 ↔ 패치 — 늘 출력하고,
+#      reload_gate 를 켜면 패치 쪽 첫 탐색 뒤에 가중치 재적재 줄이 있을 때 실패(P2-2 게이트)
+#   5. 산출물(.js/.wasm, 며칠만)을 아티팩트로 — 로컬에서 같은 대조를 다시 돌릴 수 있게
 #
 # 릴리스는 만들지 않는다. 캐시는 **복원만** 한다 — 패치된 작업 트리를 rapfi 소스 캐시로 저장하면
 # 다음 릴리스 빌드가 그것을 물려받는다(빌드 스크립트가 되돌리지만, 캐시를 더럽힐 이유가 없다).
@@ -26,6 +28,10 @@ on:
         description: "추가 변형(예: single-simd128-relaxed)"
         default: ""
         type: string
+      reload_gate:
+        description: "스레드 수 변경 뒤 가중치 재적재가 있으면 실패(P2-2 패치용)"
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -43,6 +49,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "26"
+      - uses: pnpm/action-setup@v4
 
       - name: 시스템 도구
         run: sudo apt-get update -qq && sudo apt-get install -y ninja-build ccache file
@@ -85,6 +92,23 @@ jobs:
             ENGINE_DIR=base ENGINE_DIR_B=out/engine PAIR=single-simd128,single-simd128 STRICT=1 \
               POSITIONS="$set" node spike/relaxed-equivalence.mjs | tail -1
           done
+
+      - name: 스레드 재구성 재적재 탐침 (패치 없는 릴리스 ↔ 패치 · multi-simd128)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GATE: ${{ inputs.reload_gate && '1' || '' }}
+        run: |
+          pnpm install --no-frozen-lockfile
+          pnpm exec playwright install --with-deps chromium
+          E=bench/gomocalc/engines
+          mkdir -p "$E/base" "$E/patched"
+          gh release download "$ENGINE_TAG" --dir "$E/base" --pattern 'rapfi-multi-simd128.*' --pattern 'rapfi.data'
+          mv "$E/base/rapfi.data" "$E/base/rapfi-multi-simd128.data"
+          cp out/engine/rapfi-multi-simd128.* "$E/patched/"
+          echo "--- 패치 없는 릴리스 ---"
+          node bench/gomocalc/thread-reload-probe.mjs base multi-simd128
+          echo "--- 패치 ---"
+          STRICT="$GATE" node bench/gomocalc/thread-reload-probe.mjs patched multi-simd128
 
       - name: 산출물
         uses: actions/upload-artifact@v4
