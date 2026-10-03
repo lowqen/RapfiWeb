@@ -1,0 +1,1722 @@
+{
+  "generatedAt": "2026-10-03T05:33:40.737Z",
+  "engine": "name=\"Rapfi\", version=\"0.43.02 (g++ 13.3.0 on Linux SSE41 AVX2 BMI2)\", author=\"Rapfi developers (see AUTHORS file)\", country=\"China\"",
+  "params": {
+    "screenNodes": 20000,
+    "finalNodes": 500000,
+    "radius": 3,
+    "parents": 6,
+    "screenGap": 0.15,
+    "maxGap": 0.08,
+    "keep": 60,
+    "perSource": 4,
+    "perParent": 2,
+    "concurrency": 2,
+    "five": true
+  },
+  "note": "흑 승률은 흑 쪽에서 본 값. 노드 고정 · 해시 비움 · 1 스레드 평가 — bench/sprt/make-openings.mjs",
+  "stats": {
+    "four": 882,
+    "five": 5619,
+    "screened": 1186,
+    "unique": 852,
+    "chosen": 60,
+    "sourcesCovered": 24,
+    "fourStone": 1,
+    "fiveStone": 59,
+    "screenGapHistogram": [
+      425,
+      361,
+      400,
+      375,
+      423,
+      4515
+    ],
+    "finalGapHistogram": [
+      179,
+      152,
+      138,
+      97,
+      82,
+      198
+    ]
+  },
+  "openings": [
+    {
+      "name": "direct-f9+g7i6",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          6,
+          8
+        ],
+        [
+          8,
+          9
+        ]
+      ],
+      "blackWinrate": 0.5,
+      "eval": "0",
+      "source": "direct-f9"
+    },
+    {
+      "name": "direct-g8+g7j9",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          6,
+          8
+        ],
+        [
+          9,
+          6
+        ]
+      ],
+      "blackWinrate": 0.5,
+      "eval": "0",
+      "source": "direct-g8"
+    },
+    {
+      "name": "indirect-g7+f10i10",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          6,
+          8
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          8,
+          5
+        ]
+      ],
+      "blackWinrate": 0.5,
+      "eval": "0",
+      "source": "indirect-g7"
+    },
+    {
+      "name": "direct-g8+f8e9",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          5,
+          7
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "blackWinrate": 0.5012,
+      "eval": "-1",
+      "source": "direct-g8"
+    },
+    {
+      "name": "indirect-g9+j8k9",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          9,
+          7
+        ],
+        [
+          10,
+          6
+        ]
+      ],
+      "blackWinrate": 0.5012,
+      "eval": "-1",
+      "source": "indirect-g9"
+    },
+    {
+      "name": "direct-f9+g7e7",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          6,
+          8
+        ],
+        [
+          4,
+          8
+        ]
+      ],
+      "blackWinrate": 0.4988,
+      "eval": "1",
+      "source": "direct-f9"
+    },
+    {
+      "name": "direct-f7+i7h5",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          5,
+          8
+        ],
+        [
+          8,
+          8
+        ],
+        [
+          7,
+          10
+        ]
+      ],
+      "blackWinrate": 0.4988,
+      "eval": "1",
+      "source": "direct-f7"
+    },
+    {
+      "name": "indirect-g9+k8k7",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          10,
+          7
+        ],
+        [
+          10,
+          8
+        ]
+      ],
+      "blackWinrate": 0.4988,
+      "eval": "1",
+      "source": "indirect-g9"
+    },
+    {
+      "name": "direct-g9+i7j10",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          8,
+          8
+        ],
+        [
+          9,
+          5
+        ]
+      ],
+      "blackWinrate": 0.5025,
+      "eval": "-2",
+      "source": "direct-g9"
+    },
+    {
+      "name": "direct-g9+i7i6",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          8,
+          8
+        ],
+        [
+          8,
+          9
+        ]
+      ],
+      "blackWinrate": 0.5025,
+      "eval": "-2",
+      "source": "direct-g9"
+    },
+    {
+      "name": "indirect-g8+f8g6",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          5,
+          7
+        ],
+        [
+          6,
+          9
+        ]
+      ],
+      "blackWinrate": 0.4975,
+      "eval": "2",
+      "source": "indirect-g8"
+    },
+    {
+      "name": "direct-g10+f8e6",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          6,
+          5
+        ],
+        [
+          5,
+          7
+        ],
+        [
+          4,
+          9
+        ]
+      ],
+      "blackWinrate": 0.4963,
+      "eval": "3",
+      "source": "direct-g10"
+    },
+    {
+      "name": "direct-h7+j8i7",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          7,
+          8
+        ],
+        [
+          9,
+          7
+        ],
+        [
+          8,
+          8
+        ]
+      ],
+      "blackWinrate": 0.4963,
+      "eval": "3",
+      "source": "direct-h7"
+    },
+    {
+      "name": "direct-f6+j7i9",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          5,
+          9
+        ],
+        [
+          9,
+          8
+        ],
+        [
+          8,
+          6
+        ]
+      ],
+      "blackWinrate": 0.5037,
+      "eval": "-3",
+      "source": "direct-f6"
+    },
+    {
+      "name": "direct-f9+i9h7",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          7,
+          8
+        ]
+      ],
+      "blackWinrate": 0.505,
+      "eval": "-4",
+      "source": "direct-f9"
+    },
+    {
+      "name": "direct-g8+g7g9",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          6,
+          8
+        ],
+        [
+          6,
+          6
+        ]
+      ],
+      "blackWinrate": 0.505,
+      "eval": "-4",
+      "source": "direct-g8"
+    },
+    {
+      "name": "indirect-i10+f9g6",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          8,
+          5
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          6,
+          9
+        ]
+      ],
+      "blackWinrate": 0.505,
+      "eval": "-4",
+      "source": "indirect-i10"
+    },
+    {
+      "name": "indirect-f7+e6k7",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          5,
+          8
+        ],
+        [
+          4,
+          9
+        ],
+        [
+          10,
+          8
+        ]
+      ],
+      "blackWinrate": 0.505,
+      "eval": "-4",
+      "source": "indirect-f7"
+    },
+    {
+      "name": "direct-f10+g9f9",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          5,
+          6
+        ]
+      ],
+      "blackWinrate": 0.5062,
+      "eval": "-5",
+      "source": "direct-f10"
+    },
+    {
+      "name": "direct-g10+g8f8",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          6,
+          5
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          5,
+          7
+        ]
+      ],
+      "blackWinrate": 0.4938,
+      "eval": "5",
+      "source": "direct-g10"
+    },
+    {
+      "name": "direct-g9+j8k9",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          9,
+          7
+        ],
+        [
+          10,
+          6
+        ]
+      ],
+      "blackWinrate": 0.5062,
+      "eval": "-5",
+      "source": "direct-g9"
+    },
+    {
+      "name": "direct-f7+j10e7",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          5,
+          8
+        ],
+        [
+          9,
+          5
+        ],
+        [
+          4,
+          8
+        ]
+      ],
+      "blackWinrate": 0.5062,
+      "eval": "-5",
+      "source": "direct-f7"
+    },
+    {
+      "name": "indirect-f10+g9f9",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          5,
+          6
+        ]
+      ],
+      "blackWinrate": 0.4938,
+      "eval": "5",
+      "source": "indirect-f10"
+    },
+    {
+      "name": "indirect-j10+j9g9",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          9,
+          5
+        ],
+        [
+          9,
+          6
+        ],
+        [
+          6,
+          6
+        ]
+      ],
+      "blackWinrate": 0.5062,
+      "eval": "-5",
+      "source": "indirect-j10"
+    },
+    {
+      "name": "direct-g8+f8g6",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          5,
+          7
+        ],
+        [
+          6,
+          9
+        ]
+      ],
+      "blackWinrate": 0.4925,
+      "eval": "6",
+      "source": "direct-g8"
+    },
+    {
+      "name": "indirect-f6+k9h6",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          5,
+          9
+        ],
+        [
+          10,
+          6
+        ],
+        [
+          7,
+          9
+        ]
+      ],
+      "blackWinrate": 0.4925,
+      "eval": "6",
+      "source": "indirect-f6"
+    },
+    {
+      "name": "indirect-j10+i10",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          9,
+          5
+        ],
+        [
+          8,
+          5
+        ]
+      ],
+      "blackWinrate": 0.5087,
+      "eval": "7",
+      "source": "indirect-j10"
+    },
+    {
+      "name": "direct-h10+g11i7",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          7,
+          5
+        ],
+        [
+          6,
+          4
+        ],
+        [
+          8,
+          8
+        ]
+      ],
+      "blackWinrate": 0.5087,
+      "eval": "-7",
+      "source": "direct-h10"
+    },
+    {
+      "name": "direct-f8+i8i9",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          5,
+          7
+        ],
+        [
+          8,
+          7
+        ],
+        [
+          8,
+          6
+        ]
+      ],
+      "blackWinrate": 0.5087,
+      "eval": "-7",
+      "source": "direct-f8"
+    },
+    {
+      "name": "direct-f8+f10g11",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          5,
+          7
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          6,
+          4
+        ]
+      ],
+      "blackWinrate": 0.4913,
+      "eval": "7",
+      "source": "direct-f8"
+    },
+    {
+      "name": "indirect-g8+f8h11",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          5,
+          7
+        ],
+        [
+          7,
+          4
+        ]
+      ],
+      "blackWinrate": 0.5087,
+      "eval": "-7",
+      "source": "indirect-g8"
+    },
+    {
+      "name": "direct-f6+g7f5",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          5,
+          9
+        ],
+        [
+          6,
+          8
+        ],
+        [
+          5,
+          10
+        ]
+      ],
+      "blackWinrate": 0.51,
+      "eval": "-8",
+      "source": "direct-f6"
+    },
+    {
+      "name": "indirect-f10+e11j11",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          9,
+          4
+        ]
+      ],
+      "blackWinrate": 0.49,
+      "eval": "8",
+      "source": "indirect-f10"
+    },
+    {
+      "name": "indirect-j10+j9i8",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          9,
+          5
+        ],
+        [
+          9,
+          6
+        ],
+        [
+          8,
+          7
+        ]
+      ],
+      "blackWinrate": 0.49,
+      "eval": "8",
+      "source": "indirect-j10"
+    },
+    {
+      "name": "indirect-g8+g9f11",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          5,
+          4
+        ]
+      ],
+      "blackWinrate": 0.4888,
+      "eval": "9",
+      "source": "indirect-g8"
+    },
+    {
+      "name": "direct-g10+g9i7",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          6,
+          5
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          8,
+          8
+        ]
+      ],
+      "blackWinrate": 0.5112,
+      "eval": "-9",
+      "source": "direct-g10"
+    },
+    {
+      "name": "direct-f8+g10i9",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          5,
+          7
+        ],
+        [
+          6,
+          5
+        ],
+        [
+          8,
+          6
+        ]
+      ],
+      "blackWinrate": 0.5112,
+      "eval": "-9",
+      "source": "direct-f8"
+    },
+    {
+      "name": "indirect-f10+i7i10",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          8,
+          8
+        ],
+        [
+          8,
+          5
+        ]
+      ],
+      "blackWinrate": 0.5112,
+      "eval": "-9",
+      "source": "indirect-f10"
+    },
+    {
+      "name": "direct-f7+j10g7",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          5,
+          8
+        ],
+        [
+          9,
+          5
+        ],
+        [
+          6,
+          8
+        ]
+      ],
+      "blackWinrate": 0.5125,
+      "eval": "-10",
+      "source": "direct-f7"
+    },
+    {
+      "name": "indirect-i10+f9k7",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          8,
+          5
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          10,
+          8
+        ]
+      ],
+      "blackWinrate": 0.5125,
+      "eval": "-10",
+      "source": "indirect-i10"
+    },
+    {
+      "name": "direct-f9+f8h7",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          5,
+          7
+        ],
+        [
+          7,
+          8
+        ]
+      ],
+      "blackWinrate": 0.4863,
+      "eval": "11",
+      "source": "direct-f9"
+    },
+    {
+      "name": "direct-g6+h10j9",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          6,
+          9
+        ],
+        [
+          7,
+          5
+        ],
+        [
+          9,
+          6
+        ]
+      ],
+      "blackWinrate": 0.485,
+      "eval": "12",
+      "source": "direct-g6"
+    },
+    {
+      "name": "direct-h10+g11f11",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          7,
+          5
+        ],
+        [
+          6,
+          4
+        ],
+        [
+          5,
+          4
+        ]
+      ],
+      "blackWinrate": 0.4838,
+      "eval": "13",
+      "source": "direct-h10"
+    },
+    {
+      "name": "indirect-h10+h7i7",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          7,
+          5
+        ],
+        [
+          7,
+          8
+        ],
+        [
+          8,
+          8
+        ]
+      ],
+      "blackWinrate": 0.5162,
+      "eval": "-13",
+      "source": "indirect-h10"
+    },
+    {
+      "name": "indirect-h10+j8k6",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          7,
+          5
+        ],
+        [
+          9,
+          7
+        ],
+        [
+          10,
+          9
+        ]
+      ],
+      "blackWinrate": 0.5162,
+      "eval": "-13",
+      "source": "indirect-h10"
+    },
+    {
+      "name": "indirect-g9+i7i6",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          8,
+          8
+        ],
+        [
+          8,
+          9
+        ]
+      ],
+      "blackWinrate": 0.5162,
+      "eval": "-13",
+      "source": "indirect-g9"
+    },
+    {
+      "name": "direct-h10+i8i11",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          7,
+          5
+        ],
+        [
+          8,
+          7
+        ],
+        [
+          8,
+          4
+        ]
+      ],
+      "blackWinrate": 0.5175,
+      "eval": "-14",
+      "source": "direct-h10"
+    },
+    {
+      "name": "direct-g7+f6e7",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          6,
+          8
+        ],
+        [
+          5,
+          9
+        ],
+        [
+          4,
+          8
+        ]
+      ],
+      "blackWinrate": 0.5175,
+      "eval": "-14",
+      "source": "direct-g7"
+    },
+    {
+      "name": "indirect-h10+h7i11",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          7,
+          5
+        ],
+        [
+          7,
+          8
+        ],
+        [
+          8,
+          4
+        ]
+      ],
+      "blackWinrate": 0.4825,
+      "eval": "14",
+      "source": "indirect-h10"
+    },
+    {
+      "name": "direct-f10+e9i8",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          8,
+          7
+        ]
+      ],
+      "blackWinrate": 0.5187,
+      "eval": "-15",
+      "source": "direct-f10"
+    },
+    {
+      "name": "direct-h10+g9j9",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          7,
+          5
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          9,
+          6
+        ]
+      ],
+      "blackWinrate": 0.5187,
+      "eval": "-15",
+      "source": "direct-h10"
+    },
+    {
+      "name": "direct-g9+i11k11",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          8,
+          4
+        ],
+        [
+          10,
+          4
+        ]
+      ],
+      "blackWinrate": 0.4813,
+      "eval": "15",
+      "source": "direct-g9"
+    },
+    {
+      "name": "indirect-g10+h11h6",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          6,
+          5
+        ],
+        [
+          7,
+          4
+        ],
+        [
+          7,
+          9
+        ]
+      ],
+      "blackWinrate": 0.4813,
+      "eval": "15",
+      "source": "indirect-g10"
+    },
+    {
+      "name": "indirect-i10+h11f10",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          8,
+          5
+        ],
+        [
+          7,
+          4
+        ],
+        [
+          5,
+          5
+        ]
+      ],
+      "blackWinrate": 0.4813,
+      "eval": "15",
+      "source": "indirect-i10"
+    },
+    {
+      "name": "indirect-f9+i6h6",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          8,
+          9
+        ],
+        [
+          7,
+          9
+        ]
+      ],
+      "blackWinrate": 0.4813,
+      "eval": "15",
+      "source": "indirect-f9"
+    },
+    {
+      "name": "indirect-f8+k7j6",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          5,
+          7
+        ],
+        [
+          10,
+          8
+        ],
+        [
+          9,
+          9
+        ]
+      ],
+      "blackWinrate": 0.5187,
+      "eval": "-15",
+      "source": "indirect-f8"
+    },
+    {
+      "name": "direct-g10+g7e6",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          6,
+          5
+        ],
+        [
+          6,
+          8
+        ],
+        [
+          4,
+          9
+        ]
+      ],
+      "blackWinrate": 0.52,
+      "eval": "-16",
+      "source": "direct-g10"
+    },
+    {
+      "name": "direct-h7+j8g10",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          7,
+          8
+        ],
+        [
+          9,
+          7
+        ],
+        [
+          6,
+          5
+        ]
+      ],
+      "blackWinrate": 0.52,
+      "eval": "-16",
+      "source": "direct-h7"
+    },
+    {
+      "name": "direct-g6+i6j6",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          6,
+          9
+        ],
+        [
+          8,
+          9
+        ],
+        [
+          9,
+          9
+        ]
+      ],
+      "blackWinrate": 0.48,
+      "eval": "16",
+      "source": "direct-g6"
+    },
+    {
+      "name": "indirect-f10+g7j8",
+      "moves": [
+        [
+          7,
+          7
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          6,
+          8
+        ],
+        [
+          9,
+          7
+        ]
+      ],
+      "blackWinrate": 0.48,
+      "eval": "16",
+      "source": "indirect-f10"
+    }
+  ]
+}
