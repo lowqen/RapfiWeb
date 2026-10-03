@@ -71,7 +71,8 @@ jobs:
         env:
           BASE: ${{ inputs.base_patches }}
           TEST: ${{ inputs.test_patches }}
-          WASM_OPT: ${{ inputs.wasm_opt }}
+          # WASM_OPT 는 build_engine_wasm.sh 가 wasm-opt 바이너리 경로로 읽는 이름이다 — 겹치지 않게
+          OPT_PASSES: ${{ inputs.wasm_opt }}
         run: |
           set -o pipefail   # 셸을 안 적은 run 은 pipefail 이 없다 — A 의 해시 게이트가 `| grep` 에 삼켜지지 않게
           grep -m1 "model name" /proc/cpuinfo || true
@@ -81,11 +82,11 @@ jobs:
                out/engine/ENGINE_VERSION.txt "bench/gomocalc/engines/$1/"
             grep upstream "bench/gomocalc/engines/$1/ENGINE_VERSION.txt"
           }
-          RAPFI_PATCHES="$BASE" WASM_OPT_POST="$WASM_OPT" bash tools/build_engine_wasm.sh
+          RAPFI_PATCHES="$BASE" WASM_OPT_POST="$OPT_PASSES" bash tools/build_engine_wasm.sh
           echo "--- A: BENCH(배포 구성이면 2b7c7da9 여야 함 — 다르면 여기서 멈춘다)"
           node spike/node-bench.mjs single-simd128 | grep -E '"(hash|nodes|pass)"'
           take rapfiweb-base
-          RAPFI_PATCHES="$(echo $BASE $TEST)" WASM_OPT_POST="$WASM_OPT" bash tools/build_engine_wasm.sh
+          RAPFI_PATCHES="$(echo $BASE $TEST)" WASM_OPT_POST="$OPT_PASSES" bash tools/build_engine_wasm.sh
           echo "--- B: BENCH(트리를 바꾸는 변경이면 달라지는 것이 정상 — 기록만)"
           node spike/node-bench.mjs single-simd128 | grep -E '"(hash|nodes|pass)"' || true
           take rapfiweb-test
