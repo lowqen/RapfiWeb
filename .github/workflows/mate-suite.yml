@@ -32,6 +32,10 @@ on:
         description: "국면당 탐색 시간(ms)"
         default: "10000"
         type: string
+      test_first:
+        description: "B(시험)를 먼저 잴지 — 순서 효과를 지우려면 두 번째 실행에서 켠다"
+        default: false
+        type: boolean
       variant:
         description: "변형(1 스레드 결정성 때문에 기본은 single-simd128)"
         default: "single-simd128"
@@ -102,8 +106,10 @@ jobs:
           SUITE: ${{ inputs.suite }}
         run: |
           grep -m1 "model name" /proc/cpuinfo || true
-          ENGINES=rapfiweb-base LABEL=mate-base node bench/gomocalc/mate-probe.mjs
-          ENGINES=rapfiweb-test LABEL=mate-test node bench/gomocalc/mate-probe.mjs
+          # 엔진마다 묶음 전체를 차례로 푼다 — 나중에 잰 쪽이 빠르게 나오는 순서 효과가 있어(P3-3), 뒤집어 볼 수 있게
+          if [ "${{ inputs.test_first }}" = "true" ]; then order="test base"; else order="base test"; fi
+          echo "측정 순서: $order"
+          for e in $order; do ENGINES=rapfiweb-$e LABEL=mate-$e node bench/gomocalc/mate-probe.mjs; done
           R=bench/gomocalc/results
           node bench/gomocalc/mate-probe.mjs --report $R/mate-base.json $R/mate-test.json | tee $R/mate-compare.md
           {
