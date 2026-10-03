@@ -20,6 +20,10 @@ on:
         description: "시험(A)에 base_patches 위로 더 얹을 패치(비우면 B 와 같은 엔진 — 자체 대국)"
         default: ""
         type: string
+      test_config:
+        description: "시험(A)의 config.toml 만 바꿀 것 — tools/config_set.mjs 의 \"표:키=값\"(쉼표로 여럿, 예: model.evaluator:margin_scale=300)"
+        default: ""
+        type: string
       games:
         description: "최대 판 수(쌍 단위)"
         default: "20"
@@ -90,10 +94,15 @@ jobs:
         env:
           BASE: ${{ inputs.base_patches }}
           TEST: ${{ inputs.test_patches }}
+          TEST_CONFIG: ${{ inputs.test_config }}
         run: |
           grep -m1 "model name" /proc/cpuinfo || true
           OUT_DIR=bench/sprt/engines/base RAPFI_PATCHES="$BASE" bash tools/build_host_engine.sh
           OUT_DIR=bench/sprt/engines/test RAPFI_PATCHES="$(echo $BASE $TEST)" bash tools/build_host_engine.sh
+          if [ -n "$TEST_CONFIG" ]; then
+            IFS=',' read -ra kv <<< "$TEST_CONFIG"
+            node tools/config_set.mjs bench/sprt/engines/test/config.toml "${kv[@]}"
+          fi
 
       - name: SPRT
         env:

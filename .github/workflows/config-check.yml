@@ -1,0 +1,77 @@
+name: 설정 대조 (고정 깊이 · 네이티브)
+
+# 재빌드 없이 config.toml 만 다른 엔진들을 같은 국면 · 같은 깊이로 풀어 노드 · 시간 · NPS · 최선수 · 평가를 맞댄다
+# (bench/sprt/fixed-depth.mjs). 트리를 바꾸는 설정(P2-7 margin_scale 등)의 싼 확인 — Elo 는 sprt.yml 로.
+#
+#   variants: "이름=설정;이름=설정" — 설정은 tools/config_set.mjs 의 "표:키=값"(쉼표로 여럿), 비우면 그대로.
+#             첫 변형이 기준이다. 예: "395=;300=model.evaluator:margin_scale=300;250=model.evaluator:margin_scale=250"
+on:
+  workflow_dispatch:
+    inputs:
+      variants:
+        default: "395=;300=model.evaluator:margin_scale=300;250=model.evaluator:margin_scale=250"
+        type: string
+      depth:
+        default: "16"
+        type: string
+      repeat:
+        default: "2"
+        type: string
+      positions:
+        default: "bench/sprt/openings-balanced.json,bench/gomocalc/mate-suite.json,bench/gomocalc/positions.json"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      WORK: ${{ github.workspace }}/../rapfi-wasm-work
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "26"
+      - name: 시스템 도구
+        run: sudo apt-get update -qq && sudo apt-get install -y ninja-build ccache
+      - name: rapfi 소스 캐시 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.WORK }}/rapfi
+          key: rapfi-3c94c2a9-v1
+      - name: 네이티브 빌드(패치 없음 — 1 스레드 고정 깊이는 결과 불변 패치와 무관)
+        run: OUT_DIR=bench/sprt/engines/plain bash tools/build_host_engine.sh
+      - name: 변형 만들기 · 대조
+        env:
+          VARIANTS: ${{ inputs.variants }}
+        run: |
+          set -o pipefail
+          grep -m1 "model name" /proc/cpuinfo || true
+          E=bench/sprt/engines
+          args=()
+          IFS=';' read -ra vs <<< "$VARIANTS"
+          for v in "${vs[@]}"; do
+            name="${v%%=*}"; sets="${v#*=}"
+            rm -rf "$E/v-$name"; cp -r "$E/plain" "$E/v-$name"
+            echo "--- 변형 $name"
+            if [ -n "$sets" ]; then
+              IFS=',' read -ra kv <<< "$sets"
+              node tools/config_set.mjs "$E/v-$name/config.toml" "${kv[@]}"
+            fi
+            args+=(--engine "$name|$PWD/$E/v-$name/pbrain-rapfi|$E/v-$name")
+          done
+          node bench/sprt/fixed-depth.mjs "${args[@]}" --depth "${{ inputs.depth }}" --repeat "${{ inputs.repeat }}" \
+            --positions "${{ inputs.positions }}" --out config-check.json | tee config-check.log
+          { echo "### 설정 대조 — 깊이 ${{ inputs.depth }}"; sed -n '/^| 엔진/,$p' config-check.log; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        continue-on-error: true
+        with:
+          name: config-check
+          retention-days: 14
+          path: |
+            config-check.json
+            config-check.log
