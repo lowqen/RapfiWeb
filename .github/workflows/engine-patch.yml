@@ -15,8 +15,8 @@ on:
   workflow_dispatch:
     inputs:
       patches:
-        description: "적용할 패치(공백 구분, 저장소 루트 기준)"
-        default: "tools/patches/p2-1-codebook-pipeline.patch"
+        description: "적용할 패치(공백 구분, 저장소 루트 기준 — 비우면 패치 없음)"
+        default: ""
         type: string
       wasm_opt:
         description: "wasm-opt 후처리 패스(예: -O4 --converge — 비우면 하지 않음)"
