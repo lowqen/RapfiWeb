@@ -22,7 +22,7 @@ on:
     inputs:
       tag:
         description: "릴리스 태그"
-        default: "engine-3c94c2a9-rx"
+        default: "engine-3c94c2a9-p2"
         type: string
 
 permissions:
@@ -35,6 +35,11 @@ jobs:
     env:
       WORK: ${{ github.workspace }}/../rapfi-wasm-work
       ENABLE_LTO: "ON"
+      # 엔진 소스 패치(공백 구분, 저장소 루트 기준). 빌드가 적용하고, 릴리스 본문이 밝히고,
+      # 대응 소스로 자산에 함께 낸다(GPL — 아래 「릴리스 본문」·「릴리스 발행」).
+      # P2-2 채택(docs/최적화-마스터플랜.md §4): 결과 불변(BENCH 2b7c7da9 · 렌주 비트 동일 5/5 · 50/50,
+      # engine-patch 37087267731)이고 스레드 수 변경 뒤 가중치 재적재 12줄 → 0줄.
+      RAPFI_PATCHES: "tools/patches/p2-2-keep-evaluators-on-rebuild.patch"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -129,9 +134,18 @@ jobs:
             echo
             echo "Rapfi 는 GPL-3.0-or-later 입니다. 이 자산은 그 엔진을 WebAssembly 로"
             echo "컴파일한 것이므로 같은 라이선스로 배포됩니다. 대응 소스는 upstream"
-            echo "커밋 <https://github.com/dhbloo/rapfi/tree/3c94c2a9> 이고, 빌드에 쓴"
-            echo "스크립트는 이 저장소의 \`tools/build_engine_wasm.sh\` 입니다 —"
-            echo "엔진 소스에는 어떤 패치도 넣지 않았습니다."
+            echo "커밋 <https://github.com/dhbloo/rapfi/tree/3c94c2a9> 이고(아래 패치를 얹음), 빌드에 쓴"
+            echo "스크립트는 이 저장소의 \`tools/build_engine_wasm.sh\` 입니다."
+            echo
+            if [ -n "$RAPFI_PATCHES" ]; then
+              echo "엔진 소스 패치 — 이 릴리스의 자산으로도 함께 냅니다:"
+              echo
+              for p in $RAPFI_PATCHES; do
+                echo "- [\`$(basename "$p")\`](https://github.com/${{ github.repository }}/blob/${{ github.sha }}/$p)"
+              done
+            else
+              echo "엔진 소스에는 어떤 패치도 넣지 않았습니다."
+            fi
             echo
             echo "가중치(\`.data\` 안에 구워짐)는 dhbloo/rapfi-networks 의 CC0 자료입니다."
           } > RELEASE_NOTES.md
@@ -156,7 +170,8 @@ jobs:
             out/engine/rapfi-multi-simd128-relaxed.wasm \
             out/engine/rapfi.data \
             out/engine/engine-manifest.json \
-            out/engine/ENGINE_VERSION.txt
+            out/engine/ENGINE_VERSION.txt \
+            $RAPFI_PATCHES
           gh release view "$TAG" --json assets -q '.assets[] | "\(.name)  \(.size)"'
 
       # .js/.wasm 은 커밋 대상이다 — 릴리스에서 `gh release download` 로 받아
