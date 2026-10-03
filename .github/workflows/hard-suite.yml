@@ -11,8 +11,8 @@ on:
         default: "11,15,19,23,27,31"
         type: string
       deep:
-        description: "B 단계(최대 1,100만 노드)로 보낼 국면 수"
-        default: "600"
+        description: "B 단계(최대 1,100만 노드)로 보낼 국면 수 — A2(180만 노드)를 거친 것 중에서"
+        default: "800"
         type: string
       extra:
         description: "extract 에 더 줄 인자(진단 — 예: --limit-games 20 --verbose 40)"

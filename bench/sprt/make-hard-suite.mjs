@@ -56,7 +56,8 @@ async function extract() {
     offsets: opt("offsets", "11,15,19,23,27,31").split(",").map(Number),
     screenNodes: num("screen-nodes", 150_000),
     evalMin: num("eval-min", 250),
-    deep: num("deep", 600),
+    mid: num("mid", 1500),
+    deep: num("deep", 800),
     maxOut: num("max-out", 90),
     perGameDeep: num("per-game-deep", 2),
     minNodes: num("min-nodes", 1_800_000),
@@ -121,11 +122,28 @@ async function extract() {
 
     /** 노드 제한 탐색 — 첫 ±M 보고의 노드(그 직전 TOTALNODES)와 마지막 평가. stopOnMate 면 +M 에서 멈춘다 */
     let verbose = num("verbose", 0); // 앞의 N 번 탐색의 요약 · 시간 관리 줄을 찍는다(진단)
+    const truncatedExamples = [];
+    const abbrev = (s) => {
+      const m = /^([\d.]+)([KMG]?)$/.exec(s);
+      return m ? Number(m[1]) * { "": 1, K: 1e3, M: 1e6, G: 1e9 }[m[2]] : null;
+    };
+    /** 일찍 멈춘 탐색이 5% 를 넘으면 결과를 믿을 수 없다 — 예시와 함께 실패한다 */
+    const checkTruncation = (items, what) => {
+      const t = items.filter((c) => c.r.truncated).length;
+      console.log(`  ${what}: 일찍 멈춤 ${t}/${items.length}`);
+      if (t > Math.max(2, items.length * 0.05)) {
+        for (const x of truncatedExamples) console.error(`    ${x}`);
+        throw new Error(
+          `${what} 단계 탐색 ${t}개가 노드 상한 전에 필승 없이 끝났습니다 — 결과를 쓰지 않습니다`,
+        );
+      }
+    };
     async function probe(e, moves, nodes, stopOnMate) {
       let lastNodes = 0;
       let first = null;
       let ev = null;
       let stopped = false;
+      let searched = null; // 요약 줄의 실제 탐색 노드(축약 — 150K · 1.2M)
       const diag = [];
       const untap = e.tap((l) => {
         if (verbose > 0 && /^MESSAGE (Speed|OptiTime)|^ERROR|^UNKNOWN/.test(l)) diag.push(l);
@@ -142,8 +160,11 @@ async function extract() {
             }
           }
         }
-        const s = /^MESSAGE Speed .*\| Eval (\S+) \|/.exec(l);
-        if (s) ev = s[1];
+        const s = /^MESSAGE Speed .*\| Eval (\S+) \| Node (\S+) \|/.exec(l);
+        if (s) {
+          ev = s[1];
+          searched = abbrev(s[2]);
+        }
       });
       try {
         await e.send("YXHASHCLEAR");
@@ -156,7 +177,14 @@ async function extract() {
             `  [v] ${moves.length}수 · 노드상한 ${nodes} · ${(performance.now() - t0).toFixed(0)}ms · 첫 필승 ${first ? `${first.eval}@${first.nodes}` : "-"} · ${diag.slice(-3).join(" / ")}`,
           );
         }
-        return { first, eval: ev, nodes: lastNodes };
+        // 필승 없이 노드 상한의 90% 도 못 채우고 끝났으면 「일찍 멈춤」 — 첫 전체 실행(37125393168)에서 B 600번이
+        // 18초에 끝난 일이 있었고 같은 조건의 진단 두 번에서는 재현되지 않았다. 다시 나면 잡아서 멈춘다.
+        const truncated = !first && searched != null && searched < nodes * 0.9;
+        if (truncated && truncatedExamples.length < 10)
+          truncatedExamples.push(
+            `${moves.length}수 상한 ${nodes} 실제 ${searched} · ${diag.slice(-2).join(" / ")}`,
+          );
+        return { first, eval: ev, nodes: lastNodes, searched, truncated };
       } finally {
         untap();
       }
@@ -181,6 +209,7 @@ async function extract() {
 
     // A
     await pool(cands, (e, c) => probe(e, c.moves, P.screenNodes, false), "A");
+    checkTruncation(cands, "A");
     const counts = { easy: 0, losing: 0, low: 0, open: 0 };
     const open = [];
     for (const c of cands) {
@@ -197,20 +226,33 @@ async function extract() {
       `[A] ${P.screenNodes}노드: 쉬움(+M) ${counts.easy} · 짐(−M) ${counts.losing} · 평가 ${P.evalMin} 미만 ${counts.low} · 남음 ${counts.open}`,
     );
 
-    // B
+    // A2 — 창의 아래 끝(minNodes)까지. 여기서 풀리면 창보다 쉽다. 평가가 높은 것부터 판당 perGameDeep 개.
+    // (A2 없이 평가 순으로 바로 B 에 보내면 60개 중 57개가 1.8M 노드 안에 풀렸다 — 비싼 B 를 쉬운 것에 썼다)
     open.sort((a, b) => Number(b.r.eval) - Number(a.r.eval));
     const perGame = new Map();
-    const deep = [];
+    const mid = [];
     for (const c of open) {
-      if (deep.length >= P.deep) break;
+      if (mid.length >= P.mid) break;
       if ((perGame.get(c.game) ?? 0) >= P.perGameDeep) continue;
       perGame.set(c.game, (perGame.get(c.game) ?? 0) + 1);
-      deep.push(c);
+      mid.push(c);
     }
+    console.log(`[A2] ${mid.length}개 — ${P.minNodes.toLocaleString()}노드(창 아래 끝)`);
+    await pool(mid, (e, c) => probe(e, c.moves, P.minNodes, true), "A2");
+    checkTruncation(mid, "A2");
+    const midEasy = mid.filter((c) => c.r.first?.eval.startsWith("+")).length;
+    const deep = mid
+      .filter((c) => !c.r.first && /^-?\d+$/.test(c.r.eval ?? "") && Number(c.r.eval) >= P.evalMin)
+      .sort((a, b) => Number(b.r.eval) - Number(a.r.eval))
+      .slice(0, P.deep);
+    console.log(`[A2] 창보다 쉬움 ${midEasy} · 다음으로 ${deep.length}개`);
+
+    // B
     console.log(
       `[B] 깊게 ${deep.length}개 — 최대 ${P.maxNodes.toLocaleString()}노드, 첫 +M 에서 멈춤`,
     );
     await pool(deep, (e, c) => probe(e, c.moves, P.maxNodes, true), "B");
+    checkTruncation(deep, "B");
     const hits = deep.filter(
       (c) =>
         c.r.first?.eval.startsWith("+") &&
@@ -246,6 +288,8 @@ async function extract() {
       counts: {
         candidates: cands.length,
         ...counts,
+        mid: mid.length,
+        midEasy,
         deep: deep.length,
         inWindow: hits.length,
         tooEasy,
