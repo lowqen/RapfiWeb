@@ -43,6 +43,8 @@ jobs:
     env:
       WORK: ${{ github.workspace }}/../rapfi-wasm-work
       ENABLE_LTO: "ON"
+      # 대조 기준 = **패치 없는** 릴리스. 배포 중인 engine-3c94c2a9-p2 는 P2-2 패치·wasm-opt 를 실었으니
+      # 「패치 없음 ↔ 패치」 대조에는 이 태그를 그대로 둔다(지우지 말 것).
       ENGINE_TAG: engine-3c94c2a9-rx
     steps:
       - uses: actions/checkout@v4

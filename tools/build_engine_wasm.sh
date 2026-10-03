@@ -55,9 +55,9 @@ RELEASE_TAG="${RELEASE_TAG:-}"
 # 같은 순서 무관 플래그만 넣는다(-s 설정은 뒤의 upstream 값에 덮인다 — 아래 [3/6] 주석).
 EXTRA_LDFLAGS="${EXTRA_LDFLAGS:-}"
 # upstream 패치(공백 구분, 저장소 루트 기준 경로 — 예: tools/patches/p2-1-codebook-pipeline.patch).
-# **기본값은 비움 = 패치 없음**(배포 릴리스의 「dhbloo/rapfi 그대로」를 지킨다). Phase 2 의
-# 결과 불변 패치를 BENCH 해시로 판정할 때 켠다(docs/최적화-마스터플랜.md §4 Phase 2,
-# engine-patch.yml). 적용한 패치는 ENGINE_VERSION.txt 에 적힌다.
+# **기본값은 비움 = 패치 없음.** Phase 2 의 결과 불변 패치를 BENCH 해시로 판정할 때 켜고
+# (docs/최적화-마스터플랜.md §4 Phase 2, engine-patch.yml), 채택된 것은 engine-release.yml 이 잡 env 로
+# 넘긴다(P2-2 부터 — 릴리스 본문이 밝히고 패치 파일을 자산으로 함께 낸다). 적용한 패치는 ENGINE_VERSION.txt 에 적힌다.
 RAPFI_PATCHES="${RAPFI_PATCHES:-}"
 # .wasm 후처리 패스(예: "-O4 --converge" — docs/최적화-마스터플랜.md 2-i · P2-6). **기본값은 비움 = 하지
 # 않음.** emcc 가 링크 때 이미 wasm-opt 를 돌리므로 이것은 그 위에 얹는 추가 패스다. 켜면 [4.5/6] 에서

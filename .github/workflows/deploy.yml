@@ -48,7 +48,7 @@ env:
   TARGET: ${{ inputs.target || 'cloudflare' }}
   PROJECT: rapfiweb
   # src/engine/engine-manifest.json 의 tag 와 같아야 한다(verify-engine.ts 가 본다).
-  ENGINE_TAG: engine-3c94c2a9-rx
+  ENGINE_TAG: engine-3c94c2a9-p2
 
 jobs:
   build:
