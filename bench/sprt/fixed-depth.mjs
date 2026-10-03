@@ -57,7 +57,7 @@ async function solve(e, moves) {
     const n = /^INFO TOTALNODES (\d+)/.exec(l);
     if (n) nodes = Number(n[1]);
     const s =
-      /^MESSAGE Speed \d+ \| Depth (\d+)-\d+ \| Eval (\S+) \| Node \S+ \| Time (\d+)ms/.exec(l);
+      /^MESSAGE Speed \S+ \| Depth (\d+)-\d+ \| Eval (\S+) \| Node \S+ \| Time (\d+)ms/.exec(l);
     if (s) summary = { depth: Number(s[1]), eval: s[2], ms: Number(s[3]) };
   });
   try {
