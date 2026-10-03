@@ -1,0 +1,37 @@
+diff --git a/Rapfi/search/ab/parameter.h b/Rapfi/search/ab/parameter.h
+index bb0b016..5b4d4d6 100644
+--- a/Rapfi/search/ab/parameter.h
++++ b/Rapfi/search/ab/parameter.h
+@@ -67,7 +67,9 @@ constexpr Depth TTM_EXT_PV            = 0.25f;
+ constexpr Depth TTM_EXT_NONPV         = 0.08f;
+ constexpr Depth NEARB4_EXT_DIST4      = 0.24f;
+ constexpr Depth NEARB4_EXT_DIST6      = 0.05f;
+-constexpr Depth CONTINUOUS_ATTACK_EXT = 0.53f;
++// Continuous attack extension per rule. Renju is raised from 0.53 (still used by the other
++// rules) so that threat sequences of the attacker are reduced less.
++constexpr Depth CONTINUOUS_ATTACK_EXT[RULE_NB] = {0.53f, 0.53f, 0.9f};
+ 
+ // -------------------------------------------------
+ // Dynamic margin & reduction functions/LUTs
+@@ -239,7 +241,7 @@ constexpr Depth policyReduction(float normalizedPolicyScore)
+ {
+     constexpr Depth PolicyReductionScale[RULE_NB] = {3.14f, 2.95f, 3.2f};
+     constexpr Depth PolicyReductionBias[RULE_NB]  = {2.21f, 3.81f, 4.0f};
+-    constexpr Depth PolicyReductionMax[RULE_NB]   = {5.00f, 3.76f, 5.1f};
++    constexpr Depth PolicyReductionMax[RULE_NB]   = {5.00f, 3.76f, 4.0f};
+ 
+     Depth r = PolicyReductionBias[R] - PolicyReductionScale[R] * normalizedPolicyScore;
+     return std::min(std::max(r, 0.0f), PolicyReductionMax[R]);
+diff --git a/Rapfi/search/ab/search.cpp b/Rapfi/search/ab/search.cpp
+index 1346b90..4e0c194 100644
+--- a/Rapfi/search/ab/search.cpp
++++ b/Rapfi/search/ab/search.cpp
+@@ -908,7 +908,7 @@ Depth computeLmrReduction(Board            &board,
+     // Decrease reduction for continuous attack (~5 elo)
+     if (!oppo4 && (ss - 2)->moveP4[self] >= H_FLEX3
+         && (ss->moveP4[self] >= H_FLEX3 || mt.distSelf <= 4 && ss->moveP4[self] >= J_FLEX2_2X))
+-        r -= CONTINUOUS_ATTACK_EXT;
++        r -= CONTINUOUS_ATTACK_EXT[Rule];
+ 
+     if constexpr (Rule == Rule::RENJU) {
+         // Decrease reduction for false forbidden move in Renju (~6 elo)

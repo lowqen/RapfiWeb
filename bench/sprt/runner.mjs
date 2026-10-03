@@ -18,6 +18,7 @@
  *        --games N               최대 판 수(쌍 단위로 올림, 기본 200) · --concurrency C 동시 대국(기본 1)
  *        --openings a,b,…        개시 이름(기본 26개 모두 — `--list-openings`) · --seed S 개시 순서 섞기
  *        --max-plies N           수 제한(넘으면 비김, 기본 225) · --hash-mb M (기본 64) · --threads T (기본 1)
+ *        --max-minutes M         시간 예산 — 넘으면 새 쌍을 시작하지 않고 마저 둔 뒤 요약(CI 잡 시간 제한 전에 끝내려고)
  * SPRT   --elo0 0 --elo1 5 --alpha 0.05 --beta 0.05     (로지스틱 Elo · stats.mjs)
  * 출력   --out games.jsonl(판마다 한 줄) · --summary summary.json · --verbose(엔진 출력도 찍음)
  *
@@ -144,6 +145,7 @@ try {
     games: Math.max(2, Number(opts.games ?? 200)),
     concurrency: Math.max(1, Number(opts.concurrency ?? 1)),
     maxPlies: Number(opts["max-plies"] ?? 225),
+    maxMinutes: Number(opts["max-minutes"] ?? 0),
     hashKb: Number(opts["hash-mb"] ?? 64) * 1024,
     threads: Number(opts.threads ?? 1),
     sprt: {
@@ -208,13 +210,22 @@ const tally = { wins: 0, draws: 0, losses: 0, penta: [0, 0, 0, 0, 0] };
 const pairScores = new Map(); // pair → A 점수 배열
 const startedPairs = new Set();
 const records = [];
-let stopRequested = false; // SPRT 결정 · 사용자 중단 — 새 쌍을 시작하지 않는다
+let stopRequested = false; // SPRT 결정 · 시간 예산 · 사용자 중단 — 새 쌍을 시작하지 않는다
+let budgetHit = false;
 let aborting = false; // 두 번째 Ctrl-C · 치명적 오류 — 진행 중 판도 버린다
 let fatal = null;
 let nextJob = 0;
 let summary = summarize(tally, cfg.sprt);
 
 function takeJob() {
+  if (
+    cfg.maxMinutes > 0 &&
+    !stopRequested &&
+    performance.now() - tStart > cfg.maxMinutes * 60_000
+  ) {
+    stopRequested = budgetHit = true;
+    console.log(`  → 시간 예산 ${cfg.maxMinutes}분을 넘었습니다 — 시작한 쌍만 마저 두고 멈춥니다`);
+  }
   while (nextJob < jobs.length) {
     const j = jobs[nextJob];
     // 멈출 때는 이미 시작한 쌍의 나머지 판만 둔다 — 오각 표본을 반쪽으로 남기지 않는다.
@@ -508,7 +519,7 @@ console.log(
       ? `H1 채택 — A 가 elo ≥ ${cfg.sprt.elo1} 쪽`
       : s.sprt.decision === "H0"
         ? `H0 채택 — A 가 elo ≤ ${cfg.sprt.elo0} 쪽`
-        : "결정 전(판 수 한도에서 멈춤)"),
+        : `결정 전(${budgetHit ? "시간 예산" : interrupts ? "사용자 중단" : "판 수 한도"}에서 멈춤)`),
 );
 console.log(
   `프로세스: 남은 엔진 ${leaked.length}${leaked.length ? " — " + leaked.join(", ") : ""} · 남은 자식 핸들 ${childHandles} · 활성 자원 ${JSON.stringify(resources)}(러너 자신의 파이프 ${ownPipes})`,

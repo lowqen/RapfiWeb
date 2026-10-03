@@ -145,3 +145,19 @@ test("엔진별 시간 제어 — 같은 느린 엔진이 넉넉한 A 는 버티
   assert.match(r.stdout, /A 수당 2000ms · 유예 2000ms \/ B 수당 50ms · 유예 100ms/);
   noLeak(r);
 });
+
+test("시간 예산 — 넘으면 새 쌍을 시작하지 않고, 시작한 쌍은 마저 두고 끝낸다", () => {
+  const r = run(`${FAKE} --seed 11 --slow 30`, `${FAKE} --seed 12 --slow 30`, [
+    "--games",
+    "200",
+    "--tc",
+    "turn=500",
+    "--max-minutes",
+    "0.02",
+  ]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(r.games.length > 0 && r.games.length < 200, String(r.games.length));
+  assert.equal(r.games.length % 2, 0, "쌍이 반쪽으로 남지 않는다");
+  assert.match(r.stdout, /시간 예산에서 멈춤/);
+  noLeak(r);
+});
