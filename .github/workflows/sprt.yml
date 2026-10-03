@@ -62,13 +62,18 @@ on:
       elo1:
         default: "5"
         type: string
+      runner:
+        description: "러너 — ubuntu-latest(논리 2) 또는 self-hosted(Vultr 전용 CPU — concurrency 를 코어 수에 맞춰)"
+        default: "ubuntu-latest"
+        type: choice
+        options: ["ubuntu-latest", "self-hosted"]
 
 permissions:
   contents: read
 
 jobs:
   sprt:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     timeout-minutes: 360
     env:
       WORK: ${{ github.workspace }}/../rapfi-wasm-work
@@ -79,7 +84,21 @@ jobs:
           node-version: "26"
 
       - name: 시스템 도구
-        run: sudo apt-get update -qq && sudo apt-get install -y ninja-build ccache
+        # self-hosted 러너는 도구가 이미 있을 수 있고, sudo 에 암호가 걸려 있을 수 있다 — 있으면 건너뛰고,
+        # 없으면 sudo -n(암호를 묻지 않고 바로 실패)으로 설치를 시도해 무엇이 없는지 분명히 말한다.
+        run: |
+          missing=()
+          for t in git cmake ninja g++ ccache pgrep; do command -v "$t" > /dev/null || missing+=("$t"); done
+          if [ ${#missing[@]} -eq 0 ]; then echo "도구 모두 있음"; exit 0; fi
+          echo "없는 도구: ${missing[*]} — 설치 시도"
+          sudo -n apt-get update -qq && sudo -n apt-get install -y git cmake ninja-build g++ ccache procps \
+            || { echo "::error::설치 실패(sudo 암호?) — 러너 기계에 직접 설치: sudo apt-get install -y git cmake ninja-build g++ ccache procps"; exit 1; }
+
+      - name: 러너 정보
+        run: |
+          echo "nproc $(nproc) · $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2)"
+          grep -E 'MemTotal|MemAvailable' /proc/meminfo
+          lscpu | grep -E '^(Thread|Core|Socket)' || true
 
       - name: rapfi 소스 캐시 복원
         uses: actions/cache/restore@v4
