@@ -120,12 +120,15 @@ async function extract() {
     }
 
     /** 노드 제한 탐색 — 첫 ±M 보고의 노드(그 직전 TOTALNODES)와 마지막 평가. stopOnMate 면 +M 에서 멈춘다 */
+    let verbose = num("verbose", 0); // 앞의 N 번 탐색의 요약 · 시간 관리 줄을 찍는다(진단)
     async function probe(e, moves, nodes, stopOnMate) {
       let lastNodes = 0;
       let first = null;
       let ev = null;
       let stopped = false;
+      const diag = [];
       const untap = e.tap((l) => {
+        if (verbose > 0 && /^MESSAGE (Speed|OptiTime)|^ERROR|^UNKNOWN/.test(l)) diag.push(l);
         const n = /^INFO (?:TOTAL)?NODES (\d+)/.exec(l);
         if (n) lastNodes = Math.max(lastNodes, Number(n[1]));
         const v = /^INFO EVAL (\S+)/.exec(l);
@@ -145,7 +148,14 @@ async function extract() {
       try {
         await e.send("YXHASHCLEAR");
         await e.send(`INFO MAX_NODE ${nodes}`);
+        const t0 = performance.now();
         await e.play(moves, { timeoutMs: 1_800_000 });
+        if (verbose > 0) {
+          verbose--;
+          console.log(
+            `  [v] ${moves.length}수 · 노드상한 ${nodes} · ${(performance.now() - t0).toFixed(0)}ms · 첫 필승 ${first ? `${first.eval}@${first.nodes}` : "-"} · ${diag.slice(-3).join(" / ")}`,
+          );
+        }
         return { first, eval: ev, nodes: lastNodes };
       } finally {
         untap();

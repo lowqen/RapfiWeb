@@ -14,6 +14,14 @@ on:
         description: "B 단계(최대 1,100만 노드)로 보낼 국면 수"
         default: "600"
         type: string
+      extra:
+        description: "extract 에 더 줄 인자(진단 — 예: --limit-games 20 --verbose 40)"
+        default: ""
+        type: string
+      verify:
+        description: "2단계(WASM 확인 · 묶기)까지 돌릴지"
+        default: true
+        type: boolean
       max_out:
         description: "WASM 확인으로 보낼 최대 국면 수(국면당 최대 60초)"
         default: "90"
@@ -49,7 +57,7 @@ jobs:
           E=bench/sprt/engines/base
           node bench/sprt/make-hard-suite.mjs extract --engine "$PWD/$E/pbrain-rapfi" --cwd "$E" --concurrency 2 \
             --offsets "${{ inputs.offsets }}" --deep "${{ inputs.deep }}" --max-out "${{ inputs.max_out }}" \
-            --out hard-candidates.json | tee extract.log
+            ${{ inputs.extra }} --out hard-candidates.json | tee extract.log
           { echo '```'; grep -E '^\[|^→' extract.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always()
@@ -62,6 +70,7 @@ jobs:
 
   verify:
     needs: extract
+    if: inputs.verify
     runs-on: ubuntu-latest
     timeout-minutes: 300
     env:
