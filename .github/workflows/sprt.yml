@@ -1,0 +1,106 @@
+name: SPRT (네이티브 대국)
+
+# bench/sprt/runner.mjs 로 네이티브 Rapfi 둘을 렌주 26개 표준 개시에서 쌍 대국시키고 SPRT 로 판정한다 —
+# docs/최적화-마스터플랜.md Phase 3 의 「트리를 바꾸는 변경」 게이트. 탐색 변경은 네이티브(wasm 보다 2~4배 빠름)에서
+# Elo 로 판정하고, 통과한 것만 wasm 으로 옮긴다(탐색 트리는 네이티브와 wasm 이 같다).
+#
+#   기준(B) = base_patches 를 얹은 빌드 · 시험(A) = base_patches + test_patches
+#   둘 다 비우면 같은 엔진끼리의 자체 대국 — 러너 · 통계 스모크(결정이 나지 않아야 정상)
+#
+# ⚠ 비공개 저장소의 ubuntu-latest 는 논리 2개다. 대국은 한 번에 한 쪽만 생각하므로 동시 대국 2 가 맞다.
+#   시간 제어가 짧을수록 러너 부하의 몫이 커진다 — 초속기 결과를 긴 시간 제어로 일반화하지 말 것.
+on:
+  workflow_dispatch:
+    inputs:
+      base_patches:
+        description: "기준(B)에 얹을 패치(공백 구분 — 비우면 패치 없음)"
+        default: ""
+        type: string
+      test_patches:
+        description: "시험(A)에 base_patches 위로 더 얹을 패치(비우면 B 와 같은 엔진 — 자체 대국)"
+        default: ""
+        type: string
+      games:
+        description: "최대 판 수(쌍 단위)"
+        default: "20"
+        type: string
+      tc:
+        description: "시간 제어(runner.mjs --tc)"
+        default: "turn=100"
+        type: string
+      concurrency:
+        description: "동시 대국"
+        default: "2"
+        type: string
+      elo0:
+        default: "0"
+        type: string
+      elo1:
+        default: "5"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  sprt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      WORK: ${{ github.workspace }}/../rapfi-wasm-work
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "26"
+
+      - name: 시스템 도구
+        run: sudo apt-get update -qq && sudo apt-get install -y ninja-build ccache
+
+      - name: rapfi 소스 캐시 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.WORK }}/rapfi
+          key: rapfi-3c94c2a9-v1
+
+      - name: 러너 · 통계 시험
+        run: node --test bench/sprt/
+
+      - name: 네이티브 빌드 — 기준(B) · 시험(A)
+        env:
+          BASE: ${{ inputs.base_patches }}
+          TEST: ${{ inputs.test_patches }}
+        run: |
+          grep -m1 "model name" /proc/cpuinfo || true
+          OUT_DIR=bench/sprt/engines/base RAPFI_PATCHES="$BASE" bash tools/build_host_engine.sh
+          OUT_DIR=bench/sprt/engines/test RAPFI_PATCHES="$(echo $BASE $TEST)" bash tools/build_host_engine.sh
+
+      - name: SPRT
+        run: |
+          set -o pipefail
+          E=bench/sprt/engines
+          node bench/sprt/runner.mjs \
+            --a "$PWD/$E/test/pbrain-rapfi" --a-cwd "$E/test" --a-name test \
+            --b "$PWD/$E/base/pbrain-rapfi" --b-cwd "$E/base" --b-name base \
+            --games "${{ inputs.games }}" --tc "${{ inputs.tc }}" --concurrency "${{ inputs.concurrency }}" \
+            --elo0 "${{ inputs.elo0 }}" --elo1 "${{ inputs.elo1 }}" \
+            --out sprt/games.jsonl --summary sprt/summary.json | tee sprt.log
+          {
+            echo "### SPRT — test(\`${{ inputs.base_patches }} ${{ inputs.test_patches }}\`) vs base(\`${{ inputs.base_patches }}\`)"
+            echo '```'
+            sed -n '/──────/,$p' sprt.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "--- 남은 pbrain 프로세스(0 이어야 함): $(pgrep -c pbrain-rapfi || true)"
+
+      - name: 기보 · 요약
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: sprt
+          retention-days: 7
+          path: |
+            sprt/
+            bench/sprt/engines/*/ENGINE_VERSION.txt
+            bench/sprt/engines/*/bench.txt

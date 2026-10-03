@@ -36,3 +36,7 @@ desktop.ini
 .idea/
 .vscode/
 *.log
+
+# SPRT 러너가 빌드해 쓰는 네이티브 엔진(tools/build_host_engine.sh) · 대국 기록
+/bench/sprt/engines/
+/sprt/
