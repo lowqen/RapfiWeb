@@ -70,6 +70,19 @@ for d in lib/profile include/profile; do
   rm -rf "${RT:?}/$d"
   cp -r "$up/$d" "$RT/$d"
 done
+# Emscripten 은 lib/profile 의 소스를 몽땅 컴파일한다. 새 런타임에는 GPU 전용 파일(InstrProfilingPlatformROCm.cpp 등)이
+# 있는데 Emscripten 에 없는 sanitizer/interception 헤더를 쓴다 — WASM 과 무관하고 원래 사본에도 없던 것들이라 뺀다.
+for f in "$RT/lib/profile"/*; do
+  [ -f "$f" ] || continue
+  if grep -q -E '#include "(interception|sanitizer_common)/' "$f"; then
+    if [ -e "$RT/lib/profile.orig/$(basename "$f")" ]; then
+      echo "  X $(basename "$f") 는 원래 사본에도 있는데 sanitizer/interception 을 쓴다 — 손으로 봐야 한다"
+      exit 1
+    fi
+    rm -f "$f"
+    echo "    - 뺌: $(basename "$f")(sanitizer/interception 의존 · 원래 사본에 없음)"
+  fi
+done
 echo "$commit" > "$STAMP"
 echo "  . 바꿈 — Emscripten 런타임 raw 형식 이제 $(ver_of "$RT")"
 
