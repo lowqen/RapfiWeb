@@ -83,6 +83,17 @@ for f in "$RT/lib/profile"/*; do
     echo "    - 뺌: $(basename "$f")(sanitizer/interception 의존 · 원래 사본에 없음)"
   fi
 done
+# Emscripten 이 자기 사본에 얹어 둔 손질을 다시 한다 — upstream 은 호스트 이름을 __wasi__ 에서만 빈 값으로 두고
+# 나머지는 lprofGetHostName(COMPILER_RT_HAS_UNAME 일 때만 정의)을 부른다. Emscripten 빌드는 그 매크로를 안 켜서
+# 링크가 "undefined symbol: lprofGetHostName" 으로 실패한다(진단 37172796755).
+port="$RT/lib/profile/InstrProfilingPort.h"
+if grep -q '^#if defined(__ORBIS__) || defined(__wasi__)$' "$port"; then
+  sed -i 's/^#if defined(__ORBIS__) || defined(__wasi__)$/#if defined(__ORBIS__) || defined(__wasi__) || defined(__EMSCRIPTEN__)/' "$port"
+  echo "    + InstrProfilingPort.h: 호스트 이름 — __EMSCRIPTEN__ 도 빈 값"
+elif ! grep -q '__EMSCRIPTEN__' "$port"; then
+  echo "  X InstrProfilingPort.h 의 호스트 이름 분기를 찾지 못했다 — upstream 이 바뀌었다, 손으로 볼 것"
+  exit 1
+fi
 echo "$commit" > "$STAMP"
 echo "  . 바꿈 — Emscripten 런타임 raw 형식 이제 $(ver_of "$RT")"
 
