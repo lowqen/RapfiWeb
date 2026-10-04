@@ -63,6 +63,18 @@ RAPFI_PATCHES="${RAPFI_PATCHES:-}"
 # 않음.** emcc 가 링크 때 이미 wasm-opt 를 돌리므로 이것은 그 위에 얹는 추가 패스다. 켜면 [4.5/6] 에서
 # 변형마다 그 변형이 쓰는 기능만 켜고 돌린다(wasm_features). 적용 여부는 ENGINE_VERSION.txt 에 적힌다.
 WASM_OPT_POST="${WASM_OPT_POST:-}"
+# LLVM PGO(P3-5 — tools/build_engine_wasm_pgo.sh 가 쓴다). **기본은 둘 다 비움 = PGO 없음.**
+#   PGO_GENERATE=1     계측 빌드: -fprofile-instr-generate + --pre-js tools/pgo/profdump.js(프로파일을 디스크로)
+#   PGO_PROFILE=<경로> 프로파일 사용 빌드: -fprofile-instr-use=<.profdata> — 컴파일 플래그만, 엔진 코드는 그대로
+# 둘 다 CMAKE_C(XX)_FLAGS 로 넣는다(upstream 은 그 변수에 덧붙이기만 한다). 적용 여부는 ENGINE_VERSION.txt 에 적힌다.
+PGO_GENERATE="${PGO_GENERATE:-}"
+PGO_PROFILE="${PGO_PROFILE:-}"
+# 기본 변형(공백 구분). 계측 빌드는 훈련에 쓰는 단일 스레드만 만들면 된다(BASE_VARIANTS=single-simd128).
+BASE_VARIANTS="${BASE_VARIANTS:-single-simd128 multi-simd128}"
+if [ -n "$PGO_GENERATE" ] && [ -n "$PGO_PROFILE" ]; then
+  echo "  X PGO_GENERATE 와 PGO_PROFILE 은 함께 쓸 수 없다"
+  exit 1
+fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK="${WORK:-$HOME/rapfi-wasm-work}"
@@ -242,14 +254,24 @@ build_variant () {
   local dir="build-$name"
   local extra=()
   [ "$threads" = "ON" ] || extra+=(-DNO_MULTI_THREADING=ON)
+  local cflags="" ldflags="$EXTRA_LDFLAGS"
+  if [ -n "$PGO_GENERATE" ]; then
+    cflags="-fprofile-instr-generate"
+    ldflags="$ldflags -fprofile-instr-generate --pre-js $ROOT/tools/pgo/profdump.js"
+  elif [ -n "$PGO_PROFILE" ]; then
+    # 프로파일에 없는 함수(다른 변형 · 훈련이 안 닿은 경로)는 경고만 — PGO 없이 컴파일된다
+    cflags="-fprofile-instr-use=$PGO_PROFILE -Wno-profile-instr-unprofiled -Wno-profile-instr-out-of-date -Wno-backend-plugin"
+  fi
 
-  echo "--- build: $name (threads=$threads relaxed=$relaxed) ---"
+  echo "--- build: $name (threads=$threads relaxed=$relaxed${cflags:+ · $cflags}) ---"
   emcmake cmake -S . -B "$dir" -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DNO_COMMAND_MODULES=ON \
     -DUSE_WASM_SIMD=ON \
     -DUSE_WASM_SIMD_RELAXED="$relaxed" \
-    -DCMAKE_EXE_LINKER_FLAGS="$EXTRA_LDFLAGS" \
+    -DCMAKE_C_FLAGS="$cflags" \
+    -DCMAKE_CXX_FLAGS="$cflags" \
+    -DCMAKE_EXE_LINKER_FLAGS="$ldflags" \
     "${extra[@]}"
   cmake --build "$dir" -j"$JOBS"
 }
@@ -260,11 +282,17 @@ build_variant () {
 # 빼는 CMake 옵션이 없다. upstream README 의 4종 안내는 mix10 이전 것이다.
 # 그래서 SIMD 두 종만 만든다 — 지원 범위는 Chrome/Edge 91+, Firefox 89+,
 # Safari 16.4+ 이고, 빠지는 것은 사실상 iOS 16.4 미만이다.
-build_variant single-simd128 OFF
-build_variant multi-simd128  ON
+VARIANTS=()
+for v in $BASE_VARIANTS; do
+  case "$v" in
+    single-simd128) build_variant single-simd128 OFF ;;
+    multi-simd128)  build_variant multi-simd128  ON ;;
+    *) echo "  X BASE_VARIANTS 에 모르는 변형: $v"; exit 1 ;;
+  esac
+  VARIANTS+=("$v")
+done
 
 # 추가 변형(EXTRA_VARIANTS) — relaxed SIMD. 이름이 곧 설정이다.
-VARIANTS=(single-simd128 multi-simd128)
 for v in $EXTRA_VARIANTS; do
   case "$v" in
     multi-simd128-relaxed)  build_variant "$v" ON ON ;;
@@ -434,6 +462,14 @@ verify () {
     echo "  X -msimd128 없음 — 스칼라 빌드다(이 커밋에서는 링크도 안 된다)"
     fail=1
   fi
+  if [ -n "$PGO_GENERATE" ]; then
+    grep -q -- "-fprofile-instr-generate" "$nj" || { echo "  X PGO_GENERATE 인데 -fprofile-instr-generate 가 없다"; fail=1; }
+    grep -q -- "profdump.js" "$nj" || { echo "  X PGO_GENERATE 인데 profdump.js(프로파일 꺼내기)가 없다"; fail=1; }
+  elif [ -n "$PGO_PROFILE" ]; then
+    grep -q -- "-fprofile-instr-use=" "$nj" || { echo "  X PGO_PROFILE 인데 -fprofile-instr-use 가 없다"; fail=1; }
+  else
+    grep -q -- "-fprofile-instr" "$nj" && { echo "  X PGO 를 켜지 않았는데 -fprofile-instr 플래그가 있다(이전 빌드 캐시?)"; fail=1; }
+  fi
   if ! grep -q -- "preamble.js" "$nj"; then
     echo "  X --pre-js preamble.js 가 없다 — sendCommand 펌프 없이 나온 빌드다"
     fail=1
@@ -486,6 +522,9 @@ ls -l "$OUT/bench" | sed "s/^/  . /"
   echo "data       : rapfi.data (모든 변형 공유) $DATA_SIZE bytes sha256 $DATA_SHA"
   echo "link opts  : (upstream CMakeLists 의 EMSCRIPTEN 블록이 전부 정한다 — 우리는 얹지 않는다)"
   echo "wasm-opt   : 추가 후처리 $WASM_OPT_NOTE"
+  if [ -n "$PGO_GENERATE" ]; then echo "pgo        : 계측 빌드(-fprofile-instr-generate) — 배포하지 말 것";
+  elif [ -n "$PGO_PROFILE" ]; then echo "pgo        : 프로파일 사용 $(basename "$PGO_PROFILE") sha256 $(sha256sum "$PGO_PROFILE" | cut -c1-16)";
+  else echo "pgo        : 없음"; fi
   echo "variants   : ${VARIANTS[*]}"
   echo "preloads   : $PRELOAD_SET"
   echo "note       : SIMD 없는 변형은 eval/mix10nnue.cpp 의 static_assert 때문에 이 커밋에서 빌드되지 않는다"
