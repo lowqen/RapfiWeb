@@ -14,11 +14,16 @@
     if (typeof process !== "undefined" && process.versions && process.versions.node) {
       var out = (process.env && process.env.RAPFI_PROFRAW) || "rapfi.profraw";
       try {
-        var data = FS.readFile("/default.profraw");
+        // 프런트엔드 계측은 default.profraw, IR 계측(-fprofile-generate)은 default_<id>.profraw — 루트의 .profraw 를 모두
+        var names = FS.readdir("/").filter(function (n) {
+          return /\.profraw$/.test(n);
+        });
+        if (names.length !== 1) throw new Error("루트의 .profraw 가 " + names.length + "개: " + names.join(","));
+        var data = FS.readFile("/" + names[0]);
         require("fs").writeFileSync(out, data);
-        process.stderr.write("[pgo] profraw " + data.length + " bytes -> " + out + "\n");
+        process.stderr.write("[pgo] /" + names[0] + " " + data.length + " bytes -> " + out + "\n");
       } catch (e) {
-        process.stderr.write("[pgo] /default.profraw 를 꺼내지 못함: " + e + "\n");
+        process.stderr.write("[pgo] 프로파일을 꺼내지 못함: " + e + "\n");
       }
     }
     if (prev) prev(code);

@@ -62,11 +62,16 @@ jobs:
           # 1차 진단(37171091827): 종료 때 값 프로파일 런타임(initializeValueProfRuntimeRecord)에서 OOB. 컴파일에만
           # -mllvm -disable-vp=true 를 준 빌드는 모듈 ID 까지 같았다 — LTO 라 계측 낮춤이 링크(wasm-ld) 때 돈다.
           # 그래서 링크에도 -Wl,-mllvm,-disable-vp=true 를 준다(C).
-          for v in C; do
-            gen="-mllvm -disable-vp=true"; genld="--profiling-funcs -Wl,-mllvm,-disable-vp=true"
-            echo "================ 진단 $v — PGO_GEN_CFLAGS='$gen' PGO_GEN_LDFLAGS='$genld'"
-            PGO_GEN_CFLAGS="$gen" PGO_GEN_LDFLAGS="$genld" PGO_TRAIN_LIMIT=3 PGO_TRAIN_NODES=20000 \
+          # 2차(37171485247): 링크에도 -disable-vp 를 줬지만 모듈 ID 가 A · B 와 같았다 — 그 옵션은 IR 계측용이고 프런트엔드
+          # 계측의 값 프로파일은 -enable-value-profiling 이 정한다(D). E 는 IR 계측(-fprofile-generate) + -disable-vp.
+          # 모듈이 실제로 바뀌었는지 sha256 으로 확인한다.
+          for v in D E; do
+            if [ $v = D ]; then kind=fe; gen="-mllvm -enable-value-profiling=false"; genld="--profiling-funcs -Wl,-mllvm,-enable-value-profiling=false"
+            else kind=ir; gen="-mllvm -disable-vp=true"; genld="--profiling-funcs -Wl,-mllvm,-disable-vp=true"; fi
+            echo "================ 진단 $v — PGO_KIND=$kind PGO_GEN_CFLAGS='$gen' PGO_GEN_LDFLAGS='$genld'"
+            PGO_KIND=$kind PGO_GEN_CFLAGS="$gen" PGO_GEN_LDFLAGS="$genld" PGO_TRAIN_LIMIT=3 PGO_TRAIN_NODES=20000 \
               PGO_STOP_AFTER_TRAIN=1 bash tools/build_engine_wasm_pgo.sh > diag-$v.log 2>&1 && echo "진단 $v: 성공" || echo "진단 $v: 실패"
+            sha256sum "$WORK/pgo/inst/rapfi-single-simd128.wasm" | cut -c1-16 | sed 's/^/  계측 wasm sha256 /'
             grep -E "훈련 국면|\[pgo\]|RuntimeError|wasm-function|profraw|Total functions|Maximum function count|  X |PGO_STOP" diag-$v.log | head -40
           done
 

@@ -71,6 +71,13 @@ PGO_GENERATE="${PGO_GENERATE:-}"
 PGO_PROFILE="${PGO_PROFILE:-}"
 # 기본 변형(공백 구분). 계측 빌드는 훈련에 쓰는 단일 스레드만 만들면 된다(BASE_VARIANTS=single-simd128).
 BASE_VARIANTS="${BASE_VARIANTS:-single-simd128 multi-simd128}"
+# PGO 종류: fe = 프런트엔드 계측(-fprofile-instr-generate / -fprofile-instr-use, 기본) · ir = IR 계측(-fprofile-generate / -fprofile-use)
+PGO_KIND="${PGO_KIND:-fe}"
+case "$PGO_KIND" in
+  fe) PGO_GEN_FLAG="-fprofile-instr-generate"; PGO_USE_FLAG="-fprofile-instr-use" ;;
+  ir) PGO_GEN_FLAG="-fprofile-generate";       PGO_USE_FLAG="-fprofile-use" ;;
+  *) echo "  X PGO_KIND 는 fe 또는 ir: $PGO_KIND"; exit 1 ;;
+esac
 if [ -n "$PGO_GENERATE" ] && [ -n "$PGO_PROFILE" ]; then
   echo "  X PGO_GENERATE 와 PGO_PROFILE 은 함께 쓸 수 없다"
   exit 1
@@ -257,11 +264,11 @@ build_variant () {
   local cflags="" ldflags="$EXTRA_LDFLAGS"
   if [ -n "$PGO_GENERATE" ]; then
     # PGO_GEN_CFLAGS: 계측 빌드에만 더할 컴파일 플래그(예: -mllvm -disable-vp=true — 값 프로파일 끄기)
-    cflags="-fprofile-instr-generate ${PGO_GEN_CFLAGS:-}"
-    ldflags="$ldflags -fprofile-instr-generate --pre-js $ROOT/tools/pgo/profdump.js"
+    cflags="$PGO_GEN_FLAG ${PGO_GEN_CFLAGS:-}"
+    ldflags="$ldflags $PGO_GEN_FLAG --pre-js $ROOT/tools/pgo/profdump.js"
   elif [ -n "$PGO_PROFILE" ]; then
     # 프로파일에 없는 함수(다른 변형 · 훈련이 안 닿은 경로)는 경고만 — PGO 없이 컴파일된다
-    cflags="-fprofile-instr-use=$PGO_PROFILE -Wno-profile-instr-unprofiled -Wno-profile-instr-out-of-date -Wno-backend-plugin"
+    cflags="$PGO_USE_FLAG=$PGO_PROFILE -Wno-profile-instr-unprofiled -Wno-profile-instr-out-of-date -Wno-backend-plugin"
   fi
 
   echo "--- build: $name (threads=$threads relaxed=$relaxed${cflags:+ · $cflags}) ---"
@@ -464,12 +471,12 @@ verify () {
     fail=1
   fi
   if [ -n "$PGO_GENERATE" ]; then
-    grep -q -- "-fprofile-instr-generate" "$nj" || { echo "  X PGO_GENERATE 인데 -fprofile-instr-generate 가 없다"; fail=1; }
+    grep -q -- "$PGO_GEN_FLAG" "$nj" || { echo "  X PGO_GENERATE 인데 $PGO_GEN_FLAG 가 없다"; fail=1; }
     grep -q -- "profdump.js" "$nj" || { echo "  X PGO_GENERATE 인데 profdump.js(프로파일 꺼내기)가 없다"; fail=1; }
   elif [ -n "$PGO_PROFILE" ]; then
-    grep -q -- "-fprofile-instr-use=" "$nj" || { echo "  X PGO_PROFILE 인데 -fprofile-instr-use 가 없다"; fail=1; }
+    grep -q -- "$PGO_USE_FLAG=" "$nj" || { echo "  X PGO_PROFILE 인데 $PGO_USE_FLAG 가 없다"; fail=1; }
   else
-    grep -q -- "-fprofile-instr" "$nj" && { echo "  X PGO 를 켜지 않았는데 -fprofile-instr 플래그가 있다(이전 빌드 캐시?)"; fail=1; }
+    grep -q -E -- "-fprofile-(instr-)?(generate|use)" "$nj" && { echo "  X PGO 를 켜지 않았는데 -fprofile-… 플래그가 있다(이전 빌드 캐시?)"; fail=1; }
   fi
   if ! grep -q -- "preamble.js" "$nj"; then
     echo "  X --pre-js preamble.js 가 없다 — sendCommand 펌프 없이 나온 빌드다"
