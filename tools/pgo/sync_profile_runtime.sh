@@ -97,8 +97,14 @@ fi
 echo "$commit" > "$STAMP"
 echo "  . 바꿈 — Emscripten 런타임 raw 형식 이제 $(ver_of "$RT")"
 
-# 캐시의 프로파일 라이브러리를 지운다(다음 링크에서 emcc 가 새 소스로 짓는다)
+# 캐시에서 프로파일 런타임이 든 라이브러리를 지운다(다음 링크에서 emcc 가 새 소스로 짓는다). Emscripten 은 런타임을
+# 따로 두지 않고 libclang_rt.builtins*.a 안에 넣는다 — 이름이 아니라 **안에 InstrProfiling 오브젝트가 있는지**로 찾는다.
+# (전체 실행 37173743283: 기준 빌드가 먼저 옛 소스로 builtins 를 캐시에 지어 둔 탓에, 이름으로만 찾던 sync 가 아무것도
+# 못 지웠고 계측 빌드가 옛 런타임으로 링크돼 — 모듈 ID 가 첫 실행과 같은 006dc672 — 다시 OOB 로 죽었다.)
 n=0
-while IFS= read -r f; do rm -f "$f"; n=$((n + 1)); echo "    - $f"; done \
-  < <(find "$EM/cache" -iname "*profile*" -name "*.a" 2> /dev/null)
-echo "  . 캐시에서 지운 프로파일 라이브러리 $n 개"
+while IFS= read -r f; do
+  rm -f "$f"
+  n=$((n + 1))
+  echo "    - $f"
+done < <(find "$EM/cache" -name "*.a" -exec grep -l -a "InstrProfiling" {} + 2> /dev/null)
+echo "  . 캐시에서 지운(프로파일 런타임이 든) 라이브러리 $n 개"

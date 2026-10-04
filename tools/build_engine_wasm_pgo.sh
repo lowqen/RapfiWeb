@@ -48,6 +48,14 @@ echo "  . clang: $("$WORK/emsdk/upstream/bin/clang" --version | head -1)"
 echo "=========================================================="
 echo " PGO 2/4 — 훈련(Node, 계측 WASM)"
 echo "=========================================================="
+# 먼저 1국면으로 프로파일이 실제로 떨어지는지 — 런타임이 어긋나 있으면 몇 초 만에 알 수 있다(본 훈련은 ~6분)
+( cd "$ROOT" && RAPFI_PROFRAW="$PGO_DIR/smoke.profraw" node tools/pgo/train.mjs --dir "$PGO_DIR/inst" --limit 1 --nodes 5000 ) 2>&1 | tail -3
+if [ ! -s "$PGO_DIR/smoke.profraw" ]; then
+  echo "  X 1국면 사전 확인에서 프로파일이 떨어지지 않았다 — 런타임(sync_profile_runtime.sh) · profdump.js 를 볼 것"
+  exit 1
+fi
+rm -f "$PGO_DIR/smoke.profraw"
+echo "  . 사전 확인 통과 — 본 훈련"
 (
   cd "$ROOT"
   posArgs=()
