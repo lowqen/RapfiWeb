@@ -6,6 +6,11 @@ name: WASM PGO (P3-5)
 on:
   workflow_dispatch:
     inputs:
+      mode:
+        description: "full = 전체(기준 · PGO · NPS) · diag = 계측 빌드 두 벌(이름 · 값 프로파일 끔)로 프로파일 꺼내기만 진단"
+        default: "full"
+        type: choice
+        options: ["full", "diag"]
       train_nodes:
         description: "훈련 국면당 노드"
         default: "200000"
@@ -51,7 +56,19 @@ jobs:
           path: ${{ env.WORK }}/rapfi
           key: rapfi-3c94c2a9-v1
 
+      - name: 진단 — 프로파일 꺼내기(A 이름만 · B 이름 + 값 프로파일 끔), 각각 3국면 훈련
+        if: inputs.mode == 'diag'
+        run: |
+          for v in A B; do
+            if [ $v = A ]; then gen=""; else gen="-mllvm -disable-vp=true"; fi
+            echo "================ 진단 $v — PGO_GEN_CFLAGS='$gen'"
+            PGO_GEN_CFLAGS="$gen" PGO_GEN_LDFLAGS="--profiling-funcs" PGO_TRAIN_LIMIT=3 PGO_TRAIN_NODES=20000 \
+              PGO_STOP_AFTER_TRAIN=1 bash tools/build_engine_wasm_pgo.sh > diag-$v.log 2>&1 && echo "진단 $v: 성공" || echo "진단 $v: 실패"
+            grep -E "훈련 국면|\[pgo\]|RuntimeError|at .*wasm-function|at [_A-Za-z].*\(wasm|profraw|Total functions|Maximum function count|X " diag-$v.log | head -40
+          done
+
       - name: 기준 빌드 — 배포 구성(P2-2 + -O4 --converge), PGO 없음
+        if: inputs.mode == 'full'
         run: |
           set -o pipefail
           grep -m1 "model name" /proc/cpuinfo || true
@@ -61,6 +78,7 @@ jobs:
           cp out/engine/rapfi-single-simd128.* out/engine/ENGINE_VERSION.txt bench/gomocalc/engines/rapfiweb-base/
 
       - name: PGO — 계측 → 훈련 → merge → 사용 빌드
+        if: inputs.mode == 'full'
         env:
           PGO_TRAIN_NODES: ${{ inputs.train_nodes }}
         run: |
@@ -73,6 +91,7 @@ jobs:
           cp out/engine/rapfi-single-simd128.* out/engine/ENGINE_VERSION.txt bench/gomocalc/engines/rapfiweb-pgo/
 
       - name: 1 스레드 NPS — 기준 ↔ PGO, 순서 뒤집어 두 번
+        if: inputs.mode == 'full'
         env:
           VARIANTS: single-simd128
           THREADS: "1"
@@ -96,5 +115,6 @@ jobs:
           path: |
             out/pgo/
             pgo-build.log
+            diag-*.log
             bench/gomocalc/results/pgo-run*
             bench/gomocalc/engines/rapfiweb-*/ENGINE_VERSION.txt

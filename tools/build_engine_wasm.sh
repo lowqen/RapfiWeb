@@ -256,7 +256,8 @@ build_variant () {
   [ "$threads" = "ON" ] || extra+=(-DNO_MULTI_THREADING=ON)
   local cflags="" ldflags="$EXTRA_LDFLAGS"
   if [ -n "$PGO_GENERATE" ]; then
-    cflags="-fprofile-instr-generate"
+    # PGO_GEN_CFLAGS: 계측 빌드에만 더할 컴파일 플래그(예: -mllvm -disable-vp=true — 값 프로파일 끄기)
+    cflags="-fprofile-instr-generate ${PGO_GEN_CFLAGS:-}"
     ldflags="$ldflags -fprofile-instr-generate --pre-js $ROOT/tools/pgo/profdump.js"
   elif [ -n "$PGO_PROFILE" ]; then
     # 프로파일에 없는 함수(다른 변형 · 훈련이 안 닿은 경로)는 경고만 — PGO 없이 컴파일된다

@@ -8,6 +8,8 @@
 # 나머지 환경 변수(RAPFI_PATCHES · WASM_OPT_POST · BASE_VARIANTS · EXTRA_VARIANTS · ENABLE_LTO …)는 **마지막(사용) 빌드**에
 # 그대로 넘어간다. 계측 빌드는 훈련에 쓰는 single-simd128 하나만, wasm-opt 후처리 없이 만든다.
 #   PGO_TRAIN_NODES   국면당 노드(기본 200000) · PGO_TRAIN_POSITIONS  국면 파일들(train.mjs 기본)
+#   PGO_TRAIN_LIMIT   훈련 국면 수 상한(진단용) · PGO_STOP_AFTER_TRAIN=1  훈련 뒤 멈춤(진단 — 프로파일 꺼내기만 확인)
+#   PGO_GEN_CFLAGS · PGO_GEN_LDFLAGS  계측 빌드에만 더할 플래그(예: -mllvm -disable-vp=true · --profiling-funcs)
 # 산출물: out/engine(PGO 빌드) + out/pgo/{rapfi.profdata, rapfi.profraw, train.log, profdata-show.txt}
 set -eu
 
@@ -21,7 +23,7 @@ echo "=========================================================="
 echo " PGO 1/4 — 계측 빌드(single-simd128, -fprofile-instr-generate)"
 echo "=========================================================="
 PGO_GENERATE=1 PGO_PROFILE="" BASE_VARIANTS=single-simd128 EXTRA_VARIANTS="" WASM_OPT_POST="" \
-  bash "$ROOT/tools/build_engine_wasm.sh"
+  EXTRA_LDFLAGS="${PGO_GEN_LDFLAGS:-}" bash "$ROOT/tools/build_engine_wasm.sh"
 cp "$ROOT"/out/engine/rapfi-single-simd128.* "$ROOT/out/engine/package.json" "$PGO_DIR/inst/"
 grep -E "^(upstream|pgo) " "$ROOT/out/engine/ENGINE_VERSION.txt" | sed "s/^/  | /"
 
@@ -42,6 +44,7 @@ echo "=========================================================="
   cd "$ROOT"
   posArgs=()
   [ -n "${PGO_TRAIN_POSITIONS:-}" ] && posArgs=(--positions "$PGO_TRAIN_POSITIONS")
+  [ -n "${PGO_TRAIN_LIMIT:-}" ] && posArgs+=(--limit "$PGO_TRAIN_LIMIT")
   RAPFI_PROFRAW="$PGO_DIR/rapfi.profraw" node tools/pgo/train.mjs --dir "$PGO_DIR/inst" \
     --nodes "${PGO_TRAIN_NODES:-200000}" "${posArgs[@]}" 2>&1 | tee "$PGO_DIR/train.log"
 )
@@ -50,6 +53,11 @@ if [ ! -s "$PGO_DIR/rapfi.profraw" ]; then
   exit 1
 fi
 echo "  . profraw $(stat -c%s "$PGO_DIR/rapfi.profraw") bytes"
+if [ -n "${PGO_STOP_AFTER_TRAIN:-}" ]; then
+  "$PROFDATA" merge -o "$PGO_DIR/rapfi.profdata" "$PGO_DIR/rapfi.profraw" && "$PROFDATA" show "$PGO_DIR/rapfi.profdata" | sed "s/^/  | /"
+  echo "PGO_STOP_AFTER_TRAIN — 여기서 멈춘다"
+  exit 0
+fi
 
 echo "=========================================================="
 echo " PGO 3/4 — llvm-profdata merge"
