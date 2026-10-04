@@ -1,0 +1,84 @@
+name: cachegrind 결정적 비용 지표 (M1)
+
+# docs/최적화-마스터플랜-v2.md §4 M1 — 같은 러너에서 A(base_patches) · B(+test_patches) 네이티브 128비트 빌드를
+# valgrind cachegrind 아래에서 같은 국면 · 같은 노드 상한으로 풀어 명령 수(Ir)와 모의 캐시 미스를 맞댄다.
+# Ir 은 실행마다 같아야 한다(보고서의 「결정성」 표) — 순서 효과 · CPU 잡음이 없다.
+on:
+  workflow_dispatch:
+    inputs:
+      base_patches:
+        description: "기준(A) 패치 — 배포 구성은 P2-2"
+        default: "tools/patches/p2-2-keep-evaluators-on-rebuild.patch"
+        type: string
+      test_patches:
+        description: "시험(B)에 더 얹을 패치(비우면 A 만 — 기준선)"
+        default: ""
+        type: string
+      ll_sizes:
+        description: "모의 LL 크기(바이트, 2의 거듭제곱, 공백 구분)"
+        default: "4194304 33554432"
+        type: string
+      nodes:
+        description: "국면당 노드 상한"
+        default: "250000"
+        type: string
+      count:
+        description: "국면 수(묶음 앞에서부터)"
+        default: "12"
+        type: string
+      positions:
+        default: "bench/sprt/openings-balanced.json"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  cachegrind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    env:
+      WORK: ${{ github.workspace }}/../rapfi-wasm-work
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "26"
+      - name: 시스템 도구
+        run: sudo apt-get update -qq && sudo apt-get install -y ninja-build ccache valgrind
+      - name: rapfi 소스 캐시 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.WORK }}/rapfi
+          key: rapfi-3c94c2a9-v1
+      - name: 빌드 · cachegrind · 보고
+        env:
+          BASE_PATCHES: ${{ inputs.base_patches }}
+          TEST_PATCHES: ${{ inputs.test_patches }}
+          LL_SIZES: ${{ inputs.ll_sizes }}
+          NODES: ${{ inputs.nodes }}
+          COUNT: ${{ inputs.count }}
+          POSITIONS: ${{ inputs.positions }}
+          OUT: bench/cachegrind/results/run
+        run: |
+          set -o pipefail
+          nproc
+          bash tools/bench_cachegrind.sh
+          {
+            echo "### cachegrind — base(\`${BASE_PATCHES}\`) ↔ test(+\`${TEST_PATCHES:-없음}\`)"
+            cat "$OUT/report.md"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: 결과
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: cachegrind
+          retention-days: 14
+          path: |
+            bench/cachegrind/results/run/*.json
+            bench/cachegrind/results/run/*.log
+            bench/cachegrind/results/run/*.md
+            bench/cachegrind/results/run/*.cgout
+            bench/cachegrind/engines/*/ENGINE_VERSION.txt
+            bench/cachegrind/engines/*/bench.txt
