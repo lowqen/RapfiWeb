@@ -221,6 +221,8 @@ const startedPairs = new Set();
 const records = [];
 let stopRequested = false; // SPRT 결정 · 시간 예산 · 사용자 중단 — 새 쌍을 시작하지 않는다
 let budgetHit = false;
+// SPRT 가 경계를 넘은 순간 — 그 뒤 시작한 쌍을 마저 두면 LLR 이 경계 안으로 돌아올 수 있지만 결정은 그 순간에 난다
+let decided = null;
 let aborting = false; // 두 번째 Ctrl-C · 치명적 오류 — 진행 중 판도 버린다
 let fatal = null;
 let nextJob = 0;
@@ -292,6 +294,7 @@ function record(job, result) {
   );
   if (s.decision && !stopRequested) {
     stopRequested = true;
+    decided = { decision: s.decision, game: records.length, llr: s.llr };
     console.log(`  → SPRT 결정: ${s.decision} 채택 — 시작한 쌍만 마저 두고 멈춥니다`);
   }
 }
@@ -524,11 +527,10 @@ for (const [nm, a] of [
 }
 console.log(
   `SPRT(${s.sprt.basis}): LLR ${fmt(s.sprt.llr, 3)} / [${fmt(s.sprt.lower, 3)}, ${fmt(s.sprt.upper, 3)}] → ` +
-    (s.sprt.decision === "H1"
-      ? `H1 채택 — A 가 elo ≥ ${cfg.sprt.elo1} 쪽`
-      : s.sprt.decision === "H0"
-        ? `H0 채택 — A 가 elo ≤ ${cfg.sprt.elo0} 쪽`
-        : `결정 전(${budgetHit ? "시간 예산" : interrupts ? "사용자 중단" : "판 수 한도"}에서 멈춤)`),
+    (decided
+      ? `${decided.decision} 채택 — A 가 elo ${decided.decision === "H1" ? `≥ ${cfg.sprt.elo1}` : `≤ ${cfg.sprt.elo0}`} 쪽` +
+        ` (${decided.game}판에서 경계를 넘음 · LLR ${fmt(decided.llr, 3)}; 시작한 쌍을 마저 둔 뒤 ${fmt(s.sprt.llr, 3)})`
+      : `결정 전(${budgetHit ? "시간 예산" : interrupts ? "사용자 중단" : "판 수 한도"}에서 멈춤)`),
 );
 console.log(
   `프로세스: 남은 엔진 ${leaked.length}${leaked.length ? " — " + leaked.join(", ") : ""} · 남은 자식 핸들 ${childHandles} · 활성 자원 ${JSON.stringify(resources)}(러너 자신의 파이프 ${ownPipes})`,

@@ -1,0 +1,75 @@
+diff --git a/Rapfi/search/ab/parameter.h b/Rapfi/search/ab/parameter.h
+index bb0b016..a9fbb0e 100644
+--- a/Rapfi/search/ab/parameter.h
++++ b/Rapfi/search/ab/parameter.h
+@@ -47,6 +47,8 @@ constexpr Depth IIR_REDUCTION_PV              = 0.32f;
+ constexpr Depth IIR_REDUCTION_TT              = 0.28f;
+ constexpr Depth IIR_REDUCTION_TT_MAX          = 3.6f;
+ constexpr Depth TRIVIAL_PRUN_DEPTH            = 4.3f;
++/// Non-PV nodes below this depth order moves by classical scores, without the evaluator policy.
++constexpr Depth POLICY_SKIP_DEPTH             = TRIVIAL_PRUN_DEPTH;
+ constexpr Depth LMR_EXTRA_MAX_DEPTH           = 5.0f;
+ constexpr Depth TTPV_NEG_REDUCTION            = 0.97f;
+ constexpr Depth NO_ALPHA_IMPROVING_REDUCTION  = 0.98f;
+diff --git a/Rapfi/search/ab/search.cpp b/Rapfi/search/ab/search.cpp
+index 1346b90..c3b0d68 100644
+--- a/Rapfi/search/ab/search.cpp
++++ b/Rapfi/search/ab/search.cpp
+@@ -1216,6 +1216,9 @@ moves_loop:
+                       ttMove,
+                       &searchData->mainHistory,
+                       &searchData->counterMoveHistory,
++                      false,
++                      1.0f,
++                      PvNode || depth >= POLICY_SKIP_DEPTH,
+                   });
+ 
+     // Step 11. Loop through all legal moves until no moves remain
+diff --git a/Rapfi/search/movepick.cpp b/Rapfi/search/movepick.cpp
+index a45fbfa..9c4d20c 100644
+--- a/Rapfi/search/movepick.cpp
++++ b/Rapfi/search/movepick.cpp
+@@ -176,6 +176,7 @@ MovePicker::MovePicker(Rule rule, const Board &board, ExtraArgs<MovePicker::MAIN
+     , hasPolicy(false)
+     , useNormalizedPolicy(args.useNormalizedPolicy)
+     , normalizedPolicyTemp(args.normalizedPolicyTemp)
++    , usePolicy(args.usePolicy)
+ {
+     Color oppo = ~board.sideToMove();
+     bool  ttmValid;
+@@ -372,6 +373,13 @@ void MovePicker::scoreAndSortMoves()
+         scoreAllMoves<ScoreType(BALANCED | POLICY)>();
+         fastPartialSort(curMove, endMove, 0, ScoredMove::PolicyComparator {});
+     }
++    else if (!usePolicy) {
++        // Skip the evaluator policy (its dynamic pwconv l2 FC<528,64> and the per-move heads)
++        // and order by classical scores. hasPolicy stays false, so the policy based pruning
++        // and reduction in search are not applied at this node.
++        scoreAllMoves<ScoreType(BALANCED | ExtraFlags)>();
++        fastPartialSort(curMove, endMove, 0, ScoredMove::ScoreComparator {});
++    }
+     else {
+         scoreAllMoves<ScoreType(BALANCED | POLICY | ExtraFlags)>();
+         fastPartialSort(curMove, endMove, 0, ScoredMove::ScoreComparator {});
+diff --git a/Rapfi/search/movepick.h b/Rapfi/search/movepick.h
+index cedfb30..a935c40 100644
+--- a/Rapfi/search/movepick.h
++++ b/Rapfi/search/movepick.h
+@@ -92,6 +92,7 @@ private:
+     // BUG: stored but not yet applied - scoreAllMoves() calls applySoftmax() at the
+     // default temperature 1.0. Keep the plumbing; wiring it is a pending (SPRT-gated) fix.
+     float                     normalizedPolicyTemp;
++    bool                      usePolicy = true;
+     Score                     curScore;
+     Score                     maxPolicyScore;
+     float                     curPolicy;
+@@ -114,6 +115,9 @@ struct MovePicker::ExtraArgs<MovePicker::MAIN>
+     CounterMoveHistory *counterMoveHistory;
+     bool                useNormalizedPolicy  = false;
+     float               normalizedPolicyTemp = 1.0f;
++    /// Whether to score moves with the evaluator policy. When false, moves are ordered by
++    /// classical pattern scores and the policy based pruning and reduction are not applied.
++    bool                usePolicy            = true;
+ };
+ 
+ template <>

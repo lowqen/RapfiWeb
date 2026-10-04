@@ -161,3 +161,22 @@ test("시간 예산 — 넘으면 새 쌍을 시작하지 않고, 시작한 쌍�
   assert.match(r.stdout, /시간 예산에서 멈춤/);
   noLeak(r);
 });
+
+test("SPRT 결정 — 경계를 넘은 순간을 보고하고, 시작한 쌍을 마저 둔 뒤에도 결정으로 남는다", () => {
+  // α=β=0.49 면 경계가 ±0.04 — 몇 쌍 만에 넘는다(어느 쪽이든)
+  const r = run(`${FAKE} --seed 21`, `${FAKE} --seed 22`, [
+    "--games",
+    "400",
+    "--tc",
+    "turn=200",
+    "--alpha",
+    "0.49",
+    "--beta",
+    "0.49",
+  ]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(r.games.length < 400, String(r.games.length));
+  assert.match(r.stdout, /→ H[01] 채택 — A 가 elo [≥≤] -?\d+ 쪽 \(\d+판에서 경계를 넘음/);
+  assert.doesNotMatch(r.stdout, /결정 전/);
+  noLeak(r);
+});
