@@ -65,9 +65,12 @@ jobs:
           # 2차(37171485247): 링크에도 -disable-vp 를 줬지만 모듈 ID 가 A · B 와 같았다 — 그 옵션은 IR 계측용이고 프런트엔드
           # 계측의 값 프로파일은 -enable-value-profiling 이 정한다(D). E 는 IR 계측(-fprofile-generate) + -disable-vp.
           # 모듈이 실제로 바뀌었는지 sha256 으로 확인한다.
-          for v in D E; do
-            if [ $v = D ]; then kind=fe; gen="-mllvm -enable-value-profiling=false"; genld="--profiling-funcs -Wl,-mllvm,-enable-value-profiling=false"
-            else kind=ir; gen="-mllvm -disable-vp=true"; genld="--profiling-funcs -Wl,-mllvm,-disable-vp=true"; fi
+          # 3차(37171907436): IR 계측은 죽지 않았지만 "Runtime and instrumentation version mismatch : expected 10, but get 11"
+          # — Emscripten 의 프로파일 런타임이 clang 보다 오래됐다. build_engine_wasm_pgo.sh 가 이제 런타임을 clang 의 LLVM
+          # 커밋으로 맞춘다(sync_profile_runtime.sh). F = 프런트엔드 계측 그대로(값 프로파일 켬), G = IR 계측.
+          for v in F G; do
+            if [ $v = F ]; then kind=fe; else kind=ir; fi
+            gen=""; genld="--profiling-funcs"
             echo "================ 진단 $v — PGO_KIND=$kind PGO_GEN_CFLAGS='$gen' PGO_GEN_LDFLAGS='$genld'"
             PGO_KIND=$kind PGO_GEN_CFLAGS="$gen" PGO_GEN_LDFLAGS="$genld" PGO_TRAIN_LIMIT=3 PGO_TRAIN_NODES=20000 \
               PGO_STOP_AFTER_TRAIN=1 bash tools/build_engine_wasm_pgo.sh > diag-$v.log 2>&1 && echo "진단 $v: 성공" || echo "진단 $v: 실패"

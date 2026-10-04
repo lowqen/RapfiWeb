@@ -20,7 +20,15 @@ rm -rf "$PGO_DIR"
 mkdir -p "$PGO_DIR/inst"
 
 echo "=========================================================="
-echo " PGO 1/4 — 계측 빌드(single-simd128, -fprofile-instr-generate)"
+echo " PGO 0/4 — 프로파일 런타임을 clang 과 같은 LLVM 으로(tools/pgo/sync_profile_runtime.sh)"
+echo "=========================================================="
+# emsdk 6.0.11 의 런타임은 raw 형식 10, 그 clang 은 11 — 맞추지 않으면 계측 WASM 이 종료 때 죽거나 기록을 거부한다
+if [ "${PGO_SYNC_RUNTIME:-1}" = "1" ]; then
+  WORK="$WORK" bash "$ROOT/tools/pgo/sync_profile_runtime.sh"
+fi
+
+echo "=========================================================="
+echo " PGO 1/4 — 계측 빌드(single-simd128, PGO_KIND=${PGO_KIND:-fe})"
 echo "=========================================================="
 PGO_GENERATE=1 PGO_PROFILE="" BASE_VARIANTS=single-simd128 EXTRA_VARIANTS="" WASM_OPT_POST="" \
   EXTRA_LDFLAGS="${PGO_GEN_LDFLAGS:-}" bash "$ROOT/tools/build_engine_wasm.sh"
