@@ -1,0 +1,5322 @@
+{
+  "label": "pgo-run1",
+  "startedAt": "2026-10-04T03:51:34.248Z",
+  "host": {
+    "cpu": "AMD EPYC 9V45 96-Core Processor",
+    "logicalCores": 2,
+    "memGB": 7.8,
+    "platform": "linux 6.17.0-1022-azure",
+    "browser": "151.0.7922.34"
+  },
+  "params": {
+    "TIME_MS": 10000,
+    "REPEAT": 2,
+    "HASH_MB": 128,
+    "THREADS": [
+      1
+    ],
+    "COLD_MS": 3000,
+    "WARM_MS": 8000
+  },
+  "runs": [
+    {
+      "engine": "rapfiweb-base",
+      "variant": "single-simd128",
+      "searches": [
+        {
+          "positionId": "open-direct",
+          "threads": 1,
+          "repeat": 0,
+          "move": [
+            6,
+            8
+          ],
+          "wallMs": 9775,
+          "nodes": 134828,
+          "engineMs": 1046,
+          "nps": 128898,
+          "depth": 18,
+          "selDepth": 24,
+          "eval": "-352",
+          "winrate": 0.14679,
+          "bestline": [
+            [
+              6,
+              8
+            ],
+            [
+              8,
+              5
+            ],
+            [
+              8,
+              7
+            ],
+            [
+              6,
+              5
+            ],
+            [
+              7,
+              5
+            ],
+            [
+              7,
+              4
+            ],
+            [
+              6,
+              3
+            ],
+            [
+              8,
+              3
+            ],
+            [
+              9,
+              2
+            ],
+            [
+              8,
+              4
+            ],
+            [
+              8,
+              2
+            ],
+            [
+              10,
+              4
+            ],
+            [
+              9,
+              4
+            ],
+            [
+              9,
+              5
+            ],
+            [
+              11,
+              3
+            ],
+            [
+              10,
+              6
+            ],
+            [
+              11,
+              7
+            ],
+            [
+              10,
+              7
+            ],
+            [
+              10,
+              5
+            ],
+            [
+              9,
+              6
+            ],
+            [
+              11,
+              8
+            ]
+          ],
+          "depthAt": {
+            "2": {
+              "engineMs": 2,
+              "wallMs": -194,
+              "nodes": 64,
+              "eval": "-211"
+            },
+            "3": {
+              "engineMs": 2,
+              "wallMs": -194,
+              "nodes": 144,
+              "eval": "126"
+            },
+            "4": {
+              "engineMs": 3,
+              "wallMs": -193,
+              "nodes": 219,
+              "eval": "-262"
+            },
+            "5": {
+              "engineMs": 4,
+              "wallMs": -192,
+              "nodes": 299,
+              "eval": "-233"
+            },
+            "6": {
+              "engineMs": 4,
+              "wallMs": -192,
+              "nodes": 371,
+              "eval": "-221"
+            },
+            "7": {
+              "engineMs": 7,
+              "wallMs": -190,
+              "nodes": 717,
+              "eval": "-214"
+            },
+            "8": {
+              "engineMs": 8,
+              "wallMs": -188,
+              "nodes": 969,
+              "eval": "-302"
+            },
+            "9": {
+              "engineMs": 8,
+              "wallMs": -188,
+              "nodes": 1059,
+              "eval": "-302"
+            },
+            "10": {
+              "engineMs": 9,
+              "wallMs": -187,
+              "nodes": 1175,
+              "eval": "-302"
+            },
+            "11": {
+              "engineMs": 11,
+              "wallMs": -185,
+              "nodes": 1401,
+              "eval": "-302"
+            },
+            "12": {
+              "engineMs": 14,
+              "wallMs": -182,
+              "nodes": 1702,
+              "eval": "-302"
+            },
+            "13": {
+              "engineMs": 366,
+              "wallMs": 170,
+              "nodes": 41269,
+              "eval": "-322"
+            },
+            "14": {
+              "engineMs": 370,
+              "wallMs": 174,
+              "nodes": 42168,
+              "eval": "-322"
+            },
+            "15": {
+              "engineMs": 824,
+              "wallMs": 628,
+              "nodes": 103621,
+              "eval": "-352"
+            },
+            "16": {
+              "engineMs": 905,
+              "wallMs": 709,
+              "nodes": 114126,
+              "eval": "-352"
+            },
+            "17": {
+              "engineMs": 951,
+              "wallMs": 755,
+              "nodes": 120864,
+              "eval": "-352"
+            },
+            "18": {
+              "engineMs": 1046,
+              "wallMs": 850,
+              "nodes": 134828,
+              "eval": "-352"
+            }
+          },
+          "firstMate": null,
+          "mem": 288686080
+        },
+        {
+          "positionId": "open-direct",
+          "threads": 1,
+          "repeat": 1,
+          "move": [
+            6,
+            8
+          ],
+          "wallMs": 9778,
+          "nodes": 134828,
+          "engineMs": 1029,
+          "nps": 131028,
+          "depth": 18,
+          "selDepth": 24,
+          "eval": "-352",
+          "winrate": 0.14679,
+          "bestline": [
+            [
+              6,
+              8
+            ],
+            [
+              8,
+              5
+            ],
+            [
+              8,
+              7
+            ],
+            [
+              6,
+              5
+            ],
+            [
+              7,
+              5
+            ],
+            [
+              7,
+              4
+            ],
+            [
+              6,
+              3
+            ],
+            [
+              8,
+              3
+            ],
+            [
+              9,
+              2
+            ],
+            [
+              8,
+              4
+            ],
+            [
+              8,
+              2
+            ],
+            [
+              10,
+              4
+            ],
+            [
+              9,
+              4
+            ],
+            [
+              9,
+              5
+            ],
+            [
+              11,
+              3
+            ],
+            [
+              10,
+              6
+            ],
+            [
+              11,
+              7
+            ],
+            [
+              10,
+              7
+            ],
+            [
+              10,
+              5
+            ],
+            [
+              9,
+              6
+            ],
+            [
+              11,
+              8
+            ]
+          ],
+          "depthAt": {
+            "2": {
+              "engineMs": 2,
+              "wallMs": -194,
+              "nodes": 64,
+              "eval": "-211"
+            },
+            "3": {
+              "engineMs": 3,
+              "wallMs": -193,
+              "nodes": 144,
+              "eval": "126"
+            },
+            "4": {
+              "engineMs": 3,
+              "wallMs": -193,
+              "nodes": 219,
+              "eval": "-262"
+            },
+            "5": {
+              "engineMs": 4,
+              "wallMs": -192,
+              "nodes": 299,
+              "eval": "-233"
+            },
+            "6": {
+              "engineMs": 4,
+              "wallMs": -192,
+              "nodes": 371,
+              "eval": "-221"
+            },
+            "7": {
+              "engineMs": 6,
+              "wallMs": -190,
+              "nodes": 717,
+              "eval": "-214"
+            },
+            "8": {
+              "engineMs": 7,
+              "wallMs": -189,
+              "nodes": 969,
+              "eval": "-302"
+            },
+            "9": {
+              "engineMs": 8,
+              "wallMs": -188,
+              "nodes": 1059,
+              "eval": "-302"
+            },
+            "10": {
+              "engineMs": 8,
+              "wallMs": -188,
+              "nodes": 1175,
+              "eval": "-302"
+            },
+            "11": {
+              "engineMs": 10,
+              "wallMs": -185,
+              "nodes": 1401,
+              "eval": "-302"
+            },
+            "12": {
+              "engineMs": 13,
+              "wallMs": -183,
+              "nodes": 1702,
+              "eval": "-302"
+            },
+            "13": {
+              "engineMs": 358,
+              "wallMs": 162,
+              "nodes": 41269,
+              "eval": "-322"
+            },
+            "14": {
+              "engineMs": 362,
+              "wallMs": 166,
+              "nodes": 42168,
+              "eval": "-322"
+            },
+            "15": {
+              "engineMs": 799,
+              "wallMs": 603,
+              "nodes": 103621,
+              "eval": "-352"
+            },
+            "16": {
+              "engineMs": 880,
+              "wallMs": 684,
+              "nodes": 114126,
+              "eval": "-352"
+            },
+            "17": {
+              "engineMs": 930,
+              "wallMs": 734,
+              "nodes": 120864,
+              "eval": "-352"
+            },
+            "18": {
+              "engineMs": 1029,
+              "wallMs": 833,
+              "nodes": 134828,
+              "eval": "-352"
+            }
+          },
+          "firstMate": null,
+          "mem": 288686080
+        },
+        {
+          "positionId": "open-indirect",
+          "threads": 1,
+          "repeat": 0,
+          "move": [
+            8,
+            7
+          ],
+          "wallMs": 8058,
+          "nodes": 902978,
+          "engineMs": 8253,
+          "nps": 109412,
+          "depth": 19,
+          "selDepth": 38,
+          "eval": "-319",
+          "winrate": 0.168682,
+          "bestline": [
+            [
+              8,
+              7
+            ],
+            [
+              8,
+              8
+            ],
+            [
+              9,
+              9
+            ],
+            [
+              7,
+              9
+            ],
+            [
+              6,
+              10
+            ],
+            [
+              8,
+              5
+            ],
+            [
+              7,
+              8
+            ],
+            [
+              9,
+              6
+            ],
+            [
+              9,
+              4
+            ],
+            [
+              7,
+              3
+            ],
+            [
+              7,
+              4
+            ],
+            [
+              8,
+              4
+            ],
+            [
+              6,
+              2
+            ],
+            [
+              9,
+              3
+            ],
+            [
+              8,
+              3
+            ],
+            [
+              11,
+              5
+            ],
+            [
+              10,
+              6
+            ],
+            [
+              10,
+              5
+            ],
+            [
+              9,
+              5
+            ],
+            [
+              10,
+              2
+            ],
+            [
+              11,
+              1
+            ],
+            [
+              10,
+              4
+            ],
+            [
+              12,
+              6
+            ],
+            [
+              8,
+              2
+            ],
+            [
+              7,
+              1
+            ]
+          ],
+          "depthAt": {
+            "2": {
+              "engineMs": 2,
+              "wallMs": -194,
+              "nodes": 94,
+              "eval": "-196"
+            },
+            "3": {
+              "engineMs": 2,
+              "wallMs": -194,
+              "nodes": 165,
+              "eval": "-257"
+            },
+            "4": {
+              "engineMs": 2,
+              "wallMs": -193,
+              "nodes": 236,
+              "eval": "-257"
+            },
+            "5": {
+              "engineMs": 3,
+              "wallMs": -192,
+              "nodes": 447,
+              "eval": "-214"
+            },
+            "6": {
+              "engineMs": 3,
+              "wallMs": -192,
+              "nodes": 520,
+              "eval": "-214"
+            },
+            "7": {
+              "engineMs": 5,
+              "wallMs": -191,
+              "nodes": 801,
+              "eval": "-288"
+            },
+            "8": {
+              "engineMs": 5,
+              "wallMs": -190,
+              "nodes": 903,
+              "eval": "-288"
+            },
+            "9": {
+              "engineMs": 6,
+              "wallMs": -189,
+              "nodes": 1079,
+              "eval": "-288"
+            },
+            "10": {
+              "engineMs": 11,
+              "wallMs": -185,
+              "nodes": 1562,
+              "eval": "-196"
+            },
+            "11": {
+              "engineMs": 13,
+              "wallMs": -183,
+              "nodes": 1854,
+              "eval": "-196"
+            },
+            "12": {
+              "engineMs": 326,
+              "wallMs": 130,
+              "nodes": 31201,
+              "eval": "-230"
+            },
+            "13": {
+              "engineMs": 470,
+              "wallMs": 275,
+              "nodes": 46815,
+              "eval": "-277"
+            },
+            "14": {
+              "engineMs": 743,
+              "wallMs": 548,
+              "nodes": 76594,
+              "eval": "-262"
+            },
+            "15": {
+              "engineMs": 750,
+              "wallMs": 554,
+              "nodes": 77768,
+              "eval": "-262"
+            },
+            "16": {
+              "engineMs": 777,
+              "wallMs": 581,
+              "nodes": 81062,
+              "eval": "-262"
+            },
+            "17": {
+              "engineMs": 1007,
+              "wallMs": 811,
+              "nodes": 108438,
+              "eval": "-262"
+            },
+            "18": {
+              "engineMs": 1399,
+              "wallMs": 1203,
+              "nodes": 146948,
+              "eval": "-262"
+            },
+            "19": {
+              "engineMs": 8253,
+              "wallMs": 8058,
+              "nodes": 902978,
+              "eval": "-319"
+            }
+          },
+          "firstMate": null,
+          "mem": 288686080
+        },
+        {
+          "positionId": "open-indirect",
+          "threads": 1,
+          "repeat": 1,
+          "move": [
+            8,
+            7
+          ],
+          "wallMs": 8167,
+          "nodes": 902978,
+          "engineMs": 8363,
+          "nps": 107972,
+          "depth": 19,
+          "selDepth": 38,
+          "eval": "-319",
+          "winrate": 0.168682,
+          "bestline": [
+            [
+              8,
+              7
+            ],
+            [
+              8,
+              8
+            ],
+            [
+              9,
+              9
+            ],
+            [
+              7,
+              9
+            ],
+            [
+              6,
+              10
+            ],
+            [
+              8,
+              5
+            ],
+            [
+              7,
+              8
+            ],
+            [
+              9,
+              6
+            ],
+            [
+              9,
+              4
+            ],
+            [
+              7,
+              3
+            ],
+            [
+              7,
+              4
+            ],
+            [
+              8,
+              4
+            ],
+            [
+              6,
+              2
+            ],
+            [
+              9,
+              3
+            ],
+            [
+              8,
+              3
+            ],
+            [
+              11,
+              5
+            ],
+            [
+              10,
+              6
+            ],
+            [
+              10,
+              5
+            ],
+            [
+              9,
+              5
+            ],
+            [
+              10,
+              2
+            ],
+            [
+              11,
+              1
+            ],
+            [
+              10,
+              4
+            ],
+            [
+              12,
+              6
+            ],
+            [
+              8,
+              2
+            ],
+            [
+              7,
+              1
+            ]
+          ],
+          "depthAt": {
+            "2": {
+              "engineMs": 2,
+              "wallMs": -194,
+              "nodes": 94,
+              "eval": "-196"
+            },
+            "3": {
+              "engineMs": 2,
+              "wallMs": -193,
+              "nodes": 165,
+              "eval": "-257"
+            },
+            "4": {
+              "engineMs": 3,
+              "wallMs": -193,
+              "nodes": 236,
+              "eval": "-257"
+            },
+            "5": {
+              "engineMs": 4,
+              "wallMs": -192,
+              "nodes": 447,
+              "eval": "-214"
+            },
+            "6": {
+              "engineMs": 4,
+              "wallMs": -192,
+              "nodes": 520,
+              "eval": "-214"
+            },
+            "7": {
+              "engineMs": 5,
+              "wallMs": -190,
+              "nodes": 801,
+              "eval": "-288"
+            },
+            "8": {
+              "engineMs": 6,
+              "wallMs": -190,
+              "nodes": 903,
+              "eval": "-288"
+            },
+            "9": {
+              "engineMs": 7,
+              "wallMs": -189,
+              "nodes": 1079,
+              "eval": "-288"
+            },
+            "10": {
+              "engineMs": 11,
+              "wallMs": -185,
+              "nodes": 1562,
+              "eval": "-196"
+            },
+            "11": {
+              "engineMs": 13,
+              "wallMs": -183,
+              "nodes": 1854,
+              "eval": "-196"
+            },
+            "12": {
+              "engineMs": 338,
+              "wallMs": 142,
+              "nodes": 31201,
+              "eval": "-230"
+            },
+            "13": {
+              "engineMs": 487,
+              "wallMs": 291,
+              "nodes": 46815,
+              "eval": "-277"
+            },
+            "14": {
+              "engineMs": 761,
+              "wallMs": 565,
+              "nodes": 76594,
+              "eval": "-262"
+            },
+            "15": {
+              "engineMs": 768,
+              "wallMs": 572,
+              "nodes": 77768,
+              "eval": "-262"
+            },
+            "16": {
+              "engineMs": 796,
+              "wallMs": 600,
+              "nodes": 81062,
+              "eval": "-262"
+            },
+            "17": {
+              "engineMs": 1030,
+              "wallMs": 835,
+              "nodes": 108438,
+              "eval": "-262"
+            },
+            "18": {
+              "engineMs": 1426,
+              "wallMs": 1230,
+              "nodes": 146948,
+              "eval": "-262"
+            },
+            "19": {
+              "engineMs": 8363,
+              "wallMs": 8167,
+              "nodes": 902978,
+              "eval": "-319"
+            }
+          },
+          "firstMate": null,
+          "mem": 288686080
+        },
+        {
+          "positionId": "midgame",
+          "threads": 1,
+          "repeat": 0,
+          "move": [
+            10,
+            2
+          ],
+          "wallMs": 7322,
+          "nodes": 2037531,
+          "engineMs": 7518,
+          "nps": 271020,
+          "depth": 24,
+          "selDepth": 51,
+          "eval": "+M59",
+          "winrate": 1,
+          "bestline": [
+            [
+              10,
+              2
+            ],
+            [
+              11,
+              1
+            ],
+            [
+              11,
+              6
+            ],
+            [
+              11,
+              7
+            ],
+            [
+              11,
+              5
+            ],
+            [
+              13,
+              9
+            ],
+            [
+              10,
+              7
+            ],
+            [
+              12,
+              5
+            ],
+            [
+              7,
+              4
+            ],
+            [
+              12,
+              8
+            ],
+            [
+              10,
+              6
+            ],
+            [
+              12,
+              7
+            ],
+            [
+              11,
+              3
+            ],
+            [
+              11,
+              2
+            ],
+            [
+              6,
+              3
+            ],
+            [
+              9,
+              6
+            ],
+            [
+              12,
+              6
+            ],
+            [
+              13,
+              7
+            ],
+            [
+              12,
+              4
+            ],
+            [
+              7,
+              8
+            ],
+            [
+              6,
+              9
+            ],
+            [
+              13,
+              5
+            ],
+            [
+              13,
+              3
+            ],
+            [
+              14,
+              2
+            ],
+            [
+              10,
+              3
+            ],
+            [
+              12,
+              3
+            ],
+            [
+              6,
+              6
+            ],
+            [
+              7,
+              5
+            ],
+            [
+              6,
+              4
+            ],
+            [
+              13,
+              6
+            ],
+            [
+              13,
+              8
+            ],
+            [
+              6,
+              5
+            ],
+            [
+              5,
+              4
+            ],
+            [
+              4,
+              4
+            ]
+          ],
+          "depthAt": {
+            "2": {
+              "engineMs": 3,
+              "wallMs": -192,
+              "nodes": 129,
+              "eval": "238"
+            },
+            "3": {
+              "engineMs": 4,
+              "wallMs": -192,
+              "nodes": 273,
+              "eval": "426"
+            },
+            "4": {
+              "engineMs": 4,
+              "wallMs": -192,
+              "nodes": 410,
+              "eval": "336"
+            },
+            "5": {
+              "engineMs": 5,
+              "wallMs": -191,
+              "nodes": 821,
+              "eval": "168"
+            },
+            "6": {
+              "engineMs": 5,
+              "wallMs": -190,
+              "nodes": 959,
+              "eval": "168"
+            },
+            "7": {
+              "engineMs": 5,
+              "wallMs": -190,
+              "nodes": 1108,
+              "eval": "168"
+            },
+            "8": {
+              "engineMs": 7,
+              "wallMs": -189,
+              "nodes": 1360,
+              "eval": "394"
+            },
+            "9": {
+              "engineMs": 32,
+              "wallMs": -163,
+              "nodes": 4280,
+              "eval": "226"
+            },
+            "10": {
+              "engineMs": 35,
+              "wallMs": -161,
+              "nodes": 4682,
+              "eval": "289"
+            },
+            "11": {
+              "engineMs": 36,
+              "wallMs": -160,
+              "nodes": 4977,
+              "eval": "289"
+            },
+            "12": {
+              "engineMs": 42,
+              "wallMs": -154,
+              "nodes": 5735,
+              "eval": "289"
+            },
+            "13": {
+              "engineMs": 567,
+              "wallMs": 371,
+              "nodes": 71620,
+              "eval": "247"
+            },
+            "14": {
+              "engineMs": 715,
+              "wallMs": 519,
+              "nodes": 95665,
+              "eval": "424"
+            },
+            "15": {
+              "engineMs": 905,
+              "wallMs": 709,
+              "nodes": 133724,
+              "eval": "378"
+            },
+            "16": {
+              "engineMs": 2191,
+              "wallMs": 1996,
+              "nodes": 363870,
+              "eval": "336"
+            },
+            "17": {
+              "engineMs": 2205,
+              "wallMs": 2009,
+              "nodes": 366598,
+              "eval": "336"
+            },
+            "18": {
+              "engineMs": 3867,
+              "wallMs": 3671,
+              "nodes": 709101,
+              "eval": "455"
+            },
+            "19": {
+              "engineMs": 4623,
+              "wallMs": 4428,
+              "nodes": 958461,
+              "eval": "776"
+            },
+            "20": {
+              "engineMs": 4708,
+              "wallMs": 4513,
+              "nodes": 990403,
+              "eval": "776"
+            },
+            "21": {
+              "engineMs": 6215,
+              "wallMs": 6019,
+              "nodes": 1579533,
+              "eval": "542"
+            },
+            "22": {
+              "engineMs": 6849,
+              "wallMs": 6654,
+              "nodes": 1773290,
+              "eval": "1024"
+            },
+            "23": {
+              "engineMs": 6857,
+              "wallMs": 6661,
+              "nodes": 1776352,
+              "eval": "1018"
+            },
+            "24": {
+              "engineMs": 7518,
+              "wallMs": 7322,
+              "nodes": 2037531,
+              "eval": "+M59"
+            }
+          },
+          "firstMate": {
+            "depth": 24,
+            "engineMs": 7518,
+            "wallMs": 7322,
+            "nodes": 2037531,
+            "eval": "+M59"
+          },
+          "mem": 288686080
+        },
+        {
+          "positionId": "midgame",
+          "threads": 1,
+          "repeat": 1,
+          "move": [
+            10,
+            2
+          ],
+          "wallMs": 7715,
+          "nodes": 2141300,
+          "engineMs": 7911,
+          "nps": 270673,
+          "depth": 25,
+          "selDepth": 47,
+          "eval": "+M45",
+          "winrate": 1,
+          "bestline": [
+            [
+              10,
+              2
+            ],
+            [
+              11,
+              1
+            ],
+            [
+              11,
+              6
+            ],
+            [
+              11,
+              7
+            ],
+            [
+              11,
+              5
+            ],
+            [
+              12,
+              5
+            ],
+            [
+              11,
+              3
+            ],
+            [
+              11,
+              2
+            ],
+            [
+              7,
+              4
+            ],
+            [
+              12,
+              6
+            ],
+            [
+              12,
+              4
+            ],
+            [
+              13,
+              5
+            ],
+            [
+              14,
+              4
+            ],
+            [
+              13,
+              4
+            ],
+            [
+              8,
+              3
+            ],
+            [
+              10,
+              7
+            ],
+            [
+              12,
+              7
+            ],
+            [
+              10,
+              3
+            ],
+            [
+              6,
+              5
+            ],
+            [
+              5,
+              6
+            ],
+            [
+              6,
+              3
+            ],
+            [
+              13,
+              0
+            ],
+            [
+              12,
+              1
+            ],
+            [
+              10,
+              8
+            ],
+            [
+              9,
+              9
+            ],
+            [
+              10,
+              9
+            ],
+            [
+              10,
+              6
+            ],
+            [
+              9,
+              6
+            ],
+            [
+              6,
+              4
+            ],
+            [
+              7,
+              8
+            ],
+            [
+              6,
+              9
+            ]
+          ],
+          "depthAt": {
+            "2": {
+              "engineMs": 3,
+              "wallMs": -193,
+              "nodes": 129,
+              "eval": "238"
+            },
+            "3": {
+              "engineMs": 3,
+              "wallMs": -193,
+              "nodes": 273,
+              "eval": "426"
+            },
+            "4": {
+              "engineMs": 4,
+              "wallMs": -192,
+              "nodes": 410,
+              "eval": "336"
+            },
+            "5": {
+              "engineMs": 5,
+              "wallMs": -191,
+              "nodes": 821,
+              "eval": "168"
+            },
+            "6": {
+              "engineMs": 5,
+              "wallMs": -191,
+              "nodes": 959,
+              "eval": "168"
+            },
+            "7": {
+              "engineMs": 5,
+              "wallMs": -191,
+              "nodes": 1108,
+              "eval": "168"
+            },
+            "8": {
+              "engineMs": 8,
+              "wallMs": -188,
+              "nodes": 1360,
+              "eval": "394"
+            },
+            "9": {
+              "engineMs": 31,
+              "wallMs": -165,
+              "nodes": 4280,
+              "eval": "226"
+            },
+            "10": {
+              "engineMs": 34,
+              "wallMs": -162,
+              "nodes": 4682,
+              "eval": "289"
+            },
+            "11": {
+              "engineMs": 35,
+              "wallMs": -161,
+              "nodes": 4977,
+              "eval": "289"
+            },
+            "12": {
+              "engineMs": 41,
+              "wallMs": -155,
+              "nodes": 5735,
+              "eval": "289"
+            },
+            "13": {
+              "engineMs": 624,
+              "wallMs": 428,
+              "nodes": 71620,
+              "eval": "247"
+            },
+            "14": {
+              "engineMs": 792,
+              "wallMs": 596,
+              "nodes": 95665,
+              "eval": "424"
+            },
+            "15": {
+              "engineMs": 1008,
+              "wallMs": 812,
+              "nodes": 133724,
+              "eval": "378"
+            },
+            "16": {
+              "engineMs": 2188,
+              "wallMs": 1992,
+              "nodes": 363870,
+              "eval": "336"
+            },
+            "17": {
+              "engineMs": 2202,
+              "wallMs": 2006,
+              "nodes": 366598,
+              "eval": "336"
+            },
+            "18": {
+              "engineMs": 3887,
+              "wallMs": 3691,
+              "nodes": 709101,
+              "eval": "455"
+            },
+            "19": {
+              "engineMs": 4606,
+              "wallMs": 4410,
+              "nodes": 958461,
+              "eval": "776"
+            },
+            "20": {
+              "engineMs": 4682,
+              "wallMs": 4486,
+              "nodes": 990403,
+              "eval": "776"
+            },
+            "21": {
+              "engineMs": 6157,
+              "wallMs": 5961,
+              "nodes": 1579533,
+              "eval": "542"
+            },
+            "22": {
+              "engineMs": 6710,
+              "wallMs": 6514,
+              "nodes": 1773290,
+              "eval": "1024"
+            },
+            "23": {
+              "engineMs": 6718,
+              "wallMs": 6522,
+              "nodes": 1776352,
+              "eval": "1018"
+            },
+            "24": {
+              "engineMs": 7433,
+              "wallMs": 7237,
+              "nodes": 2037531,
+              "eval": "+M59"
+            },
+            "25": {
+              "engineMs": 7911,
+              "wallMs": 7715,
+              "nodes": 2141300,
+              "eval": "+M45"
+            }
+          },
+          "firstMate": {
+            "depth": 24,
+            "engineMs": 7433,
+            "wallMs": 7237,
+            "nodes": 2037531,
+            "eval": "+M59"
+          },
+          "mem": 288686080
+        },
+        {
+          "positionId": "vcf",
+          "threads": 1,
+          "repeat": 0,
+          "move": [
+            8,
+            11
+          ],
+          "wallMs": 1067,
+          "nodes": 341280,
+          "engineMs": 1263,
+          "nps": 270213,
+          "depth": 26,
+          "selDepth": 9,
+          "eval": "+M9",
+          "winrate": 1,
+          "bestline": [
+            [
+              8,
+              11
+            ],
+            [
+              10,
+              13
+            ],
+            [
+              9,
+              11
+            ],
+            [
+              6,
+              8
+            ],
+            [
+              10,
+              12
+            ],
+            [
+              11,
+              13
+            ],
+            [
+              8,
+              12
+            ]
+          ],
+          "depthAt": {
+            "2": {
+              "engineMs": 5,
+              "wallMs": -191,
+              "nodes": 489,
+              "eval": "+M13"
+            },
+            "3": {
+              "engineMs": 6,
+              "wallMs": -190,
+              "nodes": 663,
+              "eval": "+M13"
+            },
+            "4": {
+              "engineMs": 6,
+              "wallMs": -190,
+              "nodes": 832,
+              "eval": "+M13"
+            },
+            "5": {
+              "engineMs": 7,
+              "wallMs": -189,
+              "nodes": 1045,
+              "eval": "+M13"
+            },
+            "6": {
+              "engineMs": 8,
+              "wallMs": -188,
+              "nodes": 1330,
+              "eval": "+M13"
+            },
+            "7": {
+              "engineMs": 9,
+              "wallMs": -187,
+              "nodes": 1690,
+              "eval": "+M13"
+            },
+            "8": {
+              "engineMs": 11,
+              "wallMs": -185,
+              "nodes": 2192,
+              "eval": "+M13"
+            },
+            "9": {
+              "engineMs": 14,
+              "wallMs": -183,
+              "nodes": 2929,
+              "eval": "+M13"
+            },
+            "10": {
+              "engineMs": 17,
+              "wallMs": -179,
+              "nodes": 3943,
+              "eval": "+M13"
+            },
+            "11": {
+              "engineMs": 24,
+              "wallMs": -172,
+              "nodes": 5479,
+              "eval": "+M13"
+            },
+            "12": {
+              "engineMs": 33,
+              "wallMs": -163,
+              "nodes": 7666,
+              "eval": "+M13"
+            },
+            "13": {
+              "engineMs": 44,
+              "wallMs": -152,
+              "nodes": 10347,
+              "eval": "+M13"
+            },
+            "14": {
+              "engineMs": 59,
+              "wallMs": -137,
+              "nodes": 13950,
+              "eval": "+M13"
+            },
+            "15": {
+              "engineMs": 81,
+              "wallMs": -115,
+              "nodes": 19184,
+              "eval": "+M13"
+            },
+            "16": {
+              "engineMs": 110,
+              "wallMs": -86,
+              "nodes": 25951,
+              "eval": "+M13"
+            },
+            "17": {
+              "engineMs": 146,
+              "wallMs": -50,
+              "nodes": 34757,
+              "eval": "+M13"
+            },
+            "18": {
+              "engineMs": 196,
+              "wallMs": 0,
+              "nodes": 46573,
+              "eval": "+M13"
+            },
+            "19": {
+              "engineMs": 257,
+              "wallMs": 61,
+              "nodes": 60565,
+              "eval": "+M13"
+            },
+            "20": {
+              "engineMs": 326,
+              "wallMs": 130,
+              "nodes": 77164,
+              "eval": "+M13"
+            },
+            "21": {
+              "engineMs": 422,
+              "wallMs": 225,
+              "nodes": 100846,
+              "eval": "+M13"
+            },
+            "22": {
+              "engineMs": 538,
+              "wallMs": 341,
+              "nodes": 129889,
+              "eval": "+M13"
+            },
+            "23": {
+              "engineMs": 754,
+              "wallMs": 558,
+              "nodes": 188649,
+              "eval": "+M11"
+            },
+            "24": {
+              "engineMs": 920,
+              "wallMs": 724,
+              "nodes": 235863,
+              "eval": "+M11"
+            },
+            "25": {
+              "engineMs": 1080,
+              "wallMs": 884,
+              "nodes": 283315,
+              "eval": "+M11"
+            },
+            "26": {
+              "engineMs": 1263,
+              "wallMs": 1067,
+              "nodes": 341280,
+              "eval": "+M9"
+            }
+          },
+          "firstMate": {
+            "depth": 2,
+            "engineMs": 5,
+            "wallMs": -191,
+            "nodes": 489,
+            "eval": "+M13"
+          },
+          "mem": 288686080
+        },
+        {
+          "positionId": "vcf",
+          "threads": 1,
+          "repeat": 1,
+          "move": [
+            8,
+            11
+          ],
+          "wallMs": 1069,
+          "nodes": 341280,
+          "engineMs": 1264,
+          "nps": 270000,
+          "depth": 26,
+          "selDepth": 9,
+          "eval": "+M9",
+          "winrate": 1,
+          "bestline": [
+            [
+              8,
+              11
+            ],
+            [
+              10,
+              13
+            ],
+            [
+              9,
+              11
+            ],
+            [
+              6,
+              8
+            ],
+            [
+              10,
+              12
+            ],
+            [
+              11,
+              13
+            ],
+            [
+              8,
+              12
+            ]
+          ],
+          "depthAt": {
+            "2": {
+              "engineMs": 4,
+              "wallMs": -192,
+              "nodes": 489,
+              "eval": "+M13"
+            },
+            "3": {
+              "engineMs": 4,
+              "wallMs": -191,
+              "nodes": 663,
+              "eval": "+M13"
+            },
+            "4": {
+              "engineMs": 4,
+              "wallMs": -191,
+              "nodes": 832,
+              "eval": "+M13"
+            },
+            "5": {
+              "engineMs": 5,
+              "wallMs": -190,
+              "nodes": 1045,
+              "eval": "+M13"
+            },
+            "6": {
+              "engineMs": 6,
+              "wallMs": -189,
+              "nodes": 1330,
+              "eval": "+M13"
+            },
+            "7": {
+              "engineMs": 7,
+              "wallMs": -188,
+              "nodes": 1690,
+              "eval": "+M13"
+            },
+            "8": {
+              "engineMs": 9,
+              "wallMs": -186,
+              "nodes": 2192,
+              "eval": "+M13"
+            },
+            "9": {
+              "engineMs": 13,
+              "wallMs": -183,
+              "nodes": 2929,
+              "eval": "+M13"
+            },
+            "10": {
+              "engineMs": 17,
+              "wallMs": -178,
+              "nodes": 3943,
+              "eval": "+M13"
+            },
+            "11": {
+              "engineMs": 24,
+              "wallMs": -171,
+              "nodes": 5479,
+              "eval": "+M13"
+            },
+            "12": {
+              "engineMs": 33,
+              "wallMs": -162,
+              "nodes": 7666,
+              "eval": "+M13"
+            },
+            "13": {
+              "engineMs": 43,
+              "wallMs": -152,
+              "nodes": 10347,
+              "eval": "+M13"
+            },
+            "14": {
+              "engineMs": 58,
+              "wallMs": -137,
+              "nodes": 13950,
+              "eval": "+M13"
+            },
+            "15": {
+              "engineMs": 80,
+              "wallMs": -115,
+              "nodes": 19184,
+              "eval": "+M13"
+            },
+            "16": {
+              "engineMs": 109,
+              "wallMs": -87,
+              "nodes": 25951,
+              "eval": "+M13"
+            },
+            "17": {
+              "engineMs": 144,
+              "wallMs": -51,
+              "nodes": 34757,
+              "eval": "+M13"
+            },
+            "18": {
+              "engineMs": 192,
+              "wallMs": -3,
+              "nodes": 46573,
+              "eval": "+M13"
+            },
+            "19": {
+              "engineMs": 250,
+              "wallMs": 55,
+              "nodes": 60565,
+              "eval": "+M13"
+            },
+            "20": {
+              "engineMs": 318,
+              "wallMs": 123,
+              "nodes": 77164,
+              "eval": "+M13"
+            },
+            "21": {
+              "engineMs": 411,
+              "wallMs": 216,
+              "nodes": 100846,
+              "eval": "+M13"
+            },
+            "22": {
+              "engineMs": 525,
+              "wallMs": 330,
+              "nodes": 129889,
+              "eval": "+M13"
+            },
+            "23": {
+              "engineMs": 743,
+              "wallMs": 547,
+              "nodes": 188649,
+              "eval": "+M11"
+            },
+            "24": {
+              "engineMs": 914,
+              "wallMs": 719,
+              "nodes": 235863,
+              "eval": "+M11"
+            },
+            "25": {
+              "engineMs": 1075,
+              "wallMs": 880,
+              "nodes": 283315,
+              "eval": "+M11"
+            },
+            "26": {
+              "engineMs": 1264,
+              "wallMs": 1069,
+              "nodes": 341280,
+              "eval": "+M9"
+            }
+          },
+          "firstMate": {
+            "depth": 2,
+            "engineMs": 4,
+            "wallMs": -192,
+            "nodes": 489,
+            "eval": "+M13"
+          },
+          "mem": 288686080
+        },
+        {
+          "positionId": "vct",
+          "threads": 1,
+          "repeat": 0,
+          "move": [
+            11,
+            3
+          ],
+          "wallMs": 9778,
+          "nodes": 1580627,
+          "engineMs": 7298,
+          "nps": 216583,
+          "depth": 29,
+          "selDepth": 17,
+          "eval": "+M19",
+          "winrate": 1,
+          "bestline": [
+            [
+              11,
+              3
+            ],
+            [
+              11,
+              2
+            ],
+            [
+              10,
+              3
+            ],
+            [
+              8,
+              3
+            ],
+            [
+              13,
+              6
+            ],
+            [
+              12,
+              5
+            ],
+            [
+              11,
+              8
+            ],
+            [
+              10,
+              9
+            ],
+            [
+              10,
+              8
+            ],
+            [
+              8,
+              8
+            ],
+            [
+              13,
+              5
+            ],
+            [
+              7,
+              2
+            ],
+            [
+              6,
+              1
+            ],
+            [
+              12,
+              4
+            ],
+            [
+              13,
+              8
+            ],
+            [
+              12,
+              8
+            ]
+          ],
+          "depthAt": {
+            "2": {
+              "engineMs": 2,
+              "wallMs": -194,
+              "nodes": 133,
+              "eval": "321"
+            },
+            "3": {
+              "engineMs": 2,
+              "wallMs": -194,
+              "nodes": 271,
+              "eval": "439"
+            },
+            "4": {
+              "engineMs": 2,
+              "wallMs": -194,
+              "nodes": 397,
+              "eval": "439"
+            },
+            "5": {
+              "engineMs": 4,
+              "wallMs": -192,
+              "nodes": 848,
+              "eval": "175"
+            },
+            "6": {
+              "engineMs": 5,
+              "wallMs": -191,
+              "nodes": 1051,
+              "eval": "227"
+            },
+            "7": {
+              "engineMs": 6,
+              "wallMs": -190,
+              "nodes": 1208,
+              "eval": "227"
+            },
+            "8": {
+              "engineMs": 26,
+              "wallMs": -170,
+              "nodes": 4775,
+              "eval": "186"
+            },
+            "9": {
+              "engineMs": 26,
+              "wallMs": -169,
+              "nodes": 4935,
+              "eval": "186"
+            },
+            "10": {
+              "engineMs": 61,
+              "wallMs": -135,
+              "nodes": 10242,
+              "eval": "768"
+            },
+            "11": {
+              "engineMs": 62,
+              "wallMs": -134,
+              "nodes": 10640,
+              "eval": "768"
+            },
+            "12": {
+              "engineMs": 63,
+              "wallMs": -133,
+              "nodes": 11147,
+              "eval": "853"
+            },
+            "13": {
+              "engineMs": 81,
+              "wallMs": -115,
+              "nodes": 14222,
+              "eval": "+M23"
+            },
+            "14": {
+              "engineMs": 99,
+              "wallMs": -96,
+              "nodes": 17632,
+              "eval": "+M21"
+            },
+            "15": {
+              "engineMs": 125,
+              "wallMs": -71,
+              "nodes": 22696,
+              "eval": "+M21"
+            },
+            "16": {
+              "engineMs": 159,
+              "wallMs": -37,
+              "nodes": 29882,
+              "eval": "+M21"
+            },
+            "17": {
+              "engineMs": 206,
+              "wallMs": 10,
+              "nodes": 39678,
+              "eval": "+M19"
+            },
+            "18": {
+              "engineMs": 263,
+              "wallMs": 67,
+              "nodes": 51229,
+              "eval": "+M19"
+            },
+            "19": {
+              "engineMs": 343,
+              "wallMs": 147,
+              "nodes": 67618,
+              "eval": "+M19"
+            },
+            "20": {
+              "engineMs": 459,
+              "wallMs": 263,
+              "nodes": 92030,
+              "eval": "+M19"
+            },
+            "21": {
+              "engineMs": 624,
+              "wallMs": 428,
+              "nodes": 126912,
+              "eval": "+M19"
+            },
+            "22": {
+              "engineMs": 892,
+              "wallMs": 696,
+              "nodes": 175331,
+              "eval": "+M19"
+            },
+            "23": {
+              "engineMs": 1199,
+              "wallMs": 1003,
+              "nodes": 242611,
+              "eval": "+M19"
+            },
+            "24": {
+              "engineMs": 1627,
+              "wallMs": 1431,
+              "nodes": 332515,
+              "eval": "+M19"
+            },
+            "25": {
+              "engineMs": 2228,
+              "wallMs": 2032,
+              "nodes": 464712,
+              "eval": "+M19"
+            },
+            "26": {
+              "engineMs": 3049,
+              "wallMs": 2853,
+              "nodes": 638501,
+              "eval": "+M19"
+            },
+            "27": {
+              "engineMs": 4143,
+              "wallMs": 3947,
+              "nodes": 874098,
+              "eval": "+M19"
+            },
+            "28": {
+              "engineMs": 5490,
+              "wallMs": 5294,
+              "nodes": 1178097,
+              "eval": "+M19"
+            },
+            "29": {
+              "engineMs": 7298,
+              "wallMs": 7103,
+              "nodes": 1580627,
+              "eval": "+M19"
+            }
+          },
+          "firstMate": {
+            "depth": 13,
+            "engineMs": 81,
+            "wallMs": -115,
+            "nodes": 14222,
+            "eval": "+M23"
+          },
+          "mem": 288686080
+        },
+        {
+          "positionId": "vct",
+          "threads": 1,
+          "repeat": 1,
+          "move": [
+            11,
+            3
+          ],
+          "wallMs": 9781,
+          "nodes": 1580627,
+          "engineMs": 7288,
+          "nps": 216880,
+          "depth": 29,
+          "selDepth": 17,
+          "eval": "+M19",
+          "winrate": 1,
+          "bestline": [
+            [
+              11,
+              3
+            ],
+            [
+              11,
+              2
+            ],
+            [
+              10,
+              3
+            ],
+            [
+              8,
+              3
+            ],
+            [
+              13,
+              6
+            ],
+            [
+              12,
+              5
+            ],
+            [
+              11,
+              8
+            ],
+            [
+              10,
+              9
+            ],
+            [
+              10,
+              8
+            ],
+            [
+              8,
+              8
+            ],
+            [
+              13,
+              5
+            ],
+            [
+              7,
+              2
+            ],
+            [
+              6,
+              1
+            ],
+            [
+              12,
+              4
+            ],
+            [
+              13,
+              8
+            ],
+            [
+              12,
+              8
+            ]
+          ],
+          "depthAt": {
+            "2": {
+              "engineMs": 2,
+              "wallMs": -194,
+              "nodes": 133,
+              "eval": "321"
+            },
+            "3": {
+              "engineMs": 2,
+              "wallMs": -194,
+              "nodes": 271,
+              "eval": "439"
+            },
+            "4": {
+              "engineMs": 2,
+              "wallMs": -194,
+              "nodes": 397,
+              "eval": "439"
+            },
+            "5": {
+              "engineMs": 4,
+              "wallMs": -191,
+              "nodes": 848,
+              "eval": "175"
+            },
+            "6": {
+              "engineMs": 5,
+              "wallMs": -191,
+              "nodes": 1051,
+              "eval": "227"
+            },
+            "7": {
+              "engineMs": 5,
+              "wallMs": -190,
+              "nodes": 1208,
+              "eval": "227"
+            },
+            "8": {
+              "engineMs": 25,
+              "wallMs": -171,
+              "nodes": 4775,
+              "eval": "186"
+            },
+            "9": {
+              "engineMs": 25,
+              "wallMs": -170,
+              "nodes": 4935,
+              "eval": "186"
+            },
+            "10": {
+              "engineMs": 59,
+              "wallMs": -137,
+              "nodes": 10242,
+              "eval": "768"
+            },
+            "11": {
+              "engineMs": 60,
+              "wallMs": -136,
+              "nodes": 10640,
+              "eval": "768"
+            },
+            "12": {
+              "engineMs": 61,
+              "wallMs": -134,
+              "nodes": 11147,
+              "eval": "853"
+            },
+            "13": {
+              "engineMs": 75,
+              "wallMs": -120,
+              "nodes": 14222,
+              "eval": "+M23"
+            },
+            "14": {
+              "engineMs": 91,
+              "wallMs": -105,
+              "nodes": 17632,
+              "eval": "+M21"
+            },
+            "15": {
+              "engineMs": 116,
+              "wallMs": -80,
+              "nodes": 22696,
+              "eval": "+M21"
+            },
+            "16": {
+              "engineMs": 149,
+              "wallMs": -47,
+              "nodes": 29882,
+              "eval": "+M21"
+            },
+            "17": {
+              "engineMs": 199,
+              "wallMs": 3,
+              "nodes": 39678,
+              "eval": "+M19"
+            },
+            "18": {
+              "engineMs": 257,
+              "wallMs": 62,
+              "nodes": 51229,
+              "eval": "+M19"
+            },
+            "19": {
+              "engineMs": 336,
+              "wallMs": 140,
+              "nodes": 67618,
+              "eval": "+M19"
+            },
+            "20": {
+              "engineMs": 451,
+              "wallMs": 255,
+              "nodes": 92030,
+              "eval": "+M19"
+            },
+            "21": {
+              "engineMs": 611,
+              "wallMs": 416,
+              "nodes": 126912,
+              "eval": "+M19"
+            },
+            "22": {
+              "engineMs": 831,
+              "wallMs": 635,
+              "nodes": 175331,
+              "eval": "+M19"
+            },
+            "23": {
+              "engineMs": 1130,
+              "wallMs": 934,
+              "nodes": 242611,
+              "eval": "+M19"
+            },
+            "24": {
+              "engineMs": 1515,
+              "wallMs": 1319,
+              "nodes": 332515,
+              "eval": "+M19"
+            },
+            "25": {
+              "engineMs": 2120,
+              "wallMs": 1924,
+              "nodes": 464712,
+              "eval": "+M19"
+            },
+            "26": {
+              "engineMs": 2903,
+              "wallMs": 2707,
+              "nodes": 638501,
+              "eval": "+M19"
+            },
+            "27": {
+              "engineMs": 3942,
+              "wallMs": 3746,
+              "nodes": 874098,
+              "eval": "+M19"
+            },
+            "28": {
+              "engineMs": 5374,
+              "wallMs": 5178,
+              "nodes": 1178097,
+              "eval": "+M19"
+            },
+            "29": {
+              "engineMs": 7288,
+              "wallMs": 7092,
+              "nodes": 1580627,
+              "eval": "+M19"
+            }
+          },
+          "firstMate": {
+            "depth": 13,
+            "engineMs": 75,
+            "wallMs": -120,
+            "nodes": 14222,
+            "eval": "+M23"
+          },
+          "mem": 288686080
+        }
+      ],
+      "loadMs": 158,
+      "host": "worker",
+      "about": "name=\"Rapfi\", version=\"0.43.02 (clang++ 24.0.0 on Wasm WASM_SIMD SINGLE_THREAD)\", author=\"Rapfi developers (see AUTHORS file)\", country=\"China\"",
+      "memAfterStart": 154468352,
+      "cold": {
+        "move": [
+          6,
+          8
+        ],
+        "wallMs": 2932,
+        "nodes": 134828,
+        "engineMs": 1394,
+        "nps": 90013,
+        "depth": 18,
+        "selDepth": 27,
+        "eval": "-402",
+        "winrate": 0.14679,
+        "bestline": [
+          [
+            6,
+            8
+          ],
+          [
+            8,
+            5
+          ],
+          [
+            8,
+            7
+          ],
+          [
+            6,
+            5
+          ],
+          [
+            7,
+            5
+          ],
+          [
+            7,
+            4
+          ],
+          [
+            6,
+            3
+          ],
+          [
+            8,
+            3
+          ],
+          [
+            9,
+            2
+          ],
+          [
+            8,
+            4
+          ],
+          [
+            8,
+            2
+          ],
+          [
+            10,
+            4
+          ],
+          [
+            9,
+            4
+          ],
+          [
+            9,
+            5
+          ],
+          [
+            11,
+            3
+          ],
+          [
+            10,
+            6
+          ],
+          [
+            11,
+            7
+          ],
+          [
+            10,
+            7
+          ],
+          [
+            10,
+            5
+          ],
+          [
+            9,
+            6
+          ],
+          [
+            11,
+            8
+          ]
+        ],
+        "depthAt": {
+          "2": {
+            "engineMs": 8,
+            "wallMs": -37,
+            "nodes": 64,
+            "eval": "-211"
+          },
+          "3": {
+            "engineMs": 10,
+            "wallMs": -36,
+            "nodes": 144,
+            "eval": "126"
+          },
+          "4": {
+            "engineMs": 10,
+            "wallMs": -35,
+            "nodes": 219,
+            "eval": "-262"
+          },
+          "5": {
+            "engineMs": 11,
+            "wallMs": -34,
+            "nodes": 299,
+            "eval": "-233"
+          },
+          "6": {
+            "engineMs": 12,
+            "wallMs": -34,
+            "nodes": 371,
+            "eval": "-221"
+          },
+          "7": {
+            "engineMs": 16,
+            "wallMs": -29,
+            "nodes": 717,
+            "eval": "-214"
+          },
+          "8": {
+            "engineMs": 20,
+            "wallMs": -26,
+            "nodes": 969,
+            "eval": "-302"
+          },
+          "9": {
+            "engineMs": 21,
+            "wallMs": -24,
+            "nodes": 1059,
+            "eval": "-302"
+          },
+          "10": {
+            "engineMs": 24,
+            "wallMs": -22,
+            "nodes": 1175,
+            "eval": "-302"
+          },
+          "11": {
+            "engineMs": 29,
+            "wallMs": -16,
+            "nodes": 1401,
+            "eval": "-302"
+          },
+          "12": {
+            "engineMs": 34,
+            "wallMs": -12,
+            "nodes": 1702,
+            "eval": "-302"
+          },
+          "13": {
+            "engineMs": 441,
+            "wallMs": 395,
+            "nodes": 41269,
+            "eval": "-322"
+          },
+          "14": {
+            "engineMs": 446,
+            "wallMs": 401,
+            "nodes": 42168,
+            "eval": "-322"
+          },
+          "15": {
+            "engineMs": 1031,
+            "wallMs": 986,
+            "nodes": 103621,
+            "eval": "-352"
+          },
+          "16": {
+            "engineMs": 1160,
+            "wallMs": 1115,
+            "nodes": 114126,
+            "eval": "-352"
+          },
+          "17": {
+            "engineMs": 1240,
+            "wallMs": 1194,
+            "nodes": 120864,
+            "eval": "-352"
+          },
+          "18": {
+            "engineMs": 1394,
+            "wallMs": 1349,
+            "nodes": 134828,
+            "eval": "-352"
+          }
+        },
+        "firstMate": null,
+        "positionId": "open-direct",
+        "timeMs": 3000
+      },
+      "bench": {
+        "npsComputed": 344339,
+        "wallMs": 21965,
+        "moveBenchMs": 1125,
+        "movesPerSec": 1777751,
+        "searchBenchMs": 20824,
+        "nodes": 7170518,
+        "nps": 138088,
+        "hash": "2b7c7da9"
+      },
+      "memAfterSearch": 288686080,
+      "uaMemory": null,
+      "errors": []
+    },
+    {
+      "engine": "rapfiweb-pgo",
+      "variant": "single-simd128",
+      "searches": [
+        {
+          "positionId": "open-direct",
+          "threads": 1,
+          "repeat": 0,
+          "move": [
+            6,
+            8
+          ],
+          "wallMs": 9800,
+          "nodes": 134828,
+          "engineMs": 1084,
+          "nps": 124380,
+          "depth": 18,
+          "selDepth": 24,
+          "eval": "-352",
+          "winrate": 0.14679,
+          "bestline": [
+            [
+              6,
+              8
+            ],
+            [
+              8,
+              5
+            ],
+            [
+              8,
+              7
+            ],
+            [
+              6,
+              5
+            ],
+            [
+              7,
+              5
+            ],
+            [
+              7,
+              4
+            ],
+            [
+              6,
+              3
+            ],
+            [
+              8,
+              3
+            ],
+            [
+              9,
+              2
+            ],
+            [
+              8,
+              4
+            ],
+            [
+              8,
+              2
+            ],
+            [
+              10,
+              4
+            ],
+            [
+              9,
+              4
+            ],
+            [
+              9,
+              5
+            ],
+            [
+              11,
+              3
+            ],
+            [
+              10,
+              6
+            ],
+            [
+              11,
+              7
+            ],
+            [
+              10,
+              7
+            ],
+            [
+              10,
+              5
+            ],
+            [
+              9,
+              6
+            ],
+            [
+              11,
+              8
+            ]
+          ],
+          "depthAt": {
+            "2": {
+              "engineMs": 1,
+              "wallMs": -172,
+              "nodes": 64,
+              "eval": "-211"
+            },
+            "3": {
+              "engineMs": 2,
+              "wallMs": -172,
+              "nodes": 144,
+              "eval": "126"
+            },
+            "4": {
+              "engineMs": 2,
+              "wallMs": -171,
+              "nodes": 219,
+              "eval": "-262"
+            },
+            "5": {
+              "engineMs": 3,
+              "wallMs": -171,
+              "nodes": 299,
+              "eval": "-233"
+            },
+            "6": {
+              "engineMs": 3,
+              "wallMs": -170,
+              "nodes": 371,
+              "eval": "-221"
+            },
+            "7": {
+              "engineMs": 5,
+              "wallMs": -168,
+              "nodes": 717,
+              "eval": "-214"
+            },
+            "8": {
+              "engineMs": 7,
+              "wallMs": -167,
+              "nodes": 969,
+              "eval": "-302"
+            },
+            "9": {
+              "engineMs": 7,
+              "wallMs": -166,
+              "nodes": 1059,
+              "eval": "-302"
+            },
+            "10": {
+              "engineMs": 8,
+              "wallMs": -166,
+              "nodes": 1175,
+              "eval": "-302"
+            },
+            "11": {
+              "engineMs": 10,
+              "wallMs": -164,
+              "nodes": 1401,
+              "eval": "-302"
+            },
+            "12": {
+              "engineMs": 13,
+              "wallMs": -161,
+              "nodes": 1702,
+              "eval": "-302"
+            },
+            "13": {
+              "engineMs": 375,
+              "wallMs": 202,
+              "nodes": 41269,
+              "eval": "-322"
+            },
+            "14": {
+              "engineMs": 380,
+              "wallMs": 207,
+              "nodes": 42168,
+              "eval": "-322"
+            },
+            "15": {
+              "engineMs": 841,
+              "wallMs": 668,
+              "nodes": 103621,
+              "eval": "-352"
+            },
+            "16": {
+              "engineMs": 923,
+              "wallMs": 749,
+              "nodes": 114126,
+              "eval": "-352"
+            },
+            "17": {
+              "engineMs": 971,
+              "wallMs": 798,
+              "nodes": 120864,
+              "eval": "-352"
+            },
+            "18": {
+              "engineMs": 1084,
+              "wallMs": 911,
+              "nodes": 134828,
+              "eval": "-352"
+            }
+          },
+          "firstMate": null,
+          "mem": 288686080
+        },
+        {
+          "positionId": "open-direct",
+          "threads": 1,
+          "repeat": 1,
+          "move": [
+            6,
+            8
+          ],
+          "wallMs": 9801,
+          "nodes": 134828,
+          "engineMs": 1149,
+          "nps": 117343,
+          "depth": 18,
+          "selDepth": 24,
+          "eval": "-352",
+          "winrate": 0.14679,
+          "bestline": [
+            [
+              6,
+              8
+            ],
+            [
+              8,
+              5
+            ],
+            [
+              8,
+              7
+            ],
+            [
+              6,
+              5
+            ],
+            [
+              7,
+              5
+            ],
+            [
+              7,
+              4
+            ],
+            [
+              6,
+              3
+            ],
+            [
+              8,
+              3
+            ],
+            [
+              9,
+              2
+            ],
+            [
+              8,
+              4
+            ],
+            [
+              8,
+              2
+            ],
+            [
+              10,
+              4
+            ],
+            [
+              9,
+              4
+            ],
+            [
+              9,
+              5
+            ],
+            [
+              11,
+              3
+            ],
+            [
+              10,
+              6
+            ],
+            [
+              11,
+              7
+            ],
+            [
+              10,
+              7
+            ],
+            [
+              10,
+              5
+            ],
+            [
+              9,
+              6
+            ],
+            [
+              11,
+              8
+            ]
+          ],
+          "depthAt": {
+            "2": {
+              "engineMs": 2,
+              "wallMs": -172,
+              "nodes": 64,
+              "eval": "-211"
+            },
+            "3": {
+              "engineMs": 3,
+              "wallMs": -172,
+              "nodes": 144,
+              "eval": "126"
+            },
+            "4": {
+              "engineMs": 3,
+              "wallMs": -171,
+              "nodes": 219,
+              "eval": "-262"
+            },
+            "5": {
+              "engineMs": 3,
+              "wallMs": -171,
+              "nodes": 299,
+              "eval": "-233"
+            },
+            "6": {
+              "engineMs": 4,
+              "wallMs": -171,
+              "nodes": 371,
+              "eval": "-221"
+            },
+            "7": {
+              "engineMs": 5,
+              "wallMs": -169,
+              "nodes": 717,
+              "eval": "-214"
+            },
+            "8": {
+              "engineMs": 7,
+              "wallMs": -168,
+              "nodes": 969,
+              "eval": "-302"
+            },
+            "9": {
+              "engineMs": 7,
+              "wallMs": -167,
+              "nodes": 1059,
+              "eval": "-302"
+            },
+            "10": {
+              "engineMs": 7,
+              "wallMs": -167,
+              "nodes": 1175,
+              "eval": "-302"
+            },
+            "11": {
+              "engineMs": 10,
+              "wallMs": -165,
+              "nodes": 1401,
+              "eval": "-302"
+            },
+            "12": {
+              "engineMs": 12,
+              "wallMs": -162,
+              "nodes": 1702,
+              "eval": "-302"
+            },
+            "13": {
+              "engineMs": 380,
+              "wallMs": 206,
+              "nodes": 41269,
+              "eval": "-322"
+            },
+            "14": {
+              "engineMs": 385,
+              "wallMs": 211,
+              "nodes": 42168,
+              "eval": "-322"
+            },
+            "15": {
+              "engineMs": 890,
+              "wallMs": 716,
+              "nodes": 103621,
+              "eval": "-352"
+            },
+            "16": {
+              "engineMs": 982,
+              "wallMs": 808,
+              "nodes": 114126,
+              "eval": "-352"
+            },
+            "17": {
+              "engineMs": 1033,
+              "wallMs": 858,
+              "nodes": 120864,
+              "eval": "-352"
+            },
+            "18": {
+              "engineMs": 1149,
+              "wallMs": 974,
+              "nodes": 134828,
+              "eval": "-352"
+            }
+          },
+          "firstMate": null,
+          "mem": 288686080
+        },
+        {
+          "positionId": "open-indirect",
+          "threads": 1,
+          "repeat": 0,
+          "move": [
+            8,
+            7
+          ],
+          "wallMs": 8369,
+          "nodes": 902978,
+          "engineMs": 8543,
+          "nps": 105697,
+          "depth": 19,
+          "selDepth": 38,
+          "eval": "-319",
+          "winrate": 0.168682,
+          "bestline": [
+            [
+              8,
+              7
+            ],
+            [
+              8,
+              8
+            ],
+            [
+              9,
+              9
+            ],
+            [
+              7,
+              9
+            ],
+            [
+              6,
+              10
+            ],
+            [
+              8,
+              5
+            ],
+            [
+              7,
+              8
+            ],
+            [
+              9,
+              6
+            ],
+            [
+              9,
+              4
+            ],
+            [
+              7,
+              3
+            ],
+            [
+              7,
+              4
+            ],
+            [
+              8,
+              4
+            ],
+            [
+              6,
+              2
+            ],
+            [
+              9,
+              3
+            ],
+            [
+              8,
+              3
+            ],
+            [
+              11,
+              5
+            ],
+            [
+              10,
+              6
+            ],
+            [
+              10,
+              5
+            ],
+            [
+              9,
+              5
+            ],
+            [
+              10,
+              2
+            ],
+            [
+              11,
+              1
+            ],
+            [
+              10,
+              4
+            ],
+            [
+              12,
+              6
+            ],
+            [
+              8,
+              2
+            ],
+            [
+              7,
+              1
+            ]
+          ],
+          "depthAt": {
+            "2": {
+              "engineMs": 2,
+              "wallMs": -171,
+              "nodes": 94,
+              "eval": "-196"
+            },
+            "3": {
+              "engineMs": 3,
+              "wallMs": -171,
+              "nodes": 165,
+              "eval": "-257"
+            },
+            "4": {
+              "engineMs": 3,
+              "wallMs": -171,
+              "nodes": 236,
+              "eval": "-257"
+            },
+            "5": {
+              "engineMs": 4,
+              "wallMs": -170,
+              "nodes": 447,
+              "eval": "-214"
+            },
+            "6": {
+              "engineMs": 4,
+              "wallMs": -170,
+              "nodes": 520,
+              "eval": "-214"
+            },
+            "7": {
+              "engineMs": 6,
+              "wallMs": -168,
+              "nodes": 801,
+              "eval": "-288"
+            },
+            "8": {
+              "engineMs": 6,
+              "wallMs": -168,
+              "nodes": 903,
+              "eval": "-288"
+            },
+            "9": {
+              "engineMs": 7,
+              "wallMs": -167,
+              "nodes": 1079,
+              "eval": "-288"
+            },
+            "10": {
+              "engineMs": 11,
+              "wallMs": -163,
+              "nodes": 1562,
+              "eval": "-196"
+            },
+            "11": {
+              "engineMs": 13,
+              "wallMs": -161,
+              "nodes": 1854,
+              "eval": "-196"
+            },
+            "12": {
+              "engineMs": 340,
+              "wallMs": 166,
+              "nodes": 31201,
+              "eval": "-230"
+            },
+            "13": {
+              "engineMs": 498,
+              "wallMs": 325,
+              "nodes": 46815,
+              "eval": "-277"
+            },
+            "14": {
+              "engineMs": 785,
+              "wallMs": 611,
+              "nodes": 76594,
+              "eval": "-262"
+            },
+            "15": {
+              "engineMs": 793,
+              "wallMs": 619,
+              "nodes": 77768,
+              "eval": "-262"
+            },
+            "16": {
+              "engineMs": 821,
+              "wallMs": 647,
+              "nodes": 81062,
+              "eval": "-262"
+            },
+            "17": {
+              "engineMs": 1056,
+              "wallMs": 883,
+              "nodes": 108438,
+              "eval": "-262"
+            },
+            "18": {
+              "engineMs": 1466,
+              "wallMs": 1292,
+              "nodes": 146948,
+              "eval": "-262"
+            },
+            "19": {
+              "engineMs": 8543,
+              "wallMs": 8369,
+              "nodes": 902978,
+              "eval": "-319"
+            }
+          },
+          "firstMate": null,
+          "mem": 288686080
+        },
+        {
+          "positionId": "open-indirect",
+          "threads": 1,
+          "repeat": 1,
+          "move": [
+            8,
+            7
+          ],
+          "wallMs": 8386,
+          "nodes": 902978,
+          "engineMs": 8559,
+          "nps": 105500,
+          "depth": 19,
+          "selDepth": 38,
+          "eval": "-319",
+          "winrate": 0.168682,
+          "bestline": [
+            [
+              8,
+              7
+            ],
+            [
+              8,
+              8
+            ],
+            [
+              9,
+              9
+            ],
+            [
+              7,
+              9
+            ],
+            [
+              6,
+              10
+            ],
+            [
+              8,
+              5
+            ],
+            [
+              7,
+              8
+            ],
+            [
+              9,
+              6
+            ],
+            [
+              9,
+              4
+            ],
+            [
+              7,
+              3
+            ],
+            [
+              7,
+              4
+            ],
+            [
+              8,
+              4
+            ],
+            [
+              6,
+              2
+            ],
+            [
+              9,
+              3
+            ],
+            [
+              8,
+              3
+            ],
+            [
+              11,
+              5
+            ],
+            [
+              10,
+              6
+            ],
+            [
+              10,
+              5
+            ],
+            [
+              9,
+              5
+            ],
+            [
+              10,
+              2
+            ],
+            [
+              11,
+              1
+            ],
+            [
+              10,
+              4
+            ],
+            [
+              12,
+              6
+            ],
+            [
+              8,
+              2
+            ],
+            [
+              7,
+              1
+            ]
+          ],
+          "depthAt": {
+            "2": {
+              "engineMs": 2,
+              "wallMs": -172,
+              "nodes": 94,
+              "eval": "-196"
+            },
+            "3": {
+              "engineMs": 2,
+              "wallMs": -171,
+              "nodes": 165,
+              "eval": "-257"
+            },
+            "4": {
+              "engineMs": 2,
+              "wallMs": -171,
+              "nodes": 236,
+              "eval": "-257"
+            },
+            "5": {
+              "engineMs": 3,
+              "wallMs": -170,
+              "nodes": 447,
+              "eval": "-214"
+            },
+            "6": {
+              "engineMs": 3,
+              "wallMs": -170,
+              "nodes": 520,
+              "eval": "-214"
+            },
+            "7": {
+              "engineMs": 5,
+              "wallMs": -169,
+              "nodes": 801,
+              "eval": "-288"
+            },
+            "8": {
+              "engineMs": 5,
+              "wallMs": -168,
+              "nodes": 903,
+              "eval": "-288"
+            },
+            "9": {
+              "engineMs": 6,
+              "wallMs": -167,
+              "nodes": 1079,
+              "eval": "-288"
+            },
+            "10": {
+              "engineMs": 11,
+              "wallMs": -163,
+              "nodes": 1562,
+              "eval": "-196"
+            },
+            "11": {
+              "engineMs": 13,
+              "wallMs": -161,
+              "nodes": 1854,
+              "eval": "-196"
+            },
+            "12": {
+              "engineMs": 335,
+              "wallMs": 161,
+              "nodes": 31201,
+              "eval": "-230"
+            },
+            "13": {
+              "engineMs": 487,
+              "wallMs": 314,
+              "nodes": 46815,
+              "eval": "-277"
+            },
+            "14": {
+              "engineMs": 773,
+              "wallMs": 600,
+              "nodes": 76594,
+              "eval": "-262"
+            },
+            "15": {
+              "engineMs": 781,
+              "wallMs": 607,
+              "nodes": 77768,
+              "eval": "-262"
+            },
+            "16": {
+              "engineMs": 810,
+              "wallMs": 637,
+              "nodes": 81062,
+              "eval": "-262"
+            },
+            "17": {
+              "engineMs": 1048,
+              "wallMs": 875,
+              "nodes": 108438,
+              "eval": "-262"
+            },
+            "18": {
+              "engineMs": 1457,
+              "wallMs": 1284,
+              "nodes": 146948,
+              "eval": "-262"
+            },
+            "19": {
+              "engineMs": 8559,
+              "wallMs": 8386,
+              "nodes": 902978,
+              "eval": "-319"
+            }
+          },
+          "firstMate": null,
+          "mem": 288686080
+        },
+        {
+          "positionId": "midgame",
+          "threads": 1,
+          "repeat": 0,
+          "move": [
+            10,
+            2
+          ],
+          "wallMs": 7577,
+          "nodes": 2037531,
+          "engineMs": 7751,
+          "nps": 262873,
+          "depth": 24,
+          "selDepth": 51,
+          "eval": "+M59",
+          "winrate": 1,
+          "bestline": [
+            [
+              10,
+              2
+            ],
+            [
+              11,
+              1
+            ],
+            [
+              11,
+              6
+            ],
+            [
+              11,
+              7
+            ],
+            [
+              11,
+              5
+            ],
+            [
+              13,
+              9
+            ],
+            [
+              10,
+              7
+            ],
+            [
+              12,
+              5
+            ],
+            [
+              7,
+              4
+            ],
+            [
+              12,
+              8
+            ],
+            [
+              10,
+              6
+            ],
+            [
+              12,
+              7
+            ],
+            [
+              11,
+              3
+            ],
+            [
+              11,
+              2
+            ],
+            [
+              6,
+              3
+            ],
+            [
+              9,
+              6
+            ],
+            [
+              12,
+              6
+            ],
+            [
+              13,
+              7
+            ],
+            [
+              12,
+              4
+            ],
+            [
+              7,
+              8
+            ],
+            [
+              6,
+              9
+            ],
+            [
+              13,
+              5
+            ],
+            [
+              13,
+              3
+            ],
+            [
+              14,
+              2
+            ],
+            [
+              10,
+              3
+            ],
+            [
+              12,
+              3
+            ],
+            [
+              6,
+              6
+            ],
+            [
+              7,
+              5
+            ],
+            [
+              6,
+              4
+            ],
+            [
+              13,
+              6
+            ],
+            [
+              13,
+              8
+            ],
+            [
+              6,
+              5
+            ],
+            [
+              5,
+              4
+            ],
+            [
+              4,
+              4
+            ]
+          ],
+          "depthAt": {
+            "2": {
+              "engineMs": 3,
+              "wallMs": -171,
+              "nodes": 129,
+              "eval": "238"
+            },
+            "3": {
+              "engineMs": 4,
+              "wallMs": -170,
+              "nodes": 273,
+              "eval": "426"
+            },
+            "4": {
+              "engineMs": 4,
+              "wallMs": -170,
+              "nodes": 410,
+              "eval": "336"
+            },
+            "5": {
+              "engineMs": 6,
+              "wallMs": -169,
+              "nodes": 821,
+              "eval": "168"
+            },
+            "6": {
+              "engineMs": 6,
+              "wallMs": -168,
+              "nodes": 959,
+              "eval": "168"
+            },
+            "7": {
+              "engineMs": 6,
+              "wallMs": -168,
+              "nodes": 1108,
+              "eval": "168"
+            },
+            "8": {
+              "engineMs": 8,
+              "wallMs": -166,
+              "nodes": 1360,
+              "eval": "394"
+            },
+            "9": {
+              "engineMs": 34,
+              "wallMs": -140,
+              "nodes": 4280,
+              "eval": "226"
+            },
+            "10": {
+              "engineMs": 36,
+              "wallMs": -138,
+              "nodes": 4682,
+              "eval": "289"
+            },
+            "11": {
+              "engineMs": 37,
+              "wallMs": -137,
+              "nodes": 4977,
+              "eval": "289"
+            },
+            "12": {
+              "engineMs": 43,
+              "wallMs": -131,
+              "nodes": 5735,
+              "eval": "289"
+            },
+            "13": {
+              "engineMs": 598,
+              "wallMs": 424,
+              "nodes": 71620,
+              "eval": "247"
+            },
+            "14": {
+              "engineMs": 771,
+              "wallMs": 597,
+              "nodes": 95665,
+              "eval": "424"
+            },
+            "15": {
+              "engineMs": 996,
+              "wallMs": 822,
+              "nodes": 133724,
+              "eval": "378"
+            },
+            "16": {
+              "engineMs": 2306,
+              "wallMs": 2132,
+              "nodes": 363870,
+              "eval": "336"
+            },
+            "17": {
+              "engineMs": 2321,
+              "wallMs": 2147,
+              "nodes": 366598,
+              "eval": "336"
+            },
+            "18": {
+              "engineMs": 4022,
+              "wallMs": 3848,
+              "nodes": 709101,
+              "eval": "455"
+            },
+            "19": {
+              "engineMs": 4769,
+              "wallMs": 4595,
+              "nodes": 958461,
+              "eval": "776"
+            },
+            "20": {
+              "engineMs": 4850,
+              "wallMs": 4676,
+              "nodes": 990403,
+              "eval": "776"
+            },
+            "21": {
+              "engineMs": 6396,
+              "wallMs": 6222,
+              "nodes": 1579533,
+              "eval": "542"
+            },
+            "22": {
+              "engineMs": 6997,
+              "wallMs": 6823,
+              "nodes": 1773290,
+              "eval": "1024"
+            },
+            "23": {
+              "engineMs": 7006,
+              "wallMs": 6832,
+              "nodes": 1776352,
+              "eval": "1018"
+            },
+            "24": {
+              "engineMs": 7751,
+              "wallMs": 7577,
+              "nodes": 2037531,
+              "eval": "+M59"
+            }
+          },
+          "firstMate": {
+            "depth": 24,
+            "engineMs": 7751,
+            "wallMs": 7577,
+            "nodes": 2037531,
+            "eval": "+M59"
+          },
+          "mem": 288686080
+        },
+        {
+          "positionId": "midgame",
+          "threads": 1,
+          "repeat": 1,
+          "move": [
+            10,
+            2
+          ],
+          "wallMs": 7636,
+          "nodes": 2037531,
+          "engineMs": 7809,
+          "nps": 260920,
+          "depth": 24,
+          "selDepth": 51,
+          "eval": "+M59",
+          "winrate": 1,
+          "bestline": [
+            [
+              10,
+              2
+            ],
+            [
+              11,
+              1
+            ],
+            [
+              11,
+              6
+            ],
+            [
+              11,
+              7
+            ],
+            [
+              11,
+              5
+            ],
+            [
+              13,
+              9
+            ],
+            [
+              10,
+              7
+            ],
+            [
+              12,
+              5
+            ],
+            [
+              7,
+              4
+            ],
+            [
+              12,
+              8
+            ],
+            [
+              10,
+              6
+            ],
+            [
+              12,
+              7
+            ],
+            [
+              11,
+              3
+            ],
+            [
+              11,
+              2
+            ],
+            [
+              6,
+              3
+            ],
+            [
+              9,
+              6
+            ],
+            [
+              12,
+              6
+            ],
+            [
+              13,
+              7
+            ],
+            [
+              12,
+              4
+            ],
+            [
+              7,
+              8
+            ],
+            [
+              6,
+              9
+            ],
+            [
+              13,
+              5
+            ],
+            [
+              13,
+              3
+            ],
+            [
+              14,
+              2
+            ],
+            [
+              10,
+              3
+            ],
+            [
+              12,
+              3
+            ],
+            [
+              6,
+              6
+            ],
+            [
+              7,
+              5
+            ],
+            [
+              6,
+              4
+            ],
+            [
+              13,
+              6
+            ],
+            [
+              13,
+              8
+            ],
+            [
+              6,
+              5
+            ],
+            [
+              5,
+              4
+            ],
+            [
+              4,
+              4
+            ]
+          ],
+          "depthAt": {
+            "2": {
+              "engineMs": 4,
+              "wallMs": -170,
+              "nodes": 129,
+              "eval": "238"
+            },
+            "3": {
+              "engineMs": 4,
+              "wallMs": -169,
+              "nodes": 273,
+              "eval": "426"
+            },
+            "4": {
+              "engineMs": 5,
+              "wallMs": -169,
+              "nodes": 410,
+              "eval": "336"
+            },
+            "5": {
+              "engineMs": 6,
+              "wallMs": -167,
+              "nodes": 821,
+              "eval": "168"
+            },
+            "6": {
+              "engineMs": 7,
+              "wallMs": -166,
+              "nodes": 959,
+              "eval": "168"
+            },
+            "7": {
+              "engineMs": 8,
+              "wallMs": -166,
+              "nodes": 1108,
+              "eval": "168"
+            },
+            "8": {
+              "engineMs": 10,
+              "wallMs": -164,
+              "nodes": 1360,
+              "eval": "394"
+            },
+            "9": {
+              "engineMs": 39,
+              "wallMs": -135,
+              "nodes": 4280,
+              "eval": "226"
+            },
+            "10": {
+              "engineMs": 42,
+              "wallMs": -132,
+              "nodes": 4682,
+              "eval": "289"
+            },
+            "11": {
+              "engineMs": 43,
+              "wallMs": -130,
+              "nodes": 4977,
+              "eval": "289"
+            },
+            "12": {
+              "engineMs": 51,
+              "wallMs": -123,
+              "nodes": 5735,
+              "eval": "289"
+            },
+            "13": {
+              "engineMs": 642,
+              "wallMs": 469,
+              "nodes": 71620,
+              "eval": "247"
+            },
+            "14": {
+              "engineMs": 790,
+              "wallMs": 616,
+              "nodes": 95665,
+              "eval": "424"
+            },
+            "15": {
+              "engineMs": 985,
+              "wallMs": 811,
+              "nodes": 133724,
+              "eval": "378"
+            },
+            "16": {
+              "engineMs": 2211,
+              "wallMs": 2037,
+              "nodes": 363870,
+              "eval": "336"
+            },
+            "17": {
+              "engineMs": 2226,
+              "wallMs": 2052,
+              "nodes": 366598,
+              "eval": "336"
+            },
+            "18": {
+              "engineMs": 3935,
+              "wallMs": 3762,
+              "nodes": 709101,
+              "eval": "455"
+            },
+            "19": {
+              "engineMs": 4739,
+              "wallMs": 4565,
+              "nodes": 958461,
+              "eval": "776"
+            },
+            "20": {
+              "engineMs": 4820,
+              "wallMs": 4647,
+              "nodes": 990403,
+              "eval": "776"
+            },
+            "21": {
+              "engineMs": 6406,
+              "wallMs": 6233,
+              "nodes": 1579533,
+              "eval": "542"
+            },
+            "22": {
+              "engineMs": 7084,
+              "wallMs": 6910,
+              "nodes": 1773290,
+              "eval": "1024"
+            },
+            "23": {
+              "engineMs": 7093,
+              "wallMs": 6920,
+              "nodes": 1776352,
+              "eval": "1018"
+            },
+            "24": {
+              "engineMs": 7809,
+              "wallMs": 7636,
+              "nodes": 2037531,
+              "eval": "+M59"
+            }
+          },
+          "firstMate": {
+            "depth": 24,
+            "engineMs": 7809,
+            "wallMs": 7636,
+            "nodes": 2037531,
+            "eval": "+M59"
+          },
+          "mem": 288686080
+        },
+        {
+          "positionId": "vcf",
+          "threads": 1,
+          "repeat": 0,
+          "move": [
+            8,
+            11
+          ],
+          "wallMs": 1168,
+          "nodes": 341280,
+          "engineMs": 1342,
+          "nps": 254307,
+          "depth": 26,
+          "selDepth": 9,
+          "eval": "+M9",
+          "winrate": 1,
+          "bestline": [
+            [
+              8,
+              11
+            ],
+            [
+              10,
+              13
+            ],
+            [
+              9,
+              11
+            ],
+            [
+              6,
+              8
+            ],
+            [
+              10,
+              12
+            ],
+            [
+              11,
+              13
+            ],
+            [
+              8,
+              12
+            ]
+          ],
+          "depthAt": {
+            "2": {
+              "engineMs": 5,
+              "wallMs": -169,
+              "nodes": 489,
+              "eval": "+M13"
+            },
+            "3": {
+              "engineMs": 5,
+              "wallMs": -169,
+              "nodes": 663,
+              "eval": "+M13"
+            },
+            "4": {
+              "engineMs": 6,
+              "wallMs": -168,
+              "nodes": 832,
+              "eval": "+M13"
+            },
+            "5": {
+              "engineMs": 7,
+              "wallMs": -167,
+              "nodes": 1045,
+              "eval": "+M13"
+            },
+            "6": {
+              "engineMs": 8,
+              "wallMs": -166,
+              "nodes": 1330,
+              "eval": "+M13"
+            },
+            "7": {
+              "engineMs": 9,
+              "wallMs": -165,
+              "nodes": 1690,
+              "eval": "+M13"
+            },
+            "8": {
+              "engineMs": 11,
+              "wallMs": -163,
+              "nodes": 2192,
+              "eval": "+M13"
+            },
+            "9": {
+              "engineMs": 14,
+              "wallMs": -160,
+              "nodes": 2929,
+              "eval": "+M13"
+            },
+            "10": {
+              "engineMs": 18,
+              "wallMs": -156,
+              "nodes": 3943,
+              "eval": "+M13"
+            },
+            "11": {
+              "engineMs": 25,
+              "wallMs": -149,
+              "nodes": 5479,
+              "eval": "+M13"
+            },
+            "12": {
+              "engineMs": 35,
+              "wallMs": -138,
+              "nodes": 7666,
+              "eval": "+M13"
+            },
+            "13": {
+              "engineMs": 47,
+              "wallMs": -126,
+              "nodes": 10347,
+              "eval": "+M13"
+            },
+            "14": {
+              "engineMs": 63,
+              "wallMs": -111,
+              "nodes": 13950,
+              "eval": "+M13"
+            },
+            "15": {
+              "engineMs": 87,
+              "wallMs": -87,
+              "nodes": 19184,
+              "eval": "+M13"
+            },
+            "16": {
+              "engineMs": 118,
+              "wallMs": -56,
+              "nodes": 25951,
+              "eval": "+M13"
+            },
+            "17": {
+              "engineMs": 155,
+              "wallMs": -19,
+              "nodes": 34757,
+              "eval": "+M13"
+            },
+            "18": {
+              "engineMs": 206,
+              "wallMs": 33,
+              "nodes": 46573,
+              "eval": "+M13"
+            },
+            "19": {
+              "engineMs": 270,
+              "wallMs": 96,
+              "nodes": 60565,
+              "eval": "+M13"
+            },
+            "20": {
+              "engineMs": 343,
+              "wallMs": 169,
+              "nodes": 77164,
+              "eval": "+M13"
+            },
+            "21": {
+              "engineMs": 441,
+              "wallMs": 267,
+              "nodes": 100846,
+              "eval": "+M13"
+            },
+            "22": {
+              "engineMs": 565,
+              "wallMs": 391,
+              "nodes": 129889,
+              "eval": "+M13"
+            },
+            "23": {
+              "engineMs": 805,
+              "wallMs": 631,
+              "nodes": 188649,
+              "eval": "+M11"
+            },
+            "24": {
+              "engineMs": 982,
+              "wallMs": 808,
+              "nodes": 235863,
+              "eval": "+M11"
+            },
+            "25": {
+              "engineMs": 1151,
+              "wallMs": 977,
+              "nodes": 283315,
+              "eval": "+M11"
+            },
+            "26": {
+              "engineMs": 1342,
+              "wallMs": 1168,
+              "nodes": 341280,
+              "eval": "+M9"
+            }
+          },
+          "firstMate": {
+            "depth": 2,
+            "engineMs": 5,
+            "wallMs": -169,
+            "nodes": 489,
+            "eval": "+M13"
+          },
+          "mem": 288686080
+        },
+        {
+          "positionId": "vcf",
+          "threads": 1,
+          "repeat": 1,
+          "move": [
+            8,
+            11
+          ],
+          "wallMs": 1163,
+          "nodes": 341280,
+          "engineMs": 1336,
+          "nps": 255449,
+          "depth": 26,
+          "selDepth": 9,
+          "eval": "+M9",
+          "winrate": 1,
+          "bestline": [
+            [
+              8,
+              11
+            ],
+            [
+              10,
+              13
+            ],
+            [
+              9,
+              11
+            ],
+            [
+              6,
+              8
+            ],
+            [
+              10,
+              12
+            ],
+            [
+              11,
+              13
+            ],
+            [
+              8,
+              12
+            ]
+          ],
+          "depthAt": {
+            "2": {
+              "engineMs": 4,
+              "wallMs": -170,
+              "nodes": 489,
+              "eval": "+M13"
+            },
+            "3": {
+              "engineMs": 5,
+              "wallMs": -169,
+              "nodes": 663,
+              "eval": "+M13"
+            },
+            "4": {
+              "engineMs": 5,
+              "wallMs": -169,
+              "nodes": 832,
+              "eval": "+M13"
+            },
+            "5": {
+              "engineMs": 6,
+              "wallMs": -168,
+              "nodes": 1045,
+              "eval": "+M13"
+            },
+            "6": {
+              "engineMs": 7,
+              "wallMs": -167,
+              "nodes": 1330,
+              "eval": "+M13"
+            },
+            "7": {
+              "engineMs": 8,
+              "wallMs": -166,
+              "nodes": 1690,
+              "eval": "+M13"
+            },
+            "8": {
+              "engineMs": 10,
+              "wallMs": -164,
+              "nodes": 2192,
+              "eval": "+M13"
+            },
+            "9": {
+              "engineMs": 13,
+              "wallMs": -161,
+              "nodes": 2929,
+              "eval": "+M13"
+            },
+            "10": {
+              "engineMs": 17,
+              "wallMs": -157,
+              "nodes": 3943,
+              "eval": "+M13"
+            },
+            "11": {
+              "engineMs": 24,
+              "wallMs": -149,
+              "nodes": 5479,
+              "eval": "+M13"
+            },
+            "12": {
+              "engineMs": 35,
+              "wallMs": -139,
+              "nodes": 7666,
+              "eval": "+M13"
+            },
+            "13": {
+              "engineMs": 46,
+              "wallMs": -128,
+              "nodes": 10347,
+              "eval": "+M13"
+            },
+            "14": {
+              "engineMs": 62,
+              "wallMs": -112,
+              "nodes": 13950,
+              "eval": "+M13"
+            },
+            "15": {
+              "engineMs": 87,
+              "wallMs": -87,
+              "nodes": 19184,
+              "eval": "+M13"
+            },
+            "16": {
+              "engineMs": 118,
+              "wallMs": -56,
+              "nodes": 25951,
+              "eval": "+M13"
+            },
+            "17": {
+              "engineMs": 155,
+              "wallMs": -19,
+              "nodes": 34757,
+              "eval": "+M13"
+            },
+            "18": {
+              "engineMs": 207,
+              "wallMs": 34,
+              "nodes": 46573,
+              "eval": "+M13"
+            },
+            "19": {
+              "engineMs": 271,
+              "wallMs": 98,
+              "nodes": 60565,
+              "eval": "+M13"
+            },
+            "20": {
+              "engineMs": 344,
+              "wallMs": 171,
+              "nodes": 77164,
+              "eval": "+M13"
+            },
+            "21": {
+              "engineMs": 444,
+              "wallMs": 270,
+              "nodes": 100846,
+              "eval": "+M13"
+            },
+            "22": {
+              "engineMs": 567,
+              "wallMs": 393,
+              "nodes": 129889,
+              "eval": "+M13"
+            },
+            "23": {
+              "engineMs": 799,
+              "wallMs": 626,
+              "nodes": 188649,
+              "eval": "+M11"
+            },
+            "24": {
+              "engineMs": 978,
+              "wallMs": 805,
+              "nodes": 235863,
+              "eval": "+M11"
+            },
+            "25": {
+              "engineMs": 1145,
+              "wallMs": 971,
+              "nodes": 283315,
+              "eval": "+M11"
+            },
+            "26": {
+              "engineMs": 1336,
+              "wallMs": 1163,
+              "nodes": 341280,
+              "eval": "+M9"
+            }
+          },
+          "firstMate": {
+            "depth": 2,
+            "engineMs": 4,
+            "wallMs": -170,
+            "nodes": 489,
+            "eval": "+M13"
+          },
+          "mem": 288686080
+        },
+        {
+          "positionId": "vct",
+          "threads": 1,
+          "repeat": 0,
+          "move": [
+            11,
+            3
+          ],
+          "wallMs": 9802,
+          "nodes": 1580627,
+          "engineMs": 7449,
+          "nps": 212193,
+          "depth": 29,
+          "selDepth": 17,
+          "eval": "+M19",
+          "winrate": 1,
+          "bestline": [
+            [
+              11,
+              3
+            ],
+            [
+              11,
+              2
+            ],
+            [
+              10,
+              3
+            ],
+            [
+              8,
+              3
+            ],
+            [
+              13,
+              6
+            ],
+            [
+              12,
+              5
+            ],
+            [
+              11,
+              8
+            ],
+            [
+              10,
+              9
+            ],
+            [
+              10,
+              8
+            ],
+            [
+              8,
+              8
+            ],
+            [
+              13,
+              5
+            ],
+            [
+              7,
+              2
+            ],
+            [
+              6,
+              1
+            ],
+            [
+              12,
+              4
+            ],
+            [
+              13,
+              8
+            ],
+            [
+              12,
+              8
+            ]
+          ],
+          "depthAt": {
+            "2": {
+              "engineMs": 2,
+              "wallMs": -172,
+              "nodes": 133,
+              "eval": "321"
+            },
+            "3": {
+              "engineMs": 2,
+              "wallMs": -172,
+              "nodes": 271,
+              "eval": "439"
+            },
+            "4": {
+              "engineMs": 3,
+              "wallMs": -171,
+              "nodes": 397,
+              "eval": "439"
+            },
+            "5": {
+              "engineMs": 5,
+              "wallMs": -169,
+              "nodes": 848,
+              "eval": "175"
+            },
+            "6": {
+              "engineMs": 5,
+              "wallMs": -169,
+              "nodes": 1051,
+              "eval": "227"
+            },
+            "7": {
+              "engineMs": 6,
+              "wallMs": -168,
+              "nodes": 1208,
+              "eval": "227"
+            },
+            "8": {
+              "engineMs": 26,
+              "wallMs": -148,
+              "nodes": 4775,
+              "eval": "186"
+            },
+            "9": {
+              "engineMs": 26,
+              "wallMs": -147,
+              "nodes": 4935,
+              "eval": "186"
+            },
+            "10": {
+              "engineMs": 62,
+              "wallMs": -112,
+              "nodes": 10242,
+              "eval": "768"
+            },
+            "11": {
+              "engineMs": 63,
+              "wallMs": -111,
+              "nodes": 10640,
+              "eval": "768"
+            },
+            "12": {
+              "engineMs": 64,
+              "wallMs": -110,
+              "nodes": 11147,
+              "eval": "853"
+            },
+            "13": {
+              "engineMs": 79,
+              "wallMs": -95,
+              "nodes": 14222,
+              "eval": "+M23"
+            },
+            "14": {
+              "engineMs": 95,
+              "wallMs": -79,
+              "nodes": 17632,
+              "eval": "+M21"
+            },
+            "15": {
+              "engineMs": 121,
+              "wallMs": -53,
+              "nodes": 22696,
+              "eval": "+M21"
+            },
+            "16": {
+              "engineMs": 162,
+              "wallMs": -12,
+              "nodes": 29882,
+              "eval": "+M21"
+            },
+            "17": {
+              "engineMs": 211,
+              "wallMs": 38,
+              "nodes": 39678,
+              "eval": "+M19"
+            },
+            "18": {
+              "engineMs": 272,
+              "wallMs": 98,
+              "nodes": 51229,
+              "eval": "+M19"
+            },
+            "19": {
+              "engineMs": 355,
+              "wallMs": 181,
+              "nodes": 67618,
+              "eval": "+M19"
+            },
+            "20": {
+              "engineMs": 475,
+              "wallMs": 301,
+              "nodes": 92030,
+              "eval": "+M19"
+            },
+            "21": {
+              "engineMs": 646,
+              "wallMs": 472,
+              "nodes": 126912,
+              "eval": "+M19"
+            },
+            "22": {
+              "engineMs": 879,
+              "wallMs": 706,
+              "nodes": 175331,
+              "eval": "+M19"
+            },
+            "23": {
+              "engineMs": 1192,
+              "wallMs": 1018,
+              "nodes": 242611,
+              "eval": "+M19"
+            },
+            "24": {
+              "engineMs": 1602,
+              "wallMs": 1429,
+              "nodes": 332515,
+              "eval": "+M19"
+            },
+            "25": {
+              "engineMs": 2218,
+              "wallMs": 2045,
+              "nodes": 464712,
+              "eval": "+M19"
+            },
+            "26": {
+              "engineMs": 3112,
+              "wallMs": 2938,
+              "nodes": 638501,
+              "eval": "+M19"
+            },
+            "27": {
+              "engineMs": 4199,
+              "wallMs": 4025,
+              "nodes": 874098,
+              "eval": "+M19"
+            },
+            "28": {
+              "engineMs": 5614,
+              "wallMs": 5440,
+              "nodes": 1178097,
+              "eval": "+M19"
+            },
+            "29": {
+              "engineMs": 7449,
+              "wallMs": 7275,
+              "nodes": 1580627,
+              "eval": "+M19"
+            }
+          },
+          "firstMate": {
+            "depth": 13,
+            "engineMs": 79,
+            "wallMs": -95,
+            "nodes": 14222,
+            "eval": "+M23"
+          },
+          "mem": 288686080
+        },
+        {
+          "positionId": "vct",
+          "threads": 1,
+          "repeat": 1,
+          "move": [
+            11,
+            3
+          ],
+          "wallMs": 9802,
+          "nodes": 1580627,
+          "engineMs": 7391,
+          "nps": 213858,
+          "depth": 29,
+          "selDepth": 17,
+          "eval": "+M19",
+          "winrate": 1,
+          "bestline": [
+            [
+              11,
+              3
+            ],
+            [
+              11,
+              2
+            ],
+            [
+              10,
+              3
+            ],
+            [
+              8,
+              3
+            ],
+            [
+              13,
+              6
+            ],
+            [
+              12,
+              5
+            ],
+            [
+              11,
+              8
+            ],
+            [
+              10,
+              9
+            ],
+            [
+              10,
+              8
+            ],
+            [
+              8,
+              8
+            ],
+            [
+              13,
+              5
+            ],
+            [
+              7,
+              2
+            ],
+            [
+              6,
+              1
+            ],
+            [
+              12,
+              4
+            ],
+            [
+              13,
+              8
+            ],
+            [
+              12,
+              8
+            ]
+          ],
+          "depthAt": {
+            "2": {
+              "engineMs": 2,
+              "wallMs": -172,
+              "nodes": 133,
+              "eval": "321"
+            },
+            "3": {
+              "engineMs": 3,
+              "wallMs": -172,
+              "nodes": 271,
+              "eval": "439"
+            },
+            "4": {
+              "engineMs": 3,
+              "wallMs": -171,
+              "nodes": 397,
+              "eval": "439"
+            },
+            "5": {
+              "engineMs": 5,
+              "wallMs": -169,
+              "nodes": 848,
+              "eval": "175"
+            },
+            "6": {
+              "engineMs": 6,
+              "wallMs": -169,
+              "nodes": 1051,
+              "eval": "227"
+            },
+            "7": {
+              "engineMs": 6,
+              "wallMs": -168,
+              "nodes": 1208,
+              "eval": "227"
+            },
+            "8": {
+              "engineMs": 27,
+              "wallMs": -148,
+              "nodes": 4775,
+              "eval": "186"
+            },
+            "9": {
+              "engineMs": 27,
+              "wallMs": -147,
+              "nodes": 4935,
+              "eval": "186"
+            },
+            "10": {
+              "engineMs": 63,
+              "wallMs": -111,
+              "nodes": 10242,
+              "eval": "768"
+            },
+            "11": {
+              "engineMs": 64,
+              "wallMs": -110,
+              "nodes": 10640,
+              "eval": "768"
+            },
+            "12": {
+              "engineMs": 65,
+              "wallMs": -109,
+              "nodes": 11147,
+              "eval": "853"
+            },
+            "13": {
+              "engineMs": 80,
+              "wallMs": -94,
+              "nodes": 14222,
+              "eval": "+M23"
+            },
+            "14": {
+              "engineMs": 97,
+              "wallMs": -78,
+              "nodes": 17632,
+              "eval": "+M21"
+            },
+            "15": {
+              "engineMs": 122,
+              "wallMs": -52,
+              "nodes": 22696,
+              "eval": "+M21"
+            },
+            "16": {
+              "engineMs": 158,
+              "wallMs": -16,
+              "nodes": 29882,
+              "eval": "+M21"
+            },
+            "17": {
+              "engineMs": 208,
+              "wallMs": 34,
+              "nodes": 39678,
+              "eval": "+M19"
+            },
+            "18": {
+              "engineMs": 269,
+              "wallMs": 95,
+              "nodes": 51229,
+              "eval": "+M19"
+            },
+            "19": {
+              "engineMs": 350,
+              "wallMs": 176,
+              "nodes": 67618,
+              "eval": "+M19"
+            },
+            "20": {
+              "engineMs": 471,
+              "wallMs": 297,
+              "nodes": 92030,
+              "eval": "+M19"
+            },
+            "21": {
+              "engineMs": 639,
+              "wallMs": 464,
+              "nodes": 126912,
+              "eval": "+M19"
+            },
+            "22": {
+              "engineMs": 869,
+              "wallMs": 695,
+              "nodes": 175331,
+              "eval": "+M19"
+            },
+            "23": {
+              "engineMs": 1176,
+              "wallMs": 1002,
+              "nodes": 242611,
+              "eval": "+M19"
+            },
+            "24": {
+              "engineMs": 1580,
+              "wallMs": 1406,
+              "nodes": 332515,
+              "eval": "+M19"
+            },
+            "25": {
+              "engineMs": 2193,
+              "wallMs": 2018,
+              "nodes": 464712,
+              "eval": "+M19"
+            },
+            "26": {
+              "engineMs": 2987,
+              "wallMs": 2813,
+              "nodes": 638501,
+              "eval": "+M19"
+            },
+            "27": {
+              "engineMs": 4060,
+              "wallMs": 3886,
+              "nodes": 874098,
+              "eval": "+M19"
+            },
+            "28": {
+              "engineMs": 5493,
+              "wallMs": 5319,
+              "nodes": 1178097,
+              "eval": "+M19"
+            },
+            "29": {
+              "engineMs": 7391,
+              "wallMs": 7217,
+              "nodes": 1580627,
+              "eval": "+M19"
+            }
+          },
+          "firstMate": {
+            "depth": 13,
+            "engineMs": 80,
+            "wallMs": -94,
+            "nodes": 14222,
+            "eval": "+M23"
+          },
+          "mem": 288686080
+        }
+      ],
+      "loadMs": 191,
+      "host": "worker",
+      "about": "name=\"Rapfi\", version=\"0.43.02 (clang++ 24.0.0 on Wasm WASM_SIMD SINGLE_THREAD)\", author=\"Rapfi developers (see AUTHORS file)\", country=\"China\"",
+      "memAfterStart": 154468352,
+      "cold": {
+        "move": [
+          6,
+          8
+        ],
+        "wallMs": 2914,
+        "nodes": 134828,
+        "engineMs": 1119,
+        "nps": 120489,
+        "depth": 18,
+        "selDepth": 24,
+        "eval": "-352",
+        "winrate": 0.14679,
+        "bestline": [
+          [
+            6,
+            8
+          ],
+          [
+            8,
+            5
+          ],
+          [
+            8,
+            7
+          ],
+          [
+            6,
+            5
+          ],
+          [
+            7,
+            5
+          ],
+          [
+            7,
+            4
+          ],
+          [
+            6,
+            3
+          ],
+          [
+            8,
+            3
+          ],
+          [
+            9,
+            2
+          ],
+          [
+            8,
+            4
+          ],
+          [
+            8,
+            2
+          ],
+          [
+            10,
+            4
+          ],
+          [
+            9,
+            4
+          ],
+          [
+            9,
+            5
+          ],
+          [
+            11,
+            3
+          ],
+          [
+            10,
+            6
+          ],
+          [
+            11,
+            7
+          ],
+          [
+            10,
+            7
+          ],
+          [
+            10,
+            5
+          ],
+          [
+            9,
+            6
+          ],
+          [
+            11,
+            8
+          ]
+        ],
+        "depthAt": {
+          "2": {
+            "engineMs": 10,
+            "wallMs": -47,
+            "nodes": 64,
+            "eval": "-211"
+          },
+          "3": {
+            "engineMs": 12,
+            "wallMs": -46,
+            "nodes": 144,
+            "eval": "126"
+          },
+          "4": {
+            "engineMs": 12,
+            "wallMs": -45,
+            "nodes": 219,
+            "eval": "-262"
+          },
+          "5": {
+            "engineMs": 13,
+            "wallMs": -45,
+            "nodes": 299,
+            "eval": "-233"
+          },
+          "6": {
+            "engineMs": 13,
+            "wallMs": -44,
+            "nodes": 371,
+            "eval": "-221"
+          },
+          "7": {
+            "engineMs": 19,
+            "wallMs": -39,
+            "nodes": 717,
+            "eval": "-214"
+          },
+          "8": {
+            "engineMs": 22,
+            "wallMs": -36,
+            "nodes": 969,
+            "eval": "-302"
+          },
+          "9": {
+            "engineMs": 22,
+            "wallMs": -35,
+            "nodes": 1059,
+            "eval": "-302"
+          },
+          "10": {
+            "engineMs": 24,
+            "wallMs": -33,
+            "nodes": 1175,
+            "eval": "-302"
+          },
+          "11": {
+            "engineMs": 31,
+            "wallMs": -27,
+            "nodes": 1401,
+            "eval": "-302"
+          },
+          "12": {
+            "engineMs": 37,
+            "wallMs": -21,
+            "nodes": 1702,
+            "eval": "-302"
+          },
+          "13": {
+            "engineMs": 425,
+            "wallMs": 368,
+            "nodes": 41269,
+            "eval": "-322"
+          },
+          "14": {
+            "engineMs": 431,
+            "wallMs": 374,
+            "nodes": 42168,
+            "eval": "-322"
+          },
+          "15": {
+            "engineMs": 891,
+            "wallMs": 834,
+            "nodes": 103621,
+            "eval": "-352"
+          },
+          "16": {
+            "engineMs": 972,
+            "wallMs": 915,
+            "nodes": 114126,
+            "eval": "-352"
+          },
+          "17": {
+            "engineMs": 1020,
+            "wallMs": 963,
+            "nodes": 120864,
+            "eval": "-352"
+          },
+          "18": {
+            "engineMs": 1119,
+            "wallMs": 1061,
+            "nodes": 134828,
+            "eval": "-352"
+          }
+        },
+        "firstMate": null,
+        "positionId": "open-direct",
+        "timeMs": 3000
+      },
+      "bench": {
+        "npsComputed": 357258,
+        "wallMs": 20882,
+        "moveBenchMs": 802,
+        "movesPerSec": 2493728,
+        "searchBenchMs": 20071,
+        "nodes": 7170518,
+        "nps": 143268,
+        "hash": "2b7c7da9"
+      },
+      "memAfterSearch": 288686080,
+      "uaMemory": null,
+      "errors": []
+    }
+  ],
+  "finishedAt": "2026-10-04T03:54:59.548Z"
+}
