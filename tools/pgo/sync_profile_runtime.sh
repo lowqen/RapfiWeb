@@ -13,11 +13,31 @@
 # 이미 맞으면 아무것도 하지 않는다(멱등). 원본은 .orig 로 남긴다.
 set -eu
 
-EMSDK_DIR="${EMSDK_DIR:-${WORK:-$HOME/rapfi-wasm-work}/emsdk}"
+WORK="${WORK:-$HOME/rapfi-wasm-work}"
+EMSDK_DIR="${EMSDK_DIR:-$WORK/emsdk}"
+# emsdk 가 아직 없으면(캐시 미스) build_engine_wasm.sh [1/6] 과 같은 방식으로 깐다 — 같은 판(EMSDK_VERSION)이어야 한다
+if [ ! -x "$EMSDK_DIR/upstream/bin/clang" ]; then
+  echo "  . emsdk 가 없어 설치한다(${EMSDK_VERSION:-latest})"
+  mkdir -p "$(dirname "$EMSDK_DIR")"
+  [ -x "$EMSDK_DIR/emsdk" ] || { rm -rf "$EMSDK_DIR"; git clone -q --depth 1 https://github.com/emscripten-core/emsdk.git "$EMSDK_DIR"; }
+  ( cd "$EMSDK_DIR" && ./emsdk install "${EMSDK_VERSION:-latest}" > /dev/null && ./emsdk activate "${EMSDK_VERSION:-latest}" > /dev/null )
+fi
 EM="$EMSDK_DIR/upstream/emscripten"
 CLANG="$EMSDK_DIR/upstream/bin/clang"
-RT="$EM/system/lib/compiler-rt"
-[ -x "$CLANG" ] && [ -d "$RT/lib/profile" ] || { echo "  X emsdk 를 찾지 못했습니다: $EMSDK_DIR"; exit 1; }
+# 프로파일 런타임 소스가 있는 compiler-rt 루트를 찾는다(…/compiler-rt/lib/profile)
+prof="$(find "$EM/system/lib" -type d -path "*compiler-rt*/lib/profile" ! -path "*.orig*" 2> /dev/null | head -1)"
+if [ ! -x "$CLANG" ] || [ -z "$prof" ]; then
+  echo "  X emsdk 나 프로파일 런타임 소스를 찾지 못했습니다: clang=$CLANG"
+  find "$EM/system/lib" -maxdepth 3 -type d -iname "*compiler*" 2> /dev/null | sed "s/^/    /"
+  exit 1
+fi
+RT="${prof%/lib/profile}"
+echo "  . 런타임 소스 $RT"
+[ -f "$RT/include/profile/InstrProfData.inc" ] || {
+  echo "  X $RT/include/profile/InstrProfData.inc 가 없다"
+  find "$EM/system" -name InstrProfData.inc | sed "s/^/    /"
+  exit 1
+}
 
 ver_of () { grep -m1 -E "^#define INSTR_PROF_RAW_VERSION " "$1/include/profile/InstrProfData.inc" | awk '{print $3}'; }
 commit="$("$CLANG" --version | sed -n 's/.*llvm-project \([0-9a-f]\{40\}\).*/\1/p' | head -1)"
