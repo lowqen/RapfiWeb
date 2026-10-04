@@ -46,7 +46,8 @@ permissions:
 
 jobs:
   mate:
-    runs-on: ubuntu-latest
+    # self-hosted 러너(Lightning). 1 스레드 · 해시 비움이라 첫 필승 노드는 CPU 와 무관하다(시간만 다름).
+    runs-on: self-hosted
     timeout-minutes: 240
     env:
       WORK: ${{ github.workspace }}/../rapfi-wasm-work
@@ -58,10 +59,19 @@ jobs:
           node-version: "26"
       - uses: pnpm/action-setup@v4
       - run: pnpm install --no-frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
+      - name: chromium
+        # --with-deps 는 apt(sudo)를 쓴다 — 암호가 걸린 러너면 브라우저만 받는다(의존 라이브러리는 러너에 이미 있어야 함).
+        run: pnpm exec playwright install --with-deps chromium || pnpm exec playwright install chromium
 
       - name: 시스템 도구
-        run: sudo apt-get update -qq && sudo apt-get install -y ninja-build ccache file
+        # sprt.yml 과 같은 방식 — 이미 있으면 건너뛰고, 없으면 sudo -n 으로 설치를 시도한다.
+        run: |
+          missing=()
+          for t in git cmake ninja ccache file python3; do command -v "$t" > /dev/null || missing+=("$t"); done
+          if [ ${#missing[@]} -eq 0 ]; then echo "도구 모두 있음"; exit 0; fi
+          echo "없는 도구: ${missing[*]} — 설치 시도"
+          sudo -n apt-get update -qq && sudo -n apt-get install -y git cmake ninja-build ccache file python3 \
+            || { echo "::error::설치 실패(sudo 암호?) — 러너 기계에 직접 설치: sudo apt-get install -y git cmake ninja-build ccache file python3"; exit 1; }
 
       - name: emsdk 캐시 복원
         uses: actions/cache/restore@v4
