@@ -129,6 +129,9 @@ jobs:
         if: (inputs.patches != '' || inputs.wasm_opt != '')
         env:
           ENABLE_LTO: "ON"
+          # 배포의 주력은 relaxed 변형이다 — 내적이 1연산이라 메모리 · 로드의 몫이 일반 판과 달라
+          # 같은 패치의 이득도 다를 수 있다(A3). 대조에서도 relaxed 둘을 함께 빌드해 잰다.
+          EXTRA_VARIANTS: "single-simd128-relaxed multi-simd128-relaxed"
           PATCHES: ${{ inputs.patches }}
           WASM_OPT_B: ${{ inputs.wasm_opt || inputs.base_wasm_opt }}
           BASE_PATCHES: ${{ inputs.base_patches }}
