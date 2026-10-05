@@ -127,7 +127,7 @@ describe("엔진 기동 — 멀티 우선, 실패하면 단일로", () => {
     vi.stubGlobal("Worker", FakeWorker);
     failMulti = "fatal";
     const { c, booted, consoleLines, statuses } = client();
-    await c.start(true);
+    await c.start();
     // 멀티(relaxed 를 알면 relaxed 멀티부터)가 모두 실패하고 첫 단일이 뜬다.
     expect(spawned.map((w) => w.variant)).toEqual([...MULTI_CHAIN, SINGLE]);
     // 실패한 멀티 워커(와 그 엔진 스레드)는 내린다
@@ -146,7 +146,7 @@ describe("엔진 기동 — 멀티 우선, 실패하면 단일로", () => {
     vi.stubGlobal("Worker", FakeWorker);
     failMulti = "error";
     const { c, booted } = client();
-    await c.start(true);
+    await c.start();
     expect(c.runningVariant).toBe(SINGLE);
     expect(booted[0]!.fallbackReason).toContain("SharedArrayBuffer");
   });
@@ -156,7 +156,7 @@ describe("엔진 기동 — 멀티 우선, 실패하면 단일로", () => {
     vi.stubGlobal("Worker", FakeWorker);
     failMulti = false;
     const { c, booted } = client();
-    await c.start(true);
+    await c.start();
     expect(spawned).toHaveLength(1);
     expect(booted[0]).toMatchObject({
       variant: MULTI,
@@ -165,12 +165,12 @@ describe("엔진 기동 — 멀티 우선, 실패하면 단일로", () => {
     });
   });
 
-  it("멀티를 끄면(설정) 환경이 되어도 처음부터 단일", async () => {
+  it("단일 스레드 엔진을 고르면(relaxed) 환경이 되어도 처음부터 단일", async () => {
     vi.stubGlobal("crossOriginIsolated", true);
     vi.stubGlobal("Worker", FakeWorker);
     failMulti = false;
     const { c } = client();
-    await c.start(false);
+    await c.start("relaxed");
     expect(spawned.map((w) => w.variant)).toEqual([SINGLE]);
   });
 
@@ -178,7 +178,7 @@ describe("엔진 기동 — 멀티 우선, 실패하면 단일로", () => {
     vi.stubGlobal("crossOriginIsolated", false);
     vi.stubGlobal("Worker", FakeWorker);
     const { c } = client();
-    await c.start(true);
+    await c.start();
     expect(spawned.map((w) => w.variant)).toEqual([SINGLE]);
   });
 
@@ -187,7 +187,7 @@ describe("엔진 기동 — 멀티 우선, 실패하면 단일로", () => {
     vi.stubGlobal("Worker", FakeWorker);
     failMulti = false;
     const { c, booted, statuses } = client();
-    await c.start(true);
+    await c.start();
     expect(c.runningVariant).toBe(MULTI);
     // 기동 뒤 멀티 워커가 입력 경합으로 멈췄다.
     spawned[0]!.onmessage?.({
@@ -207,7 +207,7 @@ describe("엔진 기동 — 멀티 우선, 실패하면 단일로", () => {
     vi.stubGlobal("Worker", FakeWorker);
     failMulti = false;
     const { c } = client();
-    await Promise.all([c.start(true), c.start(true)]);
+    await Promise.all([c.start(), c.start()]);
     expect(spawned).toHaveLength(1);
   });
 });
@@ -258,7 +258,7 @@ describe("relaxed SIMD — 최우선, 안 되면 같은 스레드 방식의 일�
     failMulti = false;
     const { c, booted } = client();
     expect(c.capabilities.variant).toBe("multi-simd128-relaxed");
-    await c.start(true);
+    await c.start();
     expect(c.runningVariant).toBe("multi-simd128-relaxed");
     // 엔진 스레드가 relaxed 글루를 읽으려면 relaxed 진입점 번들이어야 한다.
     expect(spawned[0]!.url).toContain("engine-worker-relaxed");
@@ -272,7 +272,7 @@ describe("relaxed SIMD — 최우선, 안 되면 같은 스레드 방식의 일�
     failMulti = false;
     failRelaxed = true;
     const { c, booted, statuses } = client();
-    await c.start(true);
+    await c.start();
     expect(spawned.map((w) => w.variant)).toEqual(["multi-simd128-relaxed", "multi-simd128"]);
     expect(spawned[0]!.terminated).toBe(true);
     expect(spawned[1]!.url).not.toContain("engine-worker-relaxed");
@@ -287,7 +287,7 @@ describe("relaxed SIMD — 최우선, 안 되면 같은 스레드 방식의 일�
     vi.stubGlobal("Worker", FakeWorker);
     failRelaxed = true;
     const { c } = client();
-    await c.start(true);
+    await c.start();
     expect(spawned.map((w) => w.variant)).toEqual(["single-simd128-relaxed", "single-simd128"]);
     expect(c.runningVariant).toBe("single-simd128");
   });
@@ -298,7 +298,7 @@ describe("relaxed SIMD — 최우선, 안 되면 같은 스레드 방식의 일�
     vi.stubGlobal("Worker", FakeWorker);
     failMulti = false;
     const { c, booted } = client();
-    await c.start(true);
+    await c.start();
     spawned[0]!.onmessage?.({ data: { type: "fatal", message: "입력 경합" } });
     await new Promise((r) => setTimeout(r, 30));
     expect(c.runningVariant).toBe("single-simd128-relaxed");
@@ -321,7 +321,7 @@ describe("기동 메시지 — 공유 가중치와 예열", () => {
     vi.stubGlobal("Worker", FakeWorker);
     vi.stubGlobal("location", { href: "https://rapfi.example/board", search: "" });
     const { c, booted } = client();
-    await c.start(true);
+    await c.start();
     const boot = spawned[0]!.boot!;
     expect(boot.warmupMs).toBeGreaterThan(0);
     expect(boot.weights).toEqual({
@@ -348,7 +348,7 @@ describe("기동 메시지 — 공유 가중치와 예열", () => {
         ];
       },
     });
-    await c.start(true);
+    await c.start();
     expect(asked).toEqual([...MULTI_CHAIN, SINGLE]);
     for (const multi of spawned.slice(0, -1)) {
       expect(multi.boot!.settings).toContainEqual({ kind: "info", key: "thread_num", value: 4 });
@@ -363,7 +363,7 @@ describe("기동 메시지 — 공유 가중치와 예열", () => {
     vi.stubGlobal("crossOriginIsolated", false);
     vi.stubGlobal("Worker", FakeWorker);
     const { c, booted } = client();
-    await c.start(true);
+    await c.start();
     expect(spawned[0]!.boot!).not.toHaveProperty("settings");
     expect(booted[0]!.settings).toEqual([]);
   });

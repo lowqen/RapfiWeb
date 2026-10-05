@@ -3,6 +3,7 @@ import { useBoardStore } from "./boardStore";
 import { useGameStore } from "./gameStore";
 import { useEngineStore } from "../../engine/engine-state";
 import { Icon, ICON } from "./icons";
+import { useStopAnalysis } from "./analysisActions";
 
 /**
  * 보드 바로 아래의 이동 바 — `|<` `<` `▶` `>` `>|`. 앱의 재생 바 그대로다.
@@ -11,8 +12,9 @@ import { Icon, ICON } from "./icons";
  * 보드 밑에 무엇이든 늘어나면 판이 그만큼 작아지고, 손가락이 판을 누르려다
  * 버튼을 누르게 된다.
  *
- * `▶` 는 분석을 켜고 끈다. 대국에서 엔진이 제 수를 생각하는 중에는 잠근다 —
- * 그때 멈추면 「지금 두기」가 되는데, 그 뜻은 대국 패널의 버튼이 따로 말한다.
+ * `▶` 는 분석을 켜고 끈다 — **[분석] 탭에만** 있다. [대국] 탭에서는 엔진이 대국의
+ * 차례로만 움직이므로(탭 격리) 가운데 원이 없고 기보 이동 넷만 남는다. 분석 중 `⏸` 는
+ * 분석 카드의 「정지」와 같다 — 설정이 켜져 있으면 그 순간의 최선수를 둔다.
  *
  * 이름(aria-label)은 스모크가 집는 「분석」「정지」「엔진 시작」과 겹치지 않게
  * 지었다 — 겹치면 이름으로 찾는 시험이 두 버튼을 동시에 집는다.
@@ -32,12 +34,13 @@ export function MoveTransport() {
   const status = useEngineStore((s) => s.status);
   const available = useEngineStore((s) => Boolean(s.capabilities.variant));
   const analyze = useEngineStore((s) => s.analyze);
-  const stop = useEngineStore((s) => s.stop);
+  const stopAnalysis = useStopAnalysis();
+  const analysisTab = useGameStore((s) => s.mode === "analysis");
 
   const analyzing = status === "searching" && !thinking;
   const playDisabled = !available || thinking || status === "starting";
   const toggleEngine = () => {
-    if (analyzing) stop();
+    if (analyzing) stopAnalysis();
     else void analyze(placements());
   };
 
@@ -87,18 +90,20 @@ export function MoveTransport() {
       >
         <Icon d={ICON.prev} />
       </button>
-      <button
-        type="button"
-        className="transport__btn transport__btn--play"
-        onClick={toggleEngine}
-        disabled={playDisabled}
-        aria-pressed={analyzing}
-        aria-label={analyzing ? "엔진 멈춤" : "엔진 분석"}
-        title={analyzing ? "엔진 멈춤" : "엔진 분석"}
-        data-running={analyzing || undefined}
-      >
-        <Icon d={analyzing ? ICON.pause : ICON.play} />
-      </button>
+      {analysisTab && (
+        <button
+          type="button"
+          className="transport__btn transport__btn--play"
+          onClick={toggleEngine}
+          disabled={playDisabled}
+          aria-pressed={analyzing}
+          aria-label={analyzing ? "엔진 멈춤" : "엔진 분석"}
+          title={analyzing ? "엔진 멈춤" : "엔진 분석"}
+          data-running={analyzing || undefined}
+        >
+          <Icon d={analyzing ? ICON.pause : ICON.play} />
+        </button>
+      )}
       <button
         type="button"
         className="transport__btn"

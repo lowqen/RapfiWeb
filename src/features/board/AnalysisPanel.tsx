@@ -1,19 +1,22 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
 import { useEngineStore } from "../../engine/engine-state";
 import type { SearchStats } from "../../engine/engine-types";
 import { useBoardStore } from "./boardStore";
 import { label } from "../../core/model/move";
 import { colorsForTag, DEFAULT_PALETTE } from "../../core/board/ladder";
-import { useGameStore } from "./gameStore";
+import { useSettingsStore } from "../settings/settingsStore";
+import { useCurrentAnalysis } from "./currentAnalysis";
+import { STATUS_TEXT, useStopAnalysis } from "./analysisActions";
+import { AnalysisTimeControl, MultiPvControl, PlayBestOnStopControl, Row } from "./boardControls";
 
 /**
- * 엔진 상태 카드 — 옆 칸의 맨 위. 앱의 수치 줄(DEPTH·EVAL·WINRATE…)과 후보 수순을
- * 한 카드에 모았다. 후보 수·분석 시간 같은 **설정**은 설정 탭이 진다 — 여기는
- * 지금 엔진이 무엇을 하고 있는지만 말한다.
+ * [분석] 탭의 엔진 카드 — 앱의 수치 줄(DEPTH·EVAL·WINRATE·NPS…)과 후보 수순을 한 카드에
+ * 모았다. 분석의 설정(시간 · 후보 수 · 정지하면 최선수 두기)은 바로 아래 `AnalysisOptions`
+ * 카드가 진다.
  *
- * 여기 있는 숫자는 전부 **집계된 스냅샷**에서 온다. 원시 줄은 워커 안에서 파싱되고
- * 메인 스레드는 ~10Hz 스냅샷과 저주파 콘솔 배치만 받는다(계획서 §3).
+ * 여기 있는 숫자는 전부 **지금 판의** 집계된 스냅샷에서 온다(`useCurrentAnalysis` —
+ * 엔진이 다른 국면을 말하고 있으면 비어 보인다. 무른 직후 옛 국면의 PV·최선수가 남지
+ * 않게). 원시 줄은 워커 안에서 파싱되고 메인 스레드는 ~10Hz 스냅샷만 받는다(계획서 §3).
  *
  * 실시간으로 바뀌는 숫자(깊이·노드·속도)는 **보간하지 않는다.** 초당 몇 번씩
  * 바뀌는 값을 애니메이션하는 것은 이미 지나간 값에 대한 거짓말이다(`Motion.kt` 규칙).
@@ -25,29 +28,30 @@ import { useGameStore } from "./gameStore";
  * 벽시계라 보간의 거짓말이 아니다 — 엔진이 말한 값과 벽시계 중 큰 쪽을 그린다.
  * 노드·속도는 여전히 엔진이 말한 값만.
  *
+ * **정지는 최선수를 둔다**(설정 「정지하면 최선수 두기」, 기본 켬). 정지를 누르는 그 순간의
+ * BEST — PV 의 첫 수 — 를 판에 두고, 빈 판이면 엔진을 기다리지 않고 천원(H8)이다.
+ *
  * 수치는 `dl.kv` 안에 남긴다 — 엔진 스모크가 «상태 점을 가진 패널의 `.kv dd`»로
  * 스트림 도착을 보고, **마지막 `dd` 를 최선수**로 읽는다. 그래서 BEST 가 맨 끝이다.
  */
 export function AnalysisPanel() {
   const status = useEngineStore((s) => s.status);
   const caps = useEngineStore((s) => s.capabilities);
-  const snapshot = useEngineStore((s) => s.snapshot);
   const error = useEngineStore((s) => s.error);
   const start = useEngineStore((s) => s.start);
   const analyze = useEngineStore((s) => s.analyze);
-  const stop = useEngineStore((s) => s.stop);
   const terminate = useEngineStore((s) => s.terminate);
   const multiPv = useEngineStore((s) => s.multiPv);
   const analysisMs = useEngineStore((s) => s.analysisMs);
   const analyzing = useEngineStore((s) => s.analyzing);
-  const thinking = useGameStore((s) => s.thinking);
-  const unlimitedGame = useGameStore((s) => s.moveTimeMs <= 0);
-  const moveNow = useGameStore((s) => s.moveNow);
+  const stopAnalysis = useStopAnalysis();
+  const playBest = useSettingsStore((s) => s.playBestOnStop);
 
   const render = useBoardStore((s) => s.render);
   const placements = useBoardStore((s) => s.placements);
   const size = render.size;
 
+  const snapshot = useCurrentAnalysis();
   const { stats, pvs, bestMove } = snapshot;
   const searching = status === "searching";
   const clockMs = useSearchClock(searching);
@@ -83,7 +87,12 @@ export function AnalysisPanel() {
         >
           분석
         </button>
-        <button type="button" onClick={stop} disabled={!searching}>
+        <button
+          type="button"
+          onClick={stopAnalysis}
+          disabled={!searching}
+          title={playBest ? "정지하고 최선수를 둡니다" : "정지"}
+        >
           정지
         </button>
         <button type="button" onClick={terminate} disabled={status === "idle"}>
@@ -91,28 +100,13 @@ export function AnalysisPanel() {
         </button>
       </div>
 
-      {/* 무제한 대국: 엔진은 여기를 누를 때까지 생각한다(데스크톱·앱의 기본 레벨과 같다).
-          보드의 ▶ 는 이때 잠기므로 엔진의 한 수를 끝내는 자리는 여기 하나다. */}
-      {thinking && unlimitedGame && (
-        <div className="panel__actions">
-          <button type="button" className="button--primary" onClick={moveNow}>
-            지금 두기
-          </button>
-          <span className="panel__hint panel__hint--inline">
-            무제한 — 누를 때까지 엔진이 계속 읽습니다
-          </span>
-        </div>
-      )}
-
       {error && <p className="panel__error">{error}</p>}
 
       <p className="engine-mode" data-on={analyzing || undefined}>
         <span className="engine-mode__dot" aria-hidden="true" />
         {analyzing ? "분석 중" : "분석 꺼짐"} ·{" "}
         {Number.isFinite(analysisMs) ? `${analysisMs / 1000}초` : "무제한"} · 후보 {multiPv}수
-        <Link className="inline-link engine-mode__link" to="/settings">
-          설정
-        </Link>
+        {playBest ? " · 정지하면 최선수" : ""}
       </p>
 
       <dl className="kv stats">
@@ -124,7 +118,7 @@ export function AnalysisPanel() {
         <Stat k="WINRATE">{stats.winRatePct === null ? "—" : `${stats.winRatePct}%`}</Stat>
         <Stat k="TIME">{formatTime(timeMs)}</Stat>
         <Stat k="NODE">{compact(stats.nodes)}</Stat>
-        <Stat k="SPEED">{stats.speed === null ? "—" : `${compact(stats.speed)}/s`}</Stat>
+        <Stat k="NPS">{stats.speed === null ? "—" : `${compact(stats.speed)}/s`}</Stat>
         <Stat k="BEST" wide>
           {bestMove ? label(bestMove, size) : "—"}
         </Stat>
@@ -138,7 +132,7 @@ export function AnalysisPanel() {
       )}
 
       {pvs.length > 0 && (
-        <ol className="pvlist">
+        <ol className="pvlist" aria-label="후보 수순(PV)">
           {pvs.map((pv) => {
             const c = colorsForTag(
               DEFAULT_PALETTE,
@@ -170,6 +164,37 @@ export function AnalysisPanel() {
   );
 }
 
+/** [분석] 탭의 설정 카드 — 예전에 설정 화면의 「자주 쓰는 설정」에 있던 줄들. */
+export function AnalysisOptions() {
+  return (
+    <section className="panel" aria-labelledby="analysis-options-title">
+      <h2 id="analysis-options-title" className="panel__title">
+        분석 설정
+      </h2>
+      <div className="panel__rows">
+        <Row
+          id="analysisTime"
+          label="분석 시간"
+          note="무제한이면 정지하거나 국면이 바뀔 때까지 읽습니다."
+          wide
+        >
+          <AnalysisTimeControl />
+        </Row>
+        <Row id="multiPv" label="후보 수 (멀티 PV)" note="1 이면 최선 수 하나만 깊게 읽습니다.">
+          <MultiPvControl />
+        </Row>
+        <Row
+          id="playBestOnStop"
+          label="정지하면 최선수 두기"
+          note="정지하는 순간의 BEST(PV 첫 수)를 둡니다. 빈 판이면 천원(H8)."
+        >
+          <PlayBestOnStopControl />
+        </Row>
+      </div>
+    </section>
+  );
+}
+
 /**
  * 이번 탐색이 시작된 뒤 흐른 벽시계 ms(0.1초 간격). 탐색 중이 아니면 null.
  * 탐색이 끝났다 다시 시작하면(분석 중 착수 등) 0 부터 — 집계기도 그때 0 으로 돈다.
@@ -197,14 +222,6 @@ function Stat({ k, wide, children }: { k: string; wide?: boolean; children: Reac
     </div>
   );
 }
-
-const STATUS_TEXT: Record<string, string> = {
-  idle: "꺼짐",
-  starting: "기동 중",
-  ready: "대기",
-  searching: "탐색 중",
-  error: "오류",
-};
 
 function formatEval(stats: Pick<SearchStats, "evalCp" | "mate">): string {
   if (stats.mate !== null && stats.mate !== 0) {

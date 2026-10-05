@@ -31,8 +31,10 @@ describe("스레드 설정", () => {
   it("저장된 값을 믿지 않는다 — 범위 밖은 자르고 타입이 틀리면 기본값", () => {
     expect(sanitize({ threads: 99 }).threads).toBe(16);
     expect(sanitize({ threads: -3 }).threads).toBe(0);
-    expect(sanitize({ allowThreads: "yes" as unknown as boolean }).allowThreads).toBe(true);
-    expect(sanitize({}).allowThreads).toBe(DEFAULT_SETTINGS.allowThreads);
+    expect(sanitize({ enginePreference: "yes" as unknown as "auto" }).enginePreference).toBe(
+      "auto",
+    );
+    expect(sanitize({}).enginePreference).toBe(DEFAULT_SETTINGS.enginePreference);
   });
 
   it("thread_num 은 INFO 목록에 없다 — 떠 있는 변형을 아는 엔진 스토어가 붙인다", () => {
@@ -75,6 +77,26 @@ describe("후보 수 · 고급 설정", () => {
     expect(sanitize(migrate({ multiPv: 3 })).multiPv).toBe(3);
     // 새 버전에서 일부러 5 를 고른 것은 그대로다.
     expect(sanitize(migrate({ multiPv: 5, v: SETTINGS_VERSION })).multiPv).toBe(5);
+  });
+
+  it("옛 「멀티스레드 사용」 끔은 단일 스레드 엔진 선택으로 옮긴다(판 3)", () => {
+    expect(migrate({ allowThreads: false }).enginePreference).toBe("relaxed");
+    expect(migrate({ allowThreads: true }).enginePreference).toBeUndefined();
+    // 이미 엔진을 고른 저장본은 건드리지 않는다.
+    expect(migrate({ allowThreads: false, enginePreference: "simd" }).enginePreference).toBe(
+      "simd",
+    );
+    expect("allowThreads" in migrate({ allowThreads: false })).toBe(false);
+    expect(sanitize(migrate({ allowThreads: false, v: SETTINGS_VERSION })).enginePreference).toBe(
+      "auto",
+    );
+  });
+
+  it("자동 기동 · 정지하면 최선수 두기는 기본으로 켜져 있다", () => {
+    expect(DEFAULT_SETTINGS.autoBoot).toBe(true);
+    expect(DEFAULT_SETTINGS.playBestOnStop).toBe(true);
+    expect(sanitize({ autoBoot: "no" as unknown as boolean }).autoBoot).toBe(true);
+    expect(sanitize({ playBestOnStop: false }).playBestOnStop).toBe(false);
   });
 
   it("고급 설정은 기본으로 접혀 있고, 타입이 틀리면 접는다", () => {

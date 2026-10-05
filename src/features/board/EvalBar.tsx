@@ -1,5 +1,6 @@
 import { useEngineStore } from "../../engine/engine-state";
 import type { EvalView } from "../../engine/eval-view";
+import { useCurrentEval } from "./currentAnalysis";
 
 /**
  * 평가 바 — 체스닷컴의 세로 게이지를 오목에 옮긴 것.
@@ -8,11 +9,14 @@ import type { EvalView } from "../../engine/eval-view";
  * 승률과 평가값을 적는다(외통이면 `M5`). 값은 흑 관점으로 돌려 둔 `evalView` 만
  * 읽는다 — 엔진의 값은 둘 차례 관점이라 그대로 그리면 수마다 바가 뒤집힌다.
  *
+ * 그 값이 **지금 국면이나 앞 국면**의 것일 때만 그린다(`useCurrentEval`) — 무른 판에서
+ * 뒤 국면의 형세를 말하지 않는다.
+ *
  * 움직임은 **채움의 높이만** 200ms 로 옮긴다(`Motion.kt` 의 상한). 숫자는
  * 보간하지 않는다 — 실시간 값의 애니메이션은 지나간 값에 대한 거짓말이다.
  */
 export function EvalBar({ empty }: { empty: boolean }) {
-  const view = useEngineStore((s) => s.evalView);
+  const view = useCurrentEval();
   const analyzing = useEngineStore((s) => s.analyzing);
   const status = useEngineStore((s) => s.status);
   // 빈 판에서 아무것도 읽지 않고 있으면 앞 대국의 값이 남아 있을 이유가 없다.

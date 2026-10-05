@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { useEngineStore, MULTI_PV, threadCap, type EngineConfig } from "../../engine/engine-state";
+import { isEnginePreference, type EnginePreference } from "../../engine/engine-client";
 import type { EngineCommand } from "../../engine/engine-types";
 import { DEFAULT_SIZE } from "../../core/model/move";
 
@@ -105,11 +106,18 @@ export interface Settings {
   hashAutoClear: boolean;
   /** 원하는 스레드 수(0 = 자동). 멀티 변형에서만 엔진에 닿는다. */
   threads: number;
-  /** 멀티스레드 변형을 써도 되는가. 끄면 환경이 되어도 단일로 띄운다. */
-  allowThreads: boolean;
+  /**
+   * 어느 엔진을 띄울까(자동 · 멀티 · relaxed · 일반 SIMD — `planOrder`). 예전의 「멀티스레드
+   * 사용」 스위치를 대신한다 — 그 스위치를 끈 것은 이제 `relaxed`(단일 스레드)다.
+   */
+  enginePreference: EnginePreference;
+  /** 앱을 열면 엔진을 곧바로 띄울까. 가중치(20MB)는 한 번 받으면 캐시에서 읽는다. */
+  autoBoot: boolean;
   // ── 분석 ──
   multiPv: number;
   analysisSec: number;
+  /** 분석 중 「정지」를 누르면 그때의 최선수를 판에 둔다(빈 판이면 천원). */
+  playBestOnStop: boolean;
   // ── 표시 ──
   /** 보드 옆 평가 바(앱 settings_dev 의 `showEvalBar`). */
   showEvalBar: boolean;
@@ -126,22 +134,35 @@ export const DEFAULT_SETTINGS: Settings = {
   vcThread: 0,
   hashAutoClear: false,
   threads: AUTO_THREADS,
-  allowThreads: true,
+  enginePreference: "auto",
+  autoBoot: true,
   multiPv: MULTI_PV.initial,
   analysisSec: 0,
+  playBestOnStop: true,
   showEvalBar: true,
   showAdvanced: false,
 };
 
 /**
- * 저장 형식의 판. **2** 부터 후보 수 기본이 1 이다. 그 전 판(번호 없음)은 기본값 5 를
- * 그대로 저장해 두었으므로(설정 하나만 바꿔도 전체가 저장된다), 5 는 「고른 값」이
- * 아니라 「옛 기본값」으로 보고 1 로 옮긴다. 5 가 아닌 값은 사용자가 고른 것이다.
+ * 저장 형식의 판.
+ *
+ *   - **2** 부터 후보 수 기본이 1 이다. 그 전 판(번호 없음)은 기본값 5 를 그대로 저장해
+ *     두었으므로(설정 하나만 바꿔도 전체가 저장된다), 5 는 「고른 값」이 아니라 「옛
+ *     기본값」으로 보고 1 로 옮긴다. 5 가 아닌 값은 사용자가 고른 것이다.
+ *   - **3** 부터 「멀티스레드 사용」 스위치(`allowThreads`)가 엔진 선택(`enginePreference`)
+ *     으로 바뀌었다. 스위치를 꺼 두었던 사람은 단일 스레드(relaxed — 못 쓰면 일반 SIMD)로.
  */
-export const SETTINGS_VERSION = 2;
-export function migrate(raw: Partial<Settings> & { v?: number }): Partial<Settings> {
-  if ((raw.v ?? 1) < 2 && raw.multiPv === 5) return { ...raw, multiPv: 1 };
-  return raw;
+export const SETTINGS_VERSION = 3;
+type StoredSettings = Partial<Settings> & { v?: number; allowThreads?: unknown };
+export function migrate(raw: StoredSettings): Partial<Settings> {
+  const v = raw.v ?? 1;
+  const { allowThreads, ...rest } = raw;
+  const out: Partial<Settings> = { ...rest };
+  if (v < 2 && raw.multiPv === 5) out.multiPv = 1;
+  if (v < 3 && allowThreads === false && raw.enginePreference === undefined) {
+    out.enginePreference = "relaxed";
+  }
+  return out;
 }
 
 const KEY = "rapfi.settings";
@@ -165,9 +186,13 @@ export function sanitize(raw: Partial<Settings>): Settings {
     vcThread: (vct === 1 || vct === 2 ? vct : 0) as VcThread,
     hashAutoClear: typeof raw.hashAutoClear === "boolean" ? raw.hashAutoClear : d.hashAutoClear,
     threads: clamp(num(raw.threads, d.threads), 0, 16),
-    allowThreads: typeof raw.allowThreads === "boolean" ? raw.allowThreads : d.allowThreads,
+    enginePreference: isEnginePreference(raw.enginePreference)
+      ? raw.enginePreference
+      : d.enginePreference,
+    autoBoot: typeof raw.autoBoot === "boolean" ? raw.autoBoot : d.autoBoot,
     multiPv: clamp(num(raw.multiPv, d.multiPv), MULTI_PV.min, MULTI_PV.max),
     analysisSec: sec > 0 ? Math.round(sec) : 0,
+    playBestOnStop: typeof raw.playBestOnStop === "boolean" ? raw.playBestOnStop : d.playBestOnStop,
     showEvalBar: typeof raw.showEvalBar === "boolean" ? raw.showEvalBar : d.showEvalBar,
     showAdvanced: typeof raw.showAdvanced === "boolean" ? raw.showAdvanced : d.showAdvanced,
   };
@@ -176,7 +201,7 @@ export function sanitize(raw: Partial<Settings>): Settings {
 function load(): Settings {
   try {
     const text = localStorage.getItem(KEY);
-    return text ? sanitize(migrate(JSON.parse(text) as Partial<Settings>)) : DEFAULT_SETTINGS;
+    return text ? sanitize(migrate(JSON.parse(text) as StoredSettings)) : DEFAULT_SETTINGS;
   } catch {
     return DEFAULT_SETTINGS;
   }
@@ -224,7 +249,7 @@ export const toEngineConfig = (s: Settings): EngineConfig => ({
 /** 엔진 스토어로 흘려보낸다. 엔진이 놀고 있으면 곧바로, 아니면 다음 탐색 직전에 닿는다. */
 function push(s: Settings) {
   const e = useEngineStore.getState();
-  e.setAllowThreads(s.allowThreads);
+  e.setEnginePreference(s.enginePreference);
   e.configure(toEngineConfig(s));
   e.setMultiPv(s.multiPv);
   e.setAnalysisMs(s.analysisSec > 0 ? s.analysisSec * 1000 : Infinity);
@@ -266,9 +291,11 @@ function pick(s: SettingsState): Settings {
     vcThread: s.vcThread,
     hashAutoClear: s.hashAutoClear,
     threads: s.threads,
-    allowThreads: s.allowThreads,
+    enginePreference: s.enginePreference,
+    autoBoot: s.autoBoot,
     multiPv: s.multiPv,
     analysisSec: s.analysisSec,
+    playBestOnStop: s.playBestOnStop,
     showEvalBar: s.showEvalBar,
     showAdvanced: s.showAdvanced,
   };

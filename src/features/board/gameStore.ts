@@ -1,5 +1,13 @@
 import { create } from "zustand";
-import { inBoard, label, move, sameMove, type Move } from "../../core/model/move";
+import {
+  center,
+  inBoard,
+  label,
+  move,
+  positionKey,
+  sameMove,
+  type Move,
+} from "../../core/model/move";
 import {
   colorAt,
   enginePlays,
@@ -45,6 +53,72 @@ import type { EngineCommand } from "../../engine/engine-types";
 /** 엔진 착수 시간 선택지(ms). 0 = 무제한. */
 export const MOVE_TIME_CHOICES = [0, 1_000, 3_000, 5_000, 10_000, 30_000] as const;
 
+/**
+ * 보드의 두 탭 — **대국**(사람 대 컴퓨터, 엔진이 제 차례에 둔다)과 **분석**(엔진이 국면을
+ * 읽고, 판은 사람이 마음대로 둔다). 판(기보)은 둘이 함께 쓰고, 엔진을 쓰는 방식만 갈린다:
+ *
+ *   - 대국 → 분석: 엔진이 대국의 수를 생각하던 중이면 그 수를 **버린다**(정지 · 답은 무시).
+ *     분석 탭에서는 엔진이 차례를 받아 두지 않는다.
+ *   - 분석 → 대국: 도는 분석을 **멈추기만** 한다 — 최선수를 두지 않는다. 대국의 엔진
+ *     차례는 사람이 판을 눌러 «두어라» 할 때 시작한다(평소와 같다).
+ *
+ * 그래서 탭을 오가도 기보도, 끝난 대국의 결과도, 떠 있는 물음도 그대로다.
+ */
+export type BoardMode = "game" | "analysis";
+
+/**
+ * 대국 레벨 — 데스크톱 `set_level` 처럼 **노드 수**로 세기를 정한다(`INFO max_node`).
+ * 레벨은 대국의 착수에만 얹힌다(`engine-state` 의 `play(…, info)`) — 분석은 언제나 설정의
+ * 최대 노드로 읽는다. 「최강」은 덧씌우지 않는다(설정의 최대 노드 · 착수 시간 그대로).
+ */
+export const LEVELS = [
+  { level: 1, label: "입문", maxNode: 20_000 },
+  { level: 2, label: "초급", maxNode: 100_000 },
+  { level: 3, label: "중급", maxNode: 500_000 },
+  { level: 4, label: "상급", maxNode: 2_000_000 },
+  { level: 5, label: "최강", maxNode: null },
+] as const;
+export const MAX_LEVEL = 5;
+
+/**
+ * 노드로 끝나는 레벨이 「무제한」 착수 시간과 만났을 때의 차례 상한. 레벨의 노드에서
+ * 엔진이 스스로 멈추므로 대개 그보다 훨씬 일찍 둔다 — 상한은 감시견의 바닥일 뿐이다.
+ */
+const LEVEL_TURN_CAP_MS = 60_000;
+
+/** 엔진이 「지금 두기」까지 생각하는 대국인가(무제한 착수 시간 + 최강). */
+export const isUnlimitedTurn = (s: { moveTimeMs: number; level: number }): boolean =>
+  s.moveTimeMs <= 0 && s.level >= MAX_LEVEL;
+
+/** 이 레벨이 착수에 얹는 `INFO`. 최강은 아무것도 얹지 않는다. */
+export function levelInfo(level: number): EngineCommand[] {
+  const spec = LEVELS.find((l) => l.level === level);
+  return spec?.maxNode ? [{ kind: "info", key: "max_node", value: spec.maxNode }] : [];
+}
+
+/** 분석 정지의 결과 — 최선수를 두었는가, 못 두었다면 왜. */
+export type StopResult =
+  { kind: "stopped" } | { kind: "placed"; cell: Move } | { kind: "rejected"; reason: string };
+
+const MODE_KEY = "rapfi.boardMode";
+
+function loadMode(): BoardMode {
+  try {
+    const v = typeof localStorage === "undefined" ? null : localStorage.getItem(MODE_KEY);
+    return v === "analysis" ? "analysis" : "game";
+  } catch {
+    return "game";
+  }
+}
+
+function saveMode(m: BoardMode) {
+  try {
+    localStorage.setItem(MODE_KEY, m);
+  } catch {
+    /* 저장이 안 돼도 이번 세션은 그대로 돈다 */
+  }
+}
+
 /** 렌주에서는 장목이 흑의 **금수**라 승리 판정에서는 장목을 인정한다. */
 const ALLOW_OVERLINE = true;
 
@@ -58,6 +132,13 @@ const SWAP_FIRST_OPENING = move(7, 1);
 const SWAP_FIRST_REPLY = move(5, 4);
 
 interface GameState {
+  /** 보드의 탭(`BoardMode`). 고른 탭은 이 브라우저에 남는다. */
+  mode: BoardMode;
+  /** 탭을 바꾼다 — 엔진의 쓰임을 격리한다(`BoardMode` 주석). */
+  setMode: (m: BoardMode) => void;
+  /** 대국 레벨 1..5(`LEVELS`). 5 = 최강. */
+  level: number;
+  setLevel: (n: number) => void;
   computerSide: ComputerSide;
   opening: OpeningProtocol;
   /** 대국 탐색이 돌고 있다(데스크톱의 `isthinking`). */
@@ -108,6 +189,15 @@ interface GameState {
    * 대국에서 엔진의 한 수를 끝내는 유일한 방법이다(데스크톱의 정지와 같다).
    */
   moveNow: () => void;
+  /**
+   * 분석 정지. `playBest` 면 정지하는 그 순간의 최선수(PV 첫 수 — 화면의 BEST)를 판에
+   * 둔다. 빈 판이면 엔진을 기다리지 않고 천원(H8)이다. **분석 탭에서만** 둔다 — 대국의
+   * 수는 대국의 차례가 정한다. 그 최선수는 **지금 국면의 것**이어야 한다(`snapshotKey`) —
+   * 무른 직후처럼 새 국면의 답이 아직 없으면 두지 않고 까닭을 돌려준다.
+   */
+  stopAnalysis: (opts: { playBest: boolean }) => StopResult;
+  /** 기보의 `ply` 수째 국면으로 옮긴다(형세 그래프의 한 점을 눌렀을 때). */
+  gotoPly: (ply: number) => void;
 }
 
 const board = () => useBoardStore.getState();
@@ -169,7 +259,8 @@ export const useGameStore = create<GameState>((set, get) => {
       !s.thinking &&
       !s.result &&
       sideToMove(board().render.stones) === "black" &&
-      !enginePlays(s.computerSide, "black") &&
+      // 분석 탭에서는 흑도 언제나 사람이 둔다.
+      (s.mode === "analysis" || !enginePlays(s.computerSide, "black")) &&
       // 「기동해 있고 놀고 있다」 — searching 이면 위 주석대로 건드리지 않는다.
       engine().status === "ready";
     if (!wanted) {
@@ -239,24 +330,27 @@ export const useGameStore = create<GameState>((set, get) => {
    */
   const engineTurn = () => {
     const s = get();
-    if (s.result) return;
+    // 분석 탭에서는 엔진이 차례를 받지 않는다(`BoardMode`).
+    if (s.result || s.mode !== "game") return;
     const moves = board().render.stones;
+    const info = levelInfo(s.level);
     set({ thinking: true });
-    if (s.moveTimeMs <= 0) {
+    if (isUnlimitedTurn(s)) {
       // **무제한: 엔진은 「지금 두기」까지 생각한다.** 데스크톱·앱의 기본 레벨
       // (level 0 — 시간·노드 무제한, 사용자가 멈추면 둔다)과 같다. 예전엔 여기서
       // 5초를 줬고 「앱의 기본값」이라고 적었는데, 틀린 말이었다.
       // 감시견도 걸지 않는다 — 끝을 정하는 것은 사용자다.
-      void engine().play(board().placements(), moves.length === 0, { turnMs: Infinity });
+      void engine().play(board().placements(), moves.length === 0, { turnMs: Infinity }, info);
       return;
     }
     // 한 수 예산만 준다. 대국 예산(`timeout_match`)은 0 — 대국 시계가 없다.
-    const turnMs = Math.max(500, s.moveTimeMs);
+    // 노드 레벨에 무제한 시간이면 레벨의 노드에서 엔진이 스스로 멈춘다 — 상한만 둔다.
+    const turnMs = Math.max(500, s.moveTimeMs > 0 ? s.moveTimeMs : LEVEL_TURN_CAP_MS);
     const budget = { turnMs, matchMs: 0 };
     // 감시견은 **엔진이 준비된 뒤에** 건다. 첫 수에는 엔진 기동(20MB 가중치
     // 내려받기)이 끼는데, 느린 회선에서 그 시간까지 세면 멀쩡한 대국을 끊는다.
     void engine()
-      .play(board().placements(), moves.length === 0, budget)
+      .play(board().placements(), moves.length === 0, budget, info)
       .then(() => {
         if (get().thinking) armWatchdog(turnMs);
       });
@@ -284,9 +378,66 @@ export const useGameStore = create<GameState>((set, get) => {
       log(`예상치 못한 협상 응답: ${r.kind}`);
     },
     onForbid: (cells) => board().setForbidden(get().showForbidden ? cells : []),
+    onEngineReset: () => {
+      // 엔진을 내렸다(종료 · 엔진 전환) — 생각하던 수는 오지 않는다. 판을 풀어 둔다.
+      disarmWatchdog();
+      if (!get().thinking) return;
+      set({ thinking: false });
+      log("엔진을 내려 생각하던 수를 버렸습니다");
+    },
   });
 
+  /**
+   * 분석 탭의 착수 — 사람이 두든 「정지」가 최선수를 두든 같은 문을 지난다. 대국의 개시
+   * 절차·엔진 차례는 없고, 렌주 금수와 승패 판정은 그대로다.
+   */
+  const placeForAnalysis = (cell: Move): TapResult => {
+    const s = get();
+    const size = board().render.size;
+    if (!inBoard(cell, size)) return { kind: "ignored" };
+    if (s.result) {
+      return { kind: "rejected", reason: "대국이 끝났습니다 — 무르거나 새 판을 시작하세요" };
+    }
+    if (s.prompt) return { kind: "rejected", reason: "먼저 위 물음에 답해 주세요" };
+    const moves = board().render.stones;
+    if (moves.some((m) => sameMove(m, cell))) return { kind: "ignored" };
+    if (sideToMove(moves) === "black" && board().forbidden.some((m) => sameMove(m, cell))) {
+      prompt({ kind: "forbidden", cell });
+      return { kind: "rejected", reason: `금수입니다 (${label(cell, size)})` };
+    }
+    place(cell);
+    return { kind: "placed" };
+  };
+
   return {
+    mode: loadMode(),
+    level: MAX_LEVEL,
+
+    setMode: (mode) => {
+      const s = get();
+      if (s.mode === mode) return;
+      if (s.thinking) {
+        // 대국 → 분석: 생각하던 수는 버린다. 답이 와도 `thinking` 이 꺼져 있어 무시된다.
+        disarmWatchdog();
+        set({ thinking: false });
+        engine().stop();
+        log("탭 전환 — 엔진이 생각하던 수를 버렸습니다");
+      } else if (engine().analyzing) {
+        // 분석 → 대국: 멈추기만 한다. 최선수를 두지 않는다 — 대국의 판에 새어 들지 않게.
+        engine().stop();
+      }
+      set({ mode });
+      saveMode(mode);
+      log(mode === "game" ? "대국 탭" : "분석 탭");
+      refreshForbidden();
+    },
+
+    setLevel: (n) => {
+      const level = Math.min(MAX_LEVEL, Math.max(1, Math.round(n)));
+      set({ level });
+      log(`대국 레벨: ${LEVELS.find((l) => l.level === level)?.label ?? level}`);
+    },
+
     computerSide: "none",
     opening: "none",
     thinking: false,
@@ -304,6 +455,7 @@ export const useGameStore = create<GameState>((set, get) => {
 
     swapSides: () => {
       const s = get();
+      if (s.mode !== "game") return;
       if (s.computerSide === "none" || s.computerSide === "both") return;
       // 엔진이 생각 중이거나 물음이 떠 있으면 판을 누를 때와 같이 받지 않는다.
       if (s.thinking || s.prompt) return;
@@ -357,6 +509,7 @@ export const useGameStore = create<GameState>((set, get) => {
       const s = get();
       const size = board().render.size;
       if (!inBoard(cell, size)) return { kind: "ignored" };
+      if (s.mode === "analysis") return placeForAnalysis(cell);
       // 데스크톱은 탐색 중과 종국 뒤의 클릭을 삼킨다(main.c:2663 / 2676).
       if (s.thinking) {
         const reason =
@@ -445,6 +598,40 @@ export const useGameStore = create<GameState>((set, get) => {
     moveNow: () => {
       // 워커가 다음 조각 경계(≤ 500ms)에서 멈추고 마지막 조각의 최선수를 올린다.
       if (get().thinking) engine().stop();
+    },
+
+    stopAnalysis: ({ playBest }) => {
+      const e = engine();
+      // 「분석 중」이었는가 — 의도가 켜져 있거나, 대국이 아닌 탐색이 돌고 있다.
+      const running = e.analyzing || (e.status === "searching" && !get().thinking);
+      const stones = board().render.stones;
+      // 최선수는 **멈추기 전에** 읽는다 — 정지 뒤에 오는 마지막 조각은 기다리지 않는다
+      // (화면에 보이던 BEST 가 곧 두는 수다). 지금 국면의 답이 아니면 쓰지 않는다.
+      const snap = e.snapshotKey === positionKey(stones) ? e.snapshot : null;
+      const best =
+        stones.length === 0
+          ? center(board().render.size)
+          : (snap?.bestMove ?? snap?.pvs[0]?.line[0] ?? null);
+      e.stop();
+      if (!playBest || !running || get().mode !== "analysis") return { kind: "stopped" };
+      if (!best) {
+        return { kind: "rejected", reason: "엔진이 아직 이 국면의 최선수를 찾지 못했습니다" };
+      }
+      const r = placeForAnalysis(best);
+      if (r.kind === "placed") {
+        log(`정지 — 최선수 ${label(best, board().render.size)} 착수`);
+        return { kind: "placed", cell: best };
+      }
+      return {
+        kind: "rejected",
+        reason: r.kind === "rejected" ? r.reason : "최선수 자리에 둘 수 없습니다",
+      };
+    },
+
+    gotoPly: (ply) => {
+      const cur = board().render.stones.length;
+      if (ply < cur) rewind(cur - ply, `${ply}수로`);
+      else if (ply > cur) replay(ply - cur, `${ply}수로`);
     },
 
     dismissPrompt: () => {

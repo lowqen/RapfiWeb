@@ -4,6 +4,7 @@ import {
   EMPTY_SNAPSHOT,
   fromSerializable,
   type AnalysisSnapshot,
+  type BootPhase,
   type EngineCommand,
   type EngineStatus,
   type FromWorker,
@@ -85,6 +86,73 @@ export function planVariants(o: {
   if (o.relaxed) out.push("single-simd128-relaxed");
   out.push("single-simd128");
   return out;
+}
+
+/**
+ * 사용자가 고른 엔진 — 상단 바와 설정의 「엔진」 드롭다운.
+ *
+ *   - `auto`    환경이 허락하는 가장 빠른 것부터(`planVariants` 순서 그대로)
+ *   - `multi`   멀티스레드(pthread). relaxed 를 알면 relaxed 멀티가 먼저다
+ *   - `relaxed` 단일 스레드 · relaxed SIMD
+ *   - `simd`    단일 스레드 · 일반(Standard) SIMD — 가장 넓게 도는 하한선
+ *
+ * 고른 것이 기동에 실패하면 **더 낮은 쪽으로** 물러선다(멀티 → 단일, relaxed → 일반).
+ * 고른 것을 이 환경에서 아예 못 쓰면 쓸 수 있는 가장 가까운 것으로 띄우고 까닭을 남긴다.
+ */
+export type EnginePreference = "auto" | "multi" | "relaxed" | "simd";
+
+export const ENGINE_PREFERENCES: readonly EnginePreference[] = ["auto", "multi", "relaxed", "simd"];
+
+export const isEnginePreference = (v: unknown): v is EnginePreference =>
+  typeof v === "string" && (ENGINE_PREFERENCES as readonly string[]).includes(v);
+
+/**
+ * 고른 엔진으로 시도할 변형 순서와, 고른 것을 그대로 못 쓸 때의 까닭.
+ * `variants` 는 이 환경에서 쓸 수 있는 변형(`Capabilities.variants`, 빠른 순)이다.
+ */
+export function planOrder(
+  variants: readonly EngineVariant[],
+  pref: EnginePreference,
+): { order: EngineVariant[]; note: string | null } {
+  const multis = variants.filter((v) => isMultiVariant(v));
+  const singles = variants.filter((v) => !isMultiVariant(v));
+  switch (pref) {
+    case "auto":
+      return { order: [...variants], note: null };
+    case "multi":
+      return multis.length
+        ? { order: [...multis, ...singles], note: null }
+        : {
+            order: singles,
+            note: "이 환경에서는 멀티스레드를 쓸 수 없어 단일 스레드로 띄웠습니다",
+          };
+    case "relaxed":
+      return singles.includes("single-simd128-relaxed")
+        ? { order: singles, note: null }
+        : {
+            order: singles,
+            note: "이 브라우저에서는 relaxed SIMD 를 쓸 수 없어 Standard SIMD 로 띄웠습니다",
+          };
+    case "simd":
+      return { order: singles.filter((v) => v === "single-simd128"), note: null };
+  }
+}
+
+/** 드롭다운의 각 항목을 이 환경에서 고를 수 있는가 — 못 고르면 그 까닭. */
+export function preferenceBlocker(caps: Capabilities, pref: EnginePreference): string | null {
+  if (!caps.simd) return caps.note;
+  switch (pref) {
+    case "auto":
+    case "simd":
+      return null;
+    case "multi":
+      return caps.threads ? null : caps.threadsNote;
+    case "relaxed":
+      if (caps.variants.includes("single-simd128-relaxed")) return null;
+      return caps.relaxedSimd
+        ? "주소의 ?relaxed=0 으로 relaxed SIMD 를 꺼 두었습니다"
+        : "이 브라우저는 WebAssembly relaxed SIMD 를 지원하지 않습니다";
+  }
 }
 
 export interface Capabilities {
@@ -236,6 +304,8 @@ export interface EngineEvents {
   onOpening?: (r: OpeningResponse) => void;
   /** 엔진이 떴다 — 어느 변형으로, 물러섰다면 왜. */
   onBooted?: (info: BootInfo) => void;
+  /** 기동이 어느 단계인가(로딩 표시용). 멈춘 멀티 엔진을 다시 띄울 때도 온다. */
+  onBootPhase?: (phase: BootPhase, variant: EngineVariant) => void;
 }
 
 export interface EngineOptions extends EngineEvents {
@@ -263,6 +333,14 @@ export type OpeningResponse = Extract<FromWorker, { type: "opening" }>["response
 
 const env = import.meta.env;
 
+/** 기동 중에 엔진을 내려(`terminate`) 그 기동이 버려졌다. 오류가 아니다. */
+export class BootAbortedError extends Error {
+  constructor(why = "엔진 기동을 취소했습니다") {
+    super(why);
+    this.name = "BootAbortedError";
+  }
+}
+
 export class EngineClient {
   private worker: Worker | null = null;
   private status: EngineStatus = "idle";
@@ -270,6 +348,14 @@ export class EngineClient {
   private readyResolvers: (() => void)[] = [];
   /** 마지막으로 보낸 탐색 요청의 번호. `searchDone` 이 이것과 같을 때만 「대기」다. */
   private searchSeq = 0;
+  /**
+   * 기동 세대. `terminate` 가 올린다 — 그 전에 시작된 기동은 결과를 버리고 조용히 끝난다.
+   * 없으면 기동 중에 엔진을 바꿀 때(변형 전환) 옛 기동이 120초 뒤 시간 초과로 깨어나
+   * 다음 변형을 **새로** 띄운다 — 아무도 붙잡지 않은 워커가 하나 더 생긴다.
+   */
+  private generation = 0;
+  /** 지금 기다리는 기동을 곧바로 끝낸다(`terminate` 가 부른다). */
+  private abortBoot: (() => void) | null = null;
 
   readonly capabilities: Capabilities = detectCapabilities();
   readonly engineBaseUrl: string;
@@ -318,22 +404,29 @@ export class EngineClient {
    * 멈추면) 같은 방식으로 일반 SIMD 로 간다. 가중치는 캐시에서 다시 쓰므로 물러설 때 다시
    * 받지 않는다(`weights-cache.ts`).
    *
-   * `allowThreads` 가 거짓이면(설정 ▸ 멀티스레드 끔) 멀티 변형을 빼고 시작한다.
+   * `preference` 는 사용자가 고른 엔진이다(`planOrder`). 고른 것을 그대로 못 쓰면 그
+   * 까닭이 `fallbackReason` 으로 간다.
+   *
+   * 기동 중에 `terminate` 가 오면 **조용히 그만둔다** — `BootAbortedError` 로 거부하되
+   * 오류·상태 이벤트를 내지 않고 다음 변형도 띄우지 않는다.
    */
-  async start(allowThreads = true): Promise<void> {
+  async start(preference: EnginePreference = "auto"): Promise<void> {
     const best = this.capabilities.variant;
     if (!best) throw new Error(this.capabilities.note ?? "엔진을 실행할 수 없습니다");
     if (this.booting) return this.booting;
     if (this.worker) return this.whenReady();
 
-    const order = this.capabilities.variants.filter((v) => allowThreads || !isMultiVariant(v));
+    const plan = planOrder(this.capabilities.variants, preference);
+    const order = plan.order.length ? plan.order : [...this.capabilities.variants];
+    const gen = this.generation;
     this.setStatus("starting");
-    this.booting = (async () => {
-      let fallbackReason: string | null = null;
+    const booting = (async () => {
+      let fallbackReason: string | null = plan.note;
       for (const variant of order) {
         try {
           const settings = this.bootSettingsFor(variant);
           const booted = await this.spawn(variant, settings);
+          if (gen !== this.generation) throw new BootAbortedError();
           this.variant = variant;
           this.setStatus("ready");
           this.events.onBooted?.({
@@ -348,6 +441,10 @@ export class EngineClient {
           });
           return;
         } catch (e) {
+          // 엔진을 내렸다(변형 전환 등) — 이 기동은 더 볼 것이 없다. 워커는 `terminate` 가 치웠다.
+          if (gen !== this.generation || e instanceof BootAbortedError) {
+            throw e instanceof BootAbortedError ? e : new BootAbortedError();
+          }
           this.worker?.terminate();
           this.worker = null;
           const why = e instanceof Error ? e.message : String(e);
@@ -363,9 +460,10 @@ export class EngineClient {
         }
       }
     })().finally(() => {
-      this.booting = null;
+      if (this.booting === booting) this.booting = null;
     });
-    return this.booting;
+    this.booting = booting;
+    return booting;
   }
 
   private variant: EngineVariant | null = null;
@@ -393,11 +491,13 @@ export class EngineClient {
     this.setStatus("starting");
     // 단일 변형도 relaxed 부터 — 실패하면 일반 단일로.
     const singles = this.capabilities.variants.filter((v) => !isMultiVariant(v));
+    const gen = this.generation;
     let last: unknown = null;
     for (const variant of singles) {
       try {
         const settings = this.bootSettingsFor(variant);
         const booted = await this.spawn(variant, settings);
+        if (gen !== this.generation) return;
         this.variant = variant;
         this.setStatus("ready");
         this.events.onBooted?.({
@@ -412,6 +512,7 @@ export class EngineClient {
         });
         return;
       } catch (e) {
+        if (gen !== this.generation) return;
         // `spawn` 이 새 워커를 this.worker 에 넣었다 — 위에서 null 로 좁혀진 타입을 푼다.
         (this.worker as Worker | null)?.terminate();
         this.worker = null;
@@ -466,8 +567,17 @@ export class EngineClient {
       clearTimeout(timer);
       settle.reject(new Error(why));
       settle = null;
+      if (this.abortBoot === abort) this.abortBoot = null;
       return true;
     };
+    /** `terminate` 가 부른다 — 기다리던 기동을 곧바로 끝내 `start` 가 그만두게 한다. */
+    const abort = () => {
+      if (!settle) return;
+      clearTimeout(timer);
+      settle.reject(new BootAbortedError());
+      settle = null;
+    };
+    this.abortBoot = abort;
 
     worker.onmessage = (ev: MessageEvent<FromWorker>) => {
       const m = ev.data;
@@ -476,6 +586,10 @@ export class EngineClient {
           clearTimeout(timer);
           settle?.resolve(m);
           settle = null;
+          if (this.abortBoot === abort) this.abortBoot = null;
+          break;
+        case "phase":
+          if (this.worker === worker) this.events.onBootPhase?.(m.phase, variant);
           break;
         case "snapshot":
           // 밀려난 탐색이 마지막으로 올린 스냅샷은 **옛 국면**의 값이다. 받으면 보드의
@@ -662,6 +776,12 @@ export class EngineClient {
    * 다만 조각 경계에서도 반응하지 않을 때는 이것뿐이다 — 재기동은 수백 ms 다.
    */
   terminate(): void {
+    // 진행 중인 기동이 있으면 그 결과를 버린다 — 다음 변형으로 물러서지도 않는다.
+    this.generation++;
+    this.booting = null;
+    const abort = this.abortBoot;
+    this.abortBoot = null;
+    abort?.();
     // 멀티 변형이면 엔진 스레드(중첩 워커)도 이 워커와 함께 사라진다.
     this.worker?.terminate();
     this.worker = null;
