@@ -22,7 +22,7 @@ on:
     inputs:
       tag:
         description: "릴리스 태그"
-        default: "engine-3c94c2a9-a1"
+        default: "engine-3c94c2a9-a1n"
         type: string
       runner:
         description: "러너 — self-hosted(Vultr) 또는 ubuntu-latest"
@@ -48,7 +48,10 @@ jobs:
       # 트리가 바뀐다 — 웹 BENCH 2b7c7da9 → bb7888cc(spike/web-baseline.json). WASM SPRT(relaxed · 500ms)
       # sprt 37247788294 에서 H1, Elo +20.2(95% +6.6 ~ +33.9). relaxed 판은 relaxed_q15mulr — 입력이 0 이상이라
       # 구현 정의 경우(INT16_MIN²)가 없다.
-      RAPFI_PATCHES: "tools/patches/p2-2-keep-evaluators-on-rebuild.patch tools/patches/a1-q15mulr.patch"
+      # P4-1(출력 전용): 주 탐색 스레드가 INFO_DETAIL 에서 500ms 마다 INFO TOTALNODES · TOTALTIME · SPEED 를
+      # 찍는다 — 멀티 변형의 무제한 분석에서 노드 카운터가 깊이 완료 때만 움직여 몇 초씩 멈추던 것.
+      # 결과 불변: BENCH bb7888cc · 배포 릴리스 a1 과 렌주 비트 동일 5/5 · 50/50 · 재적재 0(engine-patch 37258958981).
+      RAPFI_PATCHES: "tools/patches/p2-2-keep-evaluators-on-rebuild.patch tools/patches/a1-q15mulr.patch tools/patches/p4-1-periodic-node-stats.patch"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

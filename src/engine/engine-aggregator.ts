@@ -39,6 +39,8 @@ export class SearchAggregator {
    * 카운터만 보태고 PV 집합은 건드리지 않는다.
    */
   private sawInfoPv = false;
+  /** 이 탐색이 탐색 없는 즉답(좌표 한 줄뿐)으로 끝났는가 — `consume` 의 `bestMove`. */
+  private instant = false;
   private realtimeBest: Move | null = null;
   private realtimeLine: readonly Move[] = [];
   private stats: SearchStats = EMPTY_STATS;
@@ -87,6 +89,7 @@ export class SearchAggregator {
     this.stats = EMPTY_STATS;
     this.round = 0;
     this.sawInfoPv = false;
+    this.instant = false;
     this.floor = 0;
     this.shallow = false;
     this.baseNodes = 0;
@@ -284,6 +287,29 @@ export class SearchAggregator {
         if (this.shallow) return false;
         return this.realtime(r);
 
+      case "bestMove": {
+        // **탐색 없는 즉답.** 빈 판(0수)에서 Rapfi 는 탐색하지 않고 천원(7,7)을 곧바로
+        // 돌려준다 — PV · 깊이 · 평가 · 카운터가 한 줄도 없다. 오목을 완성하는 수 · 막아야만
+        // 하는 수도 같다(tryTrivialBestmove). 예전엔 이 좌표를 흘려 스냅샷이 끝까지 비었고,
+        // 화면은 «탐색 중»인데 아무것도 오지 않는 멈춘 모습이었다. 탐색이 무엇이든 말했으면
+        // (PV · 실시간 · 카운터) 좌표는 그 탐색의 끝일 뿐이므로 건드리지 않는다.
+        const head = r.moves[0];
+        if (!head || this.pvs.size > 0 || this.realtimeBest || this.sawNodes || this.sawInfoPv) {
+          return false;
+        }
+        this.instant = true;
+        this.pvs.set(0, {
+          index: 0,
+          depth: 0,
+          winRate: null,
+          mate: null,
+          evalCp: null,
+          line: [head],
+          round: this.round,
+        });
+        return true;
+      }
+
       default:
         return false;
     }
@@ -328,6 +354,7 @@ export class SearchAggregator {
       loseCells: new Set(this.loseCells),
       bestMove: this.realtimeBest ?? bestLine[0] ?? null,
       bestLine,
+      instant: this.instant,
     };
   }
 

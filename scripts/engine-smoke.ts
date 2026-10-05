@@ -183,6 +183,32 @@ try {
     fail(`콘솔에 엔진 출력이 없습니다:\n${consoleText.slice(0, 400)}`);
   }
 
+  // 1d. **빈 판(0수) 분석.** Rapfi 는 빈 판에서 탐색하지 않고 천원(7,7)을 곧바로 돌려준다 —
+  // PV · 깊이 · 평가 · 카운터가 한 줄도 없다. 예전엔 집계기가 그 좌표를 흘려 화면이 «탐색 중»
+  // 그대로 비어 멈춘 듯 보였다. 이제 최선수 H8 과 즉답 안내가 떠야 한다.
+  {
+    const panel = page.locator(".panel").filter({ has: page.locator(".panel__badge") });
+    await page.getByRole("button", { name: "분석", exact: true }).click();
+    await page.locator('.panel__badge[data-status="searching"]').waitFor({ timeout: 10_000 });
+    const best = panel.locator(".kv dd").last();
+    await page
+      .waitForFunction(
+        `(() => { const dds = [...document.querySelectorAll(".panel .kv dd")];
+                  return dds.length > 0 && dds[dds.length - 1].textContent.trim() === "H8"; })()`,
+        undefined,
+        { timeout: 10_000 },
+      )
+      .catch(() => undefined);
+    const emptyBest = (await best.innerText()).trim();
+    if (emptyBest !== "H8") fail(`빈 판 분석의 최선수가 H8 이 아닙니다: «${emptyBest}»`);
+    if (!(await panel.locator("[data-instant]").isVisible())) {
+      fail("빈 판 분석에 즉답 안내가 없습니다");
+    }
+    console.log(`빈 판 분석: 최선수 ${emptyBest} · 즉답 안내`);
+    await page.getByRole("button", { name: "정지" }).click();
+    await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 5000 });
+  }
+
   // 2. 돌 하나 놓기 — 보드 한가운데는 15×15 에서 H8 이다.
   const view = await page.locator(".board__view").boundingBox();
   if (!view) throw new Error("보드가 없습니다");
@@ -269,6 +295,10 @@ try {
   // 한 단계 끝날 때만 카운터를 찍어 TIME 이 1.5초에 몇 초씩 멈춘 적이 있다.
   else if (ts.at(-1)! - ts[0]! < 2000) fail(`TIME 이 멈춰 있습니다: ${ts.join(" → ")}`);
   else if (!ok(ns)) fail(`NODE 가 들쭉날쭉합니다: ${ns.join(" → ")}`);
+  // 3.5초를 읽는 동안 노드도 늘어야 한다. 격리 멀티 변형은 조각 없이 한 번에 돌고 Rapfi 가 노드 수를
+  // PV 완료 때만 찍어, 깊은 단계 하나 동안 NODE 가 첫 값에 멈췄다(CI 249000→249000). 엔진 패치 P4-1 이
+  // 0.5초마다 카운터를 찍는다.
+  else if (ns.at(-1)! <= ns[0]!) fail(`NODE 가 멈춰 있습니다: ${ns.join(" → ")}`);
   else console.log(`실시간 카운터: TIME ${ts[0]}→${ts.at(-1)}ms · NODE ${ns[0]}→${ns.at(-1)}`);
 
   // 4c. **무제한 분석은 스스로 멈추지 않는다.** 예전엔 분석 예산이 5초였고, 즉답

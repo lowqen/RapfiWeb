@@ -130,6 +130,13 @@ export function AnalysisPanel() {
         </Stat>
       </dl>
 
+      {snapshot.instant && (
+        <p className="panel__hint" data-instant>
+          엔진이 탐색 없이 곧바로 고른 자리입니다 — 빈 판의 첫 수(천원)나 막아야만 하는 수처럼
+          정해진 수라 깊이·평가가 없습니다.
+        </p>
+      )}
+
       {pvs.length > 0 && (
         <ol className="pvlist">
           {pvs.map((pv) => {
