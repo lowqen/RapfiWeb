@@ -125,9 +125,12 @@ export function AnalysisPanel() {
       </dl>
 
       {snapshot.instant && (
-        <p className="panel__hint" data-instant>
-          엔진이 탐색 없이 곧바로 고른 자리입니다 — 빈 판의 첫 수(천원)나 막아야만 하는 수처럼
-          정해진 수라 깊이·평가가 없습니다.
+        <p
+          className="panel__hint"
+          data-instant
+          title="빈 판의 천원이나 막아야만 하는 수처럼 정해진 자리 — 깊이·평가가 없습니다"
+        >
+          즉답 — 탐색 없이 정해진 수
         </p>
       )}
 
@@ -155,11 +158,6 @@ export function AnalysisPanel() {
           })}
         </ol>
       )}
-
-      <p className="panel__hint">
-        분석을 켜 두면 수를 두거나 물러도 새 국면을 이어 읽습니다. 정지는 <strong>조각 경계</strong>
-        에서 듣습니다 — 단일 스레드 빌드에서는 최대 한 조각(기본 500ms) 뒤에 멈춥니다.
-      </p>
     </section>
   );
 }
@@ -172,21 +170,16 @@ export function AnalysisOptions() {
         분석 설정
       </h2>
       <div className="panel__rows">
-        <Row
-          id="analysisTime"
-          label="분석 시간"
-          note="무제한이면 정지하거나 국면이 바뀔 때까지 읽습니다."
-          wide
-        >
+        <Row id="analysisTime" label="분석 시간" note="무제한 = 정지할 때까지" wide>
           <AnalysisTimeControl />
         </Row>
-        <Row id="multiPv" label="후보 수 (멀티 PV)" note="1 이면 최선 수 하나만 깊게 읽습니다.">
+        <Row id="multiPv" label="후보 수" note="YXNBEST — 1 이면 최선 수 하나만 깊게">
           <MultiPvControl />
         </Row>
         <Row
           id="playBestOnStop"
           label="정지하면 최선수 두기"
-          note="정지하는 순간의 BEST(PV 첫 수)를 둡니다. 빈 판이면 천원(H8)."
+          note="정지하는 순간의 BEST 를 둡니다(빈 판은 H8)"
         >
           <PlayBestOnStopControl />
         </Row>

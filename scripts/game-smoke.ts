@@ -726,7 +726,10 @@ try {
     ok("스왑2 · Soosorv-8 은 없다");
   }
 
-  const notice = (await page.locator('[data-k="opening-notice"]').innerText()).trim();
+  // 안내는 툴팁(정보 점)으로 접혔다 — 글자가 아니라 title 을 읽는다.
+  const notice = (
+    (await page.locator('[data-k="opening-notice"]').getAttribute("title")) ?? ""
+  ).trim();
   if (!notice.includes("Rapfi")) fail(`안내 문구가 없습니다: ${notice}`);
   else ok("왜 셋뿐인지 화면이 말한다");
 

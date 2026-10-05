@@ -1642,6 +1642,11 @@ a:focus-visible {
   border: 1px solid var(--c-outline-variant);
   border-radius: var(--radius-xl);
 }
+/* 글자 칸의 폭을 고정한다 — 「가중치 받는 중 → 엔진 올리는 중 → 예열 중 → 준비」로 바뀔
+   때마다 칩이 늘었다 줄며 옆의 드롭다운을 밀었다(기동 중 깜빡임의 절반). */
+.enginechip__text {
+  min-width: 13.5em;
+}
 .enginechip__dot {
   flex: none;
   width: 8px;
@@ -1657,7 +1662,7 @@ a:focus-visible {
   background: var(--c-caution);
 }
 .enginechip[data-status="starting"] .enginechip__dot {
-  animation: chip-pulse 1s ease-in-out infinite alternate;
+  animation: chip-pulse 1.6s ease-in-out infinite alternate;
 }
 .enginechip[data-status="error"] {
   color: var(--c-error);
@@ -1685,7 +1690,11 @@ a:focus-visible {
     opacity: 1;
   }
 }
-/* 기동 중 — 상단 바 밑으로 가는 줄이 흐른다. 비율을 모르므로 양을 그리지 않는다. */
+/* 기동 중 — 상단 바 밑으로 가는 줄이 흐른다. 비율을 모르므로 양을 그리지 않는다.
+   **늘 붙어 있고 투명도로만 드나든다.** 예전에는 기동 동안만 붙였다 떼어, 캐시에서 2초 만에
+   뜨는 기동에서 줄이 「파바박」 지나가고 사라졌다. 나타날 때는 잠깐 기다렸다가(그 안에 끝나는
+   기동에서는 아예 보이지 않는다) 페이드로, 사라질 때는 곧바로 페이드로 — 전환 자체는
+   모션 상한(200ms) 안이다. 흐르는 속도도 늦췄다. */
 .bootbar {
   position: absolute;
   right: 0;
@@ -1693,22 +1702,34 @@ a:focus-visible {
   left: 0;
   height: 2px;
   overflow: hidden;
+  pointer-events: none;
   background: var(--c-surface-container-high);
+  opacity: 0;
+  transition: opacity var(--motion-value) ease-out;
+}
+.bootbar[data-active] {
+  opacity: 1;
+  transition-delay: 350ms;
 }
 .bootbar::after {
   position: absolute;
   inset: 0 auto 0 0;
-  width: 30%;
+  width: 35%;
   content: "";
   background: var(--c-caution);
-  animation: boot-slide 1.4s ease-in-out infinite;
+  border-radius: 1px;
+  animation: boot-slide 2.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  animation-play-state: paused;
+}
+.bootbar[data-active]::after {
+  animation-play-state: running;
 }
 @keyframes boot-slide {
   from {
     transform: translateX(-100%);
   }
   to {
-    transform: translateX(340%);
+    transform: translateX(290%);
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1726,11 +1747,9 @@ a:focus-visible {
   align-items: center;
   min-width: 0;
 }
+/* 이름은 화면에 적지 않는다 — 놓인 자리(상단 바 · 설정의 「엔진」 줄)가 이미 말한다.
+   스크린 리더에는 그대로 읽힌다. */
 .select__label {
-  font: var(--type-label-large);
-  color: var(--c-on-surface-variant);
-}
-.select--compact .select__label {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -1780,6 +1799,7 @@ a:focus-visible {
   .enginechip__text {
     position: absolute;
     width: 1px;
+    min-width: 0;
     height: 1px;
     overflow: hidden;
     clip: rect(0 0 0 0);
@@ -1863,4 +1883,18 @@ a:focus-visible {
 }
 .evalgraph__dot--hover {
   fill: var(--c-on-surface-variant);
+}
+
+/* 정보 점 — 늘 펼쳐 둘 필요 없는 안내를 툴팁으로 접는 자리(개시가 셋뿐인 까닭 등). */
+.infodot {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  font: var(--type-label-small);
+  font-style: italic;
+  color: var(--c-on-surface-variant);
+  border: 1px solid var(--c-outline-variant);
+  border-radius: 50%;
+  cursor: help;
 }

@@ -12,6 +12,10 @@ import { EngineSelect } from "../features/settings/engineControls";
  *
  * 진행 줄은 양을 모르는 막대다 — 가중치 내려받기의 바이트 진행은 워커가 알리지 않는다.
  * 모르는 비율을 지어내 그리지 않는다. 움직임 줄이기 설정이면 흐르지 않는다(base.css).
+ *
+ * **깜빡이지 않게.** 진행 줄은 늘 붙여 두고 투명도로 드나든다(짧은 기동이면 아예 나타나지
+ * 않을 만큼 늦게 나타나고, 부드럽게 사라진다). 칩의 글자 칸은 폭을 고정해 단계 글자가
+ * 바뀌어도 옆의 드롭다운이 들썩이지 않는다.
  */
 const PHASE_TEXT: Record<BootPhase, string> = {
   weights: "가중치 받는 중",
@@ -78,7 +82,12 @@ export function EngineIndicator() {
         )}
       </span>
       <EngineSelect compact />
-      {status === "starting" && <span className="bootbar" aria-hidden="true" />}
+      {/* 늘 붙어 있고 투명도만 바뀐다 — 붙였다 떼면 짧은 기동(캐시 ~2초)에서 번쩍인다. */}
+      <span
+        className="bootbar"
+        data-active={status === "starting" || undefined}
+        aria-hidden="true"
+      />
     </div>
   );
 }

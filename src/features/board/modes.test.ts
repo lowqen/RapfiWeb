@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { isUnlimitedTurn, levelInfo, useGameStore } from "./gameStore";
 import { useBoardStore } from "./boardStore";
 import { useEvalHistory } from "./currentAnalysis";
+import { buildSeries, evalAtOrBefore, showMarkers } from "./evalSeries";
 import { getGameHandlers, useEngineStore } from "../../engine/engine-state";
 import { isSameOrAncestorKey, move, positionKey, type Move } from "../../core/model/move";
 import { EMPTY_SNAPSHOT, type EngineCommand, type Placement } from "../../engine/engine-types";
@@ -241,6 +242,33 @@ describe("형세 그래프 · 무르기 정리", () => {
     const view = { blackPct: 61, blackEval: 40, mate: null };
     useEngineStore.setState({ evalView: view, evalKey: key });
     expect(useEvalHistory.getState().byKey.get(key)).toEqual(view);
+  });
+
+  it("대국처럼 한 수 걸러 평가가 있어도 한 줄로 잇는다 — 축만 남던 그래프", () => {
+    const v = (blackPct: number) => ({ blackPct, blackEval: null, mate: null });
+    // 사람(흑) 차례는 비고 엔진(백) 차례만 평가가 있다: 1 · 3 · 5수.
+    const points = [null, v(80), null, v(30), null, v(25), null];
+    const s = buildSeries(points);
+    expect(s).toEqual([
+      { ply: 1, pct: 80 },
+      { ply: 3, pct: 30 },
+      { ply: 5, pct: 25 },
+    ]);
+    expect(showMarkers(s)).toBe(true);
+    // 읽지 않은 6수의 값은 그 앞의 5수 값이다(몇 수째의 값인지 함께).
+    expect(evalAtOrBefore(points, 6)).toEqual({ view: v(25), ply: 5 });
+    expect(evalAtOrBefore(points, 0)).toBeNull();
+  });
+
+  it("평가가 없으면 점도 없고, 많으면 점 표시를 그리지 않는다", () => {
+    expect(buildSeries([null, null])).toEqual([]);
+    expect(showMarkers([])).toBe(false);
+    const many = Array.from({ length: 40 }, (_, i) => ({
+      blackPct: 50 + i,
+      blackEval: 0,
+      mate: null,
+    }));
+    expect(showMarkers(buildSeries(many))).toBe(false);
   });
 
   it("그래프의 한 점을 누르면 그 수로 간다 — 앞뒤 모두", () => {

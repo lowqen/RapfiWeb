@@ -4,22 +4,27 @@ import type { EvalView } from "../../engine/eval-view";
 import { useBoardStore } from "./boardStore";
 import { useGameStore } from "./gameStore";
 import { useEvalHistory } from "./currentAnalysis";
+import { buildSeries, evalAtOrBefore, showMarkers, type SeriesPoint } from "./evalSeries";
 
 /**
  * 형세 그래프 — 기보의 수마다 흑의 승률(0~100%).
  *
  * 한 계열이라 범례가 없다(제목이 말한다). 50% 선은 머리카락 굵기의 기준선이고, 위로
- * 가면 흑, 아래로 가면 백이 앞선다 — 평가 바와 같은 방향이다. 엔진이 읽지 않은 수는
- * **비워 둔다**(선을 끊는다) — 앞뒤 값을 이어 그으면 읽지 않은 국면을 지어내는 셈이다.
+ * 가면 흑, 아래로 가면 백이 앞선다 — 평가 바와 같은 방향이다.
  *
- * 가로축은 지금 판 + 앞으로 갈 수(무른 수)까지, 곧 기보 한 줄이다. 포인터를 대면 가장
- * 가까운 수로 붙는 세로선과 값이 뜨고, 누르면(또는 ← → 뒤 Enter) 그 국면으로 간다.
- * 생각 중이거나 물음이 떠 있으면 옮기지 않는다 — 이동 바와 같은 규칙이다.
+ * 엔진이 읽은 국면끼리 **이어 긋는다**(`buildSeries`) — 대국에서는 엔진 차례의 국면만
+ * 평가가 있어 한 수 걸러 점이 선다. 점이 드물면 점 표시를 함께 그려 실제로 읽은 국면을 가른다.
+ * 축과 기준선은 데이터가 없어도(빈 판 · 아직 분석 전) 늘 그린다.
+ *
+ * 크기는 `viewBox` 가 진다 — 컨테이너 폭을 재지 않으므로 탭을 오가며 다시 붙어도 0 폭으로
+ * 그려질 일이 없다. 가로축은 지금 판 + 앞으로 갈 수(무른 수)까지, 곧 기보 한 줄이다.
+ * 포인터를 대면 가장 가까운 수로 붙는 세로선과 값이 뜨고, 누르면(또는 ← → 뒤 Enter) 그
+ * 국면으로 간다. 생각 중이거나 물음이 떠 있으면 옮기지 않는다 — 이동 바와 같은 규칙이다.
  */
 
 const W = 320;
 const H = 120;
-const PAD = { top: 8, right: 8, bottom: 18, left: 30 };
+const PAD = { top: 8, right: 10, bottom: 18, left: 30 };
 const PW = W - PAD.left - PAD.right;
 const PH = H - PAD.top - PAD.bottom;
 
@@ -50,26 +55,14 @@ export function EvalGraph() {
     return out;
   }, [line, n, size, version]);
 
-  const known = points.filter(Boolean).length;
-  const x = (i: number) => PAD.left + (n === 0 ? PW / 2 : (i / n) * PW);
+  const series = useMemo(() => buildSeries(points), [points]);
+  const x = (i: number) => PAD.left + (n === 0 ? 0 : (i / n) * PW);
   const y = (pct: number) => PAD.top + (1 - pct / 100) * PH;
 
-  // 끊긴 구간마다 따로 긋는다.
-  const segments: { i: number; pct: number }[][] = [];
-  let run: { i: number; pct: number }[] = [];
-  points.forEach((p, i) => {
-    if (p) run.push({ i, pct: p.blackPct });
-    else if (run.length) {
-      segments.push(run);
-      run = [];
-    }
-  });
-  if (run.length) segments.push(run);
-
-  const path = (seg: { i: number; pct: number }[]) =>
-    seg.map((p, k) => `${k ? "L" : "M"}${x(p.i).toFixed(1)},${y(p.pct).toFixed(1)}`).join("");
-  const area = (seg: { i: number; pct: number }[]) =>
-    `${path(seg)}L${x(seg.at(-1)!.i).toFixed(1)},${y(50)}L${x(seg[0]!.i).toFixed(1)},${y(50)}Z`;
+  const path = (pts: readonly SeriesPoint[]) =>
+    pts.map((p, k) => `${k ? "L" : "M"}${x(p.ply).toFixed(1)},${y(p.pct).toFixed(1)}`).join("");
+  const area = (pts: readonly SeriesPoint[]) =>
+    `${path(pts)}L${x(pts.at(-1)!.ply).toFixed(1)},${y(50)}L${x(pts[0]!.ply).toFixed(1)},${y(50)}Z`;
 
   const plyAt = (e: { clientX: number; currentTarget: Element }) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -78,7 +71,8 @@ export function EvalGraph() {
   };
 
   const shown = hover ?? current;
-  const shownPoint = points[shown] ?? null;
+  // 읽지 않은 국면이면 그 앞의 가장 가까운 평가를 보여 준다(「몇 수째의 값」인지 함께).
+  const shownEval = evalAtOrBefore(points, shown);
   const go = (ply: number) => {
     if (!locked) gotoPly(ply);
   };
@@ -93,17 +87,19 @@ export function EvalGraph() {
     e.stopPropagation();
   };
 
+  const readout = shownEval
+    ? `${describe(shownEval.view)}${shownEval.ply === shown ? "" : ` (${shownEval.ply}수)`}`
+    : "—";
+  const markers = showMarkers(series);
+
   return (
     <section className="panel evalgraph" aria-labelledby="evalgraph-title">
       <h2 id="evalgraph-title" className="panel__title">
         형세 그래프
-        <span className="panel__status tnum">
-          {known}/{n + 1} 국면
-        </span>
+        <span className="panel__status tnum">{plyLabel(shown, line, size)}</span>
       </h2>
       <p className="evalgraph__readout tnum" aria-live="polite">
-        <strong>{shownPoint ? describe(shownPoint) : "—"}</strong>
-        <span>{plyLabel(shown, line, size)}</span>
+        <strong>{readout}</strong>
       </p>
       <svg
         className="evalgraph__plot"
@@ -114,7 +110,8 @@ export function EvalGraph() {
         aria-valuemin={0}
         aria-valuemax={n}
         aria-valuenow={shown}
-        aria-valuetext={`${plyLabel(shown, line, size)} · ${shownPoint ? describe(shownPoint) : "평가 없음"}`}
+        aria-valuetext={`${plyLabel(shown, line, size)} · ${readout}`}
+        data-points={series.length}
         data-locked={locked || undefined}
         onPointerMove={(e) => setHover(plyAt(e))}
         onPointerLeave={() => setHover(null)}
@@ -122,7 +119,7 @@ export function EvalGraph() {
         onClick={(e) => go(plyAt(e))}
         onKeyDown={onKey}
       >
-        {/* 축과 기준선 — 머리카락 굵기, 물러선 색 */}
+        {/* 축과 기준선 — 데이터가 없어도 늘. 머리카락 굵기, 물러선 색. */}
         {[0, 50, 100].map((v) => (
           <g key={v}>
             <line
@@ -140,16 +137,24 @@ export function EvalGraph() {
         <text className="evalgraph__tick" x={PAD.left} y={H - 4}>
           0
         </text>
-        <text className="evalgraph__tick" x={W - PAD.right} y={H - 4} textAnchor="end">
-          {n}수
-        </text>
+        {n > 0 && (
+          <text className="evalgraph__tick" x={W - PAD.right} y={H - 4} textAnchor="end">
+            {n}수
+          </text>
+        )}
 
-        {segments.map((seg) => (
-          <g key={seg[0]!.i}>
-            <path className="evalgraph__area" d={area(seg)} />
-            {seg.length > 1 && <path className="evalgraph__line" d={path(seg)} />}
-          </g>
-        ))}
+        {series.length > 0 && <path className="evalgraph__area" d={area(series)} />}
+        {series.length > 1 && <path className="evalgraph__line" d={path(series)} />}
+        {markers &&
+          series.map((p) => (
+            <circle
+              key={p.ply}
+              className="evalgraph__dot evalgraph__dot--point"
+              cx={x(p.ply)}
+              cy={y(p.pct)}
+              r={4}
+            />
+          ))}
 
         {/* 지금 국면 — 판에 놓인 수까지. */}
         <line
@@ -187,11 +192,7 @@ export function EvalGraph() {
           </>
         )}
       </svg>
-      {known === 0 && (
-        <p className="panel__hint">
-          분석한 국면의 흑 승률이 수마다 쌓입니다. 무르거나 앞으로 가면 그래프도 기보를 따라갑니다.
-        </p>
-      )}
+      {series.length === 0 && <p className="panel__hint">분석하면 수마다 쌓입니다</p>}
     </section>
   );
 }

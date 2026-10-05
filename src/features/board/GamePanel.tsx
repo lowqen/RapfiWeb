@@ -63,43 +63,30 @@ export function GamePanel() {
           <button type="button" className="button--primary" onClick={moveNow}>
             지금 두기
           </button>
-          <span className="panel__hint panel__hint--inline">
-            무제한 — 누를 때까지 엔진이 계속 읽습니다
-          </span>
         </div>
       )}
 
       {error && <p className="panel__error">{error}</p>}
 
       <div className="panel__rows">
-        <Row id="computer" label="흑 / 백" note="엔진 차례에 판을 누르면 엔진이 둡니다." wide>
+        <Row id="computer" label="흑 / 백" note="엔진 차례에 판을 누르면 엔진이 둡니다" wide>
           <ComputerControl />
         </Row>
         <Row
           id="moveTime"
           label="시간 제어"
-          note="엔진이 한 수에 쓰는 시간. 무제한 + 최강이면 「지금 두기」까지 읽습니다."
+          note="무제한 + 최강이면 「지금 두기」까지 읽습니다"
           wide
         >
           <MoveTimeControl />
         </Row>
-        <Row
-          id="level"
-          label="레벨"
-          note="한 수에 읽을 노드 수로 세기를 정합니다(대국에만 — 분석은 그대로)."
-          wide
-        >
+        <Row id="level" label="레벨" note="한 수에 읽을 노드 수 — 분석에는 적용되지 않습니다" wide>
           <LevelControl />
         </Row>
         <Row id="threads" label="스레드" wide>
           <ThreadControl />
         </Row>
-        <Row
-          id="ruleset"
-          label="룰셋"
-          note="기반 규칙은 렌주이고, 고르는 것은 개시입니다. 바꾸면 새 대국이 시작됩니다."
-          wide
-        >
+        <Row id="ruleset" label="룰셋" note="바꾸면 새 대국" wide>
           <RulesetControl />
         </Row>
       </div>

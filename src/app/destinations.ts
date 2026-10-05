@@ -44,7 +44,7 @@ export const RAIL: readonly Dest[] = [
   {
     path: "/settings",
     label: "설정",
-    subtitle: "대국 · 시간 · 엔진 · 분석 · 표시",
+    subtitle: "엔진 · 표시 · 고급",
     icon: ICON.settings,
   },
 ];

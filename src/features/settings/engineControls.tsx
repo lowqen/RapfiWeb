@@ -73,20 +73,17 @@ export function EngineChoiceControl() {
   const planned = planOrder(caps.variants, pref).order[0] ?? caps.variant;
   const blocker = preferenceBlocker(caps, pref);
   const shown = engine.variant ?? planned;
+  // 까닭(물러선 이유 · 못 쓰는 이유)은 툴팁으로 — 화면에는 무엇이 떴는지 한 줄만.
+  const why =
+    engine.fallbackReason ?? blocker ?? (pref === "auto" ? caps.threadsNote : null) ?? undefined;
   return (
     <div className="stack">
       <EngineSelect />
-      <p className="srow__hint tnum" data-k="engine-variant">
-        {shown ? `${shown} · ${VARIANT_LABEL[shown]}` : "실행 불가"}
-        {engine.variant
-          ? " — 실행 중"
-          : status === "starting"
-            ? " — 띄우는 중"
-            : " (엔진을 띄우면)"}
-        {engine.fallbackReason ? ` — ${engine.fallbackReason}` : blocker ? ` — ${blocker}` : ""}
-        {!engine.fallbackReason && !blocker && pref === "auto" && caps.threadsNote
-          ? ` — ${caps.threadsNote}`
-          : ""}
+      <p className="srow__hint tnum" data-k="engine-variant" title={why}>
+        {shown ?? "실행 불가"}
+        {shown ? ` · ${VARIANT_LABEL[shown]}` : ""}
+        {engine.variant ? " · 실행 중" : status === "starting" ? " · 띄우는 중" : ""}
+        {engine.fallbackReason ? " · 물러섬" : ""}
       </p>
     </div>
   );
@@ -137,13 +134,12 @@ export function ThreadControl() {
   for (let n = 1; n <= cap; n++) options.push({ value: n, label: String(n) });
 
   let line: string;
-  if (!caps.threads) line = "이 환경에서는 단일 스레드 엔진이라 1 입니다.";
-  else if (!wantsMulti) line = "단일 스레드 엔진을 골라 1 입니다(엔진 선택).";
-  else if (single) line = "단일 스레드 엔진으로 떠 있어 1 입니다.";
-  else if (status === "idle" || status === "error" || applied === null) {
-    line = `엔진을 띄우면 ${wanted} 스레드로 시작합니다.`;
-  } else if (applied === wanted) line = `적용됨 — ${applied} 스레드로 탐색합니다.`;
-  else line = `다음 탐색부터 ${wanted} 스레드 (지금 ${applied}).`;
+  if (!caps.threads) line = "단일 스레드 환경";
+  else if (!wantsMulti) line = "단일 스레드 엔진";
+  else if (single) line = "단일 스레드로 실행 중";
+  else if (status === "idle" || status === "error" || applied === null) line = `기동 시 ${wanted}`;
+  else if (applied === wanted) line = `적용 ${applied}`;
+  else line = `다음 탐색부터 ${wanted} (지금 ${applied})`;
 
   return (
     <div className="stack">
@@ -157,9 +153,7 @@ export function ThreadControl() {
       {draft !== null && (
         <div className="stack" data-k="threads-confirm">
           <p className="srow__hint tnum" role="status">
-            {resolveThreads(draft, cores)} 스레드로 바꾸면 엔진이 스레드를 다시 세우고 가중치를 다시
-            풀어 다음 탐색이 {THREAD_RELOAD_COST} 늦게 시작합니다.
-            {status === "searching" ? " 지금 탐색은 그대로 두고 다음 탐색부터 적용됩니다." : ""}
+            {resolveThreads(draft, cores)} 스레드 — 다음 탐색이 {THREAD_RELOAD_COST} 늦게 시작
           </p>
           <div className="actions">
             <button type="button" className="btn btn--tonal" onClick={commit}>
@@ -172,7 +166,8 @@ export function ThreadControl() {
         </div>
       )}
       <p className="srow__hint tnum" data-k="threads-status">
-        {line} {cores ? `이 기기의 논리 코어 ${cores}개.` : ""}
+        {line}
+        {cores ? ` · 코어 ${cores}` : ""}
       </p>
     </div>
   );

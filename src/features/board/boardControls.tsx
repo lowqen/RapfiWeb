@@ -45,10 +45,15 @@ export function RulesetControl() {
           ))}
         </ChipGroup>
       </div>
-      <p className="srow__hint">{OPENING_HINT[opening]}</p>
-      <p className="srow__hint" data-k="opening-notice">
-        {OPENING_NOTICE}
-      </p>
+      {/* 왜 셋뿐인지는 툴팁으로 — 늘 펼쳐 둘 문장이 아니다. 대국 스모크가 data-k 로 읽는다. */}
+      <span
+        className="infodot"
+        data-k="opening-notice"
+        title={OPENING_NOTICE}
+        aria-label={OPENING_NOTICE}
+      >
+        i
+      </span>
     </div>
   );
 }
@@ -164,9 +169,9 @@ export function Row({
 }) {
   return (
     <div className="srow srow--panel" data-row={id} data-wide={wide || undefined}>
-      <div className="srow__text">
+      {/* 설명은 툴팁 — 화면에는 이름만. */}
+      <div className="srow__text" title={note}>
         <span className="srow__label">{label}</span>
-        {note && <p className="srow__note">{note}</p>}
       </div>
       <div className="srow__control">{children}</div>
     </div>

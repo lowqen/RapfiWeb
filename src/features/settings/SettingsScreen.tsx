@@ -44,13 +44,6 @@ const SECTION_LABEL: Record<Section, string> = {
   system: "시스템",
 };
 
-const SECTION_DESC: Record<Section, string> = {
-  basic: "엔진과 화면의 기본. 대국·분석 설정은 보드의 [대국]·[분석] 탭에 있습니다.",
-  engine: "엔진에 INFO 로 밀어 넣는 탐색 파라미터. 탐색 중에 바꾸면 다음 탐색부터 적용됩니다.",
-  display: "보드에 무엇을 그릴지.",
-  system: "설정 자체의 저장과 초기화.",
-};
-
 const ADVANCED: readonly Section[] = ["engine", "display", "system"];
 const SECTIONS: readonly Section[] = ["basic", ...ADVANCED];
 
@@ -249,7 +242,7 @@ const ROWS: readonly RowSpec[] = [
     id: "engine",
     sec: "basic",
     label: "엔진",
-    note: "자동은 이 브라우저에서 가장 빠른 것(멀티스레드 · relaxed SIMD)부터 띄웁니다. 바꾸면 떠 있는 엔진을 내리고 고른 바이너리로 다시 띄웁니다 — 해시는 비고, 켜 둔 분석은 이어 읽습니다. 상단 바에서도 고를 수 있습니다.",
+    note: "바꾸면 엔진을 다시 띄웁니다(분석은 이어 읽음)",
     keywords:
       "wasm simd relaxed standard multi single thread pthread 멀티 단일 변형 바이너리 멀티스레드 사용",
     wide: true,
@@ -259,7 +252,7 @@ const ROWS: readonly RowSpec[] = [
     id: "threads",
     sec: "basic",
     label: "스레드 수",
-    note: "자동은 코어 하나를 화면에 남기고(코어 − 1) 4 를 넘기지 않습니다. 엔진이 떠 있을 때 바꾸면 가중치를 다시 푸는 비용(약 0.8초)을 알리고 「적용」을 눌러야 바뀝니다. 탐색 중이면 다음 탐색부터입니다.",
+    note: "자동 = 코어 − 1 (최대 4)",
     engineKey: "thread_num",
     keywords: "threads 코어 cpu",
     wide: true,
@@ -269,7 +262,7 @@ const ROWS: readonly RowSpec[] = [
     id: "autoBoot",
     sec: "basic",
     label: "앱을 열면 엔진 시작",
-    note: "켜 두면 앱이 뜨는 대로 엔진을 뒤에서 띄웁니다. 가중치(약 20MB)는 처음 한 번만 받고 그 뒤로는 캐시에서 읽습니다.",
+    note: "가중치 20MB 는 처음 한 번만 받습니다",
     keywords: "자동 기동 부팅 autoboot 시작",
     Control: AutoBootControl,
   },
@@ -277,7 +270,7 @@ const ROWS: readonly RowSpec[] = [
     id: "boardTabs",
     sec: "basic",
     label: "대국 · 분석 설정",
-    note: "컴퓨터 색 · 착수 시간 · 레벨 · 개시(RIF · 교환)는 보드의 [대국] 탭, 분석 시간 · 후보 수 · 정지하면 최선수 두기는 [분석] 탭에 있습니다.",
+    note: "컴퓨터 색 · 착수 시간 · 레벨 · 개시 · 분석 시간 · 후보 수",
     keywords:
       "컴퓨터 흑 백 사람 진영 착수 시간 레벨 level timeout_turn 룰셋 규칙 렌주 개시 오프닝 RIF 교환 swap 분석 시간 후보 nbest pv 멀티 PV 정지 최선수",
     wide: true,
@@ -287,7 +280,7 @@ const ROWS: readonly RowSpec[] = [
     id: "theme",
     sec: "basic",
     label: "다크 모드",
-    note: "시스템이면 기기 설정을 따릅니다.",
+
     keywords: "테마 dark",
     wide: true,
     Control: ThemeControl,
@@ -298,7 +291,7 @@ const ROWS: readonly RowSpec[] = [
     id: "hash",
     sec: "engine",
     label: "해시 크기 (MB)",
-    note: "탭 메모리 안에서 — 데스크톱 기본값 8192MB 는 브라우저 탭을 죽입니다. 엔진에는 KB 로 보냅니다(MB<<10).",
+    note: "탭 메모리 한도 안에서",
     engineKey: "hash_size",
     keywords: "메모리 tt",
     wide: true,
@@ -308,7 +301,7 @@ const ROWS: readonly RowSpec[] = [
     id: "hashAutoClear",
     sec: "engine",
     label: "해시 자동 지우기",
-    note: "탐색마다 앞서 YXHASHCLEAR 를 보냅니다. 끄면 앞 탐색이 읽은 것을 이어 씁니다. 지금 한 번 비우기는 엔진 탭에.",
+    note: "탐색마다 해시를 비웁니다",
     engineKey: "YXHASHCLEAR",
     Control: HashAutoClearControl,
   },
@@ -316,7 +309,7 @@ const ROWS: readonly RowSpec[] = [
     id: "style",
     sec: "engine",
     label: "스타일",
-    note: "0 성급함 … 5 신중함.",
+
     engineKey: "caution_factor",
     wide: true,
     Control: StyleControl,
@@ -325,7 +318,7 @@ const ROWS: readonly RowSpec[] = [
     id: "maxDepth",
     sec: "engine",
     label: "최대 깊이",
-    note: `${MAX_DEPTH_LIMIT}(보드 칸 수)이면 사실상 무제한입니다.`,
+    note: `${MAX_DEPTH_LIMIT} = 무제한`,
     engineKey: "max_depth",
     Control: MaxDepthControl,
   },
@@ -333,7 +326,7 @@ const ROWS: readonly RowSpec[] = [
     id: "maxNode",
     sec: "engine",
     label: "최대 노드 수",
-    note: "탐색 한 번이 읽을 노드 상한.",
+
     engineKey: "max_node",
     wide: true,
     Control: MaxNodeControl,
@@ -353,7 +346,7 @@ const ROWS: readonly RowSpec[] = [
     id: "evalBar",
     sec: "display",
     label: "평가 바 표시",
-    note: "보드 왼쪽의 흑백 게이지. 흑 승률만큼 위(흑)가 차고, 끝에 승률과 평가값을 적습니다.",
+
     keywords: "eval bar 승률 게이지",
     Control: EvalBarControl,
   },
@@ -361,14 +354,14 @@ const ROWS: readonly RowSpec[] = [
     id: "numbers",
     sec: "display",
     label: "번호 매기기",
-    note: "돌 위에 수 번호.",
+
     Control: NumbersControl,
   },
   {
     id: "forbidden",
     sec: "display",
     label: "금수 표시",
-    note: "흑 차례에 엔진이 알려 주는 금수를 그립니다.",
+
     engineKey: "YXSHOWFORBID",
     Control: ForbiddenControl,
   },
@@ -378,7 +371,7 @@ const ROWS: readonly RowSpec[] = [
     id: "reset",
     sec: "system",
     label: "설정 초기화",
-    note: "엔진·분석·표시 설정을 기본값으로. 대국은 건드리지 않습니다. 설정은 이 브라우저에만 저장됩니다.",
+    note: "대국은 그대로입니다",
     keywords: "기본값 reset",
     Control: ResetControl,
   },
@@ -401,14 +394,14 @@ function Group({ sec, rows }: { sec: Section; rows: readonly RowSpec[] }) {
         <h2 id={`sg-${sec}`} className="sgroup__title">
           {SECTION_LABEL[sec]}
         </h2>
-        <p className="sgroup__desc">{SECTION_DESC[sec]}</p>
       </header>
       {rows.map((r) => (
         <div key={r.id} className="srow" data-row={r.id} data-wide={r.wide || undefined}>
-          <div className="srow__text">
+          {/* 설명은 펼쳐 적지 않고 툴팁으로 — 화면에는 이름만. 검색은 여전히 설명까지 찾는다.
+              INFO 키 꼬리표는 고급 설정에서만(엔진 파라미터를 만지는 사람의 것이다). */}
+          <div className="srow__text" title={r.note}>
             <span className="srow__label">{r.label}</span>
-            {r.engineKey && <code className="srow__key">{r.engineKey}</code>}
-            {r.note && <p className="srow__note">{r.note}</p>}
+            {r.engineKey && sec !== "basic" && <code className="srow__key">{r.engineKey}</code>}
           </div>
           <div className="srow__control">
             <r.Control />
@@ -449,15 +442,14 @@ export function SettingsScreen() {
           <input
             className="search__input"
             type="search"
-            placeholder="설정 검색 (이름·설명·INFO 키) — 고급 설정까지 찾습니다"
+            placeholder="설정 검색"
             aria-label="설정 검색"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
         </div>
         <p className="settings__meta tnum">
-          {visible.length}/{ROWS.length} ·{" "}
-          {live ? "엔진 실행 중 — 변경 즉시 반영" : "엔진 꺼짐 — 기동할 때 반영"}
+          {visible.length}/{ROWS.length} · {live ? "즉시 반영" : "기동할 때 반영"}
         </p>
       </div>
 
@@ -474,9 +466,7 @@ export function SettingsScreen() {
                   고급 설정
                 </h2>
                 <p className="sgroup__desc">
-                  {advanced
-                    ? "엔진 탐색 파라미터 · 표시 · 초기화가 아래에 펼쳐져 있습니다."
-                    : `해시 · 스타일 · 깊이 · 노드 · 표시 · 초기화 — ${ADVANCED_COUNT}개 숨김`}
+                  {advanced ? "해시 · 스타일 · 깊이 · 노드 · 표시" : `${ADVANCED_COUNT}개 숨김`}
                 </p>
               </div>
               <Switch

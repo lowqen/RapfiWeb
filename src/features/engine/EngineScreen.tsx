@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import { useEngineStore } from "../../engine/engine-state";
 import { useSettingsStore } from "../settings/settingsStore";
 
@@ -79,11 +78,7 @@ export function EngineScreen() {
           <dd>{analyzing ? "켜짐 — 국면을 따라 읽는 중" : "꺼짐"}</dd>
         </dl>
         {!caps.variant && caps.note && <p className="panel__hint">{caps.note}</p>}
-        {engine.fallbackReason && (
-          <p className="panel__hint">
-            멀티스레드 기동에 실패해 단일 스레드로 물러섰습니다 — {engine.fallbackReason}
-          </p>
-        )}
+        {engine.fallbackReason && <p className="panel__hint">물러섬 — {engine.fallbackReason}</p>}
         {!engine.variant && caps.threadsNote && caps.variant && (
           <p className="panel__hint">{caps.threadsNote}</p>
         )}
@@ -108,13 +103,6 @@ export function EngineScreen() {
             해시 비우기
           </button>
         </div>
-        <p className="panel__hint">
-          스레드 수는{" "}
-          <Link className="inline-link" to="/settings">
-            설정
-          </Link>
-          의 자주 쓰는 설정에, 해시·스타일·깊이 등 탐색 파라미터는 고급 설정에 있습니다.
-        </p>
       </section>
 
       <section className="panel enginescreen__console">
