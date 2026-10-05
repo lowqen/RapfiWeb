@@ -349,6 +349,47 @@ describe("집계 — INFO 블록이 스냅샷이 된다", () => {
     expect(b.snapshot().stats.winRatePct).toBe(42);
   });
 
+  it("탐색 없는 즉답(빈 판의 7,7)도 최선수가 된다 — 스냅샷이 비지 않는다", () => {
+    // 빈 판에서 Rapfi 는 PV · 카운터 없이 좌표 한 줄만 돌려준다(YXNBEST 1 · 5 모두).
+    const agg = new SearchAggregator(15);
+    expect(agg.consume(p("7,7"))).toBe(true);
+    const s = agg.snapshot();
+    expect(s.instant).toBe(true);
+    expect(s.bestMove).toEqual({ x: 7, y: 7 });
+    expect(s.bestLine).toEqual([{ x: 7, y: 7 }]);
+    expect(s.pvs).toHaveLength(1);
+    expect(s.pvs[0]).toMatchObject({ depth: 0, evalCp: null, winRate: null, mate: null });
+    // 깊이 · 평가 · 카운터는 지어내지 않는다.
+    expect(s.stats.depth).toBe(0); // 빈 깊이(화면은 «—»)
+    expect(s.stats.nodes).toBeNull();
+    // 즉답을 되묻는 다음 조각의 같은 좌표는 아무것도 바꾸지 않는다.
+    expect(agg.consume(p("7,7"))).toBe(false);
+  });
+
+  it("탐색 끝의 좌표는 그 탐색의 결과를 덮지 않는다", () => {
+    const agg = new SearchAggregator(15);
+    feed(agg, ["INFO PV 0", "INFO DEPTH 9", "INFO BESTLINE 7,7 8,8", "INFO PV DONE"]);
+    expect(agg.consume(p("3,3"))).toBe(false);
+    const s = agg.snapshot();
+    expect(s.instant).toBe(false);
+    expect(s.bestMove).toEqual({ x: 7, y: 7 });
+  });
+
+  it("카운터만 보인 탐색(요약 줄)의 좌표도 즉답이 아니다", () => {
+    const agg = new SearchAggregator(15);
+    feed(agg, ["INFO TOTALNODES 1200"]);
+    expect(agg.consume(p("7,7"))).toBe(false);
+    expect(agg.snapshot().instant).toBe(false);
+  });
+
+  it("reset 이 즉답 표시도 지운다", () => {
+    const agg = new SearchAggregator(15);
+    agg.consume(p("7,7"));
+    agg.reset();
+    expect(agg.snapshot().instant).toBe(false);
+    expect(agg.snapshot().bestMove).toBeNull();
+  });
+
   it("reset 이 오버레이를 비운다", () => {
     const agg = new SearchAggregator(15);
     feed(agg, ["INFO PV 0", "INFO BESTLINE 7,7", "INFO PV DONE", "MESSAGE REALTIME POS 1,1"]);

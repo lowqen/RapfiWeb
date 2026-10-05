@@ -32,6 +32,10 @@ on:
         description: "스레드 수 변경 뒤 가중치 재적재가 있으면 실패(P2-2 패치용)"
         default: false
         type: boolean
+      base_tag:
+        description: "대조 기준 릴리스 — 패치 없는 engine-3c94c2a9-rx, 또는 배포 구성 위에 얹는 패치면 배포 릴리스(예: engine-3c94c2a9-a1, patches 에 그 패치들을 함께)"
+        default: "engine-3c94c2a9-rx"
+        type: string
 
 permissions:
   contents: read
@@ -45,7 +49,7 @@ jobs:
       ENABLE_LTO: "ON"
       # 대조 기준 = **패치 없는** 릴리스. 배포 중인 engine-3c94c2a9-p2 는 P2-2 패치·wasm-opt 를 실었으니
       # 「패치 없음 ↔ 패치」 대조에는 이 태그를 그대로 둔다(지우지 말 것).
-      ENGINE_TAG: engine-3c94c2a9-rx
+      ENGINE_TAG: ${{ inputs.base_tag }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

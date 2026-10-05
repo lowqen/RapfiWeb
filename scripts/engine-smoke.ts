@@ -183,6 +183,32 @@ try {
     fail(`콘솔에 엔진 출력이 없습니다:\n${consoleText.slice(0, 400)}`);
   }
 
+  // 1d. **빈 판(0수) 분석.** Rapfi 는 빈 판에서 탐색하지 않고 천원(7,7)을 곧바로 돌려준다 —
+  // PV · 깊이 · 평가 · 카운터가 한 줄도 없다. 예전엔 집계기가 그 좌표를 흘려 화면이 «탐색 중»
+  // 그대로 비어 멈춘 듯 보였다. 이제 최선수 H8 과 즉답 안내가 떠야 한다.
+  {
+    const panel = page.locator(".panel").filter({ has: page.locator(".panel__badge") });
+    await page.getByRole("button", { name: "분석", exact: true }).click();
+    await page.locator('.panel__badge[data-status="searching"]').waitFor({ timeout: 10_000 });
+    const best = panel.locator(".kv dd").last();
+    await page
+      .waitForFunction(
+        `(() => { const dds = [...document.querySelectorAll(".panel .kv dd")];
+                  return dds.length > 0 && dds[dds.length - 1].textContent.trim() === "H8"; })()`,
+        undefined,
+        { timeout: 10_000 },
+      )
+      .catch(() => undefined);
+    const emptyBest = (await best.innerText()).trim();
+    if (emptyBest !== "H8") fail(`빈 판 분석의 최선수가 H8 이 아닙니다: «${emptyBest}»`);
+    if (!(await panel.locator("[data-instant]").isVisible())) {
+      fail("빈 판 분석에 즉답 안내가 없습니다");
+    }
+    console.log(`빈 판 분석: 최선수 ${emptyBest} · 즉답 안내`);
+    await page.getByRole("button", { name: "정지" }).click();
+    await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 5000 });
+  }
+
   // 2. 돌 하나 놓기 — 보드 한가운데는 15×15 에서 H8 이다.
   const view = await page.locator(".board__view").boundingBox();
   if (!view) throw new Error("보드가 없습니다");

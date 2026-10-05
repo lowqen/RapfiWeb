@@ -99,8 +99,12 @@ async function run(variant, dir = ENGINE_DIR, tag = variant) {
     const t0 = Date.now();
     Module.sendCommand("YXNBEST 1"); // 단일 빌드: 탐색이 이 호출 안에서 끝난다
     const seg = lines.slice(from);
+    // 값은 **PV 블록 안의 것**만 읽는다 — 마지막 `INFO PV DONE` 에서 거꾸로. 엔진 패치 P4-1 이
+    // 탐색 도중 0.5초마다 `INFO TOTALNODES` 를 따로 찍어서, 「마지막 TOTALNODES」가 출력 시점에 따라
+    // 블록 밖의 중간값이 될 수 있다(결정적이어야 할 대조가 흔들린다).
+    const pvEnd = seg.findLastIndex((l) => l === "INFO PV DONE");
     const last = (key) => {
-      for (let i = seg.length - 1; i >= 0; i--) {
+      for (let i = (pvEnd < 0 ? seg.length : pvEnd) - 1; i >= 0; i--) {
         const m = new RegExp(`^INFO ${key} (.*)$`).exec(seg[i]);
         if (m) return m[1].trim();
       }

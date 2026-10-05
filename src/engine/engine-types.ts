@@ -205,6 +205,11 @@ export interface AnalysisSnapshot {
   bestMove: Move | null;
   /** 최선 수순(고스트 돌). 실시간 PV 가 있으면 그것, 없으면 1번 PV. */
   bestLine: readonly Move[];
+  /**
+   * 엔진이 **탐색 없이** 곧바로 좌표만 돌려준 수다(깊이·평가·카운터 없음). Rapfi 는 빈 판의
+   * 첫 수(천원)나 오목을 완성하는 수 · 막아야만 하는 수처럼 정해진 자리에서 그렇게 답한다.
+   */
+  instant: boolean;
 }
 
 export const EMPTY_SNAPSHOT: AnalysisSnapshot = {
@@ -215,6 +220,7 @@ export const EMPTY_SNAPSHOT: AnalysisSnapshot = {
   loseCells: new Set(),
   bestMove: null,
   bestLine: [],
+  instant: false,
 };
 
 // ── 워커 메시지 ──────────────────────────────────────────────────────
@@ -378,6 +384,7 @@ export interface SerializableSnapshot {
   loseCells: readonly number[];
   bestMove: Move | null;
   bestLine: readonly Move[];
+  instant: boolean;
 }
 
 export const toSerializable = (s: AnalysisSnapshot): SerializableSnapshot => ({
@@ -388,6 +395,7 @@ export const toSerializable = (s: AnalysisSnapshot): SerializableSnapshot => ({
   loseCells: [...s.loseCells],
   bestMove: s.bestMove,
   bestLine: s.bestLine,
+  instant: s.instant,
 });
 
 export const fromSerializable = (s: SerializableSnapshot): AnalysisSnapshot => ({
@@ -398,4 +406,5 @@ export const fromSerializable = (s: SerializableSnapshot): AnalysisSnapshot => (
   loseCells: new Set(s.loseCells),
   bestMove: s.bestMove,
   bestLine: s.bestLine,
+  instant: s.instant,
 });
