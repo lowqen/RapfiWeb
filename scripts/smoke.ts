@@ -86,6 +86,16 @@ try {
   await page.waitForURL("**/research/review");
   const tabs = await page.locator(".rtabs__tab").allInnerTexts();
   if (tabs.length !== 4) fail(`연구 탭이 4개가 아닙니다: ${tabs.length}`);
+  // URL 이 /research/review 로 바뀐 것과 상단 바가 탭 제목으로 다시 그려진 것은 따로 일어난다 —
+  // 느린 러너에서는 그 사이에 읽어 «연구»만 보였다(web 37256559517). 1. 의 URL 처럼 바뀔 때까지 기다린다.
+  await page
+    .waitForFunction(
+      () =>
+        document.querySelector(".topbar__title")?.textContent?.trim().startsWith("연구 ·") ?? false,
+      undefined,
+      { timeout: 5_000 },
+    )
+    .catch(() => undefined);
   const rtitle = (await page.locator(".topbar__title").innerText()).trim();
   if (!rtitle.startsWith("연구 ·")) fail(`연구 제목이 «연구 · …» 가 아닙니다: «${rtitle}»`);
 
