@@ -22,15 +22,20 @@ on:
     inputs:
       tag:
         description: "릴리스 태그"
-        default: "engine-3c94c2a9-p2"
+        default: "engine-3c94c2a9-a1"
         type: string
+      runner:
+        description: "러너 — self-hosted(Vultr) 또는 ubuntu-latest"
+        default: "self-hosted"
+        type: choice
+        options: ["self-hosted", "ubuntu-latest"]
 
 permissions:
   contents: write
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     timeout-minutes: 300
     env:
       WORK: ${{ github.workspace }}/../rapfi-wasm-work
@@ -39,7 +44,11 @@ jobs:
       # 대응 소스로 자산에 함께 낸다(GPL — 아래 「릴리스 본문」·「릴리스 발행」).
       # P2-2 채택(docs/최적화-마스터플랜.md §4): 결과 불변(BENCH 2b7c7da9 · 렌주 비트 동일 5/5 · 50/50,
       # engine-patch 37087267731)이고 스레드 수 변경 뒤 가중치 재적재 12줄 → 0줄.
-      RAPFI_PATCHES: "tools/patches/p2-2-keep-evaluators-on-rebuild.patch"
+      # A1 채택(docs/최적화-마스터플랜-v2.md §8.5): dwconv 를 mulhi(w, 4f)(내림) → q15mulr(w, 2f)(반올림, 같은 눈금).
+      # 트리가 바뀐다 — 웹 BENCH 2b7c7da9 → bb7888cc(spike/web-baseline.json). WASM SPRT(relaxed · 500ms)
+      # sprt 37247788294 에서 H1, Elo +20.2(95% +6.6 ~ +33.9). relaxed 판은 relaxed_q15mulr — 입력이 0 이상이라
+      # 구현 정의 경우(INT16_MIN²)가 없다.
+      RAPFI_PATCHES: "tools/patches/p2-2-keep-evaluators-on-rebuild.patch tools/patches/a1-q15mulr.patch"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -47,7 +56,14 @@ jobs:
           node-version: "26"
 
       - name: 시스템 도구
-        run: sudo apt-get update -qq && sudo apt-get install -y ninja-build ccache file
+        # sprt.yml 과 같은 방식 — 있으면 건너뛰고, 없으면 sudo -n(암호를 묻지 않음)으로 설치를 시도한다.
+        run: |
+          missing=()
+          for t in git cmake ninja ccache file python3 xz; do command -v "$t" > /dev/null || missing+=("$t"); done
+          if [ ${#missing[@]} -eq 0 ]; then echo "도구 모두 있음"; exit 0; fi
+          echo "없는 도구: ${missing[*]} — 설치 시도"
+          sudo -n apt-get update -qq && sudo -n apt-get install -y git cmake ninja-build ccache file python3 xz-utils \
+            || { echo "::error::설치 실패(sudo 암호?) — 러너 기계에 직접 설치: sudo apt-get install -y git cmake ninja-build ccache file python3 xz-utils"; exit 1; }
 
       # w0-spike.yml 과 같은 키. restore/save 를 따로 쓰는 이유는 그쪽 주석에 있다
       # (한 덩어리 actions/cache 는 잡이 실패하면 저장을 건너뛴다).
@@ -103,7 +119,8 @@ jobs:
           # 정착 대기를 넣었으므로 두 구성 모두 관문으로 본다.
           W0C_REQUIRE: "multi:worker-pthread,multi:page"
         run: |
-          pnpm exec playwright install --with-deps chromium
+          # --with-deps 는 apt(sudo)를 쓴다 — 안 되는 러너면 브라우저만 받는다(의존 라이브러리는 러너에 이미 있어야 함).
+          pnpm exec playwright install --with-deps chromium || pnpm exec playwright install chromium
           node spike/w0c/run.mjs
 
       - name: emsdk 캐시 저장
@@ -157,7 +174,8 @@ jobs:
         run: |
           TAG="${{ inputs.tag }}"
           gh release delete "$TAG" --yes --cleanup-tag 2> /dev/null || true
-          gh release create "$TAG" \
+          # 태그는 빌드한 커밋에 — 기본값(기본 브랜치 HEAD)이면 feature 브랜치에서 낸 릴리스의 태그가 소스와 어긋난다.
+          gh release create "$TAG" --target "${{ github.sha }}" \
             --title "엔진 $TAG" \
             --notes-file RELEASE_NOTES.md \
             out/engine/rapfi-single-simd128.js \
