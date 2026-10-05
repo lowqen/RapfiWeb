@@ -1,19 +1,27 @@
 diff --git a/Rapfi/eval/mix9svqnnue.cpp b/Rapfi/eval/mix9svqnnue.cpp
-index f9c0a3d..1d7f5e5 100644
+index f9c0a3d..9718436 100644
 --- a/Rapfi/eval/mix9svqnnue.cpp
 +++ b/Rapfi/eval/mix9svqnnue.cpp
-@@ -241,6 +241,52 @@ starBlock(int8_t output[OutSize], int8_t input[InSize], const StarBlockWeight<Ou
+@@ -241,6 +241,61 @@ starBlock(int8_t output[OutSize], int8_t input[InSize], const StarBlockWeight<Ou
      simd::crelu<OutSize, 128>(output, outputi32);
  }
  
 +/// starBlock() on N inputs that share one StarBlockWeight (the value head applies the corner,
-+/// edge and quadrant blocks to four groups each). Every linear layer reuses its weight loads
-+/// across the N inputs; bit-identical to N separate starBlock() calls.
++/// edge and quadrant blocks to four groups each). Bit-identical to N separate starBlock() calls.
++///
++/// The batched path reuses every weight load across the N inputs. It is only taken with WASM
++/// relaxed SIMD, where the i8 dot product is a single op and loads are a large share of the
++/// work: measured +3.6~6.3% NPS there, but -3~5% on plain WASM SIMD (the 8-op dot product
++/// leaves no registers for the larger tile) and no change natively (loads fold into pmaddubsw).
 +template <int N, int OutSize, int InSize>
 +inline void starBlockMulti(int8_t *const                          output[N],
 +                           int8_t *const                          input[N],
 +                           const StarBlockWeight<OutSize, InSize> &w)
 +{
++#ifndef USE_WASM_SIMD_RELAXED
++    for (int n = 0; n < N; n++)
++        starBlock<OutSize, InSize>(output[n], input[n], w);
++#else
 +    alignas(Alignment) int32_t upi32[N][OutSize * 2];
 +    alignas(Alignment) int8_t  up1[N][OutSize * 2], up2[N][OutSize * 2];
 +    alignas(Alignment) int8_t  dotsum[N][OutSize];
@@ -50,12 +58,13 @@ index f9c0a3d..1d7f5e5 100644
 +                                                 w.value_corner_down.bias);
 +    for (int n = 0; n < N; n++)
 +        simd::crelu<OutSize, 128>(output[n], outputi32[n]);
++#endif
 +}
 +
  }  // namespace
  
  namespace Evaluation::mix9svq {
-@@ -581,15 +627,17 @@ std::tuple<float, float, float> Accumulator::evaluateValue(const Weight &w)
+@@ -581,15 +636,17 @@ std::tuple<float, float, float> Accumulator::evaluateValue(const Weight &w)
      // group linear layer
      alignas(Alignment) int8_t group1[ValueSumType::NGroup][ValueSumType::NGroup][ValueDim];
  
@@ -82,7 +91,7 @@ index f9c0a3d..1d7f5e5 100644
  
      starBlock<ValueDim, FeatureDim>(group1[1][1], group0[1][1], bucket.value_center);
  
-@@ -618,19 +666,15 @@ std::tuple<float, float, float> Accumulator::evaluateValue(const Weight &w)
+@@ -618,19 +675,15 @@ std::tuple<float, float, float> Accumulator::evaluateValue(const Weight &w)
          I8LS::store(group2[1][1] + b * I8B::RegWidth, q11);
      }
  
