@@ -29,14 +29,19 @@ on:
       positions:
         default: "bench/sprt/openings-balanced.json"
         type: string
+      runner:
+        description: "러너 — self-hosted 또는 ubuntu-latest(self-hosted 가 꺼져 있을 때)"
+        default: "self-hosted"
+        type: choice
+        options: ["self-hosted", "ubuntu-latest"]
 
 permissions:
   contents: read
 
 jobs:
   cachegrind:
-    # self-hosted 러너(Lightning) — cachegrind 는 결정적이라 러너가 바뀌어도 Ir 은 같다(벽시계만 다름).
-    runs-on: self-hosted
+    # cachegrind 는 결정적이라 러너가 바뀌어도 Ir 은 같다(벽시계만 다름) — 같은 런 안의 A/B 만 맞댄다.
+    runs-on: ${{ inputs.runner }}
     timeout-minutes: 300
     env:
       WORK: ${{ github.workspace }}/../rapfi-wasm-work
