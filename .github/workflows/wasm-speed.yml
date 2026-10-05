@@ -1,0 +1,137 @@
+name: WASM 속도 대조 (같은 트리 · 고정 깊이)
+
+# 결과 불변 패치의 **순수 속도**를 WASM 실물로 잰다 — bench/sprt/fixed-depth.mjs --det · speed-report.mjs.
+#
+#   base     = base_patches 빌드
+#   control  = base 와 **같은 파일**을 다른 프로세스로 — A/A 대조. 이 하네스의 잡음 · 치우침을 같은 런 안에서 잰다
+#   test     = base_patches + test_patches 빌드
+#
+# bench-gomocalc 의 패치 대조(시간 고정 · 엔진별로 몰아 잼)는 같은 코드끼리도 −7.5 ~ +3.6% 가 나와 몇 % 짜리
+# 효과를 판정할 수 없었다(A3, docs/최적화-마스터플랜-v2.md §8.8). 여기서는:
+#   - 고정 깊이 + --det(노드 고정 예열 · 시간 무제한) → 엔진끼리 **트리가 같다** → 시간 비 = 속도 비
+#   - 국면마다 엔진 순서를 번갈아, 짝(같은 반복 · 같은 국면)은 몇 초 사이로 붙여 잰다
+#   - 짝 수백 개로 95% 구간을 낸다. control 의 구간이 0 을 품어야 하네스를 믿는다
+on:
+  workflow_dispatch:
+    inputs:
+      base_patches:
+        description: "기준 패치(배포 구성)"
+        default: "tools/patches/p2-2-keep-evaluators-on-rebuild.patch tools/patches/a1-q15mulr.patch tools/patches/p4-1-periodic-node-stats.patch"
+        type: string
+      test_patches:
+        description: "시험에 더 얹을 패치(결과 불변이어야 한다 — 트리가 다르면 짝에서 빠진다)"
+        type: string
+      variant:
+        description: "단일 스레드 변형(single-simd128 · single-simd128-relaxed)"
+        default: "single-simd128-relaxed"
+        type: string
+      wasm_opt:
+        description: "두 빌드 모두의 wasm-opt 후처리(배포 구성 = -O4 --converge)"
+        default: "-O4 --converge"
+        type: string
+      depth:
+        default: "15"
+        type: string
+      repeat:
+        default: "2"
+        type: string
+      positions:
+        default: "bench/sprt/openings-balanced.json,bench/gomocalc/mate-suite.json"
+        type: string
+      runner:
+        description: "러너 — ubuntu-latest 또는 self-hosted"
+        default: "ubuntu-latest"
+        type: choice
+        options: ["ubuntu-latest", "self-hosted"]
+
+permissions:
+  contents: read
+
+jobs:
+  speed:
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 300
+    env:
+      WORK: ${{ github.workspace }}/../rapfi-wasm-work
+      ENABLE_LTO: "ON"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "26"
+      - name: 시스템 도구
+        run: |
+          missing=()
+          for t in git cmake ninja ccache file python3 xz; do command -v "$t" > /dev/null || missing+=("$t"); done
+          if [ ${#missing[@]} -eq 0 ]; then echo "도구 모두 있음"; exit 0; fi
+          echo "없는 도구: ${missing[*]} — 설치 시도"
+          sudo -n apt-get update -qq && sudo -n apt-get install -y git cmake ninja-build ccache file python3 xz-utils \
+            || { echo "::error::설치 실패(sudo 암호?)"; exit 1; }
+      - name: 러너 정보
+        run: |
+          echo "nproc $(nproc) · $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2)"
+      - name: emsdk 캐시 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.WORK }}/emsdk
+          key: emsdk-latest-v1
+      - name: rapfi 소스 캐시 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.WORK }}/rapfi
+          key: rapfi-3c94c2a9-v1
+
+      - name: 빌드 — base · test (같은 러너 · 같은 툴체인)
+        env:
+          BASE: ${{ inputs.base_patches }}
+          TEST: ${{ inputs.test_patches }}
+          V: ${{ inputs.variant }}
+          OPT_PASSES: ${{ inputs.wasm_opt }}
+        run: |
+          set -o pipefail
+          case "$V" in multi-*) echo "::error::단일 스레드 변형만(wasm-pbrain)"; exit 1 ;; esac
+          E=bench/sprt/engines
+          extra=""; [ "$V" = "single-simd128" ] || extra="$V"
+          take () {
+            rm -rf "$E/$1"; mkdir -p "$E/$1"
+            cp out/engine/rapfi-$V.js out/engine/rapfi-$V.wasm out/engine/rapfi-$V.data \
+               out/engine/ENGINE_VERSION.txt out/engine/package.json "$E/$1/"
+          }
+          RAPFI_PATCHES="$BASE" EXTRA_VARIANTS="$extra" WASM_OPT_POST="$OPT_PASSES" bash tools/build_engine_wasm.sh
+          echo "--- base BENCH(배포 구성이면 기준선과 같아야 함)"
+          node spike/node-bench.mjs single-simd128 | grep -E '"(hash|nodes|pass)"'
+          take base
+          cp -r "$E/base" "$E/control"
+          RAPFI_PATCHES="$(echo $BASE $TEST)" EXTRA_VARIANTS="$extra" WASM_OPT_POST="$OPT_PASSES" bash tools/build_engine_wasm.sh
+          echo "--- test BENCH(결과 불변 패치면 base 와 같아야 함)"
+          node spike/node-bench.mjs single-simd128 | grep -E '"(hash|nodes|pass)"'
+          take test
+
+      - name: 고정 깊이 대조 (--det · base · control · test)
+        env:
+          V: ${{ inputs.variant }}
+        run: |
+          set -o pipefail
+          grep -m1 "model name" /proc/cpuinfo || true
+          E="$PWD/bench/sprt/engines"
+          eng () { echo "$1|node $PWD/bench/sprt/wasm-pbrain.mjs --dir $E/$1 --variant $V"; }
+          node bench/sprt/fixed-depth.mjs --det \
+            --engine "$(eng base)" --engine "$(eng control)" --engine "$(eng test)" \
+            --depth "${{ inputs.depth }}" --repeat "${{ inputs.repeat }}" \
+            --positions "${{ inputs.positions }}" --out speed/fixed-depth.json | tail -8
+          node bench/sprt/speed-report.mjs speed/fixed-depth.json --json speed/summary.json | tee speed/report.md
+          {
+            echo "### WASM 속도 대조 — \`$V\` · 깊이 ${{ inputs.depth }} · test = +\`${{ inputs.test_patches }}\`"
+            cat speed/report.md
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 결과
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-speed
+          retention-days: 14
+          path: |
+            speed/
+            bench/sprt/engines/*/ENGINE_VERSION.txt

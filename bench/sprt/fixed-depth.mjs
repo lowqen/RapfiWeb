@@ -21,6 +21,16 @@ const all = (k) => argv.flatMap((a, i) => (a === `--${k}` ? [argv[i + 1]] : []))
 const opt = (k, d) => all(k).at(-1) ?? d;
 const depth = Number(opt("depth", 14));
 const repeat = Number(opt("repeat", 2));
+/**
+ * `--det` — **엔진끼리 같은 트리**를 보장한다(결과 불변 패치의 순수 속도 대조용).
+ * `YXHASHCLEAR` 는 TT 만 비우고 탐색 역사표(ABSearchData)는 남긴다. 기본 예열은 **시간 제한**(50ms)
+ * 탐색이라 프로세스마다 예열이 닿은 깊이가 달라 역사표가 갈리고, 그 뒤 모든 트리가 갈린다 — 같은
+ * 엔진을 둘로 띄워도 깊이 13 노드 비 0.85 · 최선수 4/5 였다. 그래서: 예열을 **노드 고정**(10만 — V8 최적화 단계까지 데운다)으로,
+ * 측정 탐색을 **시간 제한 없이**(`TIMEOUT_TURN 0 · MATCH 0`) — 시간이 탐색에 닿는 곳이 없어진다.
+ * 두 엔진이 국면을 같은 순서로 풀므로 역사표도 같은 길을 걷는다(반복 사이에는 달라질 수 있다 — 짝은
+ * 같은 반복 안에서 짓는다).
+ */
+const det = argv.includes("--det");
 const files = opt(
   "positions",
   "bench/sprt/openings-balanced.json,bench/gomocalc/mate-suite.json,bench/gomocalc/positions.json",
@@ -56,9 +66,15 @@ async function solve(e, moves) {
   const untap = e.tap((l) => {
     const n = /^INFO TOTALNODES (\d+)/.exec(l);
     if (n) nodes = Number(n[1]);
+    // Rapfi timeText: 10초 미만은 ms, 그 위는 초 · 분 단위로 내림해 찍는다.
     const s =
-      /^MESSAGE Speed \S+ \| Depth (\d+)-\d+ \| Eval (\S+) \| Node \S+ \| Time (\d+)ms/.exec(l);
-    if (s) summary = { depth: Number(s[1]), eval: s[2], ms: Number(s[3]) };
+      /^MESSAGE Speed \S+ \| Depth (\d+)-\d+ \| Eval (\S+) \| Node \S+ \| Time (\d+)(ms|s|min)\b/.exec(
+        l,
+      );
+    if (s) {
+      const ms = Number(s[3]) * { ms: 1, s: 1000, min: 60_000 }[s[4]];
+      summary = { depth: Number(s[1]), eval: s[2], ms, coarse: s[4] !== "ms" };
+    }
   });
   try {
     await e.send("YXHASHCLEAR");
@@ -80,14 +96,23 @@ try {
     engines.push(
       await new Engine({ ...s, startTimeoutMs: 120_000 }).start({
         info: ["INFO THREAD_NUM 1", "INFO SHOW_DETAIL 3", "INFO HASH_SIZE 131072"],
-        warmup: true,
+        warmup: !det,
       }),
     );
   for (const e of engines) {
+    if (det) {
+      // 시간 무제한 · 노드 고정 예열 — 가중치는 여기서 풀린다(측정에 섞이지 않게).
+      await e.send("INFO TIMEOUT_TURN 0");
+      await e.send("INFO TIMEOUT_MATCH 0");
+      await e.send("INFO MAX_NODE 100000"); // V8 가 뜨거운 함수를 최적화 단계로 올릴 만큼
+      await e.play([[7, 7]], { timeoutMs: 120_000 });
+    }
     await e.send(`INFO MAX_DEPTH ${depth}`);
     await e.send("INFO MAX_NODE 0");
-    await e.send("INFO TIMEOUT_TURN 3600000");
-    await e.send("INFO TIMEOUT_MATCH 0");
+    if (!det) {
+      await e.send("INFO TIMEOUT_TURN 3600000");
+      await e.send("INFO TIMEOUT_MATCH 0");
+    }
   }
   console.log(
     `국면 ${positions.length}개 × 엔진 ${engines.length} × 반복 ${repeat} · 깊이 ${depth}`,
