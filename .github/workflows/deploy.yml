@@ -131,6 +131,11 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # `pnpm dlx` 의 캐시를 **이 실행만의** 자리로. self-hosted 러너는 실행 사이에 홈의
+          # pnpm 캐시가 남는데, 반쯤 쓰다 만 wrangler 설치(package.json 없음)가 남자 dlx 가
+          # 그 해시 자리를 그대로 다시 써 ENOENT 로 배포가 두 번 연속 죽었다(run 37308697246).
+          # 재실행으로는 풀리지 않는다 — 같은 해시 자리다. 매번 새로 받는 값은 몇 초다.
+          XDG_CACHE_HOME: ${{ runner.temp }}/deploy-cache
         run: |
           # 프로젝트가 없으면 만든다. 처음에는 대시보드에서 손으로 만들라고 안내했는데,
           # 그러면 「비밀값은 넣었는데 프로젝트가 없어서」 배포가 실패한다 —
