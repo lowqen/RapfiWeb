@@ -62,7 +62,11 @@ BUILD="build-sprt-$label"
 # shellcheck disable=SC2086
 cmake -S . -B "$BUILD" -G Ninja -DCMAKE_BUILD_TYPE=Release -DNO_COMMAND_MODULES=ON -DENABLE_LTO=ON $HOST_CMAKE_FLAGS \
   | grep -E "SSE:|AVX2:|AVX512:|BMI2:|VNNI:" | sed "s/^/  . /" || true
-cmake --build "$BUILD" -j"$JOBS" > /dev/null
+echo "  . c++ $("${CXX:-c++}" --version 2> /dev/null | head -1)"
+# 출력은 파일로 받고, 실패하면 끝 60줄을 보인다 — 예전에는 > /dev/null 이라 컴파일 오류가 로그에 한 줄도 남지 않았다
+# (RunPod 러너의 M3 SPRT 37336926210 이 「exit code 1」 만 남기고 멈췄다).
+cmake --build "$BUILD" -j"$JOBS" > "$BUILD/build.log" 2>&1 \
+  || { echo "  X 네이티브 빌드 실패 — $BUILD/build.log 끝:"; tail -60 "$BUILD/build.log"; exit 1; }
 
 rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"

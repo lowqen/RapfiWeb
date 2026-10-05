@@ -539,7 +539,10 @@ cd "$WORK/rapfi/Rapfi"
 cmake -S . -B build-host -G Ninja \
   -DCMAKE_BUILD_TYPE=Release -DNO_COMMAND_MODULES=ON -DENABLE_LTO=ON \
   2>&1 | tee "$OUT/bench/host-native-isa.txt" | grep -E "SSE:|AVX2:|AVX512:|BMI2:|VNNI:|NEON" | sed "s/^/  . 자동감지 /" || true
-cmake --build build-host -j"$JOBS" > /dev/null
+# 출력은 파일로 받고, 실패하면 끝 60줄을 보인다 — 예전에는 > /dev/null 이라 컴파일 오류가 로그에 한 줄도 남지 않았다
+# (RunPod 러너의 M3 SPRT 37336926210 이 「exit code 1」 만 남기고 멈췄다).
+cmake --build build-host -j"$JOBS" > build-host/build.log 2>&1 \
+  || { echo "  X 호스트 빌드 실패 — build-host/build.log 끝:"; tail -60 build-host/build.log; exit 1; }
 echo "  . 호스트 바이너리(자동 감지) 빌드 완료"
 
 # (b1) 통제군: x86 을 128bit 로 묶는다. AVX2/AVX512/BMI2/VNNI 를 전부 끄고 SSE 만 켠다.
@@ -547,7 +550,8 @@ cmake -S . -B build-host-sse128 -G Ninja \
   -DCMAKE_BUILD_TYPE=Release -DNO_COMMAND_MODULES=ON -DENABLE_LTO=ON \
   -DUSE_SSE=ON -DUSE_AVX2=OFF -DUSE_AVX512=OFF -DUSE_BMI2=OFF -DUSE_VNNI=OFF \
   2>&1 | tee "$OUT/bench/host-sse128-isa.txt" | grep -E "SSE:|AVX2:|AVX512:|BMI2:|VNNI:" | sed "s/^/  . sse128 /" || true
-cmake --build build-host-sse128 -j"$JOBS" > /dev/null
+cmake --build build-host-sse128 -j"$JOBS" > build-host-sse128/build.log 2>&1 \
+  || { echo "  X 호스트(SSE 128bit) 빌드 실패 — build-host-sse128/build.log 끝:"; tail -60 build-host-sse128/build.log; exit 1; }
 echo "  . 호스트 바이너리(SSE 128bit) 빌드 완료"
 
 run_host_bench () {
