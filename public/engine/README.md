@@ -1,6 +1,6 @@
 # public/engine/
 
-Rapfi WebAssembly 산출물 — **네 변형**이 같은 빌드(릴리스 `engine-3c94c2a9-a1n`)에서 나온다.
+Rapfi WebAssembly 산출물 — **네 변형**이 같은 빌드(릴리스 `engine-3c94c2a9-a3`)에서 나온다.
 
 ```
 rapfi-multi-simd128-relaxed.js/.wasm   멀티스레드 + relaxed SIMD — 격리 + relaxed 를 아는 브라우저(Chromium 114+)에서 먼저

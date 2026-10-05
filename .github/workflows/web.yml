@@ -17,11 +17,13 @@ on:
 
 env:
   # 엔진 릴리스 — src/engine/engine-manifest.json 의 tag 와 같아야 한다(verify-engine.ts 가 본다).
-  ENGINE_TAG: engine-3c94c2a9-a1n
+  ENGINE_TAG: engine-3c94c2a9-a3
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # 저장소 변수 CI_RUNNER(예: self-hosted)가 있으면 그 러너로 — GitHub 호스트 러너가 결제 · 지출 한도로 막혔을 때.
+    # 변수를 지우면 ubuntu-latest 로 돌아간다.
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -64,7 +66,8 @@ jobs:
       # 「빌드가 됐다」와 「화면이 뜬다」는 다르다. 라우터 설정 오류, CSS 변수 오타,
       # 워커 URL 실수는 전부 빌드를 통과하고 빈 화면으로 끝난다. 그래서 이 단계가 있다.
       - name: Playwright(Chromium) 설치
-        run: pnpm exec playwright install --with-deps chromium
+        # --with-deps 는 apt(sudo)를 쓴다 — 안 되는 self-hosted 러너면 브라우저만 받는다.
+        run: pnpm exec playwright install --with-deps chromium || pnpm exec playwright install chromium
 
       - name: 스모크 — AppShell 이 실제로 렌더되는가
         run: pnpm exec tsx scripts/smoke.ts
