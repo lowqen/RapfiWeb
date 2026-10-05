@@ -90,6 +90,16 @@ set +eu
 source ./emsdk_env.sh
 set -eu
 command -v emcc > /dev/null || { echo "emcc 가 PATH 에 없습니다 — emsdk 활성화 실패"; exit 1; }
+# emscripten 의 JS 도구(acorn-optimizer 등)는 upstream/emscripten/node_modules 의 npm 패키지를 쓴다.
+# 설치가 중간에 끊긴 emsdk(오래 사는 self-hosted 작업 폴더 · 덜 저장된 캐시)는 emcc 는 있어도 이 폴더가
+# 비어, 컴파일은 다 되고 **링크의 JS 최적화 단계에서** `Cannot find package 'acorn'` 으로 죽는다
+# (engine-release 37254304022). 없으면 emsdk 가 쓰는 node/npm 으로 채운다.
+EM_DIR="$(dirname "$(command -v emcc)")"
+if [ ! -d "$EM_DIR/node_modules/acorn" ]; then
+  echo "  ! $EM_DIR/node_modules 가 비었습니다 — npm 으로 채웁니다"
+  ( cd "$EM_DIR" && { npm ci --omit=dev --no-audit --no-fund || npm install --omit=dev --no-audit --no-fund; } )
+  [ -d "$EM_DIR/node_modules/acorn" ] || { echo "  X emscripten npm 패키지를 채우지 못했습니다"; exit 1; }
+fi
 EMSDK_RESOLVED="$(emcc -v 2>&1 | sed -n 1p)"
 echo "  . $EMSDK_RESOLVED"
 echo "  . cmake $(cmake --version | sed -n 1p)"
