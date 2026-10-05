@@ -19,6 +19,9 @@ RAPFI_PATCHES="${RAPFI_PATCHES:-}"
 HOST_CMAKE_FLAGS="${HOST_CMAKE_FLAGS:-}"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# cmake 가 Rapfi 의 요구(3.18.2)보다 낮은 러너면 공식 바이너리를 받아 PATH 앞에(tools/ci/ensure-cmake.sh).
+# shellcheck disable=SC1091
+source "$ROOT/tools/ci/ensure-cmake.sh"
 WORK="${WORK:-$HOME/rapfi-wasm-work}"
 OUT_DIR="${OUT_DIR:?OUT_DIR 를 주세요(예: bench/sprt/engines/base)}"
 case "$OUT_DIR" in /*) ;; *) OUT_DIR="$ROOT/$OUT_DIR" ;; esac

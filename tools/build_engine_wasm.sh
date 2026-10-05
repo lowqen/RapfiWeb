@@ -102,6 +102,9 @@ if [ ! -d "$EM_DIR/node_modules/acorn" ]; then
 fi
 EMSDK_RESOLVED="$(emcc -v 2>&1 | sed -n 1p)"
 echo "  . $EMSDK_RESOLVED"
+# cmake 가 Rapfi 의 요구(3.18.2)보다 낮은 러너(RunPod · Ubuntu 20.04 계열)면 공식 바이너리를 받아 PATH 앞에.
+# shellcheck disable=SC1091
+source "$ROOT/tools/ci/ensure-cmake.sh"
 echo "  . cmake $(cmake --version | sed -n 1p)"
 echo "  . node  $(node --version)"
 echo "  . emcc  $(command -v emcc)"

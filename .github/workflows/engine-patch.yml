@@ -82,6 +82,10 @@ jobs:
       - name: 웹 회귀 게이트 (single-simd128 · BENCH 해시)
         run: node spike/node-bench.mjs single-simd128
 
+      # gh 가 없는 self-hosted 러너(갓 띄운 컨테이너)에서 받아 둔다 — tools/ci/ensure-gh.sh 주석.
+      - name: gh 준비
+        run: bash tools/ci/ensure-gh.sh
+
       - name: 렌주 NNUE 비트 대조 (패치 없는 릴리스 ↔ 패치)
         env:
           GH_TOKEN: ${{ github.token }}
