@@ -66,7 +66,14 @@ echo "  . c++ $("${CXX:-c++}" --version 2> /dev/null | head -1)"
 # 출력은 파일로 받고, 실패하면 끝 60줄을 보인다 — 예전에는 > /dev/null 이라 컴파일 오류가 로그에 한 줄도 남지 않았다
 # (RunPod 러너의 M3 SPRT 37336926210 이 「exit code 1」 만 남기고 멈췄다).
 cmake --build "$BUILD" -j"$JOBS" > "$BUILD/build.log" 2>&1 \
-  || { echo "  X 네이티브 빌드 실패 — $BUILD/build.log 끝:"; tail -60 "$BUILD/build.log"; exit 1; }
+  || {
+    # 오류 줄이 경고 수백 줄 앞에 묻힌다 — 오류부터, 그다음 끝.
+    echo "  X 네이티브 빌드 실패 — $BUILD/build.log 의 오류:"
+    grep -n -E "(error|Error|FAILED):" "$BUILD/build.log" | head -40
+    echo "  --- 끝 20줄:"
+    tail -20 "$BUILD/build.log"
+    exit 1
+  }
 
 rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
