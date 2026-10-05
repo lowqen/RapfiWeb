@@ -39,4 +39,9 @@ export default tseslint.config(
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
     },
   },
+  {
+    // tools/*.mjs 는 노드에서만 도는 빌드 · 측정 도우미다(예: config_set.mjs) — console · process 를 안다.
+    files: ["tools/**/*.mjs"],
+    languageOptions: { globals: globals.node },
+  },
 );
