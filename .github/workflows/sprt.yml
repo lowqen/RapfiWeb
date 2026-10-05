@@ -159,7 +159,8 @@ jobs:
           OUT_DIR=$E/referee RAPFI_PATCHES="$BASE" bash tools/build_host_engine.sh
           take () {
             rm -rf "$E/$1"; mkdir -p "$E/$1"
-            cp out/engine/rapfi-$V.js out/engine/rapfi-$V.wasm out/engine/rapfi-$V.data out/engine/ENGINE_VERSION.txt "$E/$1/"
+            # package.json({"type":"commonjs"}) 이 없으면 저장소 루트의 "type": "module" 때문에 글루 .js 가 ESM 으로 읽힌다
+            cp out/engine/rapfi-$V.js out/engine/rapfi-$V.wasm out/engine/rapfi-$V.data out/engine/ENGINE_VERSION.txt out/engine/package.json "$E/$1/"
             ( cd "$E/$1" && sha256sum rapfi-$V.wasm )
           }
           extra=""; case "$V" in single-simd128) ;; *) extra="$V" ;; esac
