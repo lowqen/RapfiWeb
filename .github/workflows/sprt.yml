@@ -53,8 +53,21 @@ on:
         default: "1"
         type: string
       concurrency:
-        description: "동시 대국"
+        description: "동시 대국 — auto 면 (물리 코어 − 2) ÷ 스레드(SMT 형제끼리 겹치지 않게, 러너 · 심판 몫을 남김)"
         default: "2"
+        type: string
+      engine:
+        description: "대국 엔진 — native(pbrain-rapfi) 또는 wasm(bench/sprt/wasm-pbrain.mjs — 배포 실물. ISA 마다 속도가 다른 변경은 이것으로)"
+        default: "native"
+        type: choice
+        options: ["native", "wasm"]
+      wasm_variant:
+        description: "engine=wasm 의 변형(단일 스레드만 — wasm-pbrain 은 sendCommand 동기 펌프)"
+        default: "single-simd128-relaxed"
+        type: string
+      wasm_opt:
+        description: "engine=wasm 의 wasm-opt 후처리(배포 구성 = -O4 --converge)"
+        default: "-O4 --converge"
         type: string
       elo0:
         default: "0"
@@ -74,7 +87,8 @@ permissions:
 jobs:
   sprt:
     runs-on: ${{ inputs.runner }}
-    timeout-minutes: 360
+    # GitHub 호스트 러너는 잡 6시간 제한 — self-hosted 는 없으므로 max_minutes 를 더 길게 줄 수 있게 24시간까지.
+    timeout-minutes: ${{ inputs.runner == 'self-hosted' && 1440 || 360 }}
     env:
       WORK: ${{ github.workspace }}/../rapfi-wasm-work
     steps:
@@ -88,11 +102,12 @@ jobs:
         # 없으면 sudo -n(암호를 묻지 않고 바로 실패)으로 설치를 시도해 무엇이 없는지 분명히 말한다.
         run: |
           missing=()
-          for t in git cmake ninja g++ ccache pgrep; do command -v "$t" > /dev/null || missing+=("$t"); done
+          # wasm 은 emsdk 가 python3 · xz 를 쓴다
+          for t in git cmake ninja g++ ccache pgrep python3 xz; do command -v "$t" > /dev/null || missing+=("$t"); done
           if [ ${#missing[@]} -eq 0 ]; then echo "도구 모두 있음"; exit 0; fi
           echo "없는 도구: ${missing[*]} — 설치 시도"
-          sudo -n apt-get update -qq && sudo -n apt-get install -y git cmake ninja-build g++ ccache procps \
-            || { echo "::error::설치 실패(sudo 암호?) — 러너 기계에 직접 설치: sudo apt-get install -y git cmake ninja-build g++ ccache procps"; exit 1; }
+          sudo -n apt-get update -qq && sudo -n apt-get install -y git cmake ninja-build g++ ccache procps python3 xz-utils \
+            || { echo "::error::설치 실패(sudo 암호?) — 러너 기계에 직접 설치: sudo apt-get install -y git cmake ninja-build g++ ccache procps python3 xz-utils"; exit 1; }
 
       - name: 러너 정보
         run: |
@@ -106,28 +121,67 @@ jobs:
           path: ${{ env.WORK }}/rapfi
           key: rapfi-3c94c2a9-v1
 
+      - name: emsdk 캐시 복원
+        if: inputs.engine == 'wasm'
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.WORK }}/emsdk
+          key: emsdk-latest-v1
+
       - name: 러너 · 통계 시험
         run: node --test bench/sprt/
 
-      - name: 네이티브 빌드 — 기준(B) · 시험(A)
+      - name: 빌드 — 기준(B) · 시험(A)
         env:
           BASE: ${{ inputs.base_patches }}
           TEST: ${{ inputs.test_patches }}
           TEST_CONFIG: ${{ inputs.test_config }}
+          KIND: ${{ inputs.engine }}
+          V: ${{ inputs.wasm_variant }}
+          OPT_PASSES: ${{ inputs.wasm_opt }}
         run: |
+          set -o pipefail
           grep -m1 "model name" /proc/cpuinfo || true
-          OUT_DIR=bench/sprt/engines/base RAPFI_PATCHES="$BASE" bash tools/build_host_engine.sh
-          OUT_DIR=bench/sprt/engines/test RAPFI_PATCHES="$(echo $BASE $TEST)" bash tools/build_host_engine.sh
-          if [ -n "$TEST_CONFIG" ]; then
-            IFS=',' read -ra kv <<< "$TEST_CONFIG"
-            node tools/config_set.mjs bench/sprt/engines/test/config.toml "${kv[@]}"
+          E=bench/sprt/engines
+          if [ "$KIND" = "native" ]; then
+            OUT_DIR=$E/base RAPFI_PATCHES="$BASE" bash tools/build_host_engine.sh
+            OUT_DIR=$E/test RAPFI_PATCHES="$(echo $BASE $TEST)" bash tools/build_host_engine.sh
+            if [ -n "$TEST_CONFIG" ]; then
+              IFS=',' read -ra kv <<< "$TEST_CONFIG"
+              node tools/config_set.mjs $E/test/config.toml "${kv[@]}"
+            fi
+            exit 0
           fi
+          # ── wasm: 배포 실물(같은 변형 · 같은 wasm-opt)끼리. config 는 .data 에 구워져 test_config 를 쓸 수 없다.
+          [ -z "$TEST_CONFIG" ] || { echo "::error::engine=wasm 에서는 test_config 를 쓸 수 없습니다(.data 에 구워짐)"; exit 1; }
+          case "$V" in multi-*) echo "::error::wasm-pbrain 은 단일 스레드 변형만 — $V"; exit 1 ;; esac
+          # 심판(금수 판정)은 네이티브 기준 빌드 — 판정 결과는 같고 훨씬 가볍다.
+          OUT_DIR=$E/referee RAPFI_PATCHES="$BASE" bash tools/build_host_engine.sh
+          take () {
+            rm -rf "$E/$1"; mkdir -p "$E/$1"
+            cp out/engine/rapfi-$V.js out/engine/rapfi-$V.wasm out/engine/rapfi-$V.data out/engine/ENGINE_VERSION.txt "$E/$1/"
+            ( cd "$E/$1" && sha256sum rapfi-$V.wasm )
+          }
+          extra=""; case "$V" in single-simd128) ;; *) extra="$V" ;; esac
+          RAPFI_PATCHES="$BASE" EXTRA_VARIANTS="$extra" WASM_OPT_POST="$OPT_PASSES" bash tools/build_engine_wasm.sh
+          echo "--- B: BENCH single-simd128(배포 구성이면 2b7c7da9) · $V"
+          node spike/node-bench.mjs single-simd128 | grep -E '"(hash|nodes|pass)"'
+          node spike/node-bench.mjs "$V" | grep -E '"(hash|nodes|pass)"' || true
+          take base
+          RAPFI_PATCHES="$(echo $BASE $TEST)" EXTRA_VARIANTS="$extra" WASM_OPT_POST="$OPT_PASSES" bash tools/build_engine_wasm.sh
+          echo "--- A: BENCH(트리를 바꾸는 변경이면 달라지는 것이 정상 — 기록만) · $V"
+          node spike/node-bench.mjs "$V" | grep -E '"(hash|nodes|pass)"' || true
+          take test
 
       - name: SPRT
         env:
           TC_A: ${{ inputs.tc_a }}
           TC_B: ${{ inputs.tc_b }}
           OPENINGS_FILE: ${{ inputs.openings_file }}
+          KIND: ${{ inputs.engine }}
+          V: ${{ inputs.wasm_variant }}
+          CONC: ${{ inputs.concurrency }}
+          THREADS: ${{ inputs.threads }}
         run: |
           set -o pipefail
           E=bench/sprt/engines
@@ -135,10 +189,23 @@ jobs:
           if [ -n "$TC_A" ]; then per+=(--a-tc "$TC_A"); fi
           if [ -n "$TC_B" ]; then per+=(--b-tc "$TC_B"); fi
           if [ -n "$OPENINGS_FILE" ]; then per+=(--openings-file "$OPENINGS_FILE"); fi
-          node bench/sprt/runner.mjs "${per[@]}" \
-            --a "$PWD/$E/test/pbrain-rapfi" --a-cwd "$E/test" --a-name test \
-            --b "$PWD/$E/base/pbrain-rapfi" --b-cwd "$E/base" --b-name base \
-            --games "${{ inputs.games }}" --tc "${{ inputs.tc }}" --concurrency "${{ inputs.concurrency }}" --max-minutes "${{ inputs.max_minutes }}" --threads "${{ inputs.threads }}" \
+          if [ "$CONC" = "auto" ]; then
+            # 대국마다 한 번에 한 엔진만 생각한다 — 생각하는 스레드가 물리 코어를 넘지 않게(SMT 형제를 나눠 쓰면 양쪽
+            # 모두 느려져 시간 제어가 사실상 짧아진다), 러너 · 심판 · node GC 몫으로 2코어를 남긴다.
+            phys=$(lscpu -p=Core,Socket | grep -v '^#' | sort -u | wc -l)
+            CONC=$(( (phys - 2) / THREADS )); [ "$CONC" -ge 1 ] || CONC=1
+            echo "동시 대국 auto → $CONC (물리 코어 $phys · 스레드 $THREADS)"
+          fi
+          if [ "$KIND" = "wasm" ]; then
+            eng=(--a "node $PWD/bench/sprt/wasm-pbrain.mjs --dir $PWD/$E/test --variant $V" --a-name test
+                 --b "node $PWD/bench/sprt/wasm-pbrain.mjs --dir $PWD/$E/base --variant $V" --b-name base
+                 --referee "$PWD/$E/referee/pbrain-rapfi" --referee-cwd "$E/referee")
+          else
+            eng=(--a "$PWD/$E/test/pbrain-rapfi" --a-cwd "$E/test" --a-name test
+                 --b "$PWD/$E/base/pbrain-rapfi" --b-cwd "$E/base" --b-name base)
+          fi
+          node bench/sprt/runner.mjs "${per[@]}" "${eng[@]}" \
+            --games "${{ inputs.games }}" --tc "${{ inputs.tc }}" --concurrency "$CONC" --max-minutes "${{ inputs.max_minutes }}" --threads "$THREADS" \
             --elo0 "${{ inputs.elo0 }}" --elo1 "${{ inputs.elo1 }}" \
             --out sprt/games.jsonl --summary sprt/summary.json | tee sprt.log
           {
