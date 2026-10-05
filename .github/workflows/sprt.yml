@@ -168,12 +168,12 @@ jobs:
             ( cd "$E/$1" && sha256sum rapfi-$V.wasm )
           }
           extra=""; case "$V" in single-simd128) ;; *) extra="$V" ;; esac
-          RAPFI_PATCHES="$BASE" EXTRA_VARIANTS="$extra" WASM_OPT_POST="$OPT_PASSES" bash tools/build_engine_wasm.sh
+          HOST_BASELINE=0 RAPFI_PATCHES="$BASE" EXTRA_VARIANTS="$extra" WASM_OPT_POST="$OPT_PASSES" bash tools/build_engine_wasm.sh
           echo "--- B: BENCH single-simd128(배포 구성이면 2b7c7da9) · $V"
           node spike/node-bench.mjs single-simd128 | grep -E '"(hash|nodes|pass)"'
           node spike/node-bench.mjs "$V" | grep -E '"(hash|nodes|pass)"' || true
           take base
-          RAPFI_PATCHES="$(echo $BASE $TEST)" EXTRA_VARIANTS="$extra" WASM_OPT_POST="$OPT_PASSES" bash tools/build_engine_wasm.sh
+          HOST_BASELINE=0 RAPFI_PATCHES="$(echo $BASE $TEST)" EXTRA_VARIANTS="$extra" WASM_OPT_POST="$OPT_PASSES" bash tools/build_engine_wasm.sh
           echo "--- A: BENCH(트리를 바꾸는 변경이면 달라지는 것이 정상 — 기록만) · $V"
           node spike/node-bench.mjs "$V" | grep -E '"(hash|nodes|pass)"' || true
           take test
