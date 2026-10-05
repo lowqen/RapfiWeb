@@ -67,6 +67,22 @@ const fail = (m: string) => {
   process.exitCode = 1;
 };
 
+/**
+ * 화면의 BEST 를 읽고 **같은 순간에** 「정지」를 누른다 — 페이지 안에서 한 번에.
+ *
+ * 읽기와 누르기를 Playwright 왕복 둘로 나누면 그 사이(수십 ms)에 새 스냅샷이 와서 BEST 가 바뀐다. 앱은 누른
+ * 순간의 BEST 를 두므로(맞는 동작) 시험만 틀린다 — 16코어 멀티 러너의 실제 사이트 검증에서 H9 를 읽고 J9 가
+ * 놓인 적이 있다(deploy 37334478792).
+ */
+const STOP_AND_READ_BEST = `(() => {
+  const dds = [...document.querySelectorAll(".kv.stats dd")];
+  const best = dds.length ? dds[dds.length - 1].textContent.trim() : "";
+  const stop = [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "정지");
+  if (!stop) throw new Error("「정지」 버튼이 없습니다");
+  stop.click();
+  return best;
+})()`;
+
 if (!REMOTE) await new Promise<void>((r) => server.listen(PORT, r));
 const browser = await chromium.launch();
 let page: import("playwright").Page | null = null;
@@ -330,9 +346,8 @@ try {
 
   // 5. 정지 — 조각 경계에서 듣는다(기본 500ms). 넉넉히 3초를 준다. 정지는 **그 순간의 BEST** 를
   // 판에 둔다 — 누르기 직전에 화면의 BEST 를 읽어 두고, 둔 수와 맞춰 본다.
-  const bestBeforeStop = (await analysisPanel.locator(".kv dd").last().innerText()).trim();
   const tStop = Date.now();
-  await page.getByRole("button", { name: "정지" }).click();
+  const bestBeforeStop = (await page.evaluate(STOP_AND_READ_BEST)) as string;
   await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 5000 });
   const stopMs = Date.now() - tStop;
   console.log(`정지까지 ${stopMs}ms`);
@@ -394,8 +409,7 @@ try {
       { timeout: 30_000 },
     )
     .catch(() => fail("무른 뒤 새 국면의 분석이 이어지지 않습니다"));
-  const stopAgain = (await analysisPanel.locator(".kv dd").last().innerText()).trim();
-  await page.getByRole("button", { name: "정지" }).click();
+  const stopAgain = (await page.evaluate(STOP_AND_READ_BEST)) as string;
   await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 5000 });
   await page.waitForTimeout(150);
   const placedAgain = (await page.locator("dd[data-k=last]").innerText()).trim();

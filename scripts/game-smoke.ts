@@ -76,6 +76,22 @@ const fail = (m: string) => {
 };
 const ok = (m: string) => console.log(`  ✓ ${m}`);
 
+/**
+ * 화면의 BEST 를 읽고 **같은 순간에** 「정지」를 누른다 — 페이지 안에서 한 번에.
+ *
+ * 읽기와 누르기를 Playwright 왕복 둘로 나누면 그 사이(수십 ms)에 새 스냅샷이 와서 BEST 가 바뀐다. 앱은 누른
+ * 순간의 BEST 를 두므로(맞는 동작) 시험만 틀린다 — 16코어 멀티 러너의 실제 사이트 검증에서 H9 를 읽고 J9 가
+ * 놓인 적이 있다(deploy 37334478792).
+ */
+const STOP_AND_READ_BEST = `(() => {
+  const dds = [...document.querySelectorAll(".kv.stats dd")];
+  const best = dds.length ? dds[dds.length - 1].textContent.trim() : "";
+  const stop = [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "정지");
+  if (!stop) throw new Error("「정지」 버튼이 없습니다");
+  stop.click();
+  return best;
+})()`;
+
 if (!REMOTE) await new Promise<void>((r) => server.listen(PORT, r));
 const browser = await chromium.launch();
 const page: Page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
@@ -269,8 +285,8 @@ async function runAnalysis(ms: number): Promise<string> {
   await page.waitForTimeout(ms);
   const still = await page.locator(".panel__badge").first().getAttribute("data-status");
   if (still !== "searching") fail(`무제한 분석이 ${ms}ms 안에 저절로 멈췄습니다 (${still})`);
-  const best = (await page.locator(".kv.stats dd").last().innerText()).trim();
-  await click("정지");
+  await tab("분석");
+  const best = (await page.evaluate(STOP_AND_READ_BEST)) as string;
   await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 5_000 });
   await page.waitForTimeout(150);
   const placed = (await page.locator("dd[data-k=last]").innerText()).trim();
