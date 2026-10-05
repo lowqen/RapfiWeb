@@ -117,14 +117,22 @@ try {
     if (m.type() === "error") errors.push("[console] " + m.text());
   });
 
-  await page.goto(`${BASE}/board`, { waitUntil: "networkidle" });
-
-  // 1. 엔진 기동. 40MB .data 를 받고 가중치를 푸는 시간이 든다.
+  // 1. **자동 기동.** 아무것도 누르지 않는다 — 앱이 뜨면 엔진이 뒤에서 뜬다. 그동안 상단 바가
+  // 「준비 중」과 단계를 말하고, 끝나면 「준비」다. 20MB 가중치를 받고 푸는 시간이 든다.
   const t0 = Date.now();
-  await page.getByRole("button", { name: "엔진 시작" }).click();
-  await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 120_000 });
+  await page.goto(`${BASE}/board`, { waitUntil: "domcontentloaded" });
+  const chip = page.locator('[data-k="engine-indicator"]');
+  await chip.waitFor({ timeout: 10_000 });
+  const firstStatus = await chip.getAttribute("data-status");
+  await page
+    .locator('[data-k="engine-indicator"][data-status="ready"]')
+    .waitFor({ timeout: 120_000 });
   const bootMs = Date.now() - t0;
-  console.log(`엔진 기동 ${bootMs}ms`);
+  console.log(`엔진 자동 기동 ${bootMs}ms (처음 본 상태 ${firstStatus})`);
+  if (firstStatus === "idle") fail("앱이 떴는데 엔진이 기동을 시작하지 않았습니다");
+  // 분석 수치·분석/정지 버튼은 [분석] 탭에 있다.
+  await page.getByRole("tab", { name: "분석", exact: true }).click();
+  await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 10_000 });
 
   // 1b. **어느 변형으로 떴는가.** 격리돼 있고 멀티 산출물이 있으면 멀티여야 한다 —
   // 조용히 단일로 물러섰다면(핸드셰이크 실패) 여기서 잡는다. 격리가 없으면 단일.
@@ -160,11 +168,16 @@ try {
     fail(`첫 기동의 가중치가 내려받은 것이 아닙니다: ${firstWeights}`);
   }
   if (engineInfo.warmupMs === null) fail("예열 탐색이 돌지 않았습니다");
-  await page.reload({ waitUntil: "networkidle" });
   const t1 = Date.now();
-  await page.getByRole("button", { name: "엔진 시작" }).click();
-  await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 120_000 });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page
+    .locator('[data-k="engine-indicator"][data-status="ready"]')
+    .waitFor({ timeout: 120_000 });
   const rebootMs = Date.now() - t1;
+  // 고른 탭은 새로고침 뒤에도 남는다(분석).
+  await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 10_000 });
+  if ((await page.locator(".evalgraph").count()) !== 1)
+    fail("새로고침 뒤 분석 탭이 남지 않았습니다");
   engineInfo = (await page.evaluate(`window.__rapfiEngine()`)) as EngineInfo;
   if (engineInfo.weightsSource !== "cache") {
     fail(`새로고침 뒤 기동이 캐시를 쓰지 않았습니다: ${engineInfo.weightsSource}`);
@@ -193,7 +206,7 @@ try {
     const best = panel.locator(".kv dd").last();
     await page
       .waitForFunction(
-        `(() => { const dds = [...document.querySelectorAll(".panel .kv dd")];
+        `(() => { const dds = [...document.querySelectorAll(".kv.stats dd")];
                   return dds.length > 0 && dds[dds.length - 1].textContent.trim() === "H8"; })()`,
         undefined,
         { timeout: 10_000 },
@@ -205,15 +218,16 @@ try {
       fail("빈 판 분석에 즉답 안내가 없습니다");
     }
     console.log(`빈 판 분석: 최선수 ${emptyBest} · 즉답 안내`);
+    // 2. **정지하면 최선수를 둔다** — 빈 판이면 천원(H8).
     await page.getByRole("button", { name: "정지" }).click();
     await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 5000 });
+    await page.waitForTimeout(150);
+    const placed = (await page.locator("dd[data-k=last]").innerText()).trim();
+    const aria = await page.locator("canvas[role=img]").getAttribute("aria-label");
+    if (placed !== "H8" || !aria?.includes("돌 1개"))
+      fail(`빈 판에서 정지했는데 H8 에 두지 않았습니다: 마지막 ${placed} · ${aria}`);
+    else console.log("정지 → 천원 H8 착수");
   }
-
-  // 2. 돌 하나 놓기 — 보드 한가운데는 15×15 에서 H8 이다.
-  const view = await page.locator(".board__view").boundingBox();
-  if (!view) throw new Error("보드가 없습니다");
-  await page.mouse.click(view.x + view.width / 2, view.y + view.height / 2);
-  await page.waitForTimeout(120);
 
   // 3. 분석. 그동안 메인 스레드가 살아 있는지 rAF 로 잰다.
   //
@@ -314,7 +328,9 @@ try {
     fail(`무제한 분석이 ${Date.now() - tAnalyze}ms 만에 멈췄습니다 (${still})`);
   else console.log(`무제한 분석: ${((Date.now() - tAnalyze) / 1000).toFixed(1)}초째 계속 탐색 중`);
 
-  // 5. 정지 — 조각 경계에서 듣는다(기본 500ms). 넉넉히 3초를 준다.
+  // 5. 정지 — 조각 경계에서 듣는다(기본 500ms). 넉넉히 3초를 준다. 정지는 **그 순간의 BEST** 를
+  // 판에 둔다 — 누르기 직전에 화면의 BEST 를 읽어 두고, 둔 수와 맞춰 본다.
+  const bestBeforeStop = (await analysisPanel.locator(".kv dd").last().innerText()).trim();
   const tStop = Date.now();
   await page.getByRole("button", { name: "정지" }).click();
   await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 5000 });
@@ -325,6 +341,66 @@ try {
   else if (engineInfo.threaded && stopMs > 1000) {
     fail(`멀티 변형인데 정지가 ${stopMs}ms 걸렸습니다 — 조각 경계를 기다리는 것 같습니다`);
   }
+  await page.waitForTimeout(150);
+  const stoppedOn = (await page.locator("dd[data-k=last]").innerText()).trim();
+  if (stoppedOn !== bestBeforeStop)
+    fail(`정지가 화면의 BEST(${bestBeforeStop}) 가 아니라 ${stoppedOn} 에 두었습니다`);
+  else console.log(`정지 → 최선수 ${stoppedOn} 착수`);
+  // 둔 직후 옛 국면(1수)의 BEST·PV 가 새 국면(2수)에 남지 않는다.
+  const afterPlace = (await analysisPanel.locator(".kv dd").last().innerText()).trim();
+  if (afterPlace !== "—") fail(`착수 뒤에 옛 국면의 BEST(${afterPlace}) 가 남아 있습니다`);
+  if ((await page.locator(".pvlist__row").count()) !== 0)
+    fail("착수 뒤에 옛 국면의 PV 가 남아 있습니다");
+
+  // 5b. **무르기 정리.** 2수 국면을 분석해 값이 차오른 뒤 분석 중에 한 수 무른다. 그 순간
+  // 2수 국면의 BEST · PV · 평가 바 · 값 칩이 1수 판에 남으면 안 된다 — 새 국면의 첫 답이
+  // 오기 전의 틈을 보려고, 누르는 것과 읽는 것을 한 번에(같은 마이크로태스크 안) 한다.
+  await page.getByRole("button", { name: "분석", exact: true }).click();
+  await page
+    .waitForFunction(
+      `(() => { const dds = [...document.querySelectorAll(".kv.stats dd")];
+                return document.querySelectorAll(".pvlist__row").length > 0 &&
+                       dds.length > 0 && dds[dds.length - 1].textContent.trim() !== "—"; })()`,
+      undefined,
+      { timeout: 30_000 },
+    )
+    .catch(() => undefined);
+  const before = (await page.evaluate(
+    `(() => ({ bar: document.querySelector(".evalbar").getAttribute("aria-valuetext") }))()`,
+  )) as { bar: string };
+  const undone = (await page.evaluate(`(async () => {
+    document.querySelector('[aria-label="한 수 뒤로"]').click();
+    await Promise.resolve();
+    const dds = [...document.querySelectorAll(".kv.stats dd")];
+    return {
+      best: dds[dds.length - 1].textContent.trim(),
+      pv: document.querySelectorAll(".pvlist__row").length,
+      bar: document.querySelector(".evalbar").getAttribute("aria-valuetext"),
+      stones: document.querySelector("canvas[role=img]").getAttribute("aria-label"),
+    };
+  })()`)) as { best: string; pv: number; bar: string; stones: string };
+  if (!undone.stones.includes("돌 1개")) fail(`무르기가 돌지 않았습니다: ${undone.stones}`);
+  else if (undone.best !== "—" || undone.pv !== 0 || undone.bar !== "평가 없음") {
+    fail(
+      `무른 판에 뒤 국면의 분석이 남았습니다 — BEST ${undone.best} · PV ${undone.pv}줄 · 평가 바 «${undone.bar}»`,
+    );
+  } else console.log(`무르기 정리: 평가 바 «${before.bar}» → «평가 없음» · BEST · PV 비움`);
+  // 분석은 켜져 있으므로 1수 국면을 이어 읽어 다시 차오른다.
+  await page
+    .waitForFunction(
+      `(() => { const dds = [...document.querySelectorAll(".kv.stats dd")];
+                return dds[dds.length - 1].textContent.trim() !== "—"; })()`,
+      undefined,
+      { timeout: 30_000 },
+    )
+    .catch(() => fail("무른 뒤 새 국면의 분석이 이어지지 않습니다"));
+  const stopAgain = (await analysisPanel.locator(".kv dd").last().innerText()).trim();
+  await page.getByRole("button", { name: "정지" }).click();
+  await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 5000 });
+  await page.waitForTimeout(150);
+  const placedAgain = (await page.locator("dd[data-k=last]").innerText()).trim();
+  if (placedAgain !== stopAgain)
+    fail(`무른 뒤 정지가 BEST(${stopAgain}) 대신 ${placedAgain} 에 두었습니다`);
 
   // 6. 보드에 실제로 그려졌는가 — 동적 레이어에 빈 캔버스가 아닌 픽셀이 있어야 한다.
   const painted = await page.evaluate(() => {
@@ -337,6 +413,47 @@ try {
   });
   if (painted === 0) fail("동적 레이어가 비어 있습니다 — 돌도 칩도 그려지지 않았습니다");
   else console.log(`동적 레이어 픽셀 ${painted.toLocaleString()}개`);
+
+  // 7. **엔진 선택 — 바이너리 교체.** 상단 바에서 Standard SIMD 를 고르면 떠 있는 엔진을
+  // 깨끗이 내리고 단일 · 일반 SIMD 로 다시 띄운다. 분석을 켜 둔 채 바꾸면 새 엔진이 이어 읽는다.
+  // 자동으로 되돌리면 처음과 같은 변형이다.
+  const select = page.getByRole("combobox", { name: "엔진 선택" });
+  await page.getByRole("button", { name: "분석", exact: true }).click();
+  await page.locator('.panel__badge[data-status="searching"]').waitFor({ timeout: 10_000 });
+  const tSwap = Date.now();
+  await select.selectOption("simd");
+  await page
+    .waitForFunction(`window.__rapfiEngine().variant === "single-simd128"`, undefined, {
+      timeout: 60_000,
+      polling: 100,
+    })
+    .catch(() => undefined);
+  const swapped = (await page.evaluate(`window.__rapfiEngine()`)) as EngineInfo & {
+    status: string;
+  };
+  if (swapped.variant !== "single-simd128")
+    fail(`Standard SIMD 로 바뀌지 않았습니다: ${swapped.variant}`);
+  await page
+    .locator('.panel__badge[data-status="searching"]')
+    .waitFor({ timeout: 15_000 })
+    .catch(() => fail("엔진을 바꾼 뒤 켜 둔 분석이 이어지지 않습니다"));
+  console.log(`엔진 교체 → single-simd128 · ${Date.now() - tSwap}ms · 분석 이어짐`);
+  await page.getByRole("button", { name: "정지" }).click();
+  await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 5000 });
+  await select.selectOption("auto");
+  await page
+    .waitForFunction(
+      `window.__rapfiEngine().variant === ${JSON.stringify(wantVariant)}`,
+      undefined,
+      {
+        timeout: 60_000,
+        polling: 100,
+      },
+    )
+    .catch(() => undefined);
+  const back = (await page.evaluate(`window.__rapfiEngine()`)) as EngineInfo;
+  if (back.variant !== wantVariant) fail(`자동으로 되돌렸는데 ${back.variant} 입니다`);
+  else console.log(`엔진 교체 → 자동(${back.variant})`);
 
   if (errors.length) fail(`콘솔 오류 ${errors.length}건:\n  ${errors.join("\n  ")}`);
   if (!process.exitCode) console.log("엔진 스모크 통과");

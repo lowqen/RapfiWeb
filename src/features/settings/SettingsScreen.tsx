@@ -1,52 +1,38 @@
 import { useMemo, useState, type ComponentType } from "react";
-import { MOVE_TIME_CHOICES, useGameStore } from "../board/gameStore";
+import { useNavigate } from "react-router-dom";
+import { useGameStore, type BoardMode } from "../board/gameStore";
 import { useBoardStore } from "../board/boardStore";
-import { useEngineStore, MULTI_PV, threadCap } from "../../engine/engine-state";
-import { isMultiVariant, type EngineVariant } from "../../engine/engine-client";
+import { useEngineStore } from "../../engine/engine-state";
 import { useThemeStore, type ThemeMode } from "../../app/theme";
 import {
-  COMPUTER_SIDE_LABEL,
-  OPENING_HINT,
-  OPENING_LABEL,
-  OPENING_NOTICE,
-  type ComputerSide,
-  type OpeningProtocol,
-} from "../../core/model/game";
-import { RULE_LABEL } from "../../core/model/rules";
-import {
-  ANALYSIS_SEC_CHOICES,
   HASH_CHOICES_MB,
   MAX_DEPTH_LIMIT,
   MAX_NODE_CHOICES,
-  AUTO_THREADS,
   MIN_DEPTH,
   STYLE_RANGE,
-  THREAD_RELOAD_COST,
-  autoThreads,
-  deviceCores,
-  planThreadChange,
-  resolveThreads,
   useSettingsStore,
   type VcThread,
 } from "./settingsStore";
-import { Chip, ChipGroup, NumberField, Segmented, Stepper, Switch } from "./controls";
+import { NumberField, Segmented, Switch } from "./controls";
+import { EngineChoiceControl, ThreadControl } from "./engineControls";
 
 /**
  * 설정 — 두 층.
  *
- * **자주 쓰는 설정** 카드 하나가 늘 펼쳐져 있다: 룰셋(렌주 + 개시) · 컴퓨터가 둘 색 ·
- * 엔진 착수 시간 · 분석 시간 · 후보 수 · 스레드 수 · 다크 모드. 대국을 시작하기 전에
- * 만지는 것이 전부 여기 있다.
+ * **자주 쓰는 설정** 카드 하나가 늘 펼쳐져 있다: 엔진 선택 · 스레드 수 · 자동 기동 ·
+ * 다크 모드, 그리고 대국·분석 설정이 어디로 갔는지 알려 주는 길잡이 줄.
+ *
+ * **대국과 분석의 설정은 보드의 두 탭으로 옮겼다.** 컴퓨터 색 · 착수 시간 · 레벨 · 개시는
+ * [대국] 탭, 분석 시간 · 후보 수 · 정지하면 최선수 두기는 [분석] 탭에 있다 — 대국을
+ * 시작하거나 분석을 돌리는 바로 그 자리다. 같은 조작부를 여기에도 두면 어느 쪽이 참인지
+ * 되묻게 되어 뺐다(값의 주인은 그대로 `gameStore`·설정 스토어다). 검색은 그 이름들을
+ * 길잡이 줄로 찾아 준다.
  *
  * 그 밑의 **고급 설정** 스위치를 켜야 엔진 탐색 파라미터(해시·스타일·깊이·노드·위협
  * 확인)와 표시·초기화가 나온다. 켜 둔 상태는 저장된다(`showAdvanced`). 검색은 층을
  * 가리지 않는다 — 이름이나 INFO 키를 아는 사람이 스위치부터 찾게 하지 않는다.
  *
  * 줄마다 그 값이 엔진의 어느 `INFO` 키를 움직이는지 적는다(앱의 `engineKey`).
- *
- * 전에 있던 줄 중 대국 진행(새 대국·기권·무승부)은 보드로, 해시 지금 비우기는 엔진
- * 탭으로 갔다. 켤 수 없는 줄(사색·데이터베이스)과 렌주 하나뿐인 규칙 선택은 뺐다 —
- * 누를 수 없는 조작부는 설정을 고장 난 것으로 읽히게 한다.
  */
 
 type Section = "basic" | "engine" | "display" | "system";
@@ -59,7 +45,7 @@ const SECTION_LABEL: Record<Section, string> = {
 };
 
 const SECTION_DESC: Record<Section, string> = {
-  basic: "대국과 분석의 기본. 엔진이 떠 있으면 바꾸는 즉시 반영됩니다.",
+  basic: "엔진과 화면의 기본. 대국·분석 설정은 보드의 [대국]·[분석] 탭에 있습니다.",
   engine: "엔진에 INFO 로 밀어 넣는 탐색 파라미터. 탐색 중에 바꾸면 다음 탐색부터 적용됩니다.",
   display: "보드에 무엇을 그릴지.",
   system: "설정 자체의 저장과 초기화.",
@@ -84,205 +70,30 @@ interface RowSpec {
 
 // ── 조작부 ─────────────────────────────────────────────────────────
 
-const SIDES: readonly ComputerSide[] = ["none", "black", "white", "both"];
-const OPENINGS: readonly OpeningProtocol[] = ["none", "rif", "swapFirst"];
-
-/**
- * 룰셋 — 기반 규칙(렌주 고정)과 개시 방식을 한 줄에. 웹은 렌주 가중치만 싣기 때문에
- * 규칙은 고르는 것이 아니라 **보여 주는** 것이고, 고르는 것은 개시다.
- */
-function RulesetControl() {
-  const opening = useGameStore((s) => s.opening);
-  const setOpening = useGameStore((s) => s.setOpening);
-  return (
-    <div className="stack">
-      <div className="ruleset">
-        <span className="pill" title="INFO RULE 4 — 웹 버전은 렌주 가중치만 싣습니다">
-          {RULE_LABEL.renju}
-        </span>
-        <ChipGroup label="오프닝">
-          {OPENINGS.map((o) => (
-            <Chip key={o} on={opening === o} title={OPENING_HINT[o]} onClick={() => setOpening(o)}>
-              {OPENING_LABEL[o]}
-            </Chip>
-          ))}
-        </ChipGroup>
-      </div>
-      <p className="srow__hint">{OPENING_HINT[opening]}</p>
-      <p className="srow__hint" data-k="opening-notice">
-        {OPENING_NOTICE}
-      </p>
-    </div>
-  );
-}
-
-function ComputerControl() {
-  const side = useGameStore((s) => s.computerSide);
-  const setSide = useGameStore((s) => s.setComputerSide);
-  return (
-    <ChipGroup label="컴퓨터">
-      {SIDES.map((s) => (
-        <Chip key={s} on={side === s} onClick={() => setSide(s)}>
-          {COMPUTER_SIDE_LABEL[s]}
-        </Chip>
-      ))}
-    </ChipGroup>
-  );
-}
-
-const moveTimeLabel = (ms: number) => (ms === 0 ? "무제한" : `${ms / 1000}초`);
-
-/** 엔진 한 수의 시간 — 대국 시계 없이 `timeout_turn` 하나만 정한다. */
-function MoveTimeControl() {
-  const v = useGameStore((s) => s.moveTimeMs);
-  const set = useGameStore((s) => s.setMoveTime);
-  return (
-    <ChipGroup label="엔진 착수 시간">
-      {MOVE_TIME_CHOICES.map((ms) => (
-        <Chip key={ms} on={v === ms} onClick={() => set(ms)}>
-          {moveTimeLabel(ms)}
-        </Chip>
-      ))}
-    </ChipGroup>
-  );
-}
-
-const VARIANT_LABEL: Record<EngineVariant, string> = {
-  "multi-simd128-relaxed": "멀티스레드 · relaxed SIMD",
-  "multi-simd128": "멀티스레드",
-  "single-simd128-relaxed": "단일 스레드 · relaxed SIMD",
-  "single-simd128": "단일 스레드",
-};
-
-/**
- * 스레드 수 선택 — 자동 · 1 … 코어 수. 멀티 변형이 떠 있을 때만 엔진에 닿고, 탐색
- * 중에 바꾸면 **다음 탐색부터**다(엔진 스토어가 탐색 중에는 보내지 않는다).
- *
- * 밑의 두 줄이 지금 엔진이 실제로 쓰는 값과 **어느 변형이 왜** 떠 있는지를 말한다.
- * 멀티를 못 쓰는 환경에서 「1」만 보여 주면 설정이 고장 난 것으로 읽힌다 — 그래서
- * 따로 있던 「엔진 변형」 줄을 여기에 접어 넣었다.
- *
- * **떠 있는 멀티 엔진의 스레드 수는 곧바로 바꾸지 않는다**(P1-2). 바꿀 때마다 엔진이
- * 스레드를 다시 세우고 다음 탐색이 가중치를 다시 푼다(`THREAD_RELOAD_COST`). 1 → 2 → 3 을
- * 차례로 누르면 그 비용을 거듭 치렀다. 고른 값은 「대기」로 두고 비용을 알린 뒤 「적용」
- * 한 번에 보낸다. 엔진이 없을 때는 곧바로 저장한다 — 다음 기동의 기동 메시지로 예열 전에
- * 들어가므로(P1-1) 비용이 없다.
- */
-function ThreadControl() {
-  const caps = useEngineStore((s) => s.capabilities);
-  const status = useEngineStore((s) => s.status);
-  const engine = useEngineStore((s) => s.engine);
-  const applied = useEngineStore((s) => s.appliedThreads);
-  const allow = useSettingsStore((s) => s.allowThreads);
-  const v = useSettingsStore((s) => s.threads);
+function AutoBootControl() {
+  const on = useSettingsStore((s) => s.autoBoot);
   const update = useSettingsStore((s) => s.update);
-  /** 확정을 기다리는 선택(설정값 — 0 = 자동). */
-  const [draft, setDraft] = useState<number | null>(null);
-
-  const cores = deviceCores();
-  const live = engine.threaded && (status === "ready" || status === "searching");
-  const choose = (threads: number) => {
-    const plan = planThreadChange({ next: threads, current: v, cores, applied, live });
-    if (plan === "confirm") {
-      setDraft(threads);
-      return;
-    }
-    setDraft(null);
-    if (plan === "apply") update({ threads });
-  };
-  const commit = () => {
-    if (draft !== null) update({ threads: draft });
-    setDraft(null);
-  };
-  const cap = threadCap(cores, engine.maxThreads);
-  const single = engine.variant !== null && !isMultiVariant(engine.variant);
-  const usable = caps.threads && allow && !single;
-  const wanted = resolveThreads(v, cores);
-  const options = [{ value: AUTO_THREADS, label: `자동 (${Math.min(cap, autoThreads(cores))})` }];
-  for (let n = 1; n <= cap; n++) options.push({ value: n, label: String(n) });
-
-  let line: string;
-  if (!caps.threads) line = "이 환경에서는 단일 스레드 엔진이라 1 입니다.";
-  else if (!allow) line = "멀티스레드를 꺼 두어 1 입니다(고급 설정).";
-  else if (single) line = "단일 스레드 엔진으로 떠 있어 1 입니다.";
-  else if (status === "idle" || status === "error" || applied === null) {
-    line = `엔진을 띄우면 ${wanted} 스레드로 시작합니다.`;
-  } else if (applied === wanted) line = `적용됨 — ${applied} 스레드로 탐색합니다.`;
-  else line = `다음 탐색부터 ${wanted} 스레드 (지금 ${applied}).`;
-
-  // 띄우면 무엇이 뜰지 — 멀티를 꺼 두었으면 순서에서 멀티를 뺀 첫 변형.
-  const planned: EngineVariant | null =
-    caps.variants.find((x) => allow || !isMultiVariant(x)) ?? null;
-  const shown = engine.variant ?? planned;
-  const why = engine.fallbackReason
-    ? `앞선 변형이 기동에 실패해 물러섰습니다 — ${engine.fallbackReason}`
-    : caps.threadsNote;
-
   return (
-    <div className="stack">
-      <Segmented
-        label="스레드 수"
-        value={Math.min(draft ?? v, cap)}
-        options={options}
-        disabled={!usable}
-        onChange={choose}
-      />
-      {draft !== null && (
-        <div className="stack" data-k="threads-confirm">
-          <p className="srow__hint tnum" role="status">
-            {resolveThreads(draft, cores)} 스레드로 바꾸면 엔진이 스레드를 다시 세우고 가중치를 다시
-            풀어 다음 탐색이 {THREAD_RELOAD_COST} 늦게 시작합니다.
-            {status === "searching" ? " 지금 탐색은 그대로 두고 다음 탐색부터 적용됩니다." : ""}
-          </p>
-          <div className="actions">
-            <button type="button" className="btn btn--tonal" onClick={commit}>
-              적용
-            </button>
-            <button type="button" className="btn" onClick={() => setDraft(null)}>
-              취소
-            </button>
-          </div>
-        </div>
-      )}
-      <p className="srow__hint tnum" data-k="threads-status">
-        {line} {cores ? `이 기기의 논리 코어 ${cores}개.` : ""}
-      </p>
-      <p className="srow__hint tnum" data-k="engine-variant">
-        엔진 {shown ? `${shown} · ${VARIANT_LABEL[shown]}` : "실행 불가"}
-        {engine.variant ? "" : status === "idle" ? " (엔진을 띄우면)" : ""}
-        {why ? ` — ${why}` : ""}
-      </p>
-    </div>
+    <Switch label="앱을 열면 엔진 시작" on={on} onChange={(autoBoot) => update({ autoBoot })} />
   );
 }
 
-/** 멀티스레드 변형을 쓸지. 떠 있는 엔진과 어긋나면 다시 띄우는 버튼을 낸다. */
-function AllowThreadsControl() {
-  const caps = useEngineStore((s) => s.capabilities);
-  const status = useEngineStore((s) => s.status);
-  const engine = useEngineStore((s) => s.engine);
-  const restart = useEngineStore((s) => s.restart);
-  const allow = useSettingsStore((s) => s.allowThreads);
-  const update = useSettingsStore((s) => s.update);
-  const running = status === "ready" || status === "searching";
-  // 떠 있는 변형이 지금 설정과 다르다(물러선 경우는 다시 띄워도 같으므로 제외).
-  const stale =
-    running &&
-    ((allow && caps.threads && !engine.threaded && !engine.fallbackReason) ||
-      (!allow && engine.threaded));
+/** 대국·분석 설정이 옮겨 간 자리로 — 누르면 그 탭을 연 보드로 간다. */
+function BoardTabsControl() {
+  const navigate = useNavigate();
+  const setMode = useGameStore((s) => s.setMode);
+  const open = (m: BoardMode) => {
+    setMode(m);
+    navigate("/board");
+  };
   return (
     <div className="actions">
-      <Switch
-        label="멀티스레드 사용"
-        on={allow && caps.threads}
-        disabled={!caps.threads}
-        onChange={(v) => update({ allowThreads: v })}
-      />
-      {stale && (
-        <button type="button" className="btn" onClick={() => void restart()}>
-          엔진 다시 띄우기
-        </button>
-      )}
+      <button type="button" className="btn" onClick={() => open("game")}>
+        보드 › 대국 탭
+      </button>
+      <button type="button" className="btn" onClick={() => open("analysis")}>
+        보드 › 분석 탭
+      </button>
     </div>
   );
 }
@@ -370,35 +181,6 @@ function HashAutoClearControl() {
   return <Switch label="해시 자동 지우기" on={on} onChange={(v) => update({ hashAutoClear: v })} />;
 }
 
-const secLabel = (s: number) => (s === 0 ? "무제한" : `${s}초`);
-
-function AnalysisTimeControl() {
-  const v = useSettingsStore((s) => s.analysisSec);
-  const update = useSettingsStore((s) => s.update);
-  return (
-    <Segmented
-      label="분석 시간"
-      value={v}
-      options={ANALYSIS_SEC_CHOICES.map((s) => ({ value: s, label: secLabel(s) }))}
-      onChange={(analysisSec) => update({ analysisSec })}
-    />
-  );
-}
-
-function MultiPvControl() {
-  const v = useSettingsStore((s) => s.multiPv);
-  const update = useSettingsStore((s) => s.update);
-  return (
-    <Stepper
-      label="후보 수"
-      value={v}
-      min={MULTI_PV.min}
-      max={MULTI_PV.max}
-      onChange={(multiPv) => update({ multiPv })}
-    />
-  );
-}
-
 function EvalBarControl() {
   const on = useSettingsStore((s) => s.showEvalBar);
   const update = useSettingsStore((s) => s.update);
@@ -462,53 +244,16 @@ function ResetControl() {
 // ── 목록 ───────────────────────────────────────────────────────────
 
 const ROWS: readonly RowSpec[] = [
-  // 자주 쓰는 설정 — 대국을 시작하기 전에 만지는 순서대로.
+  // 자주 쓰는 설정 — 엔진과 화면.
   {
-    id: "ruleset",
+    id: "engine",
     sec: "basic",
-    label: "룰셋",
-    note: "기반 규칙은 렌주이고, 고르는 것은 개시 방식입니다. 바꾸면 새 대국이 시작됩니다.",
-    engineKey: "INFO RULE",
-    keywords: "규칙 렌주 renju 개시 오프닝 RIF 교환 swap",
+    label: "엔진",
+    note: "자동은 이 브라우저에서 가장 빠른 것(멀티스레드 · relaxed SIMD)부터 띄웁니다. 바꾸면 떠 있는 엔진을 내리고 고른 바이너리로 다시 띄웁니다 — 해시는 비고, 켜 둔 분석은 이어 읽습니다. 상단 바에서도 고를 수 있습니다.",
+    keywords:
+      "wasm simd relaxed standard multi single thread pthread 멀티 단일 변형 바이너리 멀티스레드 사용",
     wide: true,
-    Control: RulesetControl,
-  },
-  {
-    id: "computer",
-    sec: "basic",
-    label: "컴퓨터가 둘 색",
-    note: "엔진 차례에 판을 누르면 엔진이 둡니다. 보드의 「진영 전환」으로 대국 중에도 흑백을 맞바꿉니다.",
-    keywords: "컴퓨터 흑 백 사람 진영",
-    wide: true,
-    Control: ComputerControl,
-  },
-  {
-    id: "moveTime",
-    sec: "basic",
-    label: "엔진 착수 시간",
-    note: "대국에서 엔진이 한 수에 쓰는 시간. 무제한이면 보드의 「지금 두기」까지 읽습니다(데스크톱 level 0).",
-    engineKey: "timeout_turn",
-    keywords: "레벨 턴 시간 무제한 level",
-    wide: true,
-    Control: MoveTimeControl,
-  },
-  {
-    id: "analysisTime",
-    sec: "basic",
-    label: "분석 시간",
-    note: "무제한이면 정지하거나 국면이 바뀔 때까지 읽고, 수를 두면 새 국면을 이어 읽습니다.",
-    keywords: "무제한 예산",
-    wide: true,
-    Control: AnalysisTimeControl,
-  },
-  {
-    id: "multiPv",
-    sec: "basic",
-    label: "후보 수 (멀티 PV)",
-    note: "1 이면 최선 수 하나만 깊게 읽습니다. 다음 분석부터 적용됩니다.",
-    engineKey: "YXNBEST",
-    keywords: "nbest pv",
-    Control: MultiPvControl,
+    Control: EngineChoiceControl,
   },
   {
     id: "threads",
@@ -516,9 +261,27 @@ const ROWS: readonly RowSpec[] = [
     label: "스레드 수",
     note: "자동은 코어 하나를 화면에 남기고(코어 − 1) 4 를 넘기지 않습니다. 엔진이 떠 있을 때 바꾸면 가중치를 다시 푸는 비용(약 0.8초)을 알리고 「적용」을 눌러야 바뀝니다. 탐색 중이면 다음 탐색부터입니다.",
     engineKey: "thread_num",
-    keywords: "threads 코어 cpu wasm simd rapfi multi single 멀티 단일 변형",
+    keywords: "threads 코어 cpu",
     wide: true,
     Control: ThreadControl,
+  },
+  {
+    id: "autoBoot",
+    sec: "basic",
+    label: "앱을 열면 엔진 시작",
+    note: "켜 두면 앱이 뜨는 대로 엔진을 뒤에서 띄웁니다. 가중치(약 20MB)는 처음 한 번만 받고 그 뒤로는 캐시에서 읽습니다.",
+    keywords: "자동 기동 부팅 autoboot 시작",
+    Control: AutoBootControl,
+  },
+  {
+    id: "boardTabs",
+    sec: "basic",
+    label: "대국 · 분석 설정",
+    note: "컴퓨터 색 · 착수 시간 · 레벨 · 개시(RIF · 교환)는 보드의 [대국] 탭, 분석 시간 · 후보 수 · 정지하면 최선수 두기는 [분석] 탭에 있습니다.",
+    keywords:
+      "컴퓨터 흑 백 사람 진영 착수 시간 레벨 level timeout_turn 룰셋 규칙 렌주 개시 오프닝 RIF 교환 swap 분석 시간 후보 nbest pv 멀티 PV 정지 최선수",
+    wide: true,
+    Control: BoardTabsControl,
   },
   {
     id: "theme",
@@ -531,14 +294,6 @@ const ROWS: readonly RowSpec[] = [
   },
 
   // 고급 — 엔진
-  {
-    id: "allowThreads",
-    sec: "engine",
-    label: "멀티스레드 사용",
-    note: "끄면 환경이 되어도 단일 스레드 엔진을 씁니다. 바꾸면 엔진을 다시 띄워야 적용됩니다.",
-    keywords: "multi-simd128 pthread 멀티",
-    Control: AllowThreadsControl,
-  },
   {
     id: "hash",
     sec: "engine",

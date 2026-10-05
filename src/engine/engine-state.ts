@@ -1,16 +1,19 @@
 import { create } from "zustand";
-import type { Move } from "../core/model/move";
+import { positionKey, type Move } from "../core/model/move";
 import {
+  BootAbortedError,
   EngineClient,
   detectCapabilities,
   isMultiVariant,
   type Capabilities,
+  type EnginePreference,
   type EngineVariant,
   type OpeningResponse,
 } from "./engine-client";
 import {
   EMPTY_SNAPSHOT,
   type AnalysisSnapshot,
+  type BootPhase,
   type EngineCommand,
   type EngineStatus,
   type Placement,
@@ -23,9 +26,9 @@ import { toEvalView, type EvalView } from "./eval-view";
  * 클라이언트를 **여기서 하나만** 들고 있는다. 화면이 여럿이어도 엔진은 하나이고,
  * 라우팅으로 화면을 떠나도 탐색은 계속돼야 한다 — 워커가 살아 있는 한 스토어도 산다.
  *
- * **자동으로 기동하지 않는다.** `public/engine/` 이 비어 있을 수 있고(엔진 산출물은
- * 릴리스 자산으로 나른다), 없는 파일을 받으러 가서 콘솔에 404 를 남길 이유가 없다.
- * 사용자가 「엔진 시작」을 누르거나 분석을 요청할 때 뜬다.
+ * **이 스토어는 스스로 기동하지 않는다.** 앱이 뜰 때 셸이 한 번 `start` 를 부른다
+ * (`app/useAutoBoot.ts` — 설정 「앱을 열면 엔진 시작」, 주소의 `?autoboot=0` 으로 끈다).
+ * 엔진 산출물이 없는 개발 환경에서는 그 기동이 「오류」로 끝나고 화면이 그대로 말한다.
  */
 
 /** 콘솔 링버퍼 상한. 앱과 같은 값(계획서 §3). */
@@ -42,6 +45,14 @@ interface EngineState {
   status: EngineStatus;
   capabilities: Capabilities;
   snapshot: AnalysisSnapshot;
+  /**
+   * `snapshot` 이 **어느 국면**의 것인가(`positionKey`). 아직 아무 탐색도 없으면 null.
+   * 화면은 이 키가 지금 판의 키와 같을 때만 값 칩·PV·최선수를 그린다 — 무르기 직후처럼
+   * 국면이 바뀌고 새 탐색의 첫 스냅샷이 아직 오지 않은 틈에 옛 값이 새 판에 얹히지 않게.
+   */
+  snapshotKey: string | null;
+  /** 기동 중이면 지금 단계(로딩 표시용). 기동 중이 아니면 null. */
+  bootPhase: BootPhase | null;
   console: readonly string[];
   error: string | null;
   /** 마지막 확정 착수. `TURN`/`BEGIN` 의 응답이다(분석에서는 오지 않는다). */
@@ -72,17 +83,24 @@ interface EngineState {
    * 모르면 앞 값을 그대로 둔다(체스닷컴의 바처럼 비지 않는다).
    */
   evalView: EvalView | null;
+  /** `evalView` 가 어느 국면의 값인가. 평가 바·형세 그래프가 국면과 짝짓는다. */
+  evalKey: string | null;
   /** 떠 있는 엔진 — 어느 변형인지, 물러섰다면 왜. */
   engine: RunningEngine;
   /** 엔진에 실제로 보낸 스레드 수. 아직 안 보냈으면 null. */
   appliedThreads: number | null;
   /**
-   * 멀티스레드 변형을 써도 되는가(설정). 끄면 환경이 되어도 단일로 띄운다. 바꾸면
-   * 다음 기동부터 — 떠 있는 엔진은 `restart` 로 다시 띄운다.
+   * 사용자가 고른 엔진(자동 · 멀티 · relaxed · 일반 SIMD — `planOrder`). **바꾸면 떠 있는
+   * 엔진을 깨끗이 내리고 그 변형으로 다시 띄운다**(`restart`) — 바이너리가 다르므로
+   * 떠 있는 워커를 고쳐 쓸 수 없다. 꺼져 있으면 다음 기동부터.
    */
-  allowThreads: boolean;
-  setAllowThreads: (on: boolean) => void;
-  /** 엔진을 내렸다가 다시 띄운다(변형 전환). 해시와 분석 의도는 잃는다. */
+  enginePreference: EnginePreference;
+  setEnginePreference: (p: EnginePreference) => void;
+  /**
+   * 엔진을 내렸다가 다시 띄운다(변형 전환). 해시는 잃는다. 분석이 켜져 있었으면 새 엔진이
+   * 같은 국면을 이어 읽고, 대국에서 엔진이 생각 중이었다면 그 수는 버려진다
+   * (`onEngineReset` — 대국이 판을 풀어 사람이 다시 «두어라» 할 수 있다).
+   */
   restart: () => Promise<void>;
   /**
    * 엔진 파라미터(`INFO caution_factor` 등). 기동하면 한 번, 바뀌면 다시 보낸다.
@@ -93,11 +111,18 @@ interface EngineState {
 
   start: () => Promise<void>;
   analyze: (stones: readonly Placement[], totalMs?: number) => Promise<void>;
-  /** 대국의 한 수. 분석과 달리 조각으로 나누지 않는다. */
+  /**
+   * 대국의 한 수. 분석과 달리 조각으로 나누지 않는다.
+   *
+   * `info` 는 **이 착수에만** 얹는 `INFO` 값이다(대국 레벨의 `max_node` 등). 같은 키의
+   * 설정값을 이 탐색 동안만 덮고, 다음 분석은 설정값으로 되돌려 보낸다 — 대국의 레벨이
+   * 분석을 얕게 만들지 않게(모드 격리).
+   */
   play: (
     stones: readonly Placement[],
     emptyBoard: boolean,
     budget?: { turnMs?: number; matchMs?: number; matchLeftMs?: number },
+    info?: readonly EngineCommand[],
   ) => Promise<void>;
   /** 명령 몇 개를 그대로 보낸다(협상 단계 등). */
   send: (...cmds: EngineCommand[]) => void;
@@ -189,18 +214,23 @@ export function bootCommands(
 }
 
 let config: EngineConfig = { info: [], hashAutoClear: false, threads: 1 };
-/** 보내지 못하고 미룬 설정이 있는가. */
-let configDirty = false;
 /**
  * 이 엔진에 마지막으로 보낸 `INFO` 값(키 → 값). 바뀐 것만 보낸다 — 스레드 수 하나를
  * 바꿨다고 `hash_size` 까지 다시 보내면 엔진이 해시 표를 다시 잡을 수 있다. 엔진이
  * 새로 뜰 때마다(`onBooted`) 기동 메시지로 보낸 설정만 남기고 비운다.
+ *
+ * 보낼지 말지는 **언제나 이 표와 견줘** 정한다 — 대국 레벨이 착수 동안만 `max_node` 를
+ * 덮었다가 다음 분석이 설정값으로 되돌릴 때도 같은 길이다(바뀐 한 줄만 나간다).
  */
 const sentInfo = new Map<string, string>();
 /** 마지막으로 분석한 국면 — 밀려 끝난 분석을 다시 이을 때 쓴다. */
 let analysisStones: readonly Placement[] = [];
 /** 마지막 탐색 요청 국면의 돌 수 — 짝수면 흑 차례. 평가 바의 관점을 정한다. */
 let requestPly = 0;
+/** 마지막 탐색 요청 국면의 키(`positionKey`). 스냅샷·평가에 꼬리표로 붙는다. */
+let requestKey: string | null = null;
+
+const keyOf = (stones: readonly Placement[]) => positionKey(stones.map((p) => p.move));
 
 /**
  * 대국 상태 기계가 여기 걸어 두는 손잡이들.
@@ -212,6 +242,11 @@ let gameHandlers: {
   onEngineMove?: (moves: readonly Move[]) => void;
   onOpening?: (r: OpeningResponse) => void;
   onForbid?: (cells: readonly Move[]) => void;
+  /**
+   * 엔진을 내렸다(종료 · 변형 전환). 생각 중이던 대국의 수는 오지 않는다 — 대국이 판을
+   * 풀어야 한다. 없으면 무제한 대국에서 판이 「엔진이 생각 중입니다」로 영영 잠겼다.
+   */
+  onEngineReset?: () => void;
 } = {};
 
 export const setGameHandlers = (h: typeof gameHandlers) => {
@@ -230,8 +265,8 @@ export const getGameHandlers = () => gameHandlers;
  * «[object Object]» 로 화면에 뜬다 — 실제로 그렇게 나와서 한 런을 헤맸다.
  */
 function describe(e: unknown): string {
-  if (e instanceof Error) return e.message;
-  if (typeof e === "string") return e;
+  if (e instanceof Error) return tidy(e.message);
+  if (typeof e === "string") return tidy(e);
   try {
     return JSON.stringify(e) ?? String(e);
   } catch {
@@ -239,11 +274,32 @@ function describe(e: unknown): string {
   }
 }
 
+/**
+ * 화면에 띄울 오류 한 줄. 워커가 올리는 오류는 스택(`at je (…/engine-worker-….js:1:14127)`)을
+ * 달고 오는데, 앱이 뜨자마자 엔진이 기동하므로 그것이 첫 화면에 그대로 박혔다. 스택은 콘솔의
+ * 몫이다 — 여기서는 「무엇이」만 남긴다.
+ */
+export function tidy(message: string): string {
+  const lines = message.split("\n").filter((l) => !/^\s*at\s/.test(l));
+  const text = lines.join(" ").replace(/\s+at\s+\S+\s+\(\S+:\d+:\d+\)/g, "");
+  return text.replace(/^(Uncaught\s+)?Error:\s*/, "").trim();
+}
+
+/** 같은 키는 뒤의 것이 이긴다 — 대국 레벨이 설정의 `max_node` 를 덮는다. */
+function overlay(base: readonly EngineCommand[], over: readonly EngineCommand[]) {
+  const keys = new Set(over.flatMap((c) => (c.kind === "info" ? [c.key] : [])));
+  return [...base.filter((c) => c.kind !== "info" || !keys.has(c.key)), ...over];
+}
+
 export const useEngineStore = create<EngineState>((set, get) => {
-  /** 미룬 설정을 보낸다. 엔진이 놀 때만 부른다(탐색 직전 포함). */
-  const flushConfig = (c: EngineClient) => {
-    if (!configDirty) return;
-    configDirty = false;
+  /**
+   * 설정을 엔진에 맞춘다 — 보낸 표(`sentInfo`)와 다른 것만. 엔진이 놀 때만 부른다
+   * (기동 직후·탐색 직전·대기 중 설정 변경).
+   *
+   * `over` 는 이번 탐색에만 얹는 값(대국 레벨). 없으면 설정값 그대로라, 앞 착수가 덮어 둔
+   * 값이 있으면 이 자리에서 되돌아간다.
+   */
+  const flushConfig = (c: EngineClient, over: readonly EngineCommand[] = []) => {
     // 스레드 수는 **엔진이 놀 때만** 바뀐다 — 이 함수는 기동 직후·탐색 직전·대기 중
     // 설정 변경에서만 불린다. 탐색 중에 스레드 풀을 다시 세우면 엔진이 도는 스레드를
     // 허무는 셈이다(워커도 탐색 중에는 YXSTOP 말고 아무것도 보내지 않는다).
@@ -253,7 +309,7 @@ export const useEngineStore = create<EngineState>((set, get) => {
       config.threads,
       threadCap(c.capabilities.hardwareConcurrency, e.maxThreads),
     );
-    const fresh = [...config.info, command].filter(
+    const fresh = [...overlay(config.info, over), command].filter(
       (cmd) => cmd.kind !== "info" || sentInfo.get(cmd.key) !== String(cmd.value),
     );
     if (fresh.length) c.send(...fresh);
@@ -267,37 +323,66 @@ export const useEngineStore = create<EngineState>((set, get) => {
     if (config.hashAutoClear) c.send({ kind: "raw", line: "YXHASHCLEAR" });
     analysisStones = stones;
     requestPly = stones.length;
+    requestKey = keyOf(stones);
     const nbest = get().multiPv;
     const budget = totalMs ?? get().analysisMs;
     // exactOptionalPropertyTypes: 무제한은 키를 비워 둔다(클라이언트 기본값이 무제한).
     c.analyze(stones, Number.isFinite(budget) ? { totalMs: budget, nbest } : { nbest });
   };
 
+  /** 엔진을 띄운다 — 떠 있으면 그대로. 사용자가 고른 엔진(`enginePreference`)으로. */
+  const boot = (c: EngineClient) => c.start(get().enginePreference);
+
   const ensure = (): EngineClient => {
     if (client) return client;
-    client = new EngineClient({
-      onStatus: (status) => set({ status }),
-      onSnapshot: (snapshot) =>
-        set((s) => ({ snapshot, evalView: toEvalView(snapshot.stats, requestPly) ?? s.evalView })),
+    // 이 클라이언트가 **지금의** 엔진일 때만 스토어를 고친다. 변형을 바꾸면 옛 클라이언트를
+    // 내리고 새것을 띄우는데, 옛것이 마지막으로 흘린 사건이 새 엔진의 상태를 덮으면 안 된다.
+    const c: EngineClient = new EngineClient({
+      onStatus: (status) => {
+        if (client !== c) return;
+        set(status === "starting" ? { status } : { status, bootPhase: null });
+      },
+      onBootPhase: (bootPhase) => {
+        if (client === c) set({ bootPhase });
+      },
+      onSnapshot: (snapshot) => {
+        if (client !== c) return;
+        set((s) => {
+          const view = toEvalView(snapshot.stats, requestPly);
+          return {
+            snapshot,
+            snapshotKey: requestKey,
+            evalView: view ?? s.evalView,
+            evalKey: view ? requestKey : s.evalKey,
+          };
+        });
+      },
       onConsole: (lines) =>
         set((s) => {
           const next = [...s.console, ...lines];
           return { console: next.length > CONSOLE_MAX ? next.slice(-CONSOLE_MAX) : next };
         }),
       onBestMove: (moves) => {
+        if (client !== c) return;
         set({ lastBestMove: moves[0] ?? null });
         gameHandlers.onEngineMove?.(moves);
       },
-      onOpening: (r) => gameHandlers.onOpening?.(r),
+      onOpening: (r) => {
+        if (client === c) gameHandlers.onOpening?.(r);
+      },
       onForbid: (cells) => {
+        if (client !== c) return;
         set({ forbidden: cells });
         gameHandlers.onForbid?.(cells);
       },
-      onError: (error) => set({ error }),
+      onError: (error) => {
+        if (client === c) set({ error: tidy(error) });
+      },
       // 띄울 변형마다 — 멀티에서 단일로 물러서면 thread_num 은 1 이 된다.
       bootSettings: (variant) =>
         bootCommands(config, isMultiVariant(variant), get().capabilities.hardwareConcurrency),
       onBooted: (info) => {
+        if (client !== c) return;
         // 새 엔진은 기동 메시지로 받은 설정만 안다 — 그것을 「보냄」으로 적어 둬야 아래
         // `flushConfig` 가 같은 thread_num 을 다시 보내 스레드를 재구성하지 않는다.
         sentInfo.clear();
@@ -317,16 +402,13 @@ export const useEngineStore = create<EngineState>((set, get) => {
         });
         // 멈춘 멀티 엔진을 단일로 다시 띄웠다 — 새 엔진은 설정을 모르고, 켜 둔 분석은
         // 끊겼다. 처음 기동은 `start`·`analyze` 가 이 일을 하므로 여기서는 복구만 본다.
-        const c = client;
-        if (!info.recovered || !c) return;
-        configDirty = true;
+        if (!info.recovered) return;
         flushConfig(c);
         if (get().analyzing) runAnalysis(c, analysisStones);
       },
       onSearchDone: (mode, reason) => {
-        if (mode !== "analyze" || !get().analyzing) return;
-        const c = client;
-        if (reason === "stopped" && c) {
+        if (client !== c || mode !== "analyze" || !get().analyzing) return;
+        if (reason === "stopped") {
           // **밀려서 끝났다** — 정지 버튼이 아니라(그건 `analyzing` 을 먼저 끈다)
           // 줄에 선 다른 명령(기권 알림 등)이 비켜 달라고 한 것이다. 그 명령은
           // 이미 처리됐으니 같은 국면을 이어 읽는다. 해시가 남아 있어 깊이도 잇는다.
@@ -337,13 +419,25 @@ export const useEngineStore = create<EngineState>((set, get) => {
         set({ analyzing: false });
       },
     });
-    return client;
+    client = c;
+    return c;
+  };
+
+  /**
+   * 기동이 실패했다. 다만 **엔진을 내려서 버려진 기동**(변형 전환)은 오류가 아니다 —
+   * 그 사이 새 클라이언트가 떠 있으므로 아무것도 고치지 않는다.
+   */
+  const bootFailed = (c: EngineClient, e: unknown, extra: Partial<EngineState> = {}) => {
+    if (e instanceof BootAbortedError || client !== c) return;
+    set({ error: describe(e), status: "error", bootPhase: null, ...extra });
   };
 
   return {
     status: "idle",
     capabilities: detectCapabilities(),
     snapshot: EMPTY_SNAPSHOT,
+    snapshotKey: null,
+    bootPhase: null,
     console: [],
     error: null,
     lastBestMove: null,
@@ -355,34 +449,42 @@ export const useEngineStore = create<EngineState>((set, get) => {
     setAnalysisMs: (ms) => set({ analysisMs: ms > 0 ? ms : Infinity }),
     analyzing: false,
     evalView: null,
+    evalKey: null,
     engine: NO_ENGINE,
     appliedThreads: null,
-    allowThreads: true,
-    setAllowThreads: (on) => set({ allowThreads: on }),
+    enginePreference: "auto",
+    setEnginePreference: (p) => {
+      if (p === get().enginePreference) return;
+      set({ enginePreference: p });
+      // 떠 있거나 뜨는 중이면 깨끗이 다시 띄운다 — 다른 바이너리다. 꺼져 있으면 다음 기동부터.
+      if (get().status !== "idle") void get().restart();
+    },
 
     restart: async () => {
+      const resume = get().analyzing ? analysisStones : null;
       get().terminate();
-      await get().start();
+      // 분석이 켜져 있었으면 새 엔진이 같은 국면을 이어 읽는다 — `analyze` 가 기동까지 한다.
+      // 기동하는 사이 국면이 바뀌면 분석 따라가기(`gameStore`)가 새 국면으로 다시 청한다.
+      if (resume) await get().analyze(resume);
+      else await get().start();
     },
 
     configure: (next) => {
       config = next;
-      configDirty = true;
       // 놀고 있으면 지금 보낸다. 탐색 중이거나 아직 뜨지 않았으면 미룬다 —
-      // 기동이 끝나는 자리와 다음 탐색 직전이 받아 보낸다.
+      // 기동 메시지와 다음 탐색 직전(`flushConfig`)이 받아 보낸다.
       if (client && client.currentStatus === "ready") flushConfig(client);
     },
 
     start: async () => {
       set({ error: null });
+      const c = ensure();
       try {
-        const c = ensure();
-        await c.start(get().allowThreads);
+        await boot(c);
         // 기동 직후 한 번. 기동 메시지의 설정은 이미 들어갔으므로 기동 중에 바뀐 값만 나간다.
-        configDirty = true;
-        flushConfig(c);
+        if (client === c) flushConfig(c);
       } catch (e) {
-        set({ error: describe(e), status: "error" });
+        bootFailed(c, e);
       }
     },
 
@@ -390,34 +492,32 @@ export const useEngineStore = create<EngineState>((set, get) => {
       const c = ensure();
       set({ error: null, analyzing: true });
       try {
-        if (c.currentStatus === "idle" || c.currentStatus === "error") {
-          await c.start(get().allowThreads);
-          configDirty = true;
-        }
-        // 기동을 기다리는 사이에 정지·착수가 의도를 껐다면 시작하지 않는다.
-        if (!get().analyzing) return;
+        if (c.currentStatus === "idle" || c.currentStatus === "error") await boot(c);
+        else if (c.currentStatus === "starting") await c.whenReady();
+        // 기동을 기다리는 사이에 정지·착수·엔진 전환이 의도를 껐다면 시작하지 않는다.
+        if (!get().analyzing || client !== c) return;
         runAnalysis(c, stones, totalMs);
       } catch (e) {
-        set({ error: describe(e), status: "error", analyzing: false });
+        bootFailed(c, e, { analyzing: false });
       }
     },
 
-    play: async (stones, emptyBoard, budget) => {
+    play: async (stones, emptyBoard, budget, info = []) => {
       const c = ensure();
       // 대국의 착수가 엔진을 가져간다 — 분석 의도는 여기서 끝난다. 켜 둔 채면
       // 엔진이 답하자마자 분석이 다시 붙어 대국과 엔진을 나눠 쓰게 된다.
       set({ error: null, analyzing: false });
       try {
-        if (c.currentStatus === "idle" || c.currentStatus === "error") {
-          await c.start(get().allowThreads);
-          configDirty = true;
-        }
-        flushConfig(c);
+        if (c.currentStatus === "idle" || c.currentStatus === "error") await boot(c);
+        else if (c.currentStatus === "starting") await c.whenReady();
+        if (client !== c) return;
+        flushConfig(c, info);
         if (config.hashAutoClear) c.send({ kind: "raw", line: "YXHASHCLEAR" });
         requestPly = stones.length;
+        requestKey = keyOf(stones);
         c.play(stones, emptyBoard, budget ?? {});
       } catch (e) {
-        set({ error: describe(e), status: "error" });
+        bootFailed(c, e);
       }
     },
 
@@ -434,19 +534,26 @@ export const useEngineStore = create<EngineState>((set, get) => {
     },
 
     terminate: () => {
-      client?.terminate();
+      const c = client;
+      // 먼저 떼어 낸다 — `terminate` 가 흘리는 마지막 사건(상태 idle 등)은 받지 않는다.
       client = null;
+      c?.terminate();
+      requestKey = null;
       set({
         status: "idle",
+        bootPhase: null,
         snapshot: EMPTY_SNAPSHOT,
+        snapshotKey: null,
         lastBestMove: null,
         analyzing: false,
         evalView: null,
+        evalKey: null,
         engine: NO_ENGINE,
         appliedThreads: null,
       });
-      // 다음 기동은 새 엔진이다 — 설정을 처음부터 다시 보낸다.
-      configDirty = true;
+      // 다음 기동은 새 엔진이다 — 보낸 표는 그 엔진의 기동 메시지가 다시 채운다.
+      sentInfo.clear();
+      gameHandlers.onEngineReset?.();
     },
 
     clearConsole: () => set({ console: [] }),

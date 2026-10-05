@@ -5,6 +5,7 @@ import { TopBar } from "./TopBar";
 import { ResearchTabs } from "../features/research/ResearchTabs";
 import { titleFor } from "./destinations";
 import { useIsCompact } from "./useIsCompact";
+import { useAutoBoot } from "./useAutoBoot";
 
 /**
  * 레일 + 상단 바 + 내용. 스낵바 호스트도 결국 여기 하나가 된다(앱과 같이).
@@ -17,6 +18,8 @@ export function AppShell() {
   const compact = useIsCompact();
   const { title, subtitle } = titleFor(pathname);
   const inResearch = pathname.startsWith("/research");
+  // 앱이 뜨면 엔진을 뒤에서 띄운다 — 셸은 화면을 옮겨도 남으므로 한 번만 돈다.
+  useAutoBoot();
 
   return (
     <div className="shell" data-compact={compact || undefined}>

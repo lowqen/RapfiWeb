@@ -324,7 +324,16 @@ export type ToWorker =
  */
 export type SearchEndReason = "finished" | "stopped" | "timeout";
 
+/**
+ * 기동의 어느 단계인가 — 화면의 로딩 표시가 「무엇을 기다리는지」 말하게 한다.
+ * `weights` 가중치(~20MB) 받기·캐시 읽기·해시 확인 → `engine` 글루·wasm 인스턴스와
+ * START 핸드셰이크 → `warmup` 예열 탐색. 끝은 `booted` 다.
+ */
+export type BootPhase = "weights" | "engine" | "warmup";
+
 export type FromWorker =
+  /** 기동 단계가 바뀌었다(로딩 표시용 — 프로토콜의 의미는 없다). */
+  | { type: "phase"; phase: BootPhase }
   | {
       type: "booted";
       version: string;

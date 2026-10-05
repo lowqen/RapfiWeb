@@ -485,6 +485,8 @@ async function boot(msg: Extract<ToWorker, { type: "boot" }>) {
   // **가중치 선적재.** 공유 가중치가 있으면 글루를 읽기 **전에** 받기 시작한다 — 20MB
   // 내려받기(또는 캐시 읽기·해시 검증)가 글루 파싱과 겹친다. 글루는 인스턴스를 만들 때
   // 이 버퍼를 `getPreloadedPackage` 로 받아 내려받기를 건너뛴다.
+  // 로딩 표시용 단계 알림 — 가중치가 없으면(글루가 받는 옛 빌드) 곧장 엔진 단계다.
+  post({ type: "phase", phase: msg.weights ? "weights" : "engine" });
   const weightsP = msg.weights ? loadWeights(msg.weights) : null;
   weightsP?.catch(() => undefined); // 아래에서 기다린다 — 그 전에 거부돼도 처리되지 않은 거부로 새지 않게
   const factory = loadFactory(msg.engineBaseUrl, msg.variant);
@@ -517,6 +519,7 @@ async function boot(msg: Extract<ToWorker, { type: "boot" }>) {
       return b;
     };
   }
+  if (msg.weights) post({ type: "phase", phase: "engine" });
   mod = await factory(opts);
   if (typeof mod.sendCommand !== "function") {
     throw new Error("Module.sendCommand 가 없습니다 — preamble.js 가 빠진 빌드입니다");
@@ -565,6 +568,7 @@ async function boot(msg: Extract<ToWorker, { type: "boot" }>) {
   // JIT 승격 전 구간(첫 탐색 10~26% 느림, docs/gomocalc-엔진-비교.md §4.2)을 여기서
   // 치르고, 이 변형이 **실제로 탐색하는지**까지 확인한다 — 여기서 던지면 클라이언트가 다음
   // 변형으로 물러선다(relaxed 가 이 기기에서 이상하면 일반 SIMD 로).
+  if (msg.warmupMs && msg.warmupMs > 0) post({ type: "phase", phase: "warmup" });
   const warmupMs = msg.warmupMs && msg.warmupMs > 0 ? await warmup(msg.warmupMs) : null;
 
   post({

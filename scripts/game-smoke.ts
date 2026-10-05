@@ -87,30 +87,29 @@ page.on("console", (m) => {
 
 // ── 화면 사이를 오가는 손 ────────────────────────────────────────────
 //
-// 대국 설정(개시·컴퓨터 색·엔진 착수 시간)은 **설정 탭**의 「자주 쓰는 설정」에 있고,
-// 판·평가 바·엔진 상태·물음·「지금 두기」·퀵 바(새 판·진영 전환)·기권·무승부는
-// **보드 탭**에 있다. 대국 상태는
-// 스토어에 살아 있으므로 탭을 오가도 판은 그대로다 — 사용자가 하는 그대로 레일로 오간다.
+// 보드는 [대국] | [분석] 두 탭이다. 대국 설정(개시·흑/백·시간·레벨)·「지금 두기」·
+// 기권·무승부는 **대국 탭**에, 분석·정지와 엔진 수치는 **분석 탭**에 있다. 판·평가 바·
+// 물음·퀵 바(새 판)·이동 바는 두 탭이 함께 쓴다.
+//
+// **탭을 바꾸는 것은 엔진에 손을 대는 일이다** — 대국 → 분석은 엔진이 생각하던 대국의
+// 수를 버리고, 분석 → 대국은 도는 분석을 멈춘다. 그래서 손(`click`·`tap`)이 그 버튼이
+// 사는 탭으로 먼저 가는데, 그 이동이 시험의 뜻을 바꾸는 자리(생각 중 · 분석 중)에서는
+// 시험이 탭을 직접 고른다.
 
 type Screen = "board" | "settings";
+type Tab = "대국" | "분석";
 
-/** 설정 탭에 사는 버튼들. 여기 없는 이름은 보드 탭에서 누른다. */
-const ON_SETTINGS = new Set([
-  // 엔진 착수 시간 칩. 분석 시간의 「무제한」은 radio 라 버튼 이름과 겹치지 않는다.
-  "무제한",
-  "1초",
-  "3초",
-  "5초",
-  "10초",
-  "30초",
-  "자유 렌주",
-  "RIF 오프닝",
-  "첫 수 이후 교환",
-  "사람 대 사람",
-  "컴퓨터 흑",
-  "컴퓨터 백",
-  "컴퓨터 양쪽",
-]);
+/** 분석 탭에 사는 버튼들. 여기 없는 이름은 대국 탭에서 누른다. */
+const ON_ANALYSIS = new Set(["분석", "정지"]);
+
+/** 보드의 탭을 고른다(이미 그 탭이면 아무것도 하지 않는다). */
+async function tab(name: Tab) {
+  await goto("board");
+  const t = page.getByRole("tab", { name, exact: true });
+  if ((await t.getAttribute("aria-selected")) === "true") return;
+  await t.click();
+  await page.waitForTimeout(120);
+}
 
 async function goto(screen: Screen) {
   const marker = screen === "board" ? ".boardscreen" : ".settings";
@@ -143,7 +142,7 @@ const STEP_DIV = 15.5;
  * 둘 다 「엔진이 답하지 않는다」처럼 보였지만 클릭이 판에 닿지도 않은 것이다.
  */
 async function tap(x: number, y: number) {
-  await goto("board");
+  await tab("대국");
   const board = page.locator(".board__view");
   // 누를 **그 점**이 실제로 보드인지 확인하고 누른다. 보드(984px)가 스크롤
   // 영역보다 커서, 스크롤 뒤에는 윗줄이 고정된 상단 바 **밑으로** 들어간다 —
@@ -216,7 +215,7 @@ async function engineReply(n: number, why: string, thinkMs = 2_000) {
  */
 async function analysisHealthy(label: string) {
   const before = await stoneCount();
-  await runAnalysis(3_000);
+  const placed = await runAnalysis(3_000);
   await page.waitForTimeout(300);
   const lines = (await page.evaluate(`window.__rapfiConsole()`)) as string[];
   // 가장 최근 분석: 마지막 탐색 머리(`timeout_match 0` — 워커가 탐색마다 맨 먼저
@@ -246,23 +245,47 @@ async function analysisHealthy(label: string) {
   } else if (boards < slices)
     fail(`${label}: 조각 ${slices}개에 국면은 ${boards}번 — 국면이 흘렀습니다`);
   else if (zero.length) fail(`${label}: ${zero.length}개 조각이 0ms 로 돌았습니다 — ${zero[0]}`);
-  else if (after !== before) fail(`${label}: 분석이 판에 돌을 두었습니다 (${before}→${after})`);
-  else ok(`${label}: 조각 ${slices}개 · 조각마다 국면 재설정 · 0ms 조각 없음 · 판 그대로`);
+  else if (after !== before)
+    fail(`${label}: 분석 뒤 판이 돌아오지 않았습니다 (${before}→${after})`);
+  else
+    ok(
+      `${label}: 조각 ${slices}개 · 조각마다 국면 재설정 · 0ms 조각 없음 · 정지 → 최선수 ${placed} · 무르기로 판 복원`,
+    );
 }
 
 /**
- * 분석을 켜고 `ms` 동안 읽힌 뒤 **정지로** 끈다. 분석은 이제 무제한이 기본이라
- * 스스로 「대기」로 돌아오지 않는다 — 예전처럼 ready 를 기다리면 영원히 기다린다.
- * 그 사이에 저절로 멈췄다면 그것이 곧 회귀다(무제한 분석 조기 중단 버그).
+ * 분석 탭에서 분석을 켜고 `ms` 동안 읽힌 뒤 **정지로** 끈다. 분석은 무제한이 기본이라
+ * 스스로 「대기」로 돌아오지 않는다 — 그 사이에 저절로 멈췄다면 그것이 곧 회귀다(무제한
+ * 분석 조기 중단 버그).
+ *
+ * 정지는 **그 순간의 최선수를 둔다**(분석 탭 기본). 누르기 직전의 BEST 와 둔 수가 같은지
+ * 보고, 대국의 기보를 지키려고 그 한 수를 무른 뒤 대국 탭으로 돌아온다. 둔 수를 돌려준다.
  */
-async function runAnalysis(ms: number) {
+async function runAnalysis(ms: number): Promise<string> {
+  await tab("분석");
+  const before = await stoneCount();
   await click("분석");
   await page.locator('.panel__badge[data-status="searching"]').waitFor({ timeout: 10_000 });
   await page.waitForTimeout(ms);
   const still = await page.locator(".panel__badge").first().getAttribute("data-status");
   if (still !== "searching") fail(`무제한 분석이 ${ms}ms 안에 저절로 멈췄습니다 (${still})`);
+  const best = (await page.locator(".kv.stats dd").last().innerText()).trim();
   await click("정지");
   await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 5_000 });
+  await page.waitForTimeout(150);
+  const placed = (await page.locator("dd[data-k=last]").innerText()).trim();
+  if ((await stoneCount()) !== before + 1 || placed !== best) {
+    fail(
+      `정지가 최선수(${best})를 두지 않았습니다 — 돌 ${before}→${await stoneCount()} · 마지막 ${placed}`,
+    );
+  }
+  // 대국의 기보로 돌아간다 — 정지가 둔 수를 무르고 대국 탭으로.
+  await page.getByRole("button", { name: "한 수 뒤로" }).click();
+  await page.waitForTimeout(120);
+  if ((await stoneCount()) !== before)
+    fail(`정지가 둔 수를 무르지 못했습니다 (${await stoneCount()})`);
+  await tab("대국");
+  return placed;
 }
 
 /** 지금 떠 있는 물음의 종류. 없으면 null. 물음은 보드 탭에 뜬다. */
@@ -347,7 +370,7 @@ async function thought(label: string) {
  * 탭으로 먼저 간다(`ON_SETTINGS`).
  */
 async function click(name: string) {
-  await goto(ON_SETTINGS.has(name) ? "settings" : "board");
+  await tab(ON_ANALYSIS.has(name) ? "분석" : "대국");
   await page.getByRole("button", { name, exact: true }).click();
 }
 
@@ -380,12 +403,14 @@ async function dump(why: string) {
 // ── 검수 ─────────────────────────────────────────────────────────────
 
 try {
-  await page.goto(`${BASE}/board`, { waitUntil: "networkidle" });
-
+  // 엔진은 앱이 뜨면 스스로 기동한다 — 누르지 않고 기다린다.
   const t0 = Date.now();
-  await click("엔진 시작");
-  await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 180_000 });
-  console.log(`엔진 기동 ${Date.now() - t0}ms`);
+  await page.goto(`${BASE}/board`, { waitUntil: "domcontentloaded" });
+  await page
+    .locator('[data-k="engine-indicator"][data-status="ready"]')
+    .waitFor({ timeout: 180_000 });
+  console.log(`엔진 자동 기동 ${Date.now() - t0}ms`);
+  await tab("대국");
   // 대국 전체를 **어느 변형으로** 도는지 — 멀티면 착수·분석이 비동기 경로를 탄다.
   const engineInfo = (await page.evaluate(`window.__rapfiEngine()`)) as {
     variant: string;
@@ -437,15 +462,23 @@ try {
   await page.waitForTimeout(300);
   await thought("분석 뒤 착수");
 
-  // 분석이 **도는 도중에** 한 수를 둔다. 워커의 분석은 조각 사이에 이벤트 루프로
-  // 돌아오므로, 그 틈에 착수 요청이 끼어든다 — 명령이 섞이기 가장 쉬운 자리다.
+  // **탭 격리 — 분석이 도는 중에 대국 탭으로.** 분석은 멈추기만 하고(최선수를 두지
+  // 않는다) 판은 그대로다. 예전에는 분석 도중의 착수가 명령이 섞이기 가장 쉬운 자리였는데,
+  // 이제 대국 탭으로 가는 순간 분석이 멈추므로 그 뒤의 착수가 깨끗한지를 본다.
+  await tab("분석");
   await click("분석");
   await page.locator('.panel__badge[data-status="searching"]').waitFor({ timeout: 10_000 });
+  await page.waitForTimeout(1_500);
+  await tab("대국");
+  await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 5_000 });
+  await page.waitForTimeout(800); // 정지에 늦게 온 답이 판에 떨어지지 않는지
+  if ((await stoneCount()) !== 6)
+    fail(`분석 → 대국 탭 전환이 판을 바꿨습니다: 돌 ${await stoneCount()}개`);
+  else ok("분석 → 대국: 분석이 멈추고 판은 그대로");
   await tap(13, 1);
-  await engineReply(8, "(분석 도중 왕복)");
-  await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 30_000 });
+  await engineReply(8, "(탭 전환 뒤 왕복)");
   await page.waitForTimeout(300);
-  await thought("분석 도중 착수");
+  await thought("탭 전환 뒤 착수");
 
   // 그리고 그 다음 수도 — 명령 흐름이 한 칸 밀렸다면 **다음** 수부터 망가진다.
   await tap(13, 13);
@@ -474,6 +507,49 @@ try {
   await waitStones(2, 10_000, "(「지금 두기」 뒤 엔진의 수)");
   await page.waitForTimeout(300);
   await thought("「지금 두기」로 둔 수");
+
+  // **탭 격리 — 엔진이 대국의 수를 생각하는 중에 분석 탭으로.** 그 수는 버려져야 한다:
+  // 분석 탭에서 판에 엔진의 돌이 떨어지면 두 모드가 한 판을 두고 다툰 것이다. 대국 탭으로
+  // 돌아와 판을 누르면(«두어라») 엔진이 다시 생각해 둔다.
+  console.log("\n1b. 탭 격리 — 생각 중 탭 전환");
+  await click("새 판");
+  await tap(7, 7);
+  await waitStones(1, 5_000, "(사람 수)");
+  await page.waitForTimeout(1_000);
+  await tab("분석");
+  await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 10_000 });
+  await page.waitForTimeout(1_500);
+  if ((await stoneCount()) !== 1)
+    fail(`대국 → 분석 탭 전환 뒤 엔진의 수가 판에 떨어졌습니다 (${await stoneCount()})`);
+  else ok("대국 → 분석: 생각하던 대국의 수를 버렸다");
+  await tab("대국");
+  if ((await page.getByRole("button", { name: "지금 두기", exact: true }).count()) !== 0)
+    fail("대국 탭으로 돌아왔는데 엔진이 아직 생각 중입니다");
+  await tap(3, 3); // 엔진 차례 — «두어라»
+  await engineReply(2, "(탭 전환 뒤 «두어라»)");
+  ok("대국 탭에서 다시 «두어라» 하면 엔진이 둔다");
+
+  // ── 1c. 레벨 — 노드로 끊는 세기 ───────────────────────────────────
+  //
+  // 「입문」은 착수에 `INFO max_node 20000` 을 얹는다. 착수 시간이 무제한이어도 엔진이 그
+  // 노드에서 **스스로** 둔다(「지금 두기」가 필요 없다). 그 값은 대국 착수에만 머물고 다음
+  // 분석은 설정값(-1)으로 되돌린다 — 대국의 레벨이 분석을 얕게 만들지 않는다.
+  console.log("\n1c. 레벨 — 입문");
+  await click("새 판");
+  await page.getByRole("radio", { name: "입문", exact: true }).click();
+  await tap(7, 7);
+  const tLevel = Date.now();
+  await waitStones(2, 60_000, "(입문 레벨 엔진의 답 — 「지금 두기」 없이)");
+  ok(`입문: 엔진이 스스로 ${Date.now() - tLevel}ms 만에 두었다`);
+  let consoleLines = (await page.evaluate(`window.__rapfiConsole()`)) as string[];
+  const levelAt = consoleLines.lastIndexOf("> INFO max_node 20000");
+  if (levelAt < 0) fail("입문 레벨이 max_node 20000 을 보내지 않았습니다");
+  await runAnalysis(1_500);
+  consoleLines = (await page.evaluate(`window.__rapfiConsole()`)) as string[];
+  if (consoleLines.lastIndexOf("> INFO max_node -1") < levelAt)
+    fail("레벨 뒤의 분석이 max_node 를 설정값(-1)으로 되돌리지 않았습니다");
+  else ok("분석은 max_node -1 로 돌아갔다 — 레벨은 대국 착수에만");
+  await page.getByRole("radio", { name: "최강", exact: true }).click();
 
   // ── 2. 엔진 착수 시간 — 대국 시계 없이 ───────────────────────────
   //
@@ -634,7 +710,7 @@ try {
   // (`docs/오프닝-협상-엔진-지원.md`). 화면에 남아 있으면 못 하는 일을 계속
   // 제안하게 되므로 목록에서 내렸다 — **배포본에서 그것을 확인한다.**
   console.log("\n8. 개시 목록");
-  await goto("settings"); // 개시 칩과 안내는 설정 탭의 「룰셋」 줄(자주 쓰는 설정)에 있다
+  await tab("대국"); // 개시 칩과 안내는 보드의 대국 탭 「룰셋」 줄에 있다
   const chips = await page.locator('[role=group][aria-label="오프닝"] .chip').allInnerTexts();
   const names = chips.map((c) => c.trim()).sort();
   const want = ["RIF 오프닝", "자유 렌주", "첫 수 이후 교환"].sort();

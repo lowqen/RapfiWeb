@@ -34,3 +34,21 @@ export const label = (m: Move, size = DEFAULT_SIZE): string =>
 
 export const inBoard = (m: Move, size = DEFAULT_SIZE): boolean =>
   m.x >= 0 && m.y >= 0 && m.x < size && m.y < size;
+
+/** 판 한가운데(15×15 에서 H8 = 천원). */
+export const center = (size = DEFAULT_SIZE): Move => move(size >> 1, size >> 1);
+
+/**
+ * 국면 키 — 수순 그대로의 문자열(`"112,96,…"`, 빈 판은 `""`). 엔진의 분석 결과가
+ * **어느 국면의 것인지** 붙여 두는 꼬리표다. 무르기·앞으로·새 판으로 국면이 바뀐 뒤
+ * 옛 국면의 값 칩·PV·평가가 새 판에 얹히지 않게 화면이 이 키로 맞춰 본다.
+ *
+ * 수순(순서)까지 같아야 같은 키다 — 같은 돌 배치라도 수순이 다르면 기보가 다르고,
+ * 형세 그래프의 한 점은 기보의 한 수다.
+ */
+export const positionKey = (moves: readonly Move[], size = DEFAULT_SIZE): string =>
+  moves.map((m) => moveKey(m, size)).join(",");
+
+/** `ancestor` 가 `key` 와 같거나 그 앞 국면(수순의 머리)인가. 빈 판은 모든 국면의 머리다. */
+export const isSameOrAncestorKey = (ancestor: string, key: string): boolean =>
+  ancestor === key || ancestor === "" || key.startsWith(ancestor + ",");
