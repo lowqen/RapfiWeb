@@ -114,9 +114,6 @@ jobs:
           echo "nproc $(nproc) · $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2)"
           grep -E 'MemTotal|MemAvailable' /proc/meminfo
           lscpu | grep -E '^(Thread|Core|Socket)' || true
-          # 컨테이너 러너는 /proc 에 호스트 값이 보인다 — 실제 한도는 cgroup 이다(빌드 병렬 수가 이것을 따른다).
-          echo "cgroup memory.max: $(cat /sys/fs/cgroup/memory.max 2> /dev/null || cat /sys/fs/cgroup/memory/memory.limit_in_bytes 2> /dev/null || echo '?')"
-          echo "cgroup cpu.max: $(cat /sys/fs/cgroup/cpu.max 2> /dev/null || echo '?')"
 
       - name: rapfi 소스 캐시 복원
         uses: actions/cache/restore@v4
@@ -158,9 +155,8 @@ jobs:
           # ── wasm: 배포 실물(같은 변형 · 같은 wasm-opt)끼리. config 는 .data 에 구워져 test_config 를 쓸 수 없다.
           [ -z "$TEST_CONFIG" ] || { echo "::error::engine=wasm 에서는 test_config 를 쓸 수 없습니다(.data 에 구워짐)"; exit 1; }
           case "$V" in multi-*) echo "::error::wasm-pbrain 은 단일 스레드 변형만 — $V"; exit 1 ;; esac
-          # 심판(금수 판정)은 따로 짓지 않는다 — runner.mjs 가 --referee 가 없으면 B 와 같은 엔진(여기서는 WASM 기준)을
-          # 하나 더 띄워 YXSHOWFORBID 를 묻는다. 판정은 같은 엔진의 것이다. 예전에는 네이티브 기준 빌드를 심판으로 썼는데,
-          # 그 한 개 때문에 호스트 C++ 툴체인이 필요했다 — RunPod 러너(g++ 9.4)에서 M3 SPRT 가 그 빌드로 멈췄다(37339377453).
+          # 심판(금수 판정)은 네이티브 기준 빌드 — 판정 결과는 같고 훨씬 가볍다.
+          OUT_DIR=$E/referee RAPFI_PATCHES="$BASE" bash tools/build_host_engine.sh
           take () {
             rm -rf "$E/$1"; mkdir -p "$E/$1"
             # package.json({"type":"commonjs"}) 이 없으면 저장소 루트의 "type": "module" 때문에 글루 .js 가 ESM 으로 읽힌다
@@ -168,12 +164,12 @@ jobs:
             ( cd "$E/$1" && sha256sum rapfi-$V.wasm )
           }
           extra=""; case "$V" in single-simd128) ;; *) extra="$V" ;; esac
-          HOST_BASELINE=0 RAPFI_PATCHES="$BASE" EXTRA_VARIANTS="$extra" WASM_OPT_POST="$OPT_PASSES" bash tools/build_engine_wasm.sh
+          RAPFI_PATCHES="$BASE" EXTRA_VARIANTS="$extra" WASM_OPT_POST="$OPT_PASSES" bash tools/build_engine_wasm.sh
           echo "--- B: BENCH single-simd128(배포 구성이면 2b7c7da9) · $V"
           node spike/node-bench.mjs single-simd128 | grep -E '"(hash|nodes|pass)"'
           node spike/node-bench.mjs "$V" | grep -E '"(hash|nodes|pass)"' || true
           take base
-          HOST_BASELINE=0 RAPFI_PATCHES="$(echo $BASE $TEST)" EXTRA_VARIANTS="$extra" WASM_OPT_POST="$OPT_PASSES" bash tools/build_engine_wasm.sh
+          RAPFI_PATCHES="$(echo $BASE $TEST)" EXTRA_VARIANTS="$extra" WASM_OPT_POST="$OPT_PASSES" bash tools/build_engine_wasm.sh
           echo "--- A: BENCH(트리를 바꾸는 변경이면 달라지는 것이 정상 — 기록만) · $V"
           node spike/node-bench.mjs "$V" | grep -E '"(hash|nodes|pass)"' || true
           take test
@@ -203,7 +199,8 @@ jobs:
           fi
           if [ "$KIND" = "wasm" ]; then
             eng=(--a "node $PWD/bench/sprt/wasm-pbrain.mjs --dir $PWD/$E/test --variant $V" --a-name test
-                 --b "node $PWD/bench/sprt/wasm-pbrain.mjs --dir $PWD/$E/base --variant $V" --b-name base)
+                 --b "node $PWD/bench/sprt/wasm-pbrain.mjs --dir $PWD/$E/base --variant $V" --b-name base
+                 --referee "$PWD/$E/referee/pbrain-rapfi" --referee-cwd "$E/referee")
           else
             eng=(--a "$PWD/$E/test/pbrain-rapfi" --a-cwd "$E/test" --a-name test
                  --b "$PWD/$E/base/pbrain-rapfi" --b-cwd "$E/base" --b-name base)

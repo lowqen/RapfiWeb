@@ -67,14 +67,9 @@ WASM_OPT_POST="${WASM_OPT_POST:-}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK="${WORK:-$HOME/rapfi-wasm-work}"
 OUT="$ROOT/out"
-# 병렬 빌드 수 — 코어 수와 컨테이너 메모리 한도 중 작은 쪽(tools/ci/build-jobs.sh).
-# shellcheck disable=SC1091
-source "$ROOT/tools/ci/build-jobs.sh"
+JOBS="$(nproc)"
 
 echo ">>> [1/6] 도구"
-# emsdk 는 python 3.10+ 를 요구한다 — 낮은 러너(Ubuntu 20.04 의 3.8)면 독립 실행형 CPython 을 받는다(tools/ci/ensure-python.sh).
-# shellcheck disable=SC1091
-source "$ROOT/tools/ci/ensure-python.sh"
 mkdir -p "$WORK"
 cd "$WORK"
 # 캐시 액션이 미스에도 빈 디렉터리를 남길 수 있으므로 "있다"가 아니라
@@ -107,9 +102,6 @@ if [ ! -d "$EM_DIR/node_modules/acorn" ]; then
 fi
 EMSDK_RESOLVED="$(emcc -v 2>&1 | sed -n 1p)"
 echo "  . $EMSDK_RESOLVED"
-# cmake 가 Rapfi 의 요구(3.18.2)보다 낮은 러너(RunPod · Ubuntu 20.04 계열)면 공식 바이너리를 받아 PATH 앞에.
-# shellcheck disable=SC1091
-source "$ROOT/tools/ci/ensure-cmake.sh"
 echo "  . cmake $(cmake --version | sed -n 1p)"
 echo "  . node  $(node --version)"
 echo "  . emcc  $(command -v emcc)"
@@ -515,12 +507,6 @@ sed "s/^/  . /" "$OUT/engine/ENGINE_VERSION.txt"
 
 echo ">>> [7/7] 호스트 기준선 — wasm 해시를 **무엇과** 비교할 것인가"
 #
-# **참고값이다 — WASM 산출물을 막지 않는다.** 판정은 spike/web-baseline.json(웹 자신의 회귀 기준)으로 하고, 이 호스트
-# 해시는 node-bench 가 곁에 적는 네이티브 대조값일 뿐이다(파일이 없으면 기록값을 쓴다). 그런데 이 단계는 호스트 C++
-# 툴체인으로 LTO 빌드 둘을 하므로, 그것이 안 되는 러너(RunPod · Ubuntu 20.04 의 g++ 9.4)에서 엔진 빌드 전체가 여기서
-# 멈췄다. 이제 실패하면 경고하고 넘어간다. HOST_BASELINE=0 이면 아예 건너뛴다(SPRT 처럼 필요 없는 곳 — 빌드 둘을 아낀다).
-host_baseline () {
-#
 # 1차 측정에서 wasm 해시가 e240ab16 과 달랐다(4100a973). 원인 후보가 둘이었다:
 #
 #   (a) 설정이 다르다. 안드로이드 벤치는 config-example/config.toml 로 돌렸고,
@@ -551,7 +537,7 @@ cmake -S . -B build-host -G Ninja \
 # 출력은 파일로 받고, 실패하면 끝 60줄을 보인다 — 예전에는 > /dev/null 이라 컴파일 오류가 로그에 한 줄도 남지 않았다
 # (RunPod 러너의 M3 SPRT 37336926210 이 「exit code 1」 만 남기고 멈췄다).
 cmake --build build-host -j"$JOBS" > build-host/build.log 2>&1 \
-  || { echo "  X 호스트 빌드 실패 — build-host/build.log 끝:"; tail -60 build-host/build.log; return 1; }
+  || { echo "  X 호스트 빌드 실패 — build-host/build.log 끝:"; tail -60 build-host/build.log; exit 1; }
 echo "  . 호스트 바이너리(자동 감지) 빌드 완료"
 
 # (b1) 통제군: x86 을 128bit 로 묶는다. AVX2/AVX512/BMI2/VNNI 를 전부 끄고 SSE 만 켠다.
@@ -560,7 +546,7 @@ cmake -S . -B build-host-sse128 -G Ninja \
   -DUSE_SSE=ON -DUSE_AVX2=OFF -DUSE_AVX512=OFF -DUSE_BMI2=OFF -DUSE_VNNI=OFF \
   2>&1 | tee "$OUT/bench/host-sse128-isa.txt" | grep -E "SSE:|AVX2:|AVX512:|BMI2:|VNNI:" | sed "s/^/  . sse128 /" || true
 cmake --build build-host-sse128 -j"$JOBS" > build-host-sse128/build.log 2>&1 \
-  || { echo "  X 호스트(SSE 128bit) 빌드 실패 — build-host-sse128/build.log 끝:"; tail -60 build-host-sse128/build.log; return 1; }
+  || { echo "  X 호스트(SSE 128bit) 빌드 실패 — build-host-sse128/build.log 끝:"; tail -60 build-host-sse128/build.log; exit 1; }
 echo "  . 호스트 바이너리(SSE 128bit) 빌드 완료"
 
 run_host_bench () {
@@ -592,13 +578,6 @@ for l in android wasmcfg sse128; do
 done
 echo "    web baseline  = $(sed -n 's/.*"single-simd128"[^\"]*"\([0-9a-f]*\)".*/\1/p' "$ROOT/spike/web-baseline.json")  (웹 전용 회귀 기준)"
 echo "----------------------------------------------------------"
-
-}
-if [ "${HOST_BASELINE:-1}" = "0" ]; then
-  echo "  . HOST_BASELINE=0 — 호스트 기준선을 건너뜁니다"
-elif ! host_baseline; then
-  echo "  ! 호스트 기준선을 건너뜁니다 — 호스트 C++ 빌드 실패(참고값일 뿐, WASM 산출물은 그대로 씁니다)"
-fi
 
 echo "=========================================================="
 echo "완료: $OUT"

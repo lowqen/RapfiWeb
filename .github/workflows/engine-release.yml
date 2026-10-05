@@ -175,10 +175,6 @@ jobs:
           } > RELEASE_NOTES.md
           cat RELEASE_NOTES.md
 
-      # gh 가 없는 self-hosted 러너(갓 띄운 컨테이너)에서 받아 둔다 — tools/ci/ensure-gh.sh 주석.
-      - name: gh 준비
-        run: bash tools/ci/ensure-gh.sh
-
       - name: 릴리스 발행
         env:
           GH_TOKEN: ${{ github.token }}

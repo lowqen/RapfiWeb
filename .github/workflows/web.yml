@@ -72,10 +72,6 @@ jobs:
       - name: 스모크 — AppShell 이 실제로 렌더되는가
         run: pnpm exec tsx scripts/smoke.ts
 
-      # gh 가 없는 self-hosted 러너(갓 띄운 컨테이너)에서 받아 둔다 — tools/ci/ensure-gh.sh 주석.
-      - name: gh 준비
-        run: bash tools/ci/ensure-gh.sh
-
       # 엔진 산출물 조립. .js/.wasm 은 작아서 저장소에 두고 가중치(rapfi.data, 20MB — 모든
       # 변형 공유)는 릴리스에서 받는다(계획서 §8). 받은 뒤 커밋된 매니페스트·글루와 짝인지
       # 검증한다 — 어긋나면 배포된 앱의 가중치 무결성 검사가 모든 사용자에게서 실패한다.

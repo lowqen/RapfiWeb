@@ -67,10 +67,6 @@ jobs:
       - run: pnpm install --no-frozen-lockfile
       - run: pnpm build
 
-      # gh 가 없는 self-hosted 러너(갓 띄운 컨테이너)에서 받아 둔다 — tools/ci/ensure-gh.sh 주석.
-      - name: gh 준비
-        run: bash tools/ci/ensure-gh.sh
-
       # 엔진 산출물 조립. .js/.wasm 은 저장소에 있고 가중치(rapfi.data, 모든 변형 공유)만
       # 릴리스에서 받는다(계획서 §8). 릴리스는 engine-release.yml 이 만든다. 커밋된 매니페스트
       # ·글루와 짝이 아니면 **배포하지 않는다** — 앱의 가중치 무결성 검사가 전원 실패한다.
