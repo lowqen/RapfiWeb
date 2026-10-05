@@ -119,7 +119,7 @@ jobs:
             grep -m1 -E "^\s+LINK_FLAGS = " "$nj" | cut -c1-600 || true
           done
 
-      # Phase 2 패치 대조(docs/최적화-마스터플랜.md §5.3 「결과 불변 변경」) — 배포 릴리스가 아니라
+      # Phase 2 패치 대조(docs/최적화-마스터플랜.md 1부 §5.3 「결과 불변 변경」) — 배포 릴리스가 아니라
       # **이 러너에서 같은 툴체인으로** A(그대로)·B(패치 그리고/또는 wasm-opt 후처리) 두 빌드를 만들어
       # 그 둘만 잰다 — 엔진 이름은 rapfiweb-base(A) · rapfiweb-patch(B). 배포 렌주 구성
       # (PRELOAD_SET=renju) 그대로다. B 빌드는 BENCH 해시 게이트를 먼저 통과해야 한다.

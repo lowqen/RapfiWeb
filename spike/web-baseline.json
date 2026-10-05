@@ -24,7 +24,7 @@
     "2026-10-05: **기준선을 2b7c7da9 -> bb7888cc 로 갱신했다. 엔진 패치 A1 때문이다.**",
     "tools/patches/a1-q15mulr.patch 가 mix9svq dwconv 의 양자화 곱을 mulhi(내림) -> q15mulr(반올림)로 바꿔",
     "평가값이 달라지고 탐색 트리가 바뀐다(노드 7,170,518 -> 7,465,395). 의도한 변경이다 —",
-    "WASM SPRT(relaxed · 500ms, sprt 37247788294)에서 H1, Elo +20.2(docs/최적화-마스터플랜-v2.md §8.5).",
+    "WASM SPRT(relaxed · 500ms, sprt 37247788294)에서 H1, Elo +20.2(docs/최적화-마스터플랜.md 2부 §8.5).",
     "값은 같은 소스 · 같은 플래그(P2-2 + A1, wasm-opt -O4 --converge)로 mate-suite 37178502835 · sprt 37247788294 의",
     "빌드가 두 번 낸 것과 같다."
   ],

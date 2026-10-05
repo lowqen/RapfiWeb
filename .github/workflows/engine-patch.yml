@@ -1,7 +1,7 @@
 name: 엔진 패치 검증 (Phase 2 · 결과 불변)
 
 # upstream 패치(tools/patches/*.patch) 그리고/또는 wasm-opt 후처리(wasm_opt)를 얹어 빌드하고 **결과가 그대로인지**만 본다 —
-# docs/최적화-마스터플랜.md §4 Phase 2 의 게이트(BENCH 해시 2b7c7da9 · 7,170,518 노드 불변).
+# docs/최적화-마스터플랜.md 1부 §4 Phase 2 의 게이트(BENCH 해시 2b7c7da9 · 7,170,518 노드 불변).
 #
 #   1. tools/build_engine_wasm.sh 에 RAPFI_PATCHES 로 패치를 넘겨 빌드(검증 게이트·호스트 기준선 포함)
 #   2. 웹 회귀 게이트: node spike/node-bench.mjs single-simd128 — 기준선과 다르면 실패

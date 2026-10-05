@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * M1 — cachegrind 한 번(docs/최적화-마스터플랜-v2.md §4 M1). 네이티브 엔진을 valgrind 아래에서 띄워 고정 국면들을
+ * M1 — cachegrind 한 번(docs/최적화-마스터플랜.md 2부 §4 M1). 네이티브 엔진을 valgrind 아래에서 띄워 고정 국면들을
  * **노드 상한**으로 풀고, cachegrind 의 명령 수(Ir)와 모의 캐시 미스를 JSON 으로 남긴다.
  *
  *   node bench/cachegrind/cg-run.mjs --engine-dir DIR --mode search|load --ll 4194304 \

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# M1 — cachegrind 결정적 비용 지표 (docs/최적화-마스터플랜-v2.md §4 M1).
+# M1 — cachegrind 결정적 비용 지표 (docs/최적화-마스터플랜.md 2부 §4 M1).
 #
 #   BASE_PATCHES="tools/patches/p2-2-keep-evaluators-on-rebuild.patch" \
 #   TEST_PATCHES="tools/patches/a1-q15mulr.patch" \

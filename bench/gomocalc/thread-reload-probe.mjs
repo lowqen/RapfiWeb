@@ -6,7 +6,7 @@
  *   STRICT=1 node bench/gomocalc/thread-reload-probe.mjs patched multi-simd128
  *
  * STRICT=1 이면 첫 탐색(가중치를 처음 푸는 것이 정상) 뒤의 단계에서 재적재 줄이 하나라도 나오면
- * 종료 코드 1 — P2-2(docs/최적화-마스터플랜.md §4)의 게이트, engine-patch.yml 의 reload_gate.
+ * 종료 코드 1 — P2-2(docs/최적화-마스터플랜.md 1부 §4)의 게이트, engine-patch.yml 의 reload_gate.
  */
 import { chromium } from "playwright";
 import { Host, search, serve, setup } from "./lib.mjs";

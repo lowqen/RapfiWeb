@@ -68,7 +68,7 @@ export function resolveThreads(setting: number, cores: number | null): number {
 /**
  * 떠 있는 멀티 엔진의 스레드 수를 바꿀 때 치르는 비용. 엔진은 스레드를 **모두** 다시
  * 세우며 평가기를 버리고(`SearchEngine::setNumThreads`), 다음 탐색이 가중치를 다시 푼다
- * — T1 실측 0.73~0.85초(docs/최적화-마스터플랜.md §3.2-①).
+ * — T1 실측 0.73~0.85초(docs/최적화-마스터플랜.md 1부 §3.2-①).
  */
 export const THREAD_RELOAD_COST = "약 0.8초";
 

@@ -4,8 +4,8 @@ RapfiDroid(안드로이드 오목·렌주 분석반)의 **웹 이식**. Rapfi �
 브라우저 안에서 돌린다. 서버에 붙지 않는다 — 대국·채팅·랭킹 서버 연동은 범위 밖이다.
 
 - 설계: [`../test-yixin/docs/웹_이식_계획.md`](../test-yixin/docs/웹_이식_계획.md)
-- W0 스파이크 결과: [`docs/W0-결과.md`](docs/W0-결과.md)
-- upstream 이슈 초안: [`docs/upstream-이슈-초안.md`](docs/upstream-이슈-초안.md)
+- W0 스파이크 결과: [`docs/W0-결과.md`](docs/W0-결과.md) — 부록에 upstream 이슈 초안(미제출)
+- 엔진 최적화: [`docs/최적화-마스터플랜.md`](docs/최적화-마스터플랜.md) — 맨 앞 **통합 상태판**이 항목별 상태의 정본
 
 ## 지금 어디까지 와 있나
 
@@ -14,12 +14,13 @@ RapfiDroid(안드로이드 오목·렌주 분석반)의 **웹 이식**. Rapfi �
 | **W0** | stdin·빌드·BENCH 스파이크 | 완료 — W0-3 원인 확정·해소 |
 | **W1** | 스캐폴딩 — Vite·React·라우팅·AppShell·디자인 토큰·CI | 완료 |
 | **W2** | 보드 렌더링(Canvas 2D 2레이어) · 값 사다리 · Kotlin 톤 대조 | 완료 |
-| **W3** | 엔진 워커 + 프로토콜 이식 + 집계 + 분석 pane | **여기** |
-| W4~ | 보드 화면 전체 · 설정 · 연구 · 정석 | |
+| **W3** | 엔진 워커 + 프로토콜 이식 + 집계 + 분석 pane | 완료 |
+| **W4** | 보드 화면 — [대국] · [분석] 탭, 개시(자유 렌주 · RIF · 첫 수 이후 교환) | 완료 — 렌주 전용, 대국 시계 없음 |
+| W5 | 설정 + settings.txt 왕복 | 일부 — 설정 화면은 있고 settings.txt 왕복은 아직 |
+| W6~ | 연구(리뷰·증명 · 오프닝 · 수순 · 랭킹) · `.rif` 팩 · DB · 정석 | 미착수 — 순서는 설계 문서 부록 A |
 
-보드가 그려지고, 엔진이 붙어 있고, 분석 결과가 보드 위 값 칩·최선수 링·고스트로
-돌아온다. 나머지 여덟 화면은 라우팅과 셸이 다 연결돼 있고 내용은 「무엇이 될 자리인지」를
-적은 자리표시자다.
+보드 · 엔진 · 설정 화면은 실물이다. 나머지 여섯 화면(연구 네 탭 · DB · 정석)은 라우팅과 셸이 다
+연결돼 있고 내용은 「무엇이 될 자리인지」를 적은 자리표시자다.
 
 엔진은 **앱이 뜨면 뒤에서 자동으로 기동한다.** 상단 바의 엔진 표시가 단계(가중치 받기 →
 엔진 → 예열 → 준비)를 말하고, 그동안에도 판은 바로 둘 수 있다. 20MB 가중치는 처음 한 번만
@@ -95,7 +96,8 @@ pnpm engine:build          # tools/build_engine_wasm.sh
 20MB 짜리 `.data` 만 릴리스에서 받으면 된다:
 
 ```bash
-gh release download engine-3c94c2a9 --dir public/engine \n  --pattern 'rapfi-single-simd128.data'
+# 태그는 src/engine/engine-manifest.json 의 tag 와 같아야 한다(지금 engine-3c94c2a9-a3)
+gh release download engine-3c94c2a9-a3 --dir public/engine --pattern 'rapfi.data'
 ```
 
 릴리스가 없으면 Actions ▸ **엔진 릴리스 (WASM 산출물)** 을 한 번 돌린다.

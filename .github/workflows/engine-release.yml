@@ -42,9 +42,9 @@ jobs:
       ENABLE_LTO: "ON"
       # 엔진 소스 패치(공백 구분, 저장소 루트 기준). 빌드가 적용하고, 릴리스 본문이 밝히고,
       # 대응 소스로 자산에 함께 낸다(GPL — 아래 「릴리스 본문」·「릴리스 발행」).
-      # P2-2 채택(docs/최적화-마스터플랜.md §4): 결과 불변(BENCH 2b7c7da9 · 렌주 비트 동일 5/5 · 50/50,
+      # P2-2 채택(docs/최적화-마스터플랜.md 1부 §4): 결과 불변(BENCH 2b7c7da9 · 렌주 비트 동일 5/5 · 50/50,
       # engine-patch 37087267731)이고 스레드 수 변경 뒤 가중치 재적재 12줄 → 0줄.
-      # A1 채택(docs/최적화-마스터플랜-v2.md §8.5): dwconv 를 mulhi(w, 4f)(내림) → q15mulr(w, 2f)(반올림, 같은 눈금).
+      # A1 채택(docs/최적화-마스터플랜.md 2부 §8.5): dwconv 를 mulhi(w, 4f)(내림) → q15mulr(w, 2f)(반올림, 같은 눈금).
       # 트리가 바뀐다 — 웹 BENCH 2b7c7da9 → bb7888cc(spike/web-baseline.json). WASM SPRT(relaxed · 500ms)
       # sprt 37247788294 에서 H1, Elo +20.2(95% +6.6 ~ +33.9). relaxed 판은 relaxed_q15mulr — 입력이 0 이상이라
       # 구현 정의 경우(INT16_MIN²)가 없다.
@@ -54,7 +54,7 @@ jobs:
       # A3(결과 불변, relaxed 만): 값 헤드 starBlock 의 corner · edge · quad 넷씩을 가중치 재사용 배치로.
       # BENCH bb7888cc · 배포 a1n 과 렌주 비트 동일 5/5 · 50/50 · 재적재 0(engine-patch 37274864574).
       # 같은 트리 속도 대조 relaxed +8.7%(Xeon 8573C, wasm-speed 37278810729) · +11.2%(Xeon 8488C, 37281432681),
-      # A/A 대조는 0 을 품음 — docs/최적화-마스터플랜-v2.md §8.8.
+      # A/A 대조는 0 을 품음 — docs/최적화-마스터플랜.md 2부 §8.8.
       RAPFI_PATCHES: "tools/patches/p2-2-keep-evaluators-on-rebuild.patch tools/patches/a1-q15mulr.patch tools/patches/p4-1-periodic-node-stats.patch tools/patches/a3-starblock-multi.patch"
     steps:
       - uses: actions/checkout@v4
@@ -90,7 +90,7 @@ jobs:
         env:
           EXTRA_VARIANTS: "multi-simd128-relaxed single-simd128-relaxed"
           RELEASE_TAG: ${{ inputs.tag }}
-          # P2-6 채택(docs/최적화-마스터플랜.md §4 · §5.3): 결과 불변(BENCH 2b7c7da9 · 렌주 비트 동일)이고
+          # P2-6 채택(docs/최적화-마스터플랜.md 1부 §4 · §5.3): 결과 불변(BENCH 2b7c7da9 · 렌주 비트 동일)이고
           # 같은 러너 대조 두 번 모두 1 스레드 NPS 개선(+1.20% · +1.56%, 37044975502 · 37044987704).
           WASM_OPT_POST: "-O4 --converge"
         run: bash tools/build_engine_wasm.sh

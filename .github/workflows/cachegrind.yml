@@ -1,6 +1,6 @@
 name: cachegrind 결정적 비용 지표 (M1)
 
-# docs/최적화-마스터플랜-v2.md §4 M1 — 같은 러너에서 A(base_patches) · B(+test_patches) 네이티브 128비트 빌드를
+# docs/최적화-마스터플랜.md 2부 §4 M1 — 같은 러너에서 A(base_patches) · B(+test_patches) 네이티브 128비트 빌드를
 # valgrind cachegrind 아래에서 같은 국면 · 같은 노드 상한으로 풀어 명령 수(Ir)와 모의 캐시 미스를 맞댄다.
 # Ir 은 실행마다 같아야 한다(보고서의 「결정성」 표) — 순서 효과 · CPU 잡음이 없다.
 on:

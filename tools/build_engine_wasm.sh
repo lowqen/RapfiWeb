@@ -56,7 +56,7 @@ RELEASE_TAG="${RELEASE_TAG:-}"
 EXTRA_LDFLAGS="${EXTRA_LDFLAGS:-}"
 # upstream 패치(공백 구분, 저장소 루트 기준 경로 — 예: tools/patches/p2-1-codebook-pipeline.patch).
 # **기본값은 비움 = 패치 없음.** Phase 2 의 결과 불변 패치를 BENCH 해시로 판정할 때 켜고
-# (docs/최적화-마스터플랜.md §4 Phase 2, engine-patch.yml), 채택된 것은 engine-release.yml 이 잡 env 로
+# (docs/최적화-마스터플랜.md 1부 §4 Phase 2, engine-patch.yml), 채택된 것은 engine-release.yml 이 잡 env 로
 # 넘긴다(P2-2 부터 — 릴리스 본문이 밝히고 패치 파일을 자산으로 함께 낸다). 적용한 패치는 ENGINE_VERSION.txt 에 적힌다.
 RAPFI_PATCHES="${RAPFI_PATCHES:-}"
 # .wasm 후처리 패스(예: "-O4 --converge" — docs/최적화-마스터플랜.md 2-i · P2-6). **기본값은 비움 = 하지
