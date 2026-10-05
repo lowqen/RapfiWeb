@@ -193,9 +193,23 @@ jobs:
           if [ "$CONC" = "auto" ]; then
             # 대국마다 한 번에 한 엔진만 생각한다 — 생각하는 스레드가 물리 코어를 넘지 않게(SMT 형제를 나눠 쓰면 양쪽
             # 모두 느려져 시간 제어가 사실상 짧아진다), 러너 · 심판 · node GC 몫으로 2코어를 남긴다.
-            phys=$(lscpu -p=Core,Socket | grep -v '^#' | sort -u | wc -l)
+            #
+            # 물리 코어는 **이 프로세스가 쓸 수 있는 CPU 안에서만** 센다. 컨테이너(RunPod 등)는 lscpu 에 호스트 전체가 보여,
+            # 예전 셈은 CPU 32개짜리 컨테이너에서 「물리 128」로 동시 126판을 띄웠다 — 엔진마다 CPU 를 1/4 쯤 받아 수당 500ms 가
+            # 실제로는 ~125ms 가 됐다(M3 sprt 37343543047, 무효). CPU 쿼터(cgroup v2 cpu.max)가 있으면 그 수가 상한이다.
+            # 베어메탈은 허용 CPU 가 전부라 예전과 같은 값이다.
+            allowed=$(awk '/^Cpus_allowed_list:/ {print $2}' /proc/self/status)
+            phys=$(lscpu -p=CPU,Core,Socket | awk -F, -v list="$allowed" '
+              BEGIN { n = split(list, r, ","); for (i = 1; i <= n; i++) { if (split(r[i], ab, "-") == 2) { for (c = ab[1] + 0; c <= ab[2] + 0; c++) ok[c] = 1 } else ok[r[i] + 0] = 1 } }
+              /^#/ { next }
+              ($1 + 0) in ok { print $2 "," $3 }' | sort -u | wc -l)
+            quota=$(cat /sys/fs/cgroup/cpu.max 2> /dev/null || echo max)
+            if [ "${quota%% *}" != "max" ]; then
+              qcpu=$(( ${quota%% *} / ${quota##* } )); [ "$qcpu" -ge 1 ] || qcpu=1
+              [ "$phys" -le "$qcpu" ] || phys=$qcpu
+            fi
             CONC=$(( (phys - 2) / THREADS )); [ "$CONC" -ge 1 ] || CONC=1
-            echo "동시 대국 auto → $CONC (물리 코어 $phys · 스레드 $THREADS)"
+            echo "동시 대국 auto → $CONC (쓸 수 있는 물리 코어 $phys · 허용 CPU $allowed · cpu.max $quota · 스레드 $THREADS)"
           fi
           if [ "$KIND" = "wasm" ]; then
             eng=(--a "node $PWD/bench/sprt/wasm-pbrain.mjs --dir $PWD/$E/test --variant $V" --a-name test
