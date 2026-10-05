@@ -114,6 +114,9 @@ jobs:
           echo "nproc $(nproc) · $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2)"
           grep -E 'MemTotal|MemAvailable' /proc/meminfo
           lscpu | grep -E '^(Thread|Core|Socket)' || true
+          # 컨테이너 러너는 /proc 에 호스트 값이 보인다 — 실제 한도는 cgroup 이다(빌드 병렬 수가 이것을 따른다).
+          echo "cgroup memory.max: $(cat /sys/fs/cgroup/memory.max 2> /dev/null || cat /sys/fs/cgroup/memory/memory.limit_in_bytes 2> /dev/null || echo '?')"
+          echo "cgroup cpu.max: $(cat /sys/fs/cgroup/cpu.max 2> /dev/null || echo '?')"
 
       - name: rapfi 소스 캐시 복원
         uses: actions/cache/restore@v4

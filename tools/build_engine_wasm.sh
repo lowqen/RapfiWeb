@@ -67,7 +67,9 @@ WASM_OPT_POST="${WASM_OPT_POST:-}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK="${WORK:-$HOME/rapfi-wasm-work}"
 OUT="$ROOT/out"
-JOBS="$(nproc)"
+# 병렬 빌드 수 — 코어 수와 컨테이너 메모리 한도 중 작은 쪽(tools/ci/build-jobs.sh).
+# shellcheck disable=SC1091
+source "$ROOT/tools/ci/build-jobs.sh"
 
 echo ">>> [1/6] 도구"
 mkdir -p "$WORK"

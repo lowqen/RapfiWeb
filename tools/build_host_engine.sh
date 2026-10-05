@@ -25,7 +25,9 @@ source "$ROOT/tools/ci/ensure-cmake.sh"
 WORK="${WORK:-$HOME/rapfi-wasm-work}"
 OUT_DIR="${OUT_DIR:?OUT_DIR 를 주세요(예: bench/sprt/engines/base)}"
 case "$OUT_DIR" in /*) ;; *) OUT_DIR="$ROOT/$OUT_DIR" ;; esac
-JOBS="$(nproc 2> /dev/null || echo 2)"
+# 병렬 빌드 수 — 코어 수와 컨테이너 메모리 한도 중 작은 쪽(tools/ci/build-jobs.sh).
+# shellcheck disable=SC1091
+source "$ROOT/tools/ci/build-jobs.sh"
 
 mkdir -p "$WORK"
 cd "$WORK"
