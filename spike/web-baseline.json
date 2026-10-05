@@ -19,10 +19,17 @@
     "",
     "따라오는 한계도 적어 둔다: 이제 이 해시의 7/10 은 폴백 평가를 재고 있어",
     "렌주 경로의 회귀 신호로는 약하다. 배포 구성의 진짜 기능 게이트는",
-    "scripts/engine-smoke.ts 다 — 브라우저에서 렌주 규칙으로 기동해 착수·분석·정지까지 돈다."
+    "scripts/engine-smoke.ts 다 — 브라우저에서 렌주 규칙으로 기동해 착수·분석·정지까지 돈다.",
+    "",
+    "2026-10-05: **기준선을 2b7c7da9 -> bb7888cc 로 갱신했다. 엔진 패치 A1 때문이다.**",
+    "tools/patches/a1-q15mulr.patch 가 mix9svq dwconv 의 양자화 곱을 mulhi(내림) -> q15mulr(반올림)로 바꿔",
+    "평가값이 달라지고 탐색 트리가 바뀐다(노드 7,170,518 -> 7,465,395). 의도한 변경이다 —",
+    "WASM SPRT(relaxed · 500ms, sprt 37247788294)에서 H1, Elo +20.2(docs/최적화-마스터플랜-v2.md §8.5).",
+    "값은 같은 소스 · 같은 플래그(P2-2 + A1, wasm-opt -O4 --converge)로 mate-suite 37178502835 · sprt 37247788294 의",
+    "빌드가 두 번 낸 것과 같다."
   ],
-  "measuredAt": "2026-09-03",
-  "measuredBy": "CI engine-release.yml run 33713658585 (ubuntu-latest)",
+  "measuredAt": "2026-10-05",
+  "measuredBy": "mate-suite 37178502835 · sprt 37247788294 의 B/A 빌드(P2-2 + A1, -O4 --converge)",
   "engine": {
     "upstream": "3c94c2a976f24a0dd1c5517623e9ab6fffe66bd7",
     "networks": "e32ad77a5364363b3e3a02b3f9e8610ade19ea98",
@@ -35,17 +42,29 @@
   },
   "variants": {
     "single-simd128": {
-      "hash": "2b7c7da9",
-      "nodes": "7170518",
-      "note": "배포 경로(렌주 전용 .data). 이 값이 바뀌면 CI 실패."
+      "hash": "bb7888cc",
+      "nodes": "7465395",
+      "note": "배포 경로(렌주 전용 .data) · 엔진 패치 P2-2 + A1. 이 값이 바뀌면 CI 실패."
     },
     "single-simd128-relaxed": {
       "hash": null,
       "note": "**판정하지 않는다(기록만).** 렌주 전용 .data 의 BENCH 는 국면 7/10 이 classical 폴백 평가로 도는데, 그 경로가 relaxed 명령에서 **기계마다** 값이 갈린다: 릴리스 런 36607275266 → dd5e1c73(7,387,373 노드), 36713443997 → b63e6b5f(7,301,332) — 같은 소스·같은 플래그, 일반 SIMD 는 두 번 다 2b7c7da9. relaxed 명령이 명세상 구현 정의라는 것 그대로다. 가중치 4종 빌드(10개 모두 NNUE)에서는 relaxed = 일반(4100a973). 앱이 타는 렌주·NNUE 경로의 동등성은 spike/relaxed-equivalence.mjs 가 게이트한다.",
       "history": [
-        { "hash": "dd5e1c73", "nodes": "7387373", "run": "36607275266" },
-        { "hash": "b63e6b5f", "nodes": "7301332", "run": "36713443997" },
-        { "hash": "eb9af422", "run": "36716534226", "cpu": "AMD EPYC 7763 — 릴리스 engine-3c94c2a9-rx 를 낸 런" }
+        {
+          "hash": "dd5e1c73",
+          "nodes": "7387373",
+          "run": "36607275266"
+        },
+        {
+          "hash": "b63e6b5f",
+          "nodes": "7301332",
+          "run": "36713443997"
+        },
+        {
+          "hash": "eb9af422",
+          "run": "36716534226",
+          "cpu": "AMD EPYC 7763 — 릴리스 engine-3c94c2a9-rx 를 낸 런"
+        }
       ]
     },
     "multi-simd128": {
@@ -54,6 +73,17 @@
     }
   },
   "history": [
-    { "hash": "4100a973", "nodes": "4391204", "until": "2026-09-03", "why": "가중치 4종 전부를 굽던 시절의 값" }
+    {
+      "hash": "4100a973",
+      "nodes": "4391204",
+      "until": "2026-09-03",
+      "why": "가중치 4종 전부를 굽던 시절의 값"
+    },
+    {
+      "hash": "2b7c7da9",
+      "nodes": "7170518",
+      "until": "2026-10-05",
+      "why": "A1(q15mulr) 이전 — 렌주 전용 .data, 패치 P2-2(결과 불변)"
+    }
   ]
 }
