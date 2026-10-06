@@ -1,4 +1,4 @@
-name: N1 소형 값 헤드 — 표본 · 증류 · 관문 ①
+name: N1 소형 값 헤드 — 표본 · 증류 · 관문 ①(N1b — 구역 특징 입력)
 
 # 마스터플랜 2부 §3.2 N1 의 첫 관문(증류 오차). 수동 실행만.
 #
@@ -6,30 +6,42 @@ name: N1 소형 값 헤드 — 표본 · 증류 · 관문 ①
 #   2. bench/n1/gen-samples.mjs — SPRT 기보의 국면들을 노드 고정으로 풀며 값 헤드 호출을 표본으로 남긴다
 #      (입력 = 전역 특징 64, 정답 = 대형 헤드의 승 · 패 · 무 로짓, 그리고 그 호출의 고전 평가 · α · β).
 #      학습 · 보류는 대국 단위로 가른다.
-#   3. bench/n1/train.py — 64 → 64 → 64 → 3 소형 헤드를 엔진의 정수 추론 그대로(양자화 인식) 증류하고, 보류 표본에서
+#   3. bench/n1/train.py — 입력 → 64 → 64 → 3 소형 헤드를 엔진의 정수 추론 그대로(양자화 인식) 증류하고, 보류 표본에서
 #      승률 오차와 분기 규칙별 「소형으로 돌릴 몫 r · 그 몫의 오차 · α-β 판단 불일치」를 잰다.
+#   4. bench/n1/diag-capacity.py — 같은 표본으로 넓은 float 망을 학습해 「그 입력이 담은 정보의 상한」을 잰다
+#      (§8.10: 전역 64 만으로는 float 256 폭도 p99 28%p 였다). 상한이 관문 근처에 오지 않으면 N1 계열을 접는다.
+#
+# 표본 v2(664바이트) = 전역 특징 64 + 3×3 구역 특징 9 × 64(group0 — starBlock 앞단, 엔진이 이미 계산한 값).
 #
 # 엔진은 바꾸지 않는다 — 덤프 패치는 환경 변수가 있을 때만 쓰고 배포 빌드에는 들어가지 않는다.
 on:
   workflow_dispatch:
     inputs:
       nodes:
-        description: "국면마다 탐색 노드(해시 비움 · 1 스레드)"
-        default: "50000"
+        description: "국면마다 탐색 노드(해시 비움 · 1 스레드) — 작을수록 국면이 다양하다"
+        default: "20000"
         type: string
       every:
         description: "값 헤드 호출 몇 번에 한 줄을 남길지(국면 다양성 — 클수록 국면을 많이 돈다)"
         default: "32"
         type: string
       target:
-        description: "학습 표본 목표 줄 수(보류는 그 × holdout_frac)"
-        default: "4000000"
+        description: "학습 표본 목표 줄 수(보류는 그 × holdout_frac) — 줄 664바이트라 200만 = 1.3GB"
+        default: "2000000"
         type: string
       holdout_frac:
         default: "0.1"
         type: string
       epochs:
         default: "8"
+        type: string
+      inputs:
+        description: "소형 헤드 입력 — all = 전역 64 + 구역 576 · global = 전역 64(N1 재현)"
+        default: "all"
+        type: string
+      diag_configs:
+        description: "float 상한 진단(diag-capacity.py --configs) — 비우면 건너뛴다"
+        default: "global:64,64;all:64,64;all:256,256;all:512,512"
         type: string
       workers:
         description: "일꾼 수 — auto 면 쓸 수 있는 물리 코어 − 2(sprt.yml 과 같은 셈)"
@@ -100,12 +112,27 @@ jobs:
             || python3 -m pip install -q --target .pylib --break-system-packages numpy
           train=$(ls bench/n1/samples/train-*.bin | paste -sd, -)
           PYTHONPATH=.pylib python3 bench/n1/train.py --train "$train" --holdout bench/n1/samples/holdout.bin \
-            --out bench/n1/out --epochs "${{ inputs.epochs }}" | tee bench/n1/out-log.txt
+            --out bench/n1/out --epochs "${{ inputs.epochs }}" --inputs "${{ inputs.inputs }}" | tee bench/n1/out-log.txt
           cp bench/n1/out-log.txt bench/n1/out/
           {
             echo "### N1 관문 ① — 증류 오차(보류 표본)"
             echo '```'
             sed -n '/^보류 /,$p' bench/n1/out-log.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: float 상한 진단
+        if: inputs.diag_configs != ''
+        env:
+          CONFIGS: ${{ inputs.diag_configs }}
+        run: |
+          train=$(ls bench/n1/samples/train-*.bin | paste -sd, -)
+          PYTHONPATH=.pylib python3 bench/n1/diag-capacity.py --train "$train" --holdout bench/n1/samples/holdout.bin \
+            --configs "$CONFIGS" --out bench/n1/out/diag.json | tee bench/n1/out/diag-log.txt
+          {
+            echo "### float 상한(넓은 망 · 양자화 없음 — 그 입력이 담은 정보의 상한)"
+            echo '```'
+            cat bench/n1/out/diag-log.txt
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 

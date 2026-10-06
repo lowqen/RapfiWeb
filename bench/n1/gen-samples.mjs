@@ -6,7 +6,8 @@
  *        [--workers 8] [--nodes 100000] [--every 4] [--target 4000000] [--holdout-frac 0.1]
  *
  * 엔진은 tools/patches/n1-value-dump.patch 를 얹은 네이티브 빌드여야 한다 — 환경 변수 RAPFI_VALUE_DUMP 가 가리키는
- * 파일에, 탐색이 값 헤드를 부를 때마다 88바이트 한 줄(입력 · 대형 헤드 로짓 · 고전 평가 · 창)을 덧붙인다.
+ * 파일에, 탐색이 값 헤드를 부를 때마다 한 줄(입력 · 대형 헤드 로짓 · 고전 평가 · 창)을 덧붙인다 — v2(N1b) 664바이트,
+ * v1(N1) 88바이트(--rec 88).
  *
  * 국면: bench/sprt/results/*.jsonl 의 대국 기보(자체 대국 · SPRT 수천 판)에서 --stride 수마다 뽑고, 대칭 겹침을 뺀다.
  * **대국 단위로** 학습 · 보류를 가른다(같은 대국의 국면이 양쪽에 섞이면 보류 오차가 낙관적으로 나온다). 일꾼 0 이
@@ -37,6 +38,7 @@ const P = {
   holdoutFrac: Number(opt("holdout-frac", 0.1)),
   stride: Number(opt("stride", 5)),
   seed: opt("seed", "n1"),
+  rec: Number(opt("rec", 664)),
 };
 if (!P.engine) {
   console.error(
@@ -44,7 +46,7 @@ if (!P.engine) {
   );
   process.exit(2);
 }
-const REC = 88;
+const REC = P.rec;
 
 const parseLabel = (s) => ["abcdefghijklmno".indexOf(s[0]), 15 - Number(s.slice(1))];
 const h32 = (s) => createHash("sha256").update(`${P.seed}:${s}`).digest().readUInt32BE(0);

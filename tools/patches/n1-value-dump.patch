@@ -1,8 +1,8 @@
 diff --git a/Rapfi/eval/eval.cpp b/Rapfi/eval/eval.cpp
-index a5575c7..c462f1c 100644
+index a5575c7..d2874c2 100644
 --- a/Rapfi/eval/eval.cpp
 +++ b/Rapfi/eval/eval.cpp
-@@ -24,9 +24,100 @@
+@@ -24,9 +24,106 @@
  
  #include <algorithm>
  #include <cmath>
@@ -22,10 +22,11 @@ index a5575c7..c462f1c 100644
 +namespace {
 +
 +#pragma pack(push, 1)
-+/// 한 줄 88바이트(리틀 엔디언). bench/n1/ 의 읽기 쪽과 같은 배치다.
++/// 한 줄 664바이트(리틀 엔디언). bench/n1/ 의 읽기 쪽과 같은 배치다(v2 — N1b: 구역 특징 추가).
 +struct ValueDumpRecord
 +{
 +    int8_t  global[64];  // crelu<64, 256>(valueSum.global) — 소형 헤드의 입력
++    int8_t  group[576];  // crelu<64, 32>(valueSum.group[i][j]) 3×3 구역(행 우선) — starBlock 앞단
 +    float   logits[3];   // 대형 헤드 출력(승 · 패 · 무 로짓, softmax 전)
 +    int16_t classical;   // evaluate() 의 고전 평가(basic + threat)
 +    int16_t alpha;
@@ -35,7 +36,7 @@ index a5575c7..c462f1c 100644
 +    uint8_t reserved[3];
 +};
 +#pragma pack(pop)
-+static_assert(sizeof(ValueDumpRecord) == 88);
++static_assert(sizeof(ValueDumpRecord) == 664);
 +
 +struct ValueDumpSink
 +{
@@ -74,7 +75,11 @@ index a5575c7..c462f1c 100644
 +    return valueDumpSink().file != nullptr;
 +}
 +
-+void valueDumpWrite(const int8_t *global64, float winLogit, float lossLogit, float drawLogit)
++void valueDumpWrite(const int8_t *global64,
++                    const int8_t *group576,
++                    float         winLogit,
++                    float         lossLogit,
++                    float         drawLogit)
 +{
 +    ValueDumpSink &sink = valueDumpSink();
 +    if (!sink.file)
@@ -85,6 +90,7 @@ index a5575c7..c462f1c 100644
 +
 +    ValueDumpRecord r {};
 +    std::memcpy(r.global, global64, 64);
++    std::memcpy(r.group, group576, 576);
 +    r.logits[0] = winLogit;
 +    r.logits[1] = lossLogit;
 +    r.logits[2] = drawLogit;
@@ -103,7 +109,7 @@ index a5575c7..c462f1c 100644
  namespace {
  
  /// Makes threat mask according current pattern4 counts on board.
-@@ -110,8 +201,17 @@ Value evaluate(const Board &board, Value alpha, Value beta)
+@@ -110,8 +207,17 @@ Value evaluate(const Board &board, Value alpha, Value beta)
      if (board.evaluator()) {
          // Use evaluator eval if classical eval are in alpha-beta window margin
          int margin = classicalEvalMargin(eval);
@@ -123,10 +129,10 @@ index a5575c7..c462f1c 100644
  
      return eval;
 diff --git a/Rapfi/eval/eval.h b/Rapfi/eval/eval.h
-index 4175e8f..4509182 100644
+index 4175e8f..3c967ca 100644
 --- a/Rapfi/eval/eval.h
 +++ b/Rapfi/eval/eval.h
-@@ -32,6 +32,22 @@ Value evaluate(const Board &board, Rule rule);
+@@ -32,6 +32,26 @@ Value evaluate(const Board &board, Rule rule);
  class ValueType;
  ValueType computeEvaluatorValue(const Board &board);
  
@@ -143,14 +149,18 @@ index 4175e8f..4509182 100644
 +extern thread_local ValueDumpCtx valueDumpCtx;
 +/// 덤프가 켜져 있는가(첫 호출에서 환경 변수를 한 번 읽는다).
 +bool valueDumpEnabled();
-+/// 한 줄을 쓴다: 전역 특징 int8[64] · 대형 헤드 로짓 float[3](승 · 패 · 무) · 문맥.
-+void valueDumpWrite(const int8_t *global64, float winLogit, float lossLogit, float drawLogit);
++/// 한 줄을 쓴다: 전역 특징 int8[64] · 3×3 구역 특징 int8[9][64] · 대형 헤드 로짓 float[3](승 · 패 · 무) · 문맥.
++void valueDumpWrite(const int8_t *global64,
++                    const int8_t *group576,
++                    float         winLogit,
++                    float         lossLogit,
++                    float         drawLogit);
 +
  /// EvalInfo struct contains all information needed to evaluate a position.
  struct EvalInfo
  {
 diff --git a/Rapfi/eval/mix9svqnnue.cpp b/Rapfi/eval/mix9svqnnue.cpp
-index 9718436..4d88d90 100644
+index 9718436..a3ca9ec 100644
 --- a/Rapfi/eval/mix9svqnnue.cpp
 +++ b/Rapfi/eval/mix9svqnnue.cpp
 @@ -18,6 +18,7 @@
@@ -161,13 +171,15 @@ index 9718436..4d88d90 100644
  #include "mixcommon.h"
  
  #include "../core/compressor.h"
-@@ -708,6 +709,12 @@ std::tuple<float, float, float> Accumulator::evaluateValue(const Weight &w)
+@@ -708,6 +709,14 @@ std::tuple<float, float, float> Accumulator::evaluateValue(const Weight &w)
      simd::linear<4, ValueDim>(layer3i32, layer2, bucket.value_l3.weight, bucket.value_l3.bias);
  
      const float scale = 1.0f / (128 * 128);
-+    // [RapfiWeb N1 측정 전용] 소형 헤드 학습 표본 — 입력(전역 특징 64)과 대형 헤드의 로짓.
++    // [RapfiWeb N1 측정 전용] 소형 헤드 학습 표본 — 입력(전역 특징 64 · 구역 특징 9×64)과 대형 헤드의 로짓.
++    static_assert(sizeof(group0) == 9 * 64);
 +    if (Evaluation::valueDumpEnabled())
 +        Evaluation::valueDumpWrite(layer0,
++                                   &group0[0][0][0],
 +                                   layer3i32[0] * scale,
 +                                   layer3i32[1] * scale,
 +                                   layer3i32[2] * scale);

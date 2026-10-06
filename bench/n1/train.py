@@ -2,11 +2,11 @@
 """
 N1 — 소형 값 헤드 증류(학습 · 평가 · 내보내기). 마스터플랜 2부 §3.2.
 
-입력: tools/patches/n1-value-dump.patch 를 얹은 네이티브 엔진이 탐색하며 쓴 표본(88바이트 줄).
-  전역 특징 int8[64](대형 값 헤드의 layer0[0:64] — 소형 헤드의 입력) · 대형 헤드 로짓(승 · 패 · 무) ·
-  그 호출의 고전 평가 · α · β · 수 번호.
+입력: tools/patches/n1-value-dump.patch 를 얹은 네이티브 엔진이 탐색하며 쓴 표본(v2 664바이트 줄 · v1 88바이트는 --rec 88).
+  전역 특징 int8[64](대형 값 헤드의 layer0[0:64]) · 3×3 구역 특징 int8[9][64](group0 — starBlock 앞단, v2 만) ·
+  대형 헤드 로짓(승 · 패 · 무) · 그 호출의 고전 평가 · α · β · 수 번호.
 
-모델: 64 → 64 → 64 → 3. **엔진의 정수 추론을 그대로 흉내 낸다**(양자화 인식 학습):
+모델: 입력(--inputs global = 64 · all = 640) → 64 → 64 → 3. **엔진의 정수 추론을 그대로 흉내 낸다**(양자화 인식 학습):
   x = 입력 int8 / 128
   h1 = floor(clip(W1 x + b1, 0, 127/128) · 128) / 128     ← simd::crelu<64, 128>(int32 / 128 → [0, 127])
   h2 = 같은 식(W2, b2)
@@ -33,31 +33,42 @@ import time
 
 import numpy as np
 
-REC = np.dtype(
-    [
-        ("g", "i1", 64),
-        ("logit", "<f4", 3),
-        ("classical", "<i2"),
-        ("alpha", "<i2"),
-        ("beta", "<i2"),
-        ("ply", "<i2"),
-        ("valid", "u1"),
-        ("res", "u1", 3),
-    ]
-)
-assert REC.itemsize == 88
+_TAIL = [
+    ("logit", "<f4", 3),
+    ("classical", "<i2"),
+    ("alpha", "<i2"),
+    ("beta", "<i2"),
+    ("ply", "<i2"),
+    ("valid", "u1"),
+    ("res", "u1", 3),
+]
+# v1(N1, 88바이트) — 전역 특징만. v2(N1b, 664바이트) — 3×3 구역 특징(group0, 행 우선 9 × 64)을 더했다.
+REC_V1 = np.dtype([("g", "i1", 64)] + _TAIL)
+REC_V2 = np.dtype([("g", "i1", 64), ("grp", "i1", 576)] + _TAIL)
+assert REC_V1.itemsize == 88 and REC_V2.itemsize == 664
+REC = REC_V2
+RECS = {88: REC_V1, 664: REC_V2}
 
 SCALING = 200.0  # eval/scoretables.h ScalingFactor — 값 = 200 · logit(승률)
 VALUE_EVAL_MAX = 30000
 
 
-def load(paths, limit=0):
-    arrs = [np.fromfile(p, dtype=REC) for p in paths if p and os.path.getsize(p) > 0]
-    a = np.concatenate(arrs) if arrs else np.zeros(0, REC)
+def load(paths, limit=0, rec=REC):
+    arrs = [np.fromfile(p, dtype=rec) for p in paths if p and os.path.getsize(p) > 0]
+    a = np.concatenate(arrs) if arrs else np.zeros(0, rec)
     a = a[a["valid"] == 1]
     if limit and len(a) > limit:
         a = a[np.random.default_rng(1).choice(len(a), limit, replace=False)]
     return a
+
+
+def features(a, inputs):
+    """소형 헤드 입력(int8). global = 전역 64 · all = 전역 64 + 구역 576(엔진의 layer0[0:64] 와 group0 를 이어 붙인 순서)."""
+    if inputs == "global":
+        return np.ascontiguousarray(a["g"])
+    if inputs == "all":
+        return np.concatenate([a["g"], a["grp"]], axis=1)
+    raise ValueError(inputs)
 
 
 def softmax(z):
@@ -92,13 +103,13 @@ def qb(b):
 
 
 class Net:
-    def __init__(self, rng):
+    def __init__(self, rng, n_in=64):
         def init(o, i):
             lim = math.sqrt(6.0 / i)
             return rng.uniform(-lim, lim, (o, i)).astype(np.float32) * 0.5
 
         self.p = {
-            "W1": init(64, 64),
+            "W1": init(64, n_in),
             "b1": np.full(64, 0.05, np.float32),
             "W2": init(64, 64),
             "b2": np.full(64, 0.05, np.float32),
@@ -152,8 +163,8 @@ class Net:
             self.p[k] -= (lr * mh / (np.sqrt(vh) + eps)).astype(np.float32)
 
 
-def evaluate(net, a, rules):
-    x = a["g"].astype(np.float32) / 128
+def evaluate(net, a, rules, inputs="all"):
+    x = features(a, inputs).astype(np.float32) / 128
     pt = softmax(a["logit"].astype(np.float64))
     ps = softmax(net.forward(x).astype(np.float64))
     wt, ws = winrate(pt), winrate(ps)
@@ -216,6 +227,8 @@ def main():
     ap.add_argument("--lr", type=float, default=2e-3)
     ap.add_argument("--limit", type=int, default=0, help="학습 표본 상한(0 = 전부)")
     ap.add_argument("--seed", type=int, default=7)
+    ap.add_argument("--rec", type=int, default=664, choices=sorted(RECS), help="줄 크기(88 = N1 v1 · 664 = N1b v2)")
+    ap.add_argument("--inputs", default="all", choices=["global", "all"], help="소형 헤드 입력(all 은 v2 표본에서만)")
     ap.add_argument(
         "--rules",
         default="classical:300,classical:250,classical:200,classical:150,classical:100,classical:50,"
@@ -224,27 +237,29 @@ def main():
     args = ap.parse_args()
 
     t0 = time.time()
-    tr = load(args.train.split(","), args.limit)
-    ho = load(args.holdout.split(","))
+    rec = RECS[args.rec]
+    tr = load(args.train.split(","), args.limit, rec)
+    ho = load(args.holdout.split(","), 0, rec)
     print(f"표본: 학습 {len(tr):,} · 보류 {len(ho):,}  ({time.time() - t0:.1f}s)", flush=True)
     if len(tr) == 0 or len(ho) == 0:
         sys.exit("표본이 없습니다")
 
     rng = np.random.default_rng(args.seed)
-    net = Net(rng)
-    x_all = tr["g"].astype(np.float32) / 128
+    x_all = features(tr, args.inputs)  # int8 그대로 두고 배치마다 /128(입력 640 · 수백만 줄이면 float 로는 수 GB)
+    net = Net(rng, x_all.shape[1])
     pt_all = softmax(tr["logit"].astype(np.float64)).astype(np.float32)
+    del tr  # 학습 표본 원본은 더 쓰지 않는다(보고에는 길이만)
     rules = args.rules.split(",")
 
-    steps_per_epoch = max(1, len(tr) // args.batch)
+    steps_per_epoch = max(1, len(x_all) // args.batch)
     total = steps_per_epoch * args.epochs
     history = []
     for ep in range(args.epochs):
-        order = rng.permutation(len(tr))
+        order = rng.permutation(len(x_all))
         loss_sum = 0.0
         for i in range(steps_per_epoch):
             idx = order[i * args.batch : (i + 1) * args.batch]
-            x, pt = x_all[idx], pt_all[idx]
+            x, pt = x_all[idx].astype(np.float32) / 128, pt_all[idx]
             s = net.forward(x, train=True)
             ps = softmax(s.astype(np.float64)).astype(np.float32)
             loss_sum += float(-(pt * np.log(np.clip(ps, 1e-9, 1))).sum(1).mean())
@@ -253,7 +268,7 @@ def main():
             step = ep * steps_per_epoch + i
             lr = args.lr * 0.5 * (1 + math.cos(math.pi * step / total))
             net.step(net.backward(ds), lr)
-        ev = evaluate(net, ho, rules)
+        ev = evaluate(net, ho, rules, args.inputs)
         history.append({"epoch": ep + 1, "train_ce": round(loss_sum / steps_per_epoch, 5), "holdout": ev["all"]})
         a = ev["all"]
         print(
@@ -262,7 +277,7 @@ def main():
             flush=True,
         )
 
-    ev = evaluate(net, ho, rules)
+    ev = evaluate(net, ho, rules, args.inputs)
     os.makedirs(args.out, exist_ok=True)
     # 엔진에 그대로 싣는 정수 가중치(FCWeight<Out, In> 의 행 = 출력)
     q = {
@@ -279,7 +294,8 @@ def main():
             f.write(q[k].tobytes())
     # 대조: 표본의 가르기(학습에 쓴 게 아닌 보류에서)
     report = {
-        "samples": {"train": len(tr), "holdout": len(ho)},
+        "samples": {"train": len(x_all), "holdout": len(ho)},
+        "inputs": {"kind": args.inputs, "dim": int(x_all.shape[1])},
         "holdout_ply": {
             "p10": int(np.percentile(ho["ply"], 10)),
             "p50": int(np.percentile(ho["ply"], 50)),
