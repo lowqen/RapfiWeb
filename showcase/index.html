@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>RapfiWeb 엔진 쇼케이스</title>
+    <meta
+      name="description"
+      content="Gomocalc 순정 엔진 대 RapfiWeb 배포 엔진 — 대국 Elo · 연산 속도 · 최적화 여정(P1~P3 · A1 · A3)."
+    />
+    <meta name="color-scheme" content="light dark" />
+    <script>
+      try {
+        var t = localStorage.getItem("rapfi.showcase.theme");
+        if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+      } catch (_) {
+        /* 저장소가 막힌 환경 — 시스템 테마를 따른다 */
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./src/main.tsx"></script>
+  </body>
+</html>

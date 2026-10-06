@@ -29,6 +29,6 @@
       "~/*": ["src/*"]
     }
   },
-  "include": ["src", "scripts", "vite.config.ts"],
+  "include": ["src", "scripts", "vite.config.ts", "showcase"],
   "exclude": ["node_modules", "dist", "spike", "out", "out-diag"]
 }

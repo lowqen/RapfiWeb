@@ -6,6 +6,7 @@ RapfiDroid(안드로이드 오목·렌주 분석반)의 **웹 이식**. Rapfi �
 - 설계: [`../test-yixin/docs/웹_이식_계획.md`](../test-yixin/docs/웹_이식_계획.md)
 - W0 스파이크 결과: [`docs/W0-결과.md`](docs/W0-결과.md) — 부록에 upstream 이슈 초안(미제출)
 - 엔진 최적화: [`docs/최적화-마스터플랜.md`](docs/최적화-마스터플랜.md) — 맨 앞 **통합 상태판**이 항목별 상태의 정본
+- gomocalc 대국: [`docs/gomocalc-대국-분석.md`](docs/gomocalc-대국-분석.md) — 1 스레드 · 500ms 에서 **Elo +100.2**. 쇼케이스 `pnpm showcase:dev`(`showcase/`)
 
 ## 지금 어디까지 와 있나
 

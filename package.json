@@ -26,7 +26,10 @@
     "w0:bench": "node spike/node-bench.mjs",
     "w0:node": "node spike/node-protocol.mjs",
     "w0:browser": "node spike/browser-test.mjs",
-    "w0:summary": "node spike/summarize.mjs"
+    "w0:summary": "node spike/summarize.mjs",
+    "showcase:dev": "vite --config showcase/vite.config.ts",
+    "showcase:build": "tsc --noEmit && vite build --config showcase/vite.config.ts",
+    "showcase:preview": "vite preview --config showcase/vite.config.ts"
   },
   "dependencies": {
     "react": "^18.3.1",

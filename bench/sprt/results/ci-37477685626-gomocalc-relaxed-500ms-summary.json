@@ -1,0 +1,197 @@
+{
+  "engines": {
+    "A": {
+      "name": "rapfiweb-single-simd128-relaxed",
+      "cmd": "node",
+      "args": [
+        "/teamspace/studios/this_studio/_work/RapfiWeb/RapfiWeb/bench/sprt/wasm-pbrain.mjs",
+        "--dir",
+        "/teamspace/studios/this_studio/_work/RapfiWeb/RapfiWeb/bench/gomocalc/engines/rapfiweb",
+        "--variant",
+        "single-simd128-relaxed"
+      ],
+      "init": []
+    },
+    "B": {
+      "name": "gomocalc-single-simd128",
+      "cmd": "node",
+      "args": [
+        "/teamspace/studios/this_studio/_work/RapfiWeb/RapfiWeb/bench/sprt/wasm-pbrain.mjs",
+        "--dir",
+        "/teamspace/studios/this_studio/_work/RapfiWeb/RapfiWeb/bench/gomocalc/engines/gomocalc",
+        "--variant",
+        "single-simd128",
+        "--data",
+        "/teamspace/studios/this_studio/_work/RapfiWeb/RapfiWeb/bench/gomocalc/engines/gomocalc/rapfi.data"
+      ],
+      "init": []
+    },
+    "referee": {
+      "name": "referee",
+      "cmd": "node",
+      "args": [
+        "/teamspace/studios/this_studio/_work/RapfiWeb/RapfiWeb/bench/sprt/wasm-pbrain.mjs",
+        "--dir",
+        "/teamspace/studios/this_studio/_work/RapfiWeb/RapfiWeb/bench/gomocalc/engines/rapfiweb",
+        "--variant",
+        "single-simd128"
+      ],
+      "init": []
+    }
+  },
+  "tc": {
+    "A": {
+      "turn": 500,
+      "match": 0,
+      "nodes": 0,
+      "grace": 1000
+    },
+    "B": {
+      "turn": 500,
+      "match": 0,
+      "nodes": 0,
+      "grace": 1000
+    }
+  },
+  "cfg": {
+    "games": 800,
+    "concurrency": 2,
+    "maxPlies": 225,
+    "maxMinutes": 180,
+    "hashKb": 65536,
+    "threads": 1,
+    "sprt": {
+      "elo0": 0,
+      "elo1": 10,
+      "alpha": 0.05,
+      "beta": 0.05
+    },
+    "openings": [
+      "direct-f9+g7i6",
+      "direct-g8+g7j9",
+      "indirect-g7+f10i10",
+      "direct-g8+f8e9",
+      "indirect-g9+j8k9",
+      "direct-f9+g7e7",
+      "direct-f7+i7h5",
+      "indirect-g9+k8k7",
+      "direct-g9+i7j10",
+      "direct-g9+i7i6",
+      "indirect-g8+f8g6",
+      "direct-g10+f8e6",
+      "direct-h7+j8i7",
+      "direct-f6+j7i9",
+      "direct-f9+i9h7",
+      "direct-g8+g7g9",
+      "indirect-i10+f9g6",
+      "indirect-f7+e6k7",
+      "direct-f10+g9f9",
+      "direct-g10+g8f8",
+      "direct-g9+j8k9",
+      "direct-f7+j10e7",
+      "indirect-f10+g9f9",
+      "indirect-j10+j9g9",
+      "direct-g8+f8g6",
+      "indirect-f6+k9h6",
+      "indirect-j10+i10",
+      "direct-h10+g11i7",
+      "direct-f8+i8i9",
+      "direct-f8+f10g11",
+      "indirect-g8+f8h11",
+      "direct-f6+g7f5",
+      "indirect-f10+e11j11",
+      "indirect-j10+j9i8",
+      "indirect-g8+g9f11",
+      "direct-g10+g9i7",
+      "direct-f8+g10i9",
+      "indirect-f10+i7i10",
+      "direct-f7+j10g7",
+      "indirect-i10+f9k7",
+      "direct-f9+f8h7",
+      "direct-g6+h10j9",
+      "direct-h10+g11f11",
+      "indirect-h10+h7i7",
+      "indirect-h10+j8k6",
+      "indirect-g9+i7i6",
+      "direct-h10+i8i11",
+      "direct-g7+f6e7",
+      "indirect-h10+h7i11",
+      "direct-f10+e9i8",
+      "direct-h10+g9j9",
+      "direct-g9+i11k11",
+      "indirect-g10+h11h6",
+      "indirect-i10+h11f10",
+      "indirect-f9+i6h6",
+      "indirect-f8+k7j6",
+      "direct-g10+g7e6",
+      "direct-h7+j8g10",
+      "direct-g6+i6j6",
+      "indirect-f10+g7j8"
+    ],
+    "fixed": true
+  },
+  "summary": {
+    "games": 606,
+    "wins": 336,
+    "draws": 104,
+    "losses": 166,
+    "drawRatio": 0.1716171617161716,
+    "trinomial": {
+      "n": 606,
+      "score": 0.6402640264026402,
+      "elo": 100.15009279584098,
+      "eloLow": 74.6418431064438,
+      "eloHigh": 126.75636289230441,
+      "los": 0.9999999999999992,
+      "llr": 5.60924865914642
+    },
+    "pentanomial": {
+      "n": 303,
+      "score": 0.6402640264026402,
+      "elo": 100.15009279584098,
+      "eloLow": 76.34876859520787,
+      "eloHigh": 124.9044118879596,
+      "los": 1,
+      "llr": 5.741894826821902
+    },
+    "sprt": {
+      "elo0": 0,
+      "elo1": 10,
+      "alpha": 0.05,
+      "beta": 0.05,
+      "lower": -2.9444389791664403,
+      "upper": 2.9444389791664403,
+      "basis": "pentanomial",
+      "llr": 5.741894826821902,
+      "decision": "H1"
+    }
+  },
+  "decided": {
+    "decision": "H1",
+    "game": 361,
+    "llr": 2.9499345327933506
+  },
+  "reasons": {
+    "five": 497,
+    "board-full": 104,
+    "forbidden": 5
+  },
+  "search": {
+    "A": {
+      "moves": 19816,
+      "nps": 66037.1222394408,
+      "avgDepth": 17.203724263221638,
+      "avgSelDepth": 22.69221840936617,
+      "avgMoveMs": 434.37782599919257
+    },
+    "B": {
+      "moves": 23367,
+      "nps": 40394.43203894714,
+      "avgDepth": 16.5522745752557,
+      "avgSelDepth": 20.29961056190354,
+      "avgMoveMs": 435.1716095348141
+    }
+  },
+  "wallSec": 10886.854661062998,
+  "leaked": []
+}

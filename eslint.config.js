@@ -12,6 +12,7 @@ export default tseslint.config(
     // bench/ 는 브라우저·노드를 오가는 측정 하네스라 spike 와 같이 다룬다.
     ignores: [
       "dist",
+      "dist-showcase",
       "out",
       "out-diag",
       "results",
