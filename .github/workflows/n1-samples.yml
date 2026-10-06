@@ -1,0 +1,123 @@
+name: N1 소형 값 헤드 — 표본 · 증류 · 관문 ①
+
+# 마스터플랜 2부 §3.2 N1 의 첫 관문(증류 오차). 수동 실행만.
+#
+#   1. 배포 구성(P2-2 + A1 + P4-1 + A3) + 측정 전용 덤프 패치(n1-value-dump)로 네이티브 엔진을 짓는다.
+#   2. bench/n1/gen-samples.mjs — SPRT 기보의 국면들을 노드 고정으로 풀며 값 헤드 호출을 표본으로 남긴다
+#      (입력 = 전역 특징 64, 정답 = 대형 헤드의 승 · 패 · 무 로짓, 그리고 그 호출의 고전 평가 · α · β).
+#      학습 · 보류는 대국 단위로 가른다.
+#   3. bench/n1/train.py — 64 → 64 → 64 → 3 소형 헤드를 엔진의 정수 추론 그대로(양자화 인식) 증류하고, 보류 표본에서
+#      승률 오차와 분기 규칙별 「소형으로 돌릴 몫 r · 그 몫의 오차 · α-β 판단 불일치」를 잰다.
+#
+# 엔진은 바꾸지 않는다 — 덤프 패치는 환경 변수가 있을 때만 쓰고 배포 빌드에는 들어가지 않는다.
+on:
+  workflow_dispatch:
+    inputs:
+      nodes:
+        description: "국면마다 탐색 노드(해시 비움 · 1 스레드)"
+        default: "50000"
+        type: string
+      every:
+        description: "값 헤드 호출 몇 번에 한 줄을 남길지(국면 다양성 — 클수록 국면을 많이 돈다)"
+        default: "32"
+        type: string
+      target:
+        description: "학습 표본 목표 줄 수(보류는 그 × holdout_frac)"
+        default: "4000000"
+        type: string
+      holdout_frac:
+        default: "0.1"
+        type: string
+      epochs:
+        default: "8"
+        type: string
+      workers:
+        description: "일꾼 수 — auto 면 쓸 수 있는 물리 코어 − 2(sprt.yml 과 같은 셈)"
+        default: "auto"
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  WORK: ${{ github.workspace }}/../rapfi-wasm-work
+  DEPLOYED: >-
+    tools/patches/p2-2-keep-evaluators-on-rebuild.patch
+    tools/patches/a1-q15mulr.patch
+    tools/patches/p4-1-periodic-node-stats.patch
+    tools/patches/a3-starblock-multi.patch
+
+jobs:
+  n1:
+    runs-on: self-hosted
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "26"
+
+      - name: 러너 정보
+        run: |
+          echo "nproc $(nproc) · $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2)"
+          grep -E 'MemTotal|MemAvailable' /proc/meminfo
+          python3 --version
+
+      - name: rapfi 소스 캐시 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.WORK }}/rapfi
+          key: rapfi-3c94c2a9-v1
+
+      - name: 빌드 — 배포 구성 + 덤프 패치(네이티브)
+        run: |
+          OUT_DIR=bench/n1/engine RAPFI_PATCHES="$DEPLOYED tools/patches/n1-value-dump.patch" bash tools/build_host_engine.sh
+          ls -la bench/n1/engine
+
+      - name: 표본
+        env:
+          WORKERS: ${{ inputs.workers }}
+        run: |
+          if [ "$WORKERS" = "auto" ]; then
+            # 이 프로세스가 쓸 수 있는 CPU 안의 물리 코어(컨테이너는 lscpu 에 호스트 전체가 보인다 — sprt.yml 주석).
+            allowed=$(awk '/^Cpus_allowed_list:/ {print $2}' /proc/self/status)
+            phys=$(lscpu -p=CPU,Core,Socket | awk -F, -v list="$allowed" '
+              BEGIN { n = split(list, r, ","); for (i = 1; i <= n; i++) { if (split(r[i], ab, "-") == 2) { for (c = ab[1] + 0; c <= ab[2] + 0; c++) ok[c] = 1 } else ok[r[i] + 0] = 1 } }
+              /^#/ { next }
+              ($1 + 0) in ok { print $2 "," $3 }' | sort -u | wc -l)
+            WORKERS=$(( phys - 2 )); [ "$WORKERS" -ge 2 ] || WORKERS=2
+            echo "일꾼 auto → $WORKERS (쓸 수 있는 물리 코어 $phys)"
+          fi
+          node bench/n1/gen-samples.mjs --engine bench/n1/engine/pbrain-rapfi --cwd bench/n1/engine \
+            --out bench/n1/samples --workers "$WORKERS" --nodes "${{ inputs.nodes }}" --every "${{ inputs.every }}" \
+            --target "${{ inputs.target }}" --holdout-frac "${{ inputs.holdout_frac }}"
+          du -sh bench/n1/samples
+
+      - name: 학습 · 관문 ①
+        run: |
+          # PEP 668(우분투 24 의 시스템 파이썬) — 작업 폴더에만 깐다.
+          python3 -m pip install -q --target .pylib numpy 2> /dev/null \
+            || python3 -m pip install -q --target .pylib --break-system-packages numpy
+          train=$(ls bench/n1/samples/train-*.bin | paste -sd, -)
+          PYTHONPATH=.pylib python3 bench/n1/train.py --train "$train" --holdout bench/n1/samples/holdout.bin \
+            --out bench/n1/out --epochs "${{ inputs.epochs }}" | tee bench/n1/out-log.txt
+          cp bench/n1/out-log.txt bench/n1/out/
+          {
+            echo "### N1 관문 ① — 증류 오차(보류 표본)"
+            echo '```'
+            sed -n '/^보류 /,$p' bench/n1/out-log.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 결과 · 보류 표본
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: n1
+          retention-days: 14
+          path: |
+            bench/n1/out/
+            bench/n1/samples/holdout.bin
+            bench/n1/engine/ENGINE_VERSION.txt
+            bench/n1/engine/bench.txt

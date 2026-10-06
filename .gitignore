@@ -40,3 +40,12 @@ desktop.ini
 # SPRT 러너가 빌드해 쓰는 네이티브 엔진(tools/build_host_engine.sh) · 대국 기록
 /bench/sprt/engines/
 /sprt/
+
+# N1(n1-samples.yml) — 덤프 엔진 · 표본(수백 MB) · 학습 결과 · 작업 폴더에만 깐 파이썬 패키지.
+# 결과는 아티팩트로 받고, 남길 것(보고서 · 가중치)은 bench/n1/results/ 로 옮겨 커밋한다.
+/bench/n1/engine/
+/bench/n1/samples/
+/bench/n1/out/
+/bench/n1/out-log.txt
+/.pylib/
+__pycache__/

@@ -12,6 +12,7 @@ on:
       - "bench/**"
       - ".github/workflows/w0-*.yml"
       - ".github/workflows/bench-*.yml"
+      - ".github/workflows/n1-*.yml"
   pull_request:
   workflow_dispatch:
 

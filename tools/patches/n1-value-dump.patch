@@ -1,0 +1,176 @@
+diff --git a/Rapfi/eval/eval.cpp b/Rapfi/eval/eval.cpp
+index a5575c7..c462f1c 100644
+--- a/Rapfi/eval/eval.cpp
++++ b/Rapfi/eval/eval.cpp
+@@ -24,9 +24,100 @@
+ 
+ #include <algorithm>
+ #include <cmath>
++#include <cstdint>
++#include <cstdio>
++#include <cstdlib>
++#include <cstring>
++#include <mutex>
+ 
+ using Evaluation::EvalCfg;
+ 
++// ── [RapfiWeb N1 측정 전용] 값 헤드 표본 덤프 ─────────────────────────────────
++namespace Evaluation {
++
++thread_local ValueDumpCtx valueDumpCtx;
++
++namespace {
++
++#pragma pack(push, 1)
++/// 한 줄 88바이트(리틀 엔디언). bench/n1/ 의 읽기 쪽과 같은 배치다.
++struct ValueDumpRecord
++{
++    int8_t  global[64];  // crelu<64, 256>(valueSum.global) — 소형 헤드의 입력
++    float   logits[3];   // 대형 헤드 출력(승 · 패 · 무 로짓, softmax 전)
++    int16_t classical;   // evaluate() 의 고전 평가(basic + threat)
++    int16_t alpha;
++    int16_t beta;
++    int16_t ply;
++    uint8_t valid;       // 1 이면 evaluate() 안에서 불렸다(문맥이 이 호출의 것)
++    uint8_t reserved[3];
++};
++#pragma pack(pop)
++static_assert(sizeof(ValueDumpRecord) == 88);
++
++struct ValueDumpSink
++{
++    std::FILE *file  = nullptr;
++    unsigned   every = 1;
++    std::mutex mutex;
++
++    ValueDumpSink()
++    {
++        const char *path = std::getenv("RAPFI_VALUE_DUMP");
++        if (!path || !*path)
++            return;
++        if (const char *e = std::getenv("RAPFI_VALUE_DUMP_EVERY"))
++            every = std::max(1, std::atoi(e));
++        file = std::fopen(path, "ab");
++        if (file)
++            std::setvbuf(file, nullptr, _IOFBF, 1 << 20);
++    }
++    ~ValueDumpSink()
++    {
++        if (file)
++            std::fclose(file);
++    }
++};
++
++ValueDumpSink &valueDumpSink()
++{
++    static ValueDumpSink sink;
++    return sink;
++}
++
++}  // namespace
++
++bool valueDumpEnabled()
++{
++    return valueDumpSink().file != nullptr;
++}
++
++void valueDumpWrite(const int8_t *global64, float winLogit, float lossLogit, float drawLogit)
++{
++    ValueDumpSink &sink = valueDumpSink();
++    if (!sink.file)
++        return;
++    thread_local unsigned counter = 0;
++    if (++counter % sink.every != 0)
++        return;
++
++    ValueDumpRecord r {};
++    std::memcpy(r.global, global64, 64);
++    r.logits[0] = winLogit;
++    r.logits[1] = lossLogit;
++    r.logits[2] = drawLogit;
++    r.classical = valueDumpCtx.classical;
++    r.alpha     = valueDumpCtx.alpha;
++    r.beta      = valueDumpCtx.beta;
++    r.ply       = valueDumpCtx.ply;
++    r.valid     = valueDumpCtx.valid ? 1 : 0;
++
++    std::lock_guard<std::mutex> lock(sink.mutex);
++    std::fwrite(&r, sizeof(r), 1, sink.file);
++}
++
++}  // namespace Evaluation
++
+ namespace {
+ 
+ /// Makes threat mask according current pattern4 counts on board.
+@@ -110,8 +201,17 @@ Value evaluate(const Board &board, Value alpha, Value beta)
+     if (board.evaluator()) {
+         // Use evaluator eval if classical eval are in alpha-beta window margin
+         int margin = classicalEvalMargin(eval);
+-        if (eval >= alpha - margin && eval <= beta + margin)
++        if (eval >= alpha - margin && eval <= beta + margin) {
++            if (valueDumpEnabled()) {
++                // [RapfiWeb N1 측정 전용] 이 호출의 고전 평가 · 창을 표본과 함께 남긴다.
++                valueDumpCtx = {(int16_t)eval, (int16_t)alpha, (int16_t)beta,
++                                (int16_t)board.ply(), true};
++                Value v      = computeEvaluatorValue(board).value();
++                valueDumpCtx.valid = false;
++                return v;
++            }
+             return computeEvaluatorValue(board).value();
++        }
+     }
+ 
+     return eval;
+diff --git a/Rapfi/eval/eval.h b/Rapfi/eval/eval.h
+index 4175e8f..4509182 100644
+--- a/Rapfi/eval/eval.h
++++ b/Rapfi/eval/eval.h
+@@ -32,6 +32,22 @@ Value evaluate(const Board &board, Rule rule);
+ class ValueType;
+ ValueType computeEvaluatorValue(const Board &board);
+ 
++/// [RapfiWeb N1 측정 전용] 값 헤드 표본 덤프. 환경 변수 RAPFI_VALUE_DUMP=<파일> 이 있을 때만 켜진다.
++/// evaluate() 가 고전 평가 · 창을 이 문맥에 적고, 평가기의 값 헤드가 입력 · 출력과 함께 한 줄을 쓴다.
++struct ValueDumpCtx
++{
++    int16_t classical = 0;
++    int16_t alpha     = 0;
++    int16_t beta      = 0;
++    int16_t ply       = 0;
++    bool    valid     = false;
++};
++extern thread_local ValueDumpCtx valueDumpCtx;
++/// 덤프가 켜져 있는가(첫 호출에서 환경 변수를 한 번 읽는다).
++bool valueDumpEnabled();
++/// 한 줄을 쓴다: 전역 특징 int8[64] · 대형 헤드 로짓 float[3](승 · 패 · 무) · 문맥.
++void valueDumpWrite(const int8_t *global64, float winLogit, float lossLogit, float drawLogit);
++
+ /// EvalInfo struct contains all information needed to evaluate a position.
+ struct EvalInfo
+ {
+diff --git a/Rapfi/eval/mix9svqnnue.cpp b/Rapfi/eval/mix9svqnnue.cpp
+index 9718436..4d88d90 100644
+--- a/Rapfi/eval/mix9svqnnue.cpp
++++ b/Rapfi/eval/mix9svqnnue.cpp
+@@ -18,6 +18,7 @@
+ 
+ #include "mix9svqnnue.h"
+ 
++#include "eval.h"
+ #include "mixcommon.h"
+ 
+ #include "../core/compressor.h"
+@@ -708,6 +709,12 @@ std::tuple<float, float, float> Accumulator::evaluateValue(const Weight &w)
+     simd::linear<4, ValueDim>(layer3i32, layer2, bucket.value_l3.weight, bucket.value_l3.bias);
+ 
+     const float scale = 1.0f / (128 * 128);
++    // [RapfiWeb N1 측정 전용] 소형 헤드 학습 표본 — 입력(전역 특징 64)과 대형 헤드의 로짓.
++    if (Evaluation::valueDumpEnabled())
++        Evaluation::valueDumpWrite(layer0,
++                                   layer3i32[0] * scale,
++                                   layer3i32[1] * scale,
++                                   layer3i32[2] * scale);
+     return {layer3i32[0] * scale, layer3i32[1] * scale, layer3i32[2] * scale};
+ }
+ 
