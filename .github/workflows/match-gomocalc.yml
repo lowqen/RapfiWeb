@@ -1,0 +1,146 @@
+name: 대국 — gomocalc 순정 vs RapfiWeb 배포
+
+# 「gomocalc 가 서비스 중인 Rapfi」와 「우리가 서비스 중인 Rapfi」를 **배포 실물 그대로** 맞붙인다 — 엔진을 빌드하지 않는다.
+# 둘 다 bench/gomocalc/fetch-engines.mjs 로 받는다(gomocalc = www.gomocalc.com/build 그대로, rapfiweb = 엔진 릴리스).
+#
+#   A(시험) = rapfiweb  — 기본 single-simd128-relaxed(우리 배포의 1 스레드 최강 변형 · A1 + A3 포함)
+#   B(기준) = gomocalc  — single-simd128(gomocalc 배포본의 유일한 1 스레드 변형 — 그쪽에는 single-relaxed 가 없다)
+#
+# 대국은 bench/sprt/runner.mjs + wasm-pbrain.mjs(단일 스레드 변형만). 금수 심판은 rapfiweb single-simd128(가중치를 풀지 않는다).
+# 기본은 **고정 판 수(--fixed)** — SPRT 결정은 기록하되 멈추지 않고 games 까지 둬서 Elo 차를 좁게 잰다.
+# 엔진별 NPS · 깊이는 러너가 수마다의 요약 줄에서 모은다(summary.json 의 search).
+#
+# 대조 실험: test_variant=single-simd128 로 돌리면 같은 ISA(일반 SIMD)끼리 — relaxed 몫을 빼고 소스 · 패치 몫만 본다.
+on:
+  workflow_dispatch:
+    inputs:
+      test_variant:
+        description: "A(rapfiweb) 변형 — 단일 스레드만"
+        default: "single-simd128-relaxed"
+        type: choice
+        options: ["single-simd128-relaxed", "single-simd128"]
+      engine_tag:
+        description: "rapfiweb 엔진 릴리스 태그(배포 중인 것)"
+        default: "engine-3c94c2a9-a3"
+        type: string
+      games:
+        description: "판 수(쌍 단위로 올림)"
+        default: "800"
+        type: string
+      tc:
+        description: "시간 제어(runner.mjs --tc)"
+        default: "turn=500"
+        type: string
+      openings_file:
+        description: "개시 묶음(비우면 26개 표준 3수 개시)"
+        default: "bench/sprt/openings-balanced.json"
+        type: string
+      fixed:
+        description: "고정 판 수 — SPRT 가 결정해도 games 까지 둔다(끄면 결정 즉시 멈춤)"
+        default: true
+        type: boolean
+      elo0:
+        default: "0"
+        type: string
+      elo1:
+        default: "10"
+        type: string
+      concurrency:
+        description: "동시 대국 — auto 면 min(물리 코어, 논리 − 2), 최소 1"
+        default: "auto"
+        type: string
+      max_minutes:
+        description: "대국 시간 예산(분) — 넘으면 시작한 쌍만 마저 두고 요약"
+        default: "200"
+        type: string
+      runner:
+        description: "러너"
+        default: "self-hosted"
+        type: choice
+        options: ["self-hosted", "ubuntu-latest"]
+
+permissions:
+  contents: read
+
+jobs:
+  match:
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: ${{ inputs.runner == 'self-hosted' && 1440 || 360 }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "26"
+
+      - name: 러너 정보
+        run: |
+          echo "nproc $(nproc) · $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2)"
+          grep -E 'MemTotal|MemAvailable' /proc/meminfo
+          lscpu | grep -E '^(Thread|Core|Socket)' || true
+          node --version
+
+      - name: 러너 · 통계 시험
+        run: node --test bench/sprt/
+
+      - name: 엔진 받기 (gomocalc 순정 · rapfiweb 릴리스)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ENGINE_TAG: ${{ inputs.engine_tag }}
+        run: |
+          node bench/gomocalc/fetch-engines.mjs
+          ( cd bench/gomocalc/engines && sha256sum gomocalc/rapfi-single-simd128.wasm rapfiweb/rapfi-single-simd128*.wasm gomocalc/rapfi.data rapfiweb/rapfi.data )
+          cat bench/gomocalc/engines/rapfiweb/ENGINE_VERSION.txt
+
+      - name: 대국
+        env:
+          TV: ${{ inputs.test_variant }}
+          CONC: ${{ inputs.concurrency }}
+          OPENINGS_FILE: ${{ inputs.openings_file }}
+          FIXED: ${{ inputs.fixed }}
+        run: |
+          set -o pipefail
+          mkdir -p match
+          E=$PWD/bench/gomocalc/engines
+          P=$PWD/bench/sprt/wasm-pbrain.mjs
+          if [ "$CONC" = "auto" ]; then
+            # 대국마다 한 번에 한 엔진만 생각한다. 생각하는 엔진이 물리 코어를 넘지 않게 하고(SMT 형제를 나눠 쓰면
+            # 시간 제어가 사실상 짧아진다), 러너 · 심판 · node GC 몫으로 논리 2개를 남긴다. 허용 CPU 안에서만 센다
+            # (컨테이너가 호스트 전체를 보는 문제 — sprt.yml 의 auto 주석).
+            allowed=$(awk '/^Cpus_allowed_list:/ {print $2}' /proc/self/status)
+            phys=$(lscpu -p=CPU,Core,Socket | awk -F, -v list="$allowed" '
+              BEGIN { n = split(list, r, ","); for (i = 1; i <= n; i++) { if (split(r[i], ab, "-") == 2) { for (c = ab[1] + 0; c <= ab[2] + 0; c++) ok[c] = 1 } else ok[r[i] + 0] = 1 } }
+              /^#/ { next }
+              ($1 + 0) in ok { print $2 "," $3 }' | sort -u | wc -l)
+            logical=$(nproc)
+            CONC=$(( logical - 2 )); [ "$CONC" -le "$phys" ] || CONC=$phys; [ "$CONC" -ge 1 ] || CONC=1
+            echo "동시 대국 auto → $CONC (물리 $phys · 논리 $logical · 허용 $allowed)"
+          fi
+          extra=()
+          if [ -n "$OPENINGS_FILE" ]; then extra+=(--openings-file "$OPENINGS_FILE"); fi
+          if [ "$FIXED" = "true" ]; then extra+=(--fixed); fi
+          node bench/sprt/runner.mjs "${extra[@]}" \
+            --a "node $P --dir $E/rapfiweb --variant $TV" --a-name "rapfiweb-$TV" \
+            --b "node $P --dir $E/gomocalc --variant single-simd128 --data $E/gomocalc/rapfi.data" --b-name gomocalc-single-simd128 \
+            --referee "node $P --dir $E/rapfiweb --variant single-simd128" \
+            --games "${{ inputs.games }}" --tc "${{ inputs.tc }}" --concurrency "$CONC" --max-minutes "${{ inputs.max_minutes }}" \
+            --elo0 "${{ inputs.elo0 }}" --elo1 "${{ inputs.elo1 }}" \
+            --out match/games.jsonl --summary match/summary.json | tee match/match.log
+          {
+            echo "### 대국 — rapfiweb \`$TV\` vs gomocalc \`single-simd128\` (${{ inputs.tc }})"
+            echo '```'
+            sed -n '/──────/,$p' match/match.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "--- 남은 wasm-pbrain 프로세스(0 이어야 함): $(pgrep -fc wasm-pbrain.mjs || true)"
+
+      - name: 기보 · 요약
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: match-${{ inputs.test_variant }}
+          retention-days: 14
+          path: |
+            match/
+            bench/gomocalc/engines/manifest.json
+            bench/gomocalc/engines/rapfiweb/ENGINE_VERSION.txt

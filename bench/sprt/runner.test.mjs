@@ -180,3 +180,39 @@ test("SPRT 결정 — 경계를 넘은 순간을 보고하고, 시작한 쌍을 
   assert.doesNotMatch(r.stdout, /결정 전/);
   noLeak(r);
 });
+
+test("고정 판 수(--fixed) — SPRT 가 경계를 넘어도 --games 까지 두고, 결정은 그 순간으로 남는다", () => {
+  const r = run(`${FAKE} --seed 21`, `${FAKE} --seed 22`, [
+    "--games",
+    "40",
+    "--tc",
+    "turn=200",
+    "--alpha",
+    "0.49",
+    "--beta",
+    "0.49",
+    "--fixed",
+  ]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.games.length, 40);
+  assert.match(r.stdout, /고정 판 수\(--fixed\)라 40판까지 계속 둡니다/);
+  assert.match(r.stdout, /\d+판에서 경계를 넘음 · LLR -?[\d.]+; 고정 판 수로 끝까지 둔 뒤/);
+  noLeak(r);
+});
+
+test("탐색 통계 — 엔진의 요약 줄(MESSAGE Speed …)에서 엔진별 NPS · 깊이를 모은다(예열 수는 빼고)", () => {
+  const r = run(`${FAKE} --seed 31 --speed 20000`, `${FAKE} --seed 32 --speed 10000`, [
+    "--games",
+    "2",
+    "--tc",
+    "turn=200",
+  ]);
+  assert.equal(r.status, 0, r.stderr);
+  const plies = r.games.reduce((n, g) => n + g.plies, 0);
+  const a = /탐색 A A: (\d+)수 · NPS 20,000 · 깊이 5\.00\(선택 7\.00\) · 수당 10ms/.exec(r.stdout);
+  const b = /탐색 B B: (\d+)수 · NPS 10,000 · 깊이 5\.00/.exec(r.stdout);
+  assert.ok(a && b, r.stdout);
+  // 개시 3수는 엔진이 두지 않았다. 판마다 끝의 수(승리 · 수 제한)까지 포함해 대국 수만 센다.
+  assert.equal(Number(a[1]) + Number(b[1]), plies - 3 * r.games.length);
+  noLeak(r);
+});

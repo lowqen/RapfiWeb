@@ -21,6 +21,8 @@
  *        --max-plies N           수 제한(넘으면 비김, 기본 225) · --hash-mb M (기본 64) · --threads T (기본 1)
  *        --max-minutes M         시간 예산 — 넘으면 새 쌍을 시작하지 않고 마저 둔 뒤 요약(CI 잡 시간 제한 전에 끝내려고)
  * SPRT   --elo0 0 --elo1 5 --alpha 0.05 --beta 0.05     (로지스틱 Elo · stats.mjs)
+ *        --fixed                 고정 판 수 매치 — SPRT 가 경계를 넘어도 멈추지 않고 --games 까지 둔다(결정은 그 순간으로
+ *                                기록만). 「A 가 낫다」를 넘어 Elo 차 자체를 좁게 재고 싶을 때(gomocalc 대조 등)
  * 출력   --out games.jsonl(판마다 한 줄) · --summary summary.json · --verbose(엔진 출력도 찍음)
  *
  * 종료 코드: 0 = 끝까지 돎(SPRT 결정 여부와 무관), 1 = 치명적 오류(엔진을 띄울 수 없음 · 심판 고장 · 프로세스 누수),
@@ -40,7 +42,7 @@ function parseArgs(argv) {
     const a = argv[i];
     if (!a.startsWith("--")) throw new Error(`알 수 없는 인자: ${a}`);
     const key = a.slice(2);
-    if (["verbose", "list-openings", "help"].includes(key)) {
+    if (["verbose", "list-openings", "help", "fixed"].includes(key)) {
       opts[key] = true;
       continue;
     }
@@ -164,6 +166,7 @@ try {
       beta: Number(opts.beta ?? 0.05),
     },
     openings: opts.seed != null ? shuffled(names, Number(opts.seed)) : names,
+    fixed: Boolean(opts.fixed),
   };
   for (const [k, v] of Object.entries({
     ...cfg.sprt,
@@ -227,6 +230,42 @@ let aborting = false; // 두 번째 Ctrl-C · 치명적 오류 — 진행 중 �
 let fatal = null;
 let nextJob = 0;
 let summary = summarize(tally, cfg.sprt);
+
+/**
+ * 엔진별 탐색 통계 — 수마다 Rapfi 가 끝에 찍는 요약 줄(`MESSAGE Speed 15538 | Depth 14-16 | Eval 261 | Node 11K | Time 736ms`)을
+ * 모은다. 같은 대국 · 같은 기계에서 두 엔진의 연산 속도를 나란히 보려는 것이다(판정은 Elo 로 한다 — 이것은 설명용).
+ * 평균 NPS 는 시간 가중(Σ speed·time / Σ time ≈ 전체 노드 / 전체 시간). 이 줄을 찍지 않는 엔진은 moves 0 으로 남는다.
+ */
+const SPEED_LINE = /^MESSAGE Speed (\d+) \| Depth (\d+)-(\d+) \|.*\| Time (\d+)ms/;
+const search = {
+  A: { moves: 0, timeMs: 0, nodeMs: 0, depth: 0, selDepth: 0 },
+  B: { moves: 0, timeMs: 0, nodeMs: 0, depth: 0, selDepth: 0 },
+};
+function tapSearch(engine, key) {
+  engine.tap((line) => {
+    const m = SPEED_LINE.exec(line);
+    if (!m) return;
+    const [speed, depth, sel, ms] = m.slice(1).map(Number);
+    const st = search[key];
+    st.moves++;
+    st.timeMs += ms;
+    st.nodeMs += speed * ms;
+    st.depth += depth;
+    st.selDepth += sel;
+  });
+}
+function searchSummary() {
+  const out = {};
+  for (const [k, st] of Object.entries(search))
+    out[k] = {
+      moves: st.moves,
+      nps: st.timeMs > 0 ? st.nodeMs / st.timeMs : null,
+      avgDepth: st.moves ? st.depth / st.moves : null,
+      avgSelDepth: st.moves ? st.selDepth / st.moves : null,
+      avgMoveMs: st.moves ? st.timeMs / st.moves : null,
+    };
+  return out;
+}
 
 function takeJob() {
   if (
@@ -292,10 +331,16 @@ function record(job, result) {
       `${rec.result.padEnd(7)} ${rec.reason.padEnd(10)} ${String(rec.plies).padStart(3)}수 ${(rec.ms / 1000).toFixed(1)}s | ` +
       `A W-D-L ${tally.wins}-${tally.draws}-${tally.losses} · LLR ${s.llr.toFixed(2)} [${s.lower.toFixed(2)}, ${s.upper.toFixed(2)}]`,
   );
-  if (s.decision && !stopRequested) {
-    stopRequested = true;
+  if (s.decision && !stopRequested && !decided) {
     decided = { decision: s.decision, game: records.length, llr: s.llr };
-    console.log(`  → SPRT 결정: ${s.decision} 채택 — 시작한 쌍만 마저 두고 멈춥니다`);
+    if (cfg.fixed) {
+      console.log(
+        `  → SPRT 결정: ${s.decision} 채택 — 고정 판 수(--fixed)라 ${jobs.length}판까지 계속 둡니다`,
+      );
+    } else {
+      stopRequested = true;
+      console.log(`  → SPRT 결정: ${s.decision} 채택 — 시작한 쌍만 마저 두고 멈춥니다`);
+    }
   }
 }
 
@@ -381,6 +426,8 @@ async function ensure(slot, key, spec) {
     try {
       // 심판(R)은 수를 두지 않으니 가중치를 풀 필요가 없다 — YXSHOWFORBID 는 판만 본다.
       slot[key] = await e.start({ info: START_INFO, warmup: key !== "R" });
+      // 예열 수는 빼고 대국 수만 센다 — tap 은 start(예열 포함)가 끝난 뒤에 붙인다.
+      if (key !== "R") tapSearch(slot[key], key);
       return slot[key];
     } catch (err) {
       await e.stop();
@@ -529,9 +576,18 @@ console.log(
   `SPRT(${s.sprt.basis}): LLR ${fmt(s.sprt.llr, 3)} / [${fmt(s.sprt.lower, 3)}, ${fmt(s.sprt.upper, 3)}] → ` +
     (decided
       ? `${decided.decision} 채택 — A 가 elo ${decided.decision === "H1" ? `≥ ${cfg.sprt.elo1}` : `≤ ${cfg.sprt.elo0}`} 쪽` +
-        ` (${decided.game}판에서 경계를 넘음 · LLR ${fmt(decided.llr, 3)}; 시작한 쌍을 마저 둔 뒤 ${fmt(s.sprt.llr, 3)})`
+        ` (${decided.game}판에서 경계를 넘음 · LLR ${fmt(decided.llr, 3)}; ${cfg.fixed ? "고정 판 수로 끝까지 둔 뒤" : "시작한 쌍을 마저 둔 뒤"} ${fmt(s.sprt.llr, 3)})`
       : `결정 전(${budgetHit ? "시간 예산" : interrupts ? "사용자 중단" : "판 수 한도"}에서 멈춤)`),
 );
+const searchStats = searchSummary();
+for (const k of ["A", "B"]) {
+  const st = searchStats[k];
+  if (!st.moves) continue;
+  console.log(
+    `탐색 ${k} ${SPEC[k].name}: ${st.moves}수 · NPS ${Math.round(st.nps).toLocaleString("en-US")} · ` +
+      `깊이 ${fmt(st.avgDepth, 2)}(선택 ${fmt(st.avgSelDepth, 2)}) · 수당 ${fmt(st.avgMoveMs, 0)}ms`,
+  );
+}
 console.log(
   `프로세스: 남은 엔진 ${leaked.length}${leaked.length ? " — " + leaked.join(", ") : ""} · 남은 자식 핸들 ${childHandles} · 활성 자원 ${JSON.stringify(resources)}(러너 자신의 파이프 ${ownPipes})`,
 );
@@ -546,7 +602,9 @@ if (opts.summary) {
         tc: TC,
         cfg,
         summary: s,
+        decided,
         reasons,
+        search: searchStats,
         wallSec,
         leaked,
       },
