@@ -561,10 +561,22 @@ try {
   const levelAt = consoleLines.lastIndexOf("> INFO max_node 20000");
   if (levelAt < 0) fail("입문 레벨이 max_node 20000 을 보내지 않았습니다");
   await runAnalysis(1_500);
+  // **같은 읽기 안에서** 순서를 본다. 콘솔은 5,000줄 링버퍼라 앞서 읽은 줄 번호(levelAt)는 그 사이 앞줄이 밀려나면
+  // 어긋난다 — 출력이 많은 빠른 러너(Lightning)에서 「-1 이 20000 보다 앞」으로 잘못 읽혀 실패했다(deploy 37410487899).
   consoleLines = (await page.evaluate(`window.__rapfiConsole()`)) as string[];
-  if (consoleLines.lastIndexOf("> INFO max_node -1") < levelAt)
+  const levelAgain = consoleLines.lastIndexOf("> INFO max_node 20000");
+  const restoredAt = consoleLines.lastIndexOf("> INFO max_node -1");
+  if (restoredAt < 0 || restoredAt < levelAgain) {
     fail("레벨 뒤의 분석이 max_node 를 설정값(-1)으로 되돌리지 않았습니다");
-  else ok("분석은 max_node -1 로 돌아갔다 — 레벨은 대국 착수에만");
+    const sent = consoleLines.filter((l) => /^> (INFO max_node|YXNBEST|BOARD|YXBOARD)/.test(l));
+    console.error(
+      `      (콘솔 ${consoleLines.length}줄 · 20000@${levelAgain} · -1@${restoredAt}) 마지막 보낸 줄:\n` +
+        sent
+          .slice(-12)
+          .map((l) => `      ${l}`)
+          .join("\n"),
+    );
+  } else ok("분석은 max_node -1 로 돌아갔다 — 레벨은 대국 착수에만");
   await page.getByRole("radio", { name: "최강", exact: true }).click();
 
   // ── 2. 엔진 착수 시간 — 대국 시계 없이 ───────────────────────────
