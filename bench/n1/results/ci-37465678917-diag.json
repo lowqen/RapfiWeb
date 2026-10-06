@@ -1,0 +1,43 @@
+{
+  "train": 1000000,
+  "holdout": 200180,
+  "epochs": 10,
+  "results": [
+    {
+      "config": "global:64,64",
+      "n_in": 64,
+      "mean_pp": 4.1,
+      "p90_pp": 12.298,
+      "p99_pp": 29.131,
+      "value_mae": 60.6,
+      "seconds": 84
+    },
+    {
+      "config": "all:64,64",
+      "n_in": 640,
+      "mean_pp": 3.44,
+      "p90_pp": 10.249,
+      "p99_pp": 26.241,
+      "value_mae": 52.0,
+      "seconds": 119
+    },
+    {
+      "config": "all:256,256",
+      "n_in": 640,
+      "mean_pp": 2.891,
+      "p90_pp": 8.623,
+      "p99_pp": 22.939,
+      "value_mae": 43.2,
+      "seconds": 288
+    },
+    {
+      "config": "all:512,512",
+      "n_in": 640,
+      "mean_pp": 2.822,
+      "p90_pp": 8.415,
+      "p99_pp": 22.49,
+      "value_mae": 42.1,
+      "seconds": 571
+    }
+  ]
+}
