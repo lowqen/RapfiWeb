@@ -74,3 +74,5 @@ export const MAIN = need("match-relaxed.json");
 export const CONTROL = need("match-simd.json");
 /** 본 매치를 AMD EPYC 7B13 에서 다시 둔 것 — 없으면 null */
 export const AMD: MatchReport | null = FILES["./match-relaxed-amd7b13.json"] ?? null;
+/** 멀티스레드 — 둘 다 multi-simd128-relaxed · 2 스레드(Intel Xeon 8581C) — 없으면 null */
+export const MULTI: MatchReport | null = FILES["./match-multi-t2.json"] ?? null;

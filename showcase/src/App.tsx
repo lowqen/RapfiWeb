@@ -8,7 +8,7 @@ import {
   type IntervalRow,
 } from "./components/charts";
 import { signed } from "./components/format";
-import { AMD, CONTROL, MAIN, type MatchReport } from "./data/matches";
+import { AMD, CONTROL, MAIN, MULTI, type MatchReport } from "./data/matches";
 import {
   ELO_HISTORY,
   PAIRED_SET_LABEL,
@@ -394,6 +394,26 @@ export function App() {
           },
         ]
       : []),
+    ...(MULTI
+      ? [
+          {
+            key: "multi",
+            label: "★ 2 스레드 — relaxed 끼리",
+            sub: `${MULTI.games.toLocaleString("en-US")}판 · ${decisionText(MULTI)}`,
+            value: MULTI.elo.pentanomial.elo,
+            low: MULTI.elo.pentanomial.low,
+            high: MULTI.elo.pentanomial.high,
+            color: C.rx,
+            tip: (
+              <>
+                둘 다 multi-simd128-relaxed · 2 스레드(Intel 8581C):{" "}
+                {signed(MULTI.elo.pentanomial.elo)} (95% {signed(MULTI.elo.pentanomial.low)} ~{" "}
+                {signed(MULTI.elo.pentanomial.high)})
+              </>
+            ),
+          },
+        ]
+      : []),
     ...ELO_HISTORY.map((e) => ({
       key: e.id,
       label: e.label,
@@ -446,22 +466,33 @@ export function App() {
     }),
   );
 
-  const cpuRows: IntervalRow[] = (AMD ? [MAIN, AMD] : [MAIN]).map((m, i) => ({
-    key: `cpu-${i}`,
-    label: m.runner ?? (i ? "AMD" : "Intel"),
-    sub: `${m.games}판 · ${decisionText(m)}${m.speedElo ? ` · NPS ×${m.speedElo.npsRatio.toFixed(2)}` : ""}`,
+  // 조건별 본 매치 — CPU · 스레드를 바꿔 같은 하네스로. 멀티는 둘 다 relaxed(격리된 브라우저에서 두 서비스가 실제로 쓰는 변형).
+  const conditions = [
+    { m: MAIN, label: "1 스레드 · Intel 8488C", pair: "relaxed ↔ gomocalc simd128" },
+    ...(AMD ? [{ m: AMD, label: "1 스레드 · AMD 7B13", pair: "relaxed ↔ gomocalc simd128" }] : []),
+    ...(MULTI
+      ? [{ m: MULTI, label: "2 스레드 · Intel 8581C", pair: "relaxed ↔ gomocalc relaxed" }]
+      : []),
+  ];
+  const cpuRows: IntervalRow[] = conditions.map(({ m, label, pair }, i) => ({
+    key: `cond-${i}`,
+    label,
+    sub: `${pair} · ${m.games}판 · ${decisionText(m)}${m.speedElo ? ` · NPS ×${m.speedElo.npsRatio.toFixed(2)} → 속도 몫 ${signed(m.speedElo.predicted, 0)}` : ""}`,
     value: m.elo.pentanomial.elo,
     low: m.elo.pentanomial.low,
     high: m.elo.pentanomial.high,
     color: C.rx,
     tip: (
       <>
-        {m.runner}: Elo {signed(m.elo.pentanomial.elo)} (95% {signed(m.elo.pentanomial.low)} ~{" "}
-        {signed(m.elo.pentanomial.high)})
+        <strong>{label}</strong>
+        <div>
+          {pair}: Elo {signed(m.elo.pentanomial.elo)} (95% {signed(m.elo.pentanomial.low)} ~{" "}
+          {signed(m.elo.pentanomial.high)}) · {m.runner}
+        </div>
       </>
     ),
   }));
-  const runs = [MAIN, CONTROL, ...(AMD ? [AMD] : [])];
+  const runs = [MAIN, CONTROL, ...(AMD ? [AMD] : []), ...(MULTI ? [MULTI] : [])];
   const totalGames = runs.reduce((a, m) => a + m.games, 0);
   const wallH = runs.reduce((a, m) => a + m.wallSec, 0) / 3600;
   const faultRate = runs.reduce((a, m) => a + m.faultRate * m.games, 0) / Math.max(1, totalGames);
@@ -504,8 +535,10 @@ export function App() {
           </h1>
           <p className="hero-lead">
             gomocalc.com 이 서비스하는 Rapfi 와 RapfiWeb 이 배포하는 Rapfi 를{" "}
-            <strong>배포 실물 그대로</strong> 맞붙였다. 가중치는 바이트까지 같다. 차이를 만든 것은
-            relaxed SIMD 1 스레드 변형과 그 위의 A3 배치 — 같은 ISA 끼리의 대조에서는 차이가 없었다.
+            <strong>배포 실물 그대로</strong> 맞붙였다. 가중치는 바이트까지 같다. 1 스레드에서
+            차이를 만든 것은 relaxed SIMD 변형(gomocalc 에는 없다)과 그 위의 A3 배치 — 같은 ISA
+            끼리는 차이가 없었다. 둘 다 relaxed · 2 스레드면 우위가 줄고, 남는 Elo 는 노드당 속도로
+            다 설명된다.
           </p>
           <div className="hero-grid">
             <div className="hero-figure">
@@ -524,7 +557,15 @@ export function App() {
               </p>
             </div>
             <div className="kpis">
-              <Stat label="점수" value={pct(main.score)} note={`비김 ${pct(MAIN.drawRatio)}`} />
+              {MULTI ? (
+                <Stat
+                  label="2 스레드 · relaxed 끼리"
+                  value={signed(MULTI.elo.pentanomial.elo)}
+                  note={`${signed(MULTI.elo.pentanomial.low)} ~ ${signed(MULTI.elo.pentanomial.high)} · ${decisionText(MULTI)}`}
+                />
+              ) : (
+                <Stat label="점수" value={pct(main.score)} note={`비김 ${pct(MAIN.drawRatio)}`} />
+              )}
               <Stat
                 label="대국 중 NPS"
                 value={
@@ -562,7 +603,7 @@ export function App() {
               <Stat
                 label="총 대국"
                 value={totalGames.toLocaleString("en-US")}
-                note={`${wallH.toFixed(1)}시간 · Intel 8488C${AMD ? " · AMD 7B13" : ""}`}
+                note={`${wallH.toFixed(1)}시간 · Intel 8488C${AMD ? " · AMD 7B13" : ""}${MULTI ? " · Intel 8581C" : ""}`}
               />
             </div>
           </div>
@@ -645,26 +686,40 @@ export function App() {
                 %) Elo 도 거의 같다. 환산은 M3(수당 500ms · WASM · 균형 개시)의 +1% ≈ +1.5 Elo.
               </p>
             </Card>
-            {AMD && (
+            {conditions.length > 1 && (
               <Card
-                title="CPU 를 바꿔 다시 — Intel 8488C ↔ AMD 7B13"
-                sub="같은 엔진 · 같은 조건(수당 500ms · 균형 개시 60)으로 러너만 바꿔 둔 본 매치 · 점 = Elo · 수염 = 95% 구간"
+                title="조건을 바꿔 다시 — CPU · 스레드"
+                sub="같은 하네스 · 수당 500ms · 균형 개시 60 · 점 = Elo · 수염 = 95% 구간"
                 wide
               >
                 <IntervalChart rows={cpuRows} kind="dot" format={eloFmt} />
+                <p className="note">
+                  1 스레드에서 gomocalc 는 일반 SIMD 변형뿐이라 relaxed 의 속도가 Elo 의
+                  대부분이다(CPU 에 따라 +77 ~ +100). 격리된 브라우저처럼 둘 다 relaxed · 2 스레드면
+                  차이가 줄고, 그 Elo 는 NPS 비의 속도 몫과 거의 같다 — 같은 속도에서 더 잘 두는
+                  몫은 없고, 우위는 노드당 속도(A3 · upstream 추론 가속)에서 온다.
+                </p>
                 <DataTable
-                  caption="CPU 별 본 매치"
-                  head={["러너", "판", "W-D-L", "Elo", "95% 구간", "NPS 비"]}
-                  rows={[
-                    { m: MAIN, n: MAIN.runner ?? "Intel" },
-                    { m: AMD, n: AMD.runner ?? "AMD" },
-                  ].map(({ m, n }) => [
-                    n,
+                  caption="조건별 본 매치"
+                  head={[
+                    "조건",
+                    "맞붙인 변형",
+                    "판",
+                    "W-D-L",
+                    "Elo",
+                    "95% 구간",
+                    "NPS 비",
+                    "속도 몫",
+                  ]}
+                  rows={conditions.map(({ m, label, pair }) => [
+                    label,
+                    pair,
                     m.games,
                     `${m.wdl.w}-${m.wdl.d}-${m.wdl.l}`,
                     signed(m.elo.pentanomial.elo),
                     `${signed(m.elo.pentanomial.low)} ~ ${signed(m.elo.pentanomial.high)}`,
                     m.speedElo ? `×${m.speedElo.npsRatio.toFixed(3)}` : "—",
+                    m.speedElo ? signed(m.speedElo.predicted) : "—",
                   ])}
                 />
               </Card>
@@ -675,6 +730,7 @@ export function App() {
                   { m: MAIN, n: "본 매치", c: C.rx },
                   { m: CONTROL, n: "대조", c: C.simd },
                   ...(AMD ? [{ m: AMD, n: "본 매치 · AMD 7B13", c: C.rx }] : []),
+                  ...(MULTI ? [{ m: MULTI, n: "2 스레드 · relaxed 끼리", c: C.rx }] : []),
                 ].map(({ m, n, c }) => (
                   <div key={n} className="mini-block">
                     <p className="mini-title">

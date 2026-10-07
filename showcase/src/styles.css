@@ -421,7 +421,7 @@ main {
   display: block;
   overflow: visible;
 }
-.grid line,
+/* 차트 격자만 — `.grid line` 으로 쓰면 카드 묶음(div.grid) 안의 모든 선(구간 수염까지)이 격자색이 된다 */
 line.grid {
   stroke: var(--grid);
   stroke-width: 1;
