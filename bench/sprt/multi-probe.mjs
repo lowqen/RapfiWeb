@@ -211,15 +211,15 @@ async function child() {
     // 스레드가 실제로 도는가: 같은 깊이까지 걸린 벽시계(T ↔ 1). 멀티 빌드의 MESSAGE Speed 는 믿을 수 없다(M-1 첫 런 — 159 nps 같은 값)
     // — 노드 수에 기대지 않는다. 해시를 비우고 번갈아 두 번씩, 중앙값 대신 두 번의 합.
     const depth = Number(opt("depth", 16));
-    const t = { [threads]: 0, 1: 0 };
+    const depthTotal = { [threads]: 0, 1: 0 };
     for (let k = 0; k < 2; k++)
       for (const n of k % 2 ? [1, threads] : [threads, 1]) {
         await setThreads(n);
-        t[n] += await search(`d${depth}`, n, { depth });
+        depthTotal[n] += await search(`d${depth}`, n, { depth });
       }
     rep.depth = depth;
-    rep.depthMs = { [`t${threads}`]: t[threads], t1: t[1] };
-    rep.threadRatio = t[threads] ? t[1] / t[threads] : null;
+    rep.depthMs = { [`t${threads}`]: depthTotal[threads], t1: depthTotal[1] };
+    rep.threadRatio = depthTotal[threads] ? depthTotal[1] / depthTotal[threads] : null;
   } catch (e) {
     rep.error = e.message;
   }
