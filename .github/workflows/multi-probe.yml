@@ -1,0 +1,77 @@
+name: 멀티스레드 글루 탐침 (M-1)
+
+# bench/sprt/multi-probe.mjs — 멀티스레드 글루(PROXY_TO_PTHREAD)가 Node 에서 Gomocup 엔진으로 쓸 만한지 엔진 · 변형마다 본다.
+# gomocalc 배포본(Emscripten 구버전 · clang 21)과 우리 릴리스를 같은 러너에서. 빌드 없음 — fetch-engines 로 받은 배포 실물.
+# 통과: 세 탐색 모두 좌표 · 2 ↔ 1 스레드 NPS 비 > 1.3 · RESTART OK · 제한 시간 안에 끝남(스스로 안 끝나면 따로 표시).
+on:
+  workflow_dispatch:
+    inputs:
+      threads:
+        default: "2"
+        type: string
+      turn:
+        description: "탐색마다 수당 시간(ms)"
+        default: "1000"
+        type: string
+      runner_label:
+        description: "self-hosted 러너의 고유 라벨(c4 = Intel Xeon 8581C · 8 vCPU)"
+        default: "c4"
+        type: string
+      expect_cpu:
+        description: "러너 CPU 이름에 이 글자가 없으면 곧바로 멈춘다 — 비우면 검사 안 함"
+        default: "8581C"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: [self-hosted, "${{ inputs.runner_label }}"]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "26"
+
+      - name: 러너 정보
+        env:
+          EXPECT: ${{ inputs.expect_cpu }}
+        run: |
+          cpu=$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2)
+          echo "nproc $(nproc) · $cpu"
+          lscpu | grep -E '^(Thread|Core|Socket)' || true
+          grep -E 'MemTotal|MemAvailable' /proc/meminfo
+          node --version
+          if [ -n "$EXPECT" ] && ! echo "$cpu" | grep -qF "$EXPECT"; then
+            echo "::error::러너 CPU 가 '$EXPECT' 가 아닙니다: $cpu"; exit 1
+          fi
+
+      - name: 엔진 받기
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node bench/gomocalc/fetch-engines.mjs
+
+      - name: 탐침
+        run: |
+          set -o pipefail
+          E="$PWD/bench/gomocalc/engines"
+          mkdir -p probe
+          node bench/sprt/multi-probe.mjs --threads "${{ inputs.threads }}" --turn "${{ inputs.turn }}" \
+            --engine "gomocalc|$E/gomocalc|multi-simd128|$E/gomocalc/rapfi.data" \
+            --engine "gomocalc|$E/gomocalc|multi-simd128-relaxed|$E/gomocalc/rapfi.data" \
+            --engine "rapfiweb|$E/rapfiweb|multi-simd128" \
+            --engine "rapfiweb|$E/rapfiweb|multi-simd128-relaxed" \
+            --json probe/multi-probe.json | tee probe/multi-probe.log
+          { echo "### 멀티스레드 글루 탐침 — 스레드 ${{ inputs.threads }}"; echo '```'; cat probe/multi-probe.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          echo "--- 남은 node 자식(0 이어야 함): $(pgrep -fc multi-probe.mjs || true)"
+
+      - name: 결과
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: multi-probe
+          retention-days: 14
+          path: probe/
