@@ -9,11 +9,12 @@
  *   1. 글루 적재 → INFO RULE 4 · HASH_SIZE · THREAD_NUM <T> → START 15 → OK · ABOUT
  *   2. 기능: 예열 → 탐색 ①(T 스레드 · 수당 <turn>ms) → RESTART → OK → 탐색 ② — 좌표 뒤마다 50ms 정착
  *      (앱 engine-worker.ts SETTLE_MS — 탐색 스레드가 잠깐 입력을 더 읽는다)
- *   3. 스레드: 해시를 비우고 깊이 <depth> 까지의 벽시계를 T · 1 스레드로 번갈아 두 번씩. 멀티 빌드의 `MESSAGE Speed` 는
- *      믿을 수 없다(M-1 첫 런 37628721845 — 2 스레드 159 nps 같은 값) — 노드 수에 기대지 않는다. 스레드를 바꾼 뒤 짧은 예열로
- *      재구성 비용(gomocalc 는 가중치 재적재)을 재는 탐색 밖으로 뺀다.
+ *   3. 스레드: SHOW_DETAIL 3 으로 2초 탐색의 NPS(INFO TOTALNODES × 1000 ÷ TOTALTIME)를 T · 1 스레드로 번갈아 두 번씩, 해시를 비우고.
+ *      멀티 빌드의 `MESSAGE Speed` 는 믿을 수 없고(첫 런 37628721845 — 2 스레드 159 nps), 깊이 도달 시간은 2 스레드에서 줄지
+ *      않는다(Rapfi 의 깊이 분산은 3 스레드부터 — 마스터플랜 P3-4 · 둘째 런 37629450865). 스레드를 바꾼 뒤 짧은 예열로 재구성 비용
+ *      (gomocalc 는 가중치 재적재)을 재는 탐색 밖으로 뺀다.
  *   4. terminate() → 프로세스가 스스로 끝나는가(남은 pthread 가 붙들면 10초 뒤 코드 3)
- * 통과 조건: 기능 탐색 둘 · 깊이 탐색 넷 모두 좌표, RESTART OK, 깊이 도달 시간 비(1 ÷ T) > 1.15, 제한 시간 안에 끝남
+ * 통과 조건: 기능 탐색 둘 · NPS 탐색 넷 모두 좌표, RESTART OK, NPS 비(T ÷ 1) > 1.2, 제한 시간 안에 끝남
  * (코드 0, 또는 코드 3 — 따로 보고).
  */
 import { spawn } from "node:child_process";
@@ -45,8 +46,8 @@ async function parent() {
       String(threads),
       "--turn",
       String(turn),
-      "--depth",
-      String(opt("depth", 16)),
+      "--nps-ms",
+      String(opt("nps-ms", 2000)),
     );
     const r = await new Promise((done) => {
       const c = spawn(process.execPath, args, { stdio: ["ignore", "pipe", "pipe"] });
@@ -73,7 +74,7 @@ async function parent() {
       rep?.searches?.length === 6 &&
       rep.searches.every((s) => s.move) &&
       rep.restartOk &&
-      rep.threadRatio > 1.15;
+      rep.threadRatio > 1.2;
     results.push({
       name,
       variant,
@@ -91,7 +92,7 @@ async function parent() {
         `      적재 ${rep?.loadMs ?? "-"}ms · START ${rep?.startMs ?? "-"}ms · ` +
         s.map((x) => `${x.tag}(${x.threads}스레드) ${x.move ?? "없음"} ${x.ms}ms`).join(" · ") +
         `
-      깊이 ${rep?.depth ?? "-"} 도달 시간 합 ${JSON.stringify(rep?.depthMs ?? {})} → 1 ÷ T = **${rep?.threadRatio?.toFixed(2) ?? "-"}** · RESTART ${rep?.restartOk ? "OK" : "실패"} · 끝내기 ${rep?.exitMs ?? "-"}ms` +
+      NPS(TOTALNODES ÷ TOTALTIME) ${JSON.stringify(rep?.nps ?? {})} → T ÷ 1 = **${rep?.threadRatio?.toFixed(2) ?? "-"}** · RESTART ${rep?.restartOk ? "OK" : "실패"} · 끝내기 ${rep?.exitMs ?? "-"}ms` +
         (lingered ? " · ⚠ terminate 뒤 스스로 끝나지 않음(10초 뒤 강제 종료)" : "") +
         (ok ? "" : `\n      stderr:${r.err.split("\n").slice(-4).join(" | ")}`),
     );
@@ -165,32 +166,30 @@ async function child() {
     rep.about = (await about).replace(/.*version="([^"]+)".*/, "$1");
 
     const board = ["BOARD", "7,7,2", "8,8,1", "8,6,2", "DONE"].join("\n");
-    /** 한 번 탐색 — 좌표 줄까지의 벽시계와 마지막 몇 줄. depth 를 주면 그 깊이까지(시간은 넉넉히) */
-    const search = async (tag, n, { depth = 0, ms: turnMs = turn, record = true } = {}) => {
+    /** 한 번 탐색 — 좌표 줄까지의 벽시계 · 마지막 몇 줄 · (SHOW_DETAIL 3 이면) TOTALNODES ÷ TOTALTIME 의 NPS */
+    const search = async (tag, n, { ms: turnMs = turn, record = true, fresh = false } = {}) => {
       const tail = [];
+      let nodes = null;
+      let time = null;
       const tap = (l) => {
         tail.push(l);
         if (tail.length > 5) tail.shift();
+        const m = /^INFO (TOTALNODES|TOTALTIME) (\d+)/.exec(l.trim());
+        if (m) m[1] === "TOTALNODES" ? (nodes = Number(m[2])) : (time = Number(m[2]));
       };
       taps.add(tap);
-      if (depth) {
-        Module.sendCommand("YXHASHCLEAR");
-        Module.sendCommand(`INFO MAX_DEPTH ${depth}`);
-      }
-      Module.sendCommand(`INFO TIMEOUT_TURN ${depth ? 120_000 : turnMs}`);
+      if (fresh) Module.sendCommand("YXHASHCLEAR");
+      Module.sendCommand(`INFO TIMEOUT_TURN ${turnMs}`);
       const t1 = performance.now();
-      const mv = until(
-        (l) => /^\d+,\d+$/.test(l),
-        (depth ? 120_000 : turnMs) + 20_000,
-        `탐색 ${tag}`,
-      );
+      const mv = until((l) => /^\d+,\d+$/.test(l), turnMs + 20_000, `탐색 ${tag}`);
       Module.sendCommand(board); // 여러 줄 블록은 한 번에(wasm-pbrain 과 같은 규칙)
       const move = await mv;
       const ms = Math.round(performance.now() - t1);
       await settle();
       taps.delete(tap);
-      if (record) rep.searches.push({ tag, threads: n, depth: depth || null, move, ms, tail });
-      return ms;
+      const nps = nodes != null && time ? Math.round((nodes * 1000) / time) : null;
+      if (record) rep.searches.push({ tag, threads: n, move, ms, nodes, time, nps, tail });
+      return nps;
     };
     const setThreads = async (n) => {
       Module.sendCommand(`INFO THREAD_NUM ${n}`);
@@ -208,18 +207,22 @@ async function child() {
     rep.restartOk = true;
     await search("②", threads);
 
-    // 스레드가 실제로 도는가: 같은 깊이까지 걸린 벽시계(T ↔ 1). 멀티 빌드의 MESSAGE Speed 는 믿을 수 없다(M-1 첫 런 — 159 nps 같은 값)
-    // — 노드 수에 기대지 않는다. 해시를 비우고 번갈아 두 번씩, 중앙값 대신 두 번의 합.
-    const depth = Number(opt("depth", 16));
-    const depthTotal = { [threads]: 0, 1: 0 };
+    // 스레드가 실제로 도는가: 같은 시간 탐색의 NPS(T ↔ 1). 멀티 빌드의 `MESSAGE Speed` 는 믿을 수 없고(M-1 첫 런 — 159 nps 같은 값),
+    // 깊이 도달 시간은 2 스레드에서 늘지 않는다(Rapfi 의 깊이 분산은 3 스레드부터 — 마스터플랜 P3-4, 둘째 런에서 1 ÷ T 0.5 ~ 1.0).
+    // 그래서 벤치 하네스(bench/gomocalc/lib.mjs)처럼 SHOW_DETAIL 3 의 INFO TOTALNODES × 1000 ÷ TOTALTIME 로 잰다. 해시를 비우고 번갈아 두 번씩.
+    Module.sendCommand("INFO SHOW_DETAIL 3");
+    const npsMs = Number(opt("nps-ms", 2000));
+    const npsSum = { [threads]: [], 1: [] };
     for (let k = 0; k < 2; k++)
       for (const n of k % 2 ? [1, threads] : [threads, 1]) {
         await setThreads(n);
-        depthTotal[n] += await search(`d${depth}`, n, { depth });
+        npsSum[n].push(await search(`nps`, n, { ms: npsMs, fresh: true }));
       }
-    rep.depth = depth;
-    rep.depthMs = { [`t${threads}`]: depthTotal[threads], t1: depthTotal[1] };
-    rep.threadRatio = depthTotal[threads] ? depthTotal[1] / depthTotal[threads] : null;
+    const mean = (xs) => (xs.every((x) => x) ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+    rep.nps = { [`t${threads}`]: npsSum[threads], t1: npsSum[1] };
+    const a = mean(npsSum[threads]);
+    const b = mean(npsSum[1]);
+    rep.threadRatio = a && b ? a / b : null;
   } catch (e) {
     rep.error = e.message;
   }
