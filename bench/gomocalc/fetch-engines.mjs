@@ -51,9 +51,31 @@ const SOURCES = {
   },
 };
 
+/**
+ * 일시적 실패(네트워크 · 5xx · 429)는 물러서며 다시 — GitHub 릴리스 자산이 HTTP 500 을 한 번 내서 대국 런이
+ * 엔진 받기에서 죽었다(match-gomocalc 37633345358). 4xx(인증 · 없음)는 곧바로 실패.
+ */
+async function fetchRetry(url, init, what, tries = 5) {
+  for (let i = 1; ; i++) {
+    let why;
+    try {
+      const res = await fetch(url, init);
+      if (res.ok) return res;
+      if (res.status < 500 && res.status !== 429) throw new Error(`${what} → HTTP ${res.status}`);
+      await res.body?.cancel();
+      why = `HTTP ${res.status}`;
+    } catch (e) {
+      if (/→ HTTP 4/.test(e.message)) throw e;
+      why = e.message;
+    }
+    if (i >= tries) throw new Error(`${what} → ${why}(${tries}번 시도)`);
+    console.log(`  ! ${what}: ${why} — ${2 * i}초 뒤 다시(${i}/${tries})`);
+    await new Promise((r) => setTimeout(r, 2000 * i));
+  }
+}
+
 async function fetchOne(url, dest) {
-  const res = await fetch(url, { redirect: "follow" });
-  if (!res.ok) throw new Error(`${url} → HTTP ${res.status}`);
+  const res = await fetchRetry(url, { redirect: "follow" }, url);
   const len = Number(res.headers.get("content-length") ?? NaN);
   try {
     const s = await stat(dest);
@@ -90,16 +112,20 @@ async function ghDownload(tag, files, dir) {
       "gh 가 없고 GH_TOKEN · GITHUB_TOKEN 도 없습니다 — 비공개 릴리스를 받을 수 없음",
     );
   const auth = { Authorization: `Bearer ${token}`, "X-GitHub-Api-Version": "2022-11-28" };
-  const rel = await fetch(`https://api.github.com/repos/${REPO}/releases/tags/${tag}`, {
-    headers: { ...auth, Accept: "application/vnd.github+json" },
-  });
-  if (!rel.ok) throw new Error(`릴리스 ${tag} → HTTP ${rel.status}`);
+  const rel = await fetchRetry(
+    `https://api.github.com/repos/${REPO}/releases/tags/${tag}`,
+    { headers: { ...auth, Accept: "application/vnd.github+json" } },
+    `릴리스 ${tag}`,
+  );
   const assets = new Map((await rel.json()).assets.map((a) => [a.name, a]));
   for (const f of files) {
     const a = assets.get(f);
     if (!a) throw new Error(`릴리스 ${tag} 에 ${f} 가 없습니다`);
-    const res = await fetch(a.url, { headers: { ...auth, Accept: "application/octet-stream" } });
-    if (!res.ok) throw new Error(`${f} → HTTP ${res.status}`);
+    const res = await fetchRetry(
+      a.url,
+      { headers: { ...auth, Accept: "application/octet-stream" } },
+      f,
+    );
     await writeFile(join(dir, f), Buffer.from(await res.arrayBuffer()));
   }
 }
