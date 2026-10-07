@@ -98,6 +98,14 @@ Cloudflare 를 건드리기 전에 결과물을 확인하고 싶을 때 쓰세�
 
 ---
 
+### 엔진 쇼케이스 — `/showcase/`
+
+같은 배포에 **엔진 쇼케이스**(`showcase/` — gomocalc 대국 · 연산 속도 · 최적화 여정)가 함께 나간다:
+`https://rapfiweb.pages.dev/showcase/`. `deploy.yml` 의 「쇼케이스 빌드」가 `SHOWCASE_BASE=/showcase/ SHOWCASE_OUT=dist/showcase`
+로 앱의 `dist/` 안에 굽고, 「배포 검증 — /showcase/」가 실제 주소에서 문서 · 자산 MIME 을 확인한다.
+`public/_redirects` 의 `/showcase → /showcase/ 301` 은 SPA 폴백보다 먼저 와야 한다. 숫자를 바꾸려면
+`showcase/src/data/` 를 고쳐 `main` 에 푸시하면 된다(`docs/gomocalc-대국-분석.md` §7).
+
 ## 4. 엔진 채우기
 
 엔진 산출물은 저장소에 없습니다(`.data` 가 20MB 입니다). **한 번** 이렇게 채웁니다:

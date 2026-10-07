@@ -68,6 +68,16 @@ jobs:
       - run: pnpm install --no-frozen-lockfile
       - run: pnpm build
 
+      # 엔진 쇼케이스(showcase/) — 앱과 따로 빌드해 같은 배포의 /showcase/ 에 싣는다. 앱 번들 · 라우팅과 섞이지 않는다
+      # (정적 파일이 SPA 폴백보다 먼저 나간다). 타입 검사는 위 pnpm build 의 tsc 가 showcase 까지 이미 했다.
+      - name: 쇼케이스 빌드 (/showcase/)
+        env:
+          SHOWCASE_BASE: /showcase/
+          SHOWCASE_OUT: dist/showcase
+        run: |
+          pnpm exec vite build --config showcase/vite.config.ts
+          test -f dist/showcase/index.html
+
       # 엔진 산출물 조립. .js/.wasm 은 저장소에 있고 가중치(rapfi.data, 모든 변형 공유)만
       # 릴리스에서 받는다(계획서 §8). 릴리스는 engine-release.yml 이 만든다. 커밋된 매니페스트
       # ·글루와 짝이 아니면 **배포하지 않는다** — 앱의 가중치 무결성 검사가 전원 실패한다.
@@ -168,6 +178,25 @@ jobs:
       # 「올라갔다」와 「돈다」는 다르다. 배포된 주소에서 엔진을 실제로 띄워
       # 렌주로 착수·분석·정지까지 한 바퀴 돈다 — CI 안의 dist 가 아니라 CDN 이
       # 내주는 파일로. MIME(.wasm), 캐시 헤더, SPA 폴백이 여기서만 드러난다.
+      # 쇼케이스는 엔진이 없는 정적 페이지라 HTTP 로 충분하다 — SPA 폴백(앱 index.html)이 아니라 쇼케이스 문서가,
+      # 그 문서가 가리키는 JS · CSS 가 자산(text/html 아님)으로 나가는지.
+      - name: 배포 검증 — /showcase/
+        if: env.TARGET == 'cloudflare'
+        env:
+          BASE_URL: ${{ steps.cf.outputs.url }}
+        run: |
+          set -e
+          page=$(curl -fsSL --retry 5 --retry-delay 5 "$BASE_URL/showcase/")
+          echo "$page" | grep -q "RapfiWeb 엔진 쇼케이스" || { echo "::error::/showcase/ 가 쇼케이스가 아닙니다(SPA 폴백?)"; exit 1; }
+          for a in $(echo "$page" | grep -oE '/showcase/assets/[^"]+\.(js|css)'); do
+            ct=$(curl -fsSIL "$BASE_URL$a" | grep -i '^content-type' | tail -1)
+            echo "$a — $ct"
+            echo "$ct" | grep -qiE 'javascript|css' || { echo "::error::$a 가 자산으로 나가지 않습니다"; exit 1; }
+          done
+          code=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "$BASE_URL/showcase")
+          echo "/showcase → $code"
+          echo "- 쇼케이스: $BASE_URL/showcase/" >> "$GITHUB_STEP_SUMMARY"
+
       - name: 배포 검증 — 실제 주소에서 렌주 엔진
         if: env.TARGET == 'cloudflare'
         env:

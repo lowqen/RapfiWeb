@@ -1,2 +1,5 @@
+# 엔진 쇼케이스(showcase/ → dist/showcase/) — 끝 슬래시 없이 와도 쇼케이스로. 폴백보다 먼저 와야 한다.
+/showcase  /showcase/  301
+
 # SPA 폴백. 딥링크(/research/review, /joseki/:id)가 새로고침에서 404 가 되지 않게 한다.
 /*  /index.html  200
