@@ -7,12 +7,14 @@
  *
  * 자식이 하는 일(모두 시간 제한 안):
  *   1. 글루 적재 → INFO RULE 4 · HASH_SIZE · THREAD_NUM <T> → START 15 → OK · ABOUT
- *   2. 탐색 ① — T 스레드 · 수당 <turn>ms: 좌표 줄까지, 요약 줄(MESSAGE Speed)에서 NPS
- *   3. 좌표 뒤 50ms 정착(앱 engine-worker.ts SETTLE_MS — 탐색 스레드가 잠깐 입력을 더 읽는다) → THREAD_NUM 1 → 탐색 ② 1 스레드
- *   4. RESTART → OK, 같은 국면 탐색 ③(T 스레드) — 판을 갈아도 멀쩡한가
- *   5. terminate() → 프로세스가 스스로 끝나는 데 걸린 시간(남은 pthread 가 붙들지 않는가)
- * 부모는 자식의 종료 코드 · 시간과 자식이 찍은 JSON 한 줄로 판정한다. 통과 조건: 세 탐색 모두 좌표, ①/② NPS 비 > 1.3(스레드가
- * 실제로 돈다), RESTART OK, 자식이 제한 시간 안에 끝남(코드 0, 또는 코드 3 = terminate 뒤 스스로 안 끝남 — 따로 보고).
+ *   2. 기능: 예열 → 탐색 ①(T 스레드 · 수당 <turn>ms) → RESTART → OK → 탐색 ② — 좌표 뒤마다 50ms 정착
+ *      (앱 engine-worker.ts SETTLE_MS — 탐색 스레드가 잠깐 입력을 더 읽는다)
+ *   3. 스레드: 해시를 비우고 깊이 <depth> 까지의 벽시계를 T · 1 스레드로 번갈아 두 번씩. 멀티 빌드의 `MESSAGE Speed` 는
+ *      믿을 수 없다(M-1 첫 런 37628721845 — 2 스레드 159 nps 같은 값) — 노드 수에 기대지 않는다. 스레드를 바꾼 뒤 짧은 예열로
+ *      재구성 비용(gomocalc 는 가중치 재적재)을 재는 탐색 밖으로 뺀다.
+ *   4. terminate() → 프로세스가 스스로 끝나는가(남은 pthread 가 붙들면 10초 뒤 코드 3)
+ * 통과 조건: 기능 탐색 둘 · 깊이 탐색 넷 모두 좌표, RESTART OK, 깊이 도달 시간 비(1 ÷ T) > 1.15, 제한 시간 안에 끝남
+ * (코드 0, 또는 코드 3 — 따로 보고).
  */
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
@@ -31,14 +33,21 @@ else await parent();
 async function parent() {
   const threads = Number(opt("threads", 2));
   const turn = Number(opt("turn", 1000));
-  const limitMs = Number(opt("limit-ms", 120_000));
+  const limitMs = Number(opt("limit-ms", 300_000));
   const results = [];
   for (const spec of all("engine")) {
     const [name, dir, variant, data] = spec.split("|");
     const t0 = performance.now();
     const args = [fileURLToPath(import.meta.url), "--child", "--dir", dir, "--variant", variant];
     if (data) args.push("--data", data);
-    args.push("--threads", String(threads), "--turn", String(turn));
+    args.push(
+      "--threads",
+      String(threads),
+      "--turn",
+      String(turn),
+      "--depth",
+      String(opt("depth", 16)),
+    );
     const r = await new Promise((done) => {
       const c = spawn(process.execPath, args, { stdio: ["ignore", "pipe", "pipe"] });
       let out = "";
@@ -61,10 +70,10 @@ async function parent() {
     const lingered = r.code === 3;
     const ok =
       (r.code === 0 || lingered) &&
-      rep?.searches?.length === 3 &&
+      rep?.searches?.length === 6 &&
       rep.searches.every((s) => s.move) &&
       rep.restartOk &&
-      rep.threadRatio > 1.3;
+      rep.threadRatio > 1.15;
     results.push({
       name,
       variant,
@@ -80,13 +89,9 @@ async function parent() {
     console.log(
       `${ok ? "통과" : "실패"}  ${name} (${variant}) — 종료 ${r.code ?? r.signal} · ${rep?.about ?? "ABOUT 없음"}\n` +
         `      적재 ${rep?.loadMs ?? "-"}ms · START ${rep?.startMs ?? "-"}ms · ` +
-        s
-          .map(
-            (x) =>
-              `탐색${x.tag}(${x.threads}스레드) ${x.move ?? "없음"} NPS ${x.nps ?? "-"} ${x.ms}ms`,
-          )
-          .join(" · ") +
-        ` · 스레드 NPS 비 ${rep?.threadRatio?.toFixed(2) ?? "-"} · RESTART ${rep?.restartOk ? "OK" : "실패"} · 끝내기 ${rep?.exitMs ?? "-"}ms` +
+        s.map((x) => `${x.tag}(${x.threads}스레드) ${x.move ?? "없음"} ${x.ms}ms`).join(" · ") +
+        `
+      깊이 ${rep?.depth ?? "-"} 도달 시간 합 ${JSON.stringify(rep?.depthMs ?? {})} → 1 ÷ T = **${rep?.threadRatio?.toFixed(2) ?? "-"}** · RESTART ${rep?.restartOk ? "OK" : "실패"} · 끝내기 ${rep?.exitMs ?? "-"}ms` +
         (lingered ? " · ⚠ terminate 뒤 스스로 끝나지 않음(10초 뒤 강제 종료)" : "") +
         (ok ? "" : `\n      stderr:${r.err.split("\n").slice(-4).join(" | ")}`),
     );
@@ -160,40 +165,61 @@ async function child() {
     rep.about = (await about).replace(/.*version="([^"]+)".*/, "$1");
 
     const board = ["BOARD", "7,7,2", "8,8,1", "8,6,2", "DONE"].join("\n");
-    const search = async (tag, n) => {
-      let speed = null;
+    /** 한 번 탐색 — 좌표 줄까지의 벽시계와 마지막 몇 줄. depth 를 주면 그 깊이까지(시간은 넉넉히) */
+    const search = async (tag, n, { depth = 0, ms: turnMs = turn, record = true } = {}) => {
+      const tail = [];
       const tap = (l) => {
-        const m = /^MESSAGE Speed (\d+)/.exec(l);
-        if (m) speed = Number(m[1]);
+        tail.push(l);
+        if (tail.length > 5) tail.shift();
       };
       taps.add(tap);
-      Module.sendCommand(`INFO TIMEOUT_TURN ${turn}`);
+      if (depth) {
+        Module.sendCommand("YXHASHCLEAR");
+        Module.sendCommand(`INFO MAX_DEPTH ${depth}`);
+      }
+      Module.sendCommand(`INFO TIMEOUT_TURN ${depth ? 120_000 : turnMs}`);
       const t1 = performance.now();
-      const mv = until((l) => /^\d+,\d+$/.test(l), turn + 20_000, `탐색 ${tag}`);
+      const mv = until(
+        (l) => /^\d+,\d+$/.test(l),
+        (depth ? 120_000 : turnMs) + 20_000,
+        `탐색 ${tag}`,
+      );
       Module.sendCommand(board); // 여러 줄 블록은 한 번에(wasm-pbrain 과 같은 규칙)
       const move = await mv;
       const ms = Math.round(performance.now() - t1);
       await settle();
       taps.delete(tap);
-      rep.searches.push({ tag, threads: n, move, nps: speed, ms });
+      if (record) rep.searches.push({ tag, threads: n, depth: depth || null, move, ms, tail });
+      return ms;
     };
-    // 첫 탐색에서 가중치를 푼다 — 예열 한 번(시간을 재지 않음)
-    await search("예열", threads);
-    rep.searches.length = 0;
+    const setThreads = async (n) => {
+      Module.sendCommand(`INFO THREAD_NUM ${n}`);
+      await settle();
+      // 스레드를 바꾸면 평가기를 다시 세운다(gomocalc 는 P2-2 가 없어 가중치를 다시 푼다 — 0.8초 남짓). 재는 탐색 밖에서 치르게 짧게 한 번.
+      await search("예열", n, { ms: 200, record: false });
+    };
+
+    // 기능: 예열 → 시간 탐색 → RESTART → 시간 탐색
+    await search("예열", threads, { record: false });
     await search("①", threads);
-    Module.sendCommand("INFO THREAD_NUM 1");
-    await settle();
-    await search("②", 1);
     const r = until((l) => l === "OK", 30_000, "RESTART → OK");
-    Module.sendCommand(`INFO THREAD_NUM ${threads}`);
-    await settle();
     Module.sendCommand("RESTART");
     await r;
     rep.restartOk = true;
-    await search("③", threads);
-    const a = rep.searches[0].nps;
-    const b = rep.searches[1].nps;
-    rep.threadRatio = a && b ? a / b : null;
+    await search("②", threads);
+
+    // 스레드가 실제로 도는가: 같은 깊이까지 걸린 벽시계(T ↔ 1). 멀티 빌드의 MESSAGE Speed 는 믿을 수 없다(M-1 첫 런 — 159 nps 같은 값)
+    // — 노드 수에 기대지 않는다. 해시를 비우고 번갈아 두 번씩, 중앙값 대신 두 번의 합.
+    const depth = Number(opt("depth", 16));
+    const t = { [threads]: 0, 1: 0 };
+    for (let k = 0; k < 2; k++)
+      for (const n of k % 2 ? [1, threads] : [threads, 1]) {
+        await setThreads(n);
+        t[n] += await search(`d${depth}`, n, { depth });
+      }
+    rep.depth = depth;
+    rep.depthMs = { [`t${threads}`]: t[threads], t1: t[1] };
+    rep.threadRatio = t[threads] ? t[1] / t[threads] : null;
   } catch (e) {
     rep.error = e.message;
   }
