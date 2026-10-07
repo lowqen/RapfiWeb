@@ -26,6 +26,10 @@ on:
       positions:
         default: "bench/sprt/openings-balanced.json,bench/gomocalc/mate-suite.json"
         type: string
+      expect_cpu:
+        description: "러너 CPU 이름에 이 글자가 없으면 곧바로 멈춘다(예: 8488C · 7B13) — 비우면 검사 안 함"
+        default: ""
+        type: string
       runner:
         description: "러너"
         default: "self-hosted"
@@ -46,8 +50,15 @@ jobs:
           node-version: "26"
 
       - name: 러너 정보
+        env:
+          EXPECT: ${{ inputs.expect_cpu }}
         run: |
-          echo "nproc $(nproc) · $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2)"
+          cpu=$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2)
+          echo "nproc $(nproc) · $cpu"
+          # self-hosted 러너는 같은 등록 이름으로 기계가 바뀔 수 있다(Lightning 스튜디오의 기계 전환) — CPU 를 지정해 돌렸으면 확인한다.
+          if [ -n "$EXPECT" ] && ! echo "$cpu" | grep -qF "$EXPECT"; then
+            echo "::error::러너 CPU 가 '$EXPECT' 가 아닙니다: $cpu"; exit 1
+          fi
           grep -oE '\b(avx512_vnni|avx_vnni|avx512vnni|avx512bw|avx2)\b' /proc/cpuinfo | sort -u | tr '\n' ' '; echo
           node --version
 
