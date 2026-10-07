@@ -11,6 +11,7 @@ import { signed } from "./components/format";
 import { AMD, CONTROL, MAIN, type MatchReport } from "./data/matches";
 import {
   ELO_HISTORY,
+  PAIRED_SET_LABEL,
   PHASES,
   RELAXED_PAIRED,
   SPEED,
@@ -415,19 +416,35 @@ export function App() {
 
   const pentaCats = ["0", "½", "1", "1½", "2"];
 
-  const pairedRows: IntervalRow[] = RELAXED_PAIRED.rows.map((r) => ({
-    ...r,
-    color: r.key === "aa" ? "var(--ink-3)" : C.rx,
-    muted: r.key === "aa",
-    tip: (
-      <>
-        <strong>{r.label}</strong>
-        <div>
-          {signed(r.value, 2)}% (95% {signed(r.low, 2)} ~ {signed(r.high, 2)}) · {r.sub}
-        </div>
-      </>
-    ),
-  }));
+  // CPU 가 계열이다 — 묶음마다 Intel · AMD 를 나란히. 색은 엔진 색과 겹치지 않게 따로(--cpu-*).
+  const CPU_COLOR = { intel: "var(--cpu-intel)", amd: "var(--cpu-amd)" } as const;
+  const pairedRows: IntervalRow[] = (["all", "open", "mate", "aa"] as const).flatMap((set) =>
+    RELAXED_PAIRED.map((c) => {
+      const r = c.rows.find((x) => x.set === set);
+      if (!r) throw new Error(`짝 측정에 ${set} 가 없습니다`);
+      return {
+        key: `${c.key}-${set}`,
+        label: PAIRED_SET_LABEL[set],
+        sub: `${c.cpu} · 짝 ${r.pairs}`,
+        value: r.value,
+        low: r.low,
+        high: r.high,
+        color: CPU_COLOR[c.key],
+        muted: set === "aa",
+        tip: (
+          <>
+            <strong>
+              {PAIRED_SET_LABEL[set]} · {c.cpu}
+            </strong>
+            <div>
+              {signed(r.value, 2)}% (95% {signed(r.low, 2)} ~ {signed(r.high, 2)}) · {c.note} · 런{" "}
+              {c.run}
+            </div>
+          </>
+        ),
+      };
+    }),
+  );
 
   const cpuRows: IntervalRow[] = (AMD ? [MAIN, AMD] : [MAIN]).map((m, i) => ({
     key: `cpu-${i}`,
@@ -753,27 +770,26 @@ export function App() {
               </p>
             </Card>
             <Card
-              title="relaxed SIMD 는 어디서 빨라지나"
-              sub={`relaxed ↔ 일반 SIMD128 · 같은 런 짝(고정 깊이 15) · ${RELAXED_PAIRED.cpu}(VNNI 없음) · 수염 = 95% 구간`}
+              title="relaxed SIMD 는 어디서 · 어느 CPU 에서 빨라지나"
+              sub="relaxed ↔ 일반 SIMD128 · 같은 런 짝(고정 깊이 15) · 수염 = 95% 구간"
               wide
             >
+              <Legend
+                items={RELAXED_PAIRED.map((c) => ({
+                  label: `${c.cpu} — ${c.note}`,
+                  color: CPU_COLOR[c.key],
+                }))}
+              />
               <IntervalChart
                 rows={pairedRows}
                 kind="bar"
                 format={(v) => `${v > 0 ? "+" : ""}${v}%`}
               />
               <p className="note">
-                A/A 가 0 을 품으니 하네스는 믿을 만하다. 큰 몫은 VNNI 없이도 나온다 — 이득을 크게
-                가르는 것은 국면의 종류다: NNUE 추론 몫이 큰 개시 · 중반 +43%, 위협 수순이 많은 필승
-                국면 +19%. 대국은 개시에서 시작하므로 앞쪽에 가깝다
-                {MAIN.search && CONTROL.search?.A.nps && MAIN.search.A.nps ? (
-                  <>
-                    {" "}
-                    (Intel 8488C 대국 중 relaxed ÷ 일반 ={" "}
-                    {signed((MAIN.search.A.nps / CONTROL.search.A.nps - 1) * 100)}% — 다른 런)
-                  </>
-                ) : null}
-                .
+                A/A 가 0 근처라 하네스는 믿을 만하다. 이득의 크기는 국면이 먼저 가르고(NNUE 몫이 큰
+                개시 · 중반 ↔ 위협 수순이 많은 필승 국면), 그 위의 배수는 CPU 가 정한다 — 모든
+                묶음에서 VNNI 가 있는 Intel 이 1.7 ~ 1.8배. VNNI 가설과 맞지만 두 CPU 는 다른 점도
+                많아 인과는 정합까지만이다.
               </p>
             </Card>
           </div>
