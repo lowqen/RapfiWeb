@@ -216,3 +216,16 @@ test("탐색 통계 — 엔진의 요약 줄(MESSAGE Speed …)에서 엔진별 
   assert.equal(Number(a[1]) + Number(b[1]), plies - 3 * r.games.length);
   noLeak(r);
 });
+
+test("탐색 통계 — INFO TOTALNODES · TOTALTIME 이 있으면 그것을 쓴다(멀티 빌드의 엉터리 Speed 줄은 버린다)", () => {
+  const r = run(`${FAKE} --seed 41 --totals 30000`, `${FAKE} --seed 42 --speed 10000`, [
+    "--games",
+    "2",
+    "--tc",
+    "turn=200",
+  ]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /탐색 A A: \d+수 · NPS 30,000 · 깊이 9\.00\(선택 12\.00\)/, r.stdout);
+  assert.match(r.stdout, /탐색 B B: \d+수 · NPS 10,000 · 깊이 5\.00/, r.stdout);
+  noLeak(r);
+});

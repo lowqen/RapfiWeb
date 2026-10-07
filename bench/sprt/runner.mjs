@@ -232,26 +232,45 @@ let nextJob = 0;
 let summary = summarize(tally, cfg.sprt);
 
 /**
- * 엔진별 탐색 통계 — 수마다 Rapfi 가 끝에 찍는 요약 줄(`MESSAGE Speed 15538 | Depth 14-16 | Eval 261 | Node 11K | Time 736ms`)을
- * 모은다. 같은 대국 · 같은 기계에서 두 엔진의 연산 속도를 나란히 보려는 것이다(판정은 Elo 로 한다 — 이것은 설명용).
- * 평균 NPS 는 시간 가중(Σ speed·time / Σ time ≈ 전체 노드 / 전체 시간). 이 줄을 찍지 않는 엔진은 moves 0 으로 남는다.
+ * 엔진별 탐색 통계 — 같은 대국 · 같은 기계에서 두 엔진의 연산 속도를 나란히 보려는 것이다(판정은 Elo 로 한다 — 이것은 설명용).
+ * 수마다 둘 중 하나로 센다:
+ *   - `INFO TOTALNODES` · `INFO TOTALTIME`(SHOW_DETAIL 3 일 때) — 좌표 줄에서 그 수의 마지막 값으로 확정. 깊이는 `INFO DEPTH` · `SELDEPTH`.
+ *     **멀티스레드 빌드는 이것만 믿을 수 있다** — 요약 줄의 Speed 가 159 nps 같은 값을 낸다(M-1 탐침 37628721845).
+ *   - 그 줄이 없으면 요약 줄(`MESSAGE Speed 15538 | Depth 14-16 | Eval 261 | Node 11K | Time 736ms`) — 단일 변형의 기본 출력.
+ * 평균 NPS 는 시간 가중(Σ 노드 / Σ 시간). 둘 다 찍지 않는 엔진은 moves 0 으로 남는다.
  */
 const SPEED_LINE = /^MESSAGE Speed (\d+) \| Depth (\d+)-(\d+) \|.*\| Time (\d+)ms/;
+const INFO_LINE = /^INFO (TOTALNODES|TOTALTIME|DEPTH|SELDEPTH) (\d+)/;
+const MOVE_LINE = /^\d+\s*,\s*\d+$/;
 const search = {
   A: { moves: 0, timeMs: 0, nodeMs: 0, depth: 0, selDepth: 0 },
   B: { moves: 0, timeMs: 0, nodeMs: 0, depth: 0, selDepth: 0 },
 };
 function tapSearch(engine, key) {
-  engine.tap((line) => {
-    const m = SPEED_LINE.exec(line);
-    if (!m) return;
-    const [speed, depth, sel, ms] = m.slice(1).map(Number);
-    const st = search[key];
+  const st = search[key];
+  const add = (nodes, ms, depth, sel) => {
     st.moves++;
     st.timeMs += ms;
-    st.nodeMs += speed * ms;
+    st.nodeMs += nodes * 1000;
     st.depth += depth;
     st.selDepth += sel;
+  };
+  let cur = {};
+  engine.tap((line) => {
+    let m = INFO_LINE.exec(line);
+    if (m) return void (cur[m[1]] = Number(m[2]));
+    m = SPEED_LINE.exec(line);
+    if (m && cur.TOTALNODES == null) {
+      const [speed, depth, sel, ms] = m.slice(1).map(Number);
+      add((speed * ms) / 1000, ms, depth, sel);
+      cur.counted = true;
+      return;
+    }
+    if (MOVE_LINE.test(line)) {
+      if (!cur.counted && cur.TOTALNODES != null && cur.TOTALTIME > 0)
+        add(cur.TOTALNODES, cur.TOTALTIME, cur.DEPTH ?? 0, cur.SELDEPTH ?? 0);
+      cur = {};
+    }
   });
 }
 function searchSummary() {

@@ -185,7 +185,11 @@ test("모형: 관문 없이(정착 0ms) 좌표 직후 보낸 명령은 사라지
       eng.tick(settleMs);
     }
     const restarts = eng.got.filter((x) => x === "RESTART").length;
-    if (expectLost) assert.ok(restarts < 20, `정착 0ms 인데 RESTART ${restarts}/20 — 모형이 사고를 재현하지 못함`);
+    if (expectLost)
+      assert.ok(
+        restarts < 20,
+        `정착 0ms 인데 RESTART ${restarts}/20 — 모형이 사고를 재현하지 못함`,
+      );
     else assert.equal(restarts, 20, `정착 50ms 에서 RESTART ${restarts}/20`);
   }
 });

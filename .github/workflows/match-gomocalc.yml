@@ -3,22 +3,39 @@ name: 대국 — gomocalc 순정 vs RapfiWeb 배포
 # 「gomocalc 가 서비스 중인 Rapfi」와 「우리가 서비스 중인 Rapfi」를 **배포 실물 그대로** 맞붙인다 — 엔진을 빌드하지 않는다.
 # 둘 다 bench/gomocalc/fetch-engines.mjs 로 받는다(gomocalc = www.gomocalc.com/build 그대로, rapfiweb = 엔진 릴리스).
 #
-#   A(시험) = rapfiweb  — 기본 single-simd128-relaxed(우리 배포의 1 스레드 최강 변형 · A1 + A3 포함)
-#   B(기준) = gomocalc  — single-simd128(gomocalc 배포본의 유일한 1 스레드 변형 — 그쪽에는 single-relaxed 가 없다)
+#   A(시험) = rapfiweb  — test_variant
+#   B(기준) = gomocalc  — base_variant(auto: 단일이면 single-simd128 — gomocalc 의 유일한 1 스레드 변형, 멀티면 A 와 같은 변형)
+#             opponent=self 면 B 도 rapfiweb 의 같은 변형 — 하네스 A/A 확인(Elo 구간이 0 을 품고 고장 0 이어야 한다)
 #
-# 대국은 bench/sprt/runner.mjs + wasm-pbrain.mjs(단일 스레드 변형만). 금수 심판은 rapfiweb single-simd128(가중치를 풀지 않는다).
-# 기본은 **고정 판 수(--fixed)** — SPRT 결정은 기록하되 멈추지 않고 games 까지 둬서 Elo 차를 좁게 잰다.
-# 엔진별 NPS · 깊이는 러너가 수마다의 요약 줄에서 모은다(summary.json 의 search).
+# 대국은 bench/sprt/runner.mjs + wasm-pbrain.mjs. **multi-* 변형**은 어댑터의 명령 관문(pbrain-gate.mjs)을 거치고, 엔진마다
+# INFO THREAD_NUM <threads> 를 START 앞에 받는다(M-1 탐침 multi-probe.yml 이 두 배포본의 멀티 글루를 Node 에서 확인).
+# 멀티 빌드의 요약 줄 Speed 는 믿을 수 없어 SHOW_DETAIL 3 을 켜고 러너가 INFO TOTALNODES · TOTALTIME 으로 NPS 를 센다.
+# 금수 심판은 rapfiweb single-simd128(가중치를 풀지 않는다). 기본은 고정 판 수(--fixed).
 #
-# 대조 실험: test_variant=single-simd128 로 돌리면 같은 ISA(일반 SIMD)끼리 — relaxed 몫을 빼고 소스 · 패치 몫만 본다.
+# 러너: runner_label 의 self-hosted 러너(기본 c4 = Intel Xeon 8581C · 8 vCPU · 물리 4). ubuntu-latest 를 주면 GitHub 호스트.
+
 on:
   workflow_dispatch:
     inputs:
       test_variant:
-        description: "A(rapfiweb) 변형 — 단일 스레드만"
+        description: "A(rapfiweb) 변형"
         default: "single-simd128-relaxed"
         type: choice
-        options: ["single-simd128-relaxed", "single-simd128"]
+        options: ["single-simd128-relaxed", "single-simd128", "multi-simd128-relaxed", "multi-simd128"]
+      base_variant:
+        description: "B 변형 — auto 면 단일은 gomocalc single-simd128, 멀티는 A 와 같은 변형"
+        default: "auto"
+        type: choice
+        options: ["auto", "single-simd128", "multi-simd128", "multi-simd128-relaxed"]
+      opponent:
+        description: "B 엔진 — gomocalc(순정) 또는 self(rapfiweb 끼리 — 하네스 A/A 확인)"
+        default: "gomocalc"
+        type: choice
+        options: ["gomocalc", "self"]
+      threads:
+        description: "엔진마다 탐색 스레드(INFO THREAD_NUM) — multi-* 변형에서만 1 보다 크게"
+        default: "1"
+        type: string
       engine_tag:
         description: "rapfiweb 엔진 릴리스 태그(배포 중인 것)"
         default: "engine-3c94c2a9-a3"
@@ -46,26 +63,29 @@ on:
         default: "10"
         type: string
       concurrency:
-        description: "동시 대국 — auto 면 min(물리 코어, 논리 − 2), 최소 1"
+        description: "동시 대국 — auto 면 1 스레드: min(물리, 논리 − 2) · 멀티: 물리 ÷ 스레드, 최소 1"
         default: "auto"
         type: string
       max_minutes:
         description: "대국 시간 예산(분) — 넘으면 시작한 쌍만 마저 두고 요약"
-        default: "200"
+        default: "300"
         type: string
-      runner:
-        description: "러너"
-        default: "self-hosted"
-        type: choice
-        options: ["self-hosted", "ubuntu-latest"]
+      runner_label:
+        description: "self-hosted 러너의 고유 라벨(c4 = Intel Xeon 8581C) · self-hosted(아무 러너) · ubuntu-latest(GitHub 호스트)"
+        default: "c4"
+        type: string
+      expect_cpu:
+        description: "러너 CPU 이름에 이 글자가 없으면 곧바로 멈춘다(예: 8581C) — 비우면 검사 안 함"
+        default: ""
+        type: string
 
 permissions:
   contents: read
 
 jobs:
   match:
-    runs-on: ${{ inputs.runner }}
-    timeout-minutes: ${{ inputs.runner == 'self-hosted' && 1440 || 360 }}
+    runs-on: ${{ inputs.runner_label == 'ubuntu-latest' && 'ubuntu-latest' || fromJSON(format('["self-hosted","{0}"]', inputs.runner_label)) }}
+    timeout-minutes: ${{ inputs.runner_label == 'ubuntu-latest' && 360 || 1440 }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -73,11 +93,17 @@ jobs:
           node-version: "26"
 
       - name: 러너 정보
+        env:
+          EXPECT: ${{ inputs.expect_cpu }}
         run: |
-          echo "nproc $(nproc) · $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2)"
+          cpu=$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2)
+          echo "nproc $(nproc) · $cpu"
           grep -E 'MemTotal|MemAvailable' /proc/meminfo
           lscpu | grep -E '^(Thread|Core|Socket)' || true
           node --version
+          if [ -n "$EXPECT" ] && ! echo "$cpu" | grep -qF "$EXPECT"; then
+            echo "::error::러너 CPU 가 '$EXPECT' 가 아닙니다: $cpu"; exit 1
+          fi
 
       - name: 러너 · 통계 시험
         run: node --test bench/sprt/
@@ -88,12 +114,15 @@ jobs:
           ENGINE_TAG: ${{ inputs.engine_tag }}
         run: |
           node bench/gomocalc/fetch-engines.mjs
-          ( cd bench/gomocalc/engines && sha256sum gomocalc/rapfi-single-simd128.wasm rapfiweb/rapfi-single-simd128*.wasm gomocalc/rapfi.data rapfiweb/rapfi.data )
+          ( cd bench/gomocalc/engines && sha256sum gomocalc/*.wasm rapfiweb/*.wasm gomocalc/rapfi.data rapfiweb/rapfi.data )
           cat bench/gomocalc/engines/rapfiweb/ENGINE_VERSION.txt
 
       - name: 대국
         env:
           TV: ${{ inputs.test_variant }}
+          BV: ${{ inputs.base_variant }}
+          OPP: ${{ inputs.opponent }}
+          THREADS: ${{ inputs.threads }}
           CONC: ${{ inputs.concurrency }}
           OPENINGS_FILE: ${{ inputs.openings_file }}
           FIXED: ${{ inputs.fixed }}
@@ -102,31 +131,53 @@ jobs:
           mkdir -p match
           E=$PWD/bench/gomocalc/engines
           P=$PWD/bench/sprt/wasm-pbrain.mjs
+          multi=false; case "$TV" in multi-*) multi=true ;; esac
+          if [ "$BV" = "auto" ]; then
+            if $multi || [ "$OPP" = "self" ]; then BV=$TV; else BV=single-simd128; fi
+          fi
+          case "$BV" in
+            multi-*) $multi || { echo "::error::A($TV) 가 단일인데 B($BV) 가 멀티"; exit 1; } ;;
+            *) if $multi; then echo "::error::A($TV) 가 멀티인데 B($BV) 가 단일"; exit 1; fi ;;
+          esac
+          if ! $multi && [ "$THREADS" != "1" ]; then echo "::error::단일 변형은 threads=1 만"; exit 1; fi
           if [ "$CONC" = "auto" ]; then
-            # 대국마다 한 번에 한 엔진만 생각한다. 생각하는 엔진이 물리 코어를 넘지 않게 하고(SMT 형제를 나눠 쓰면
-            # 시간 제어가 사실상 짧아진다), 러너 · 심판 · node GC 몫으로 논리 2개를 남긴다. 허용 CPU 안에서만 센다
-            # (컨테이너가 호스트 전체를 보는 문제 — sprt.yml 의 auto 주석).
+            # 대국마다 한 번에 한 엔진만 생각한다. 생각하는 스레드가 물리 코어를 넘지 않게 한다(SMT 형제를 나눠 쓰면 시간 제어가
+            # 사실상 짧아진다). 허용 CPU 안에서만 센다(컨테이너가 호스트 전체를 보는 문제 — sprt.yml 의 auto 주석).
+            #   1 스레드: min(물리, 논리 − 2) — 러너 · 심판 · node GC 몫으로 논리 2개를 남긴다
+            #   멀티: 물리 ÷ 스레드 — 탐색 스레드가 물리 코어를 다 쓰고, 러너 · 심판 몫은 SMT 형제가 받는다
             allowed=$(awk '/^Cpus_allowed_list:/ {print $2}' /proc/self/status)
             phys=$(lscpu -p=CPU,Core,Socket | awk -F, -v list="$allowed" '
               BEGIN { n = split(list, r, ","); for (i = 1; i <= n; i++) { if (split(r[i], ab, "-") == 2) { for (c = ab[1] + 0; c <= ab[2] + 0; c++) ok[c] = 1 } else ok[r[i] + 0] = 1 } }
               /^#/ { next }
               ($1 + 0) in ok { print $2 "," $3 }' | sort -u | wc -l)
             logical=$(nproc)
-            CONC=$(( logical - 2 )); [ "$CONC" -le "$phys" ] || CONC=$phys; [ "$CONC" -ge 1 ] || CONC=1
-            echo "동시 대국 auto → $CONC (물리 $phys · 논리 $logical · 허용 $allowed)"
+            if $multi; then
+              CONC=$(( phys / THREADS ))
+            else
+              CONC=$(( logical - 2 )); [ "$CONC" -le "$phys" ] || CONC=$phys
+            fi
+            [ "$CONC" -ge 1 ] || CONC=1
+            echo "동시 대국 auto → $CONC (물리 $phys · 논리 $logical · 허용 $allowed · 스레드 $THREADS)"
+          fi
+          if [ "$OPP" = "self" ]; then
+            bspec="node $P --dir $E/rapfiweb --variant $BV"; bname="rapfiweb-$BV-b"
+          else
+            bspec="node $P --dir $E/gomocalc --variant $BV --data $E/gomocalc/rapfi.data"; bname="gomocalc-$BV"
           fi
           extra=()
           if [ -n "$OPENINGS_FILE" ]; then extra+=(--openings-file "$OPENINGS_FILE"); fi
           if [ "$FIXED" = "true" ]; then extra+=(--fixed); fi
+          if $multi; then extra+=(--a-init "INFO SHOW_DETAIL 3" --b-init "INFO SHOW_DETAIL 3"); fi
           node bench/sprt/runner.mjs "${extra[@]}" \
             --a "node $P --dir $E/rapfiweb --variant $TV" --a-name "rapfiweb-$TV" \
-            --b "node $P --dir $E/gomocalc --variant single-simd128 --data $E/gomocalc/rapfi.data" --b-name gomocalc-single-simd128 \
+            --b "$bspec" --b-name "$bname" \
             --referee "node $P --dir $E/rapfiweb --variant single-simd128" \
+            --threads "$THREADS" \
             --games "${{ inputs.games }}" --tc "${{ inputs.tc }}" --concurrency "$CONC" --max-minutes "${{ inputs.max_minutes }}" \
             --elo0 "${{ inputs.elo0 }}" --elo1 "${{ inputs.elo1 }}" \
             --out match/games.jsonl --summary match/summary.json | tee match/match.log
           {
-            echo "### 대국 — rapfiweb \`$TV\` vs gomocalc \`single-simd128\` (${{ inputs.tc }})"
+            echo "### 대국 — rapfiweb $TV vs $bname · 스레드 $THREADS · ${{ inputs.tc }}"
             echo '```'
             sed -n '/──────/,$p' match/match.log
             echo '```'
@@ -138,7 +189,7 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
-          name: match-${{ inputs.test_variant }}
+          name: match-${{ inputs.test_variant }}-${{ inputs.opponent }}-t${{ inputs.threads }}
           retention-days: 14
           path: |
             match/

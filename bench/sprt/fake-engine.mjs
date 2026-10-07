@@ -1,12 +1,13 @@
 /**
  * 시험용 가짜 Gomocup 엔진 — 러너의 오류 처리를 일부러 건드린다(runner.test.mjs).
  *
- *   node bench/sprt/fake-engine.mjs [--seed N] [--crash-at K] [--hang-at K] [--illegal-at K] [--spam LINES] [--slow MS] [--speed NPS]
+ *   node bench/sprt/fake-engine.mjs [--seed N] [--crash-at K] [--hang-at K] [--illegal-at K] [--spam LINES] [--slow MS] [--speed NPS] [--totals NPS]
  *
  * 수는 시드 고정 난수로 빈 칸에 둔다(규칙을 모른다 — 다섯이 나면 그건 우연이다). K 는 이 프로세스가
  * 받은 BOARD 의 순번(1부터)이다. --spam 은 수마다 그만큼의 MESSAGE 줄을 먼저 찍는다 — 러너가 stdout 을
  * 읽지 않으면 파이프 버퍼가 차서 이 엔진이 write 에서 멈춘다(데드락 시험). --speed 는 수마다 Rapfi 꼴의 요약 줄
- * (`MESSAGE Speed N | Depth 5-7 | … | Time 10ms`)을 찍는다 — 러너의 탐색 통계 시험.
+ * (`MESSAGE Speed N | Depth 5-7 | … | Time 10ms`)을 찍는다 — 러너의 탐색 통계 시험. --totals 는 멀티 빌드처럼
+ * `INFO DEPTH · SELDEPTH · TOTALNODES · TOTALTIME`(10ms 에 NPS 만큼)과 **엉터리** 요약 줄(Speed 159)을 함께 찍는다.
  */
 import { createInterface } from "node:readline";
 
@@ -20,6 +21,7 @@ const illegalAt = arg("illegal-at", 0);
 const spam = arg("spam", 0);
 const slow = arg("slow", 0);
 const speed = arg("speed", 0);
+const totals = arg("totals", 0);
 let seed = arg("seed", 1) >>> 0;
 const rnd = () => {
   seed = (seed + 0x6d2b79f5) >>> 0;
@@ -51,6 +53,16 @@ function reply(move) {
   const filler = "x".repeat(100);
   for (let i = 0; i < spam; i++) out(`MESSAGE spam ${i} ${filler}`);
   if (speed) out(`MESSAGE Speed ${speed} | Depth 5-7 | Eval 0 | Node 1K | Time 10ms`);
+  if (totals) {
+    for (const l of [
+      "INFO DEPTH 9",
+      "INFO SELDEPTH 12",
+      `INFO TOTALNODES ${totals / 100}`,
+      "INFO TOTALTIME 10",
+    ])
+      out(l);
+    out("MESSAGE Speed 159 | Depth 9-12 | Eval 0 | Node 1K | Time 10ms");
+  }
   if (slow) setTimeout(() => out(move), slow);
   else out(move);
 }
