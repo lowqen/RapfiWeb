@@ -328,3 +328,39 @@ export const ELO_HISTORY: EloItem[] = [
     note: "H0 채택",
   },
 ];
+
+/**
+ * relaxed ↔ 일반 SIMD128 — 같은 런 · 같은 국면 · 짝(고정 깊이 15, --det). variant-speed 37583166782 · AMD EPYC 7B13(VNNI 없음).
+ * `bench/sprt/results/ci-37583166782-variant-speed-amd7b13.md`. 대국 중 값은 본 매치(Intel 8488C)의 시간 가중 NPS 비 — 다른 런이라 구간이 없다.
+ */
+export const RELAXED_PAIRED = {
+  cpu: "AMD EPYC 7B13",
+  run: "37583166782",
+  rows: [
+    {
+      key: "aa",
+      label: "A/A 대조",
+      sub: "같은 파일 · 짝 196",
+      value: 0.25,
+      low: -1.89,
+      high: 2.45,
+    },
+    { key: "all", label: "전체", sub: "짝 181", value: 32.47, low: 28.56, high: 36.51 },
+    {
+      key: "open",
+      label: "균형 개시 60",
+      sub: "짝 105 · 개시 · 중반",
+      value: 42.83,
+      low: 37.88,
+      high: 47.96,
+    },
+    {
+      key: "mate",
+      label: "필승 묶음 50",
+      sub: "짝 76 · VCF · 위협 수순",
+      value: 19.39,
+      low: 14.42,
+      high: 24.57,
+    },
+  ],
+};

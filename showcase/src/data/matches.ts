@@ -2,8 +2,13 @@
  * gomocalc 대조 대국 — `bench/sprt/match-report.mjs` 가 CI 기보(match-gomocalc.yml)에서 만든 JSON 그대로.
  * 다시 만들려면 보고서 `docs/gomocalc-대국-분석.md` 의 「재현」 절.
  */
-import mainRaw from "./match-relaxed.json";
-import controlRaw from "./match-simd.json";
+// 있는 것만 싣는다 — CPU 별 재측정(match-relaxed-<cpu>.json)은 런이 끝나 파일이 생기면 저절로 화면에 나온다.
+const FILES = import.meta.glob<MatchReport>("./match-*.json", { eager: true, import: "default" });
+const need = (name: string): MatchReport => {
+  const m = FILES[`./${name}`];
+  if (!m) throw new Error(`쇼케이스 데이터가 없습니다: ${name}`);
+  return m;
+};
 
 export interface Interval {
   elo: number;
@@ -64,6 +69,8 @@ export interface MatchReport {
 }
 
 /** 본 매치 — RapfiWeb single-simd128-relaxed(배포 1 스레드 최강) vs gomocalc single-simd128 */
-export const MAIN = mainRaw as unknown as MatchReport;
+export const MAIN = need("match-relaxed.json");
 /** 대조 — 같은 ISA(일반 SIMD)끼리: relaxed 몫을 빼고 소스 · 패치 몫만 */
-export const CONTROL = controlRaw as unknown as MatchReport;
+export const CONTROL = need("match-simd.json");
+/** 본 매치를 AMD EPYC 7B13 에서 다시 둔 것 — 없으면 null */
+export const AMD: MatchReport | null = FILES["./match-relaxed-amd7b13.json"] ?? null;

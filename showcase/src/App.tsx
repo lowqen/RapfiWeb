@@ -8,8 +8,15 @@ import {
   type IntervalRow,
 } from "./components/charts";
 import { signed } from "./components/format";
-import { CONTROL, MAIN, type MatchReport } from "./data/matches";
-import { ELO_HISTORY, PHASES, SPEED, STATUS_LABEL, type Status } from "./data/journey";
+import { AMD, CONTROL, MAIN, type MatchReport } from "./data/matches";
+import {
+  ELO_HISTORY,
+  PHASES,
+  RELAXED_PAIRED,
+  SPEED,
+  STATUS_LABEL,
+  type Status,
+} from "./data/journey";
 
 // 계열 색은 엔티티를 따른다(순위가 아니라) — 어느 차트에서든 같은 엔진은 같은 색.
 const C = {
@@ -367,6 +374,25 @@ export function App() {
         </>
       ),
     },
+    ...(AMD
+      ? [
+          {
+            key: "amd",
+            label: "★ 본 매치 — AMD 7B13 러너",
+            sub: `${AMD.games.toLocaleString("en-US")}판 · ${decisionText(AMD)}`,
+            value: AMD.elo.pentanomial.elo,
+            low: AMD.elo.pentanomial.low,
+            high: AMD.elo.pentanomial.high,
+            color: C.rx,
+            tip: (
+              <>
+                AMD EPYC 7B13 에서 다시 둔 본 매치: {signed(AMD.elo.pentanomial.elo)} (95%{" "}
+                {signed(AMD.elo.pentanomial.low)} ~ {signed(AMD.elo.pentanomial.high)})
+              </>
+            ),
+          },
+        ]
+      : []),
     ...ELO_HISTORY.map((e) => ({
       key: e.id,
       label: e.label,
@@ -388,7 +414,40 @@ export function App() {
   ];
 
   const pentaCats = ["0", "½", "1", "1½", "2"];
-  const wallH = (MAIN.wallSec + CONTROL.wallSec) / 3600;
+
+  const pairedRows: IntervalRow[] = RELAXED_PAIRED.rows.map((r) => ({
+    ...r,
+    color: r.key === "aa" ? "var(--ink-3)" : C.rx,
+    muted: r.key === "aa",
+    tip: (
+      <>
+        <strong>{r.label}</strong>
+        <div>
+          {signed(r.value, 2)}% (95% {signed(r.low, 2)} ~ {signed(r.high, 2)}) · {r.sub}
+        </div>
+      </>
+    ),
+  }));
+
+  const cpuRows: IntervalRow[] = (AMD ? [MAIN, AMD] : [MAIN]).map((m, i) => ({
+    key: `cpu-${i}`,
+    label: m.runner ?? (i ? "AMD" : "Intel"),
+    sub: `${m.games}판 · ${decisionText(m)}${m.speedElo ? ` · NPS ×${m.speedElo.npsRatio.toFixed(2)}` : ""}`,
+    value: m.elo.pentanomial.elo,
+    low: m.elo.pentanomial.low,
+    high: m.elo.pentanomial.high,
+    color: C.rx,
+    tip: (
+      <>
+        {m.runner}: Elo {signed(m.elo.pentanomial.elo)} (95% {signed(m.elo.pentanomial.low)} ~{" "}
+        {signed(m.elo.pentanomial.high)})
+      </>
+    ),
+  }));
+  const runs = [MAIN, CONTROL, ...(AMD ? [AMD] : [])];
+  const totalGames = runs.reduce((a, m) => a + m.games, 0);
+  const wallH = runs.reduce((a, m) => a + m.wallSec, 0) / 3600;
+  const faultRate = runs.reduce((a, m) => a + m.faultRate * m.games, 0) / Math.max(1, totalGames);
 
   return (
     <>
@@ -444,7 +503,7 @@ export function App() {
               <WdlBar w={MAIN.wdl.w} d={MAIN.wdl.d} l={MAIN.wdl.l} color={C.rx} />
               <p className="hero-foot">
                 {MAIN.games.toLocaleString("en-US")}판 · RapfiWeb 기준 승 {MAIN.wdl.w} · 무{" "}
-                {MAIN.wdl.d} · 패 {MAIN.wdl.l}
+                {MAIN.wdl.d} · 패 {MAIN.wdl.l} · {MAIN.runner} · {decisionText(MAIN)}
               </p>
             </div>
             <div className="kpis">
@@ -467,24 +526,26 @@ export function App() {
               />
               <Stat
                 label="고장률"
-                value={pct(
-                  MAIN.faultRate + CONTROL.faultRate === 0
-                    ? 0
-                    : (MAIN.faultRate * MAIN.games + CONTROL.faultRate * CONTROL.games) /
-                        (MAIN.games + CONTROL.games),
-                  2,
-                )}
-                note="시간 초과 · 크래시 · 불법 수"
+                value={pct(faultRate, 2)}
+                note={`시간 초과 · 크래시 · 불법 수 · ${runs.length}개 런`}
               />
-              <Stat
-                label="SPRT [0, 10]"
-                value={MAIN.sprt.decided?.decision ?? "—"}
-                note={decisionText(MAIN)}
-              />
+              {AMD ? (
+                <Stat
+                  label="AMD 7B13 에서 다시"
+                  value={signed(AMD.elo.pentanomial.elo)}
+                  note={`${signed(AMD.elo.pentanomial.low)} ~ ${signed(AMD.elo.pentanomial.high)} · ${decisionText(AMD)}`}
+                />
+              ) : (
+                <Stat
+                  label="SPRT [0, 10]"
+                  value={MAIN.sprt.decided?.decision ?? "—"}
+                  note={decisionText(MAIN)}
+                />
+              )}
               <Stat
                 label="총 대국"
-                value={(MAIN.games + CONTROL.games).toLocaleString("en-US")}
-                note={`${wallH.toFixed(1)}시간 · ${MAIN.runner ?? "CI"}`}
+                value={totalGames.toLocaleString("en-US")}
+                note={`${wallH.toFixed(1)}시간 · Intel 8488C${AMD ? " · AMD 7B13" : ""}`}
               />
             </div>
           </div>
@@ -567,11 +628,36 @@ export function App() {
                 %) Elo 도 거의 같다. 환산은 M3(수당 500ms · WASM · 균형 개시)의 +1% ≈ +1.5 Elo.
               </p>
             </Card>
+            {AMD && (
+              <Card
+                title="CPU 를 바꿔 다시 — Intel 8488C ↔ AMD 7B13"
+                sub="같은 엔진 · 같은 조건(수당 500ms · 균형 개시 60)으로 러너만 바꿔 둔 본 매치 · 점 = Elo · 수염 = 95% 구간"
+                wide
+              >
+                <IntervalChart rows={cpuRows} kind="dot" format={eloFmt} />
+                <DataTable
+                  caption="CPU 별 본 매치"
+                  head={["러너", "판", "W-D-L", "Elo", "95% 구간", "NPS 비"]}
+                  rows={[
+                    { m: MAIN, n: MAIN.runner ?? "Intel" },
+                    { m: AMD, n: AMD.runner ?? "AMD" },
+                  ].map(({ m, n }) => [
+                    n,
+                    m.games,
+                    `${m.wdl.w}-${m.wdl.d}-${m.wdl.l}`,
+                    signed(m.elo.pentanomial.elo),
+                    `${signed(m.elo.pentanomial.low)} ~ ${signed(m.elo.pentanomial.high)}`,
+                    m.speedElo ? `×${m.speedElo.npsRatio.toFixed(3)}` : "—",
+                  ])}
+                />
+              </Card>
+            )}
             <Card title="색별 · 끝난 까닭" sub="RapfiWeb 쪽에서 본 승-무-패" wide>
               <div className="mini-table">
                 {[
                   { m: MAIN, n: "본 매치", c: C.rx },
                   { m: CONTROL, n: "대조", c: C.simd },
+                  ...(AMD ? [{ m: AMD, n: "본 매치 · AMD 7B13", c: C.rx }] : []),
                 ].map(({ m, n, c }) => (
                   <div key={n} className="mini-block">
                     <p className="mini-title">
@@ -664,6 +750,30 @@ export function App() {
                 {ctrlNpsGain != null && (
                   <> 대국 중에 잰 같은 ISA 의 NPS 차는 {signed(ctrlNpsGain * 100)}% 였다.</>
                 )}
+              </p>
+            </Card>
+            <Card
+              title="relaxed SIMD 는 어디서 빨라지나"
+              sub={`relaxed ↔ 일반 SIMD128 · 같은 런 짝(고정 깊이 15) · ${RELAXED_PAIRED.cpu}(VNNI 없음) · 수염 = 95% 구간`}
+              wide
+            >
+              <IntervalChart
+                rows={pairedRows}
+                kind="bar"
+                format={(v) => `${v > 0 ? "+" : ""}${v}%`}
+              />
+              <p className="note">
+                A/A 가 0 을 품으니 하네스는 믿을 만하다. 큰 몫은 VNNI 없이도 나온다 — 이득을 크게
+                가르는 것은 국면의 종류다: NNUE 추론 몫이 큰 개시 · 중반 +43%, 위협 수순이 많은 필승
+                국면 +19%. 대국은 개시에서 시작하므로 앞쪽에 가깝다
+                {MAIN.search && CONTROL.search?.A.nps && MAIN.search.A.nps ? (
+                  <>
+                    {" "}
+                    (Intel 8488C 대국 중 relaxed ÷ 일반 ={" "}
+                    {signed((MAIN.search.A.nps / CONTROL.search.A.nps - 1) * 100)}% — 다른 런)
+                  </>
+                ) : null}
+                .
               </p>
             </Card>
           </div>
