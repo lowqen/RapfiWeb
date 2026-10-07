@@ -1,0 +1,87 @@
+name: 배포 변형 속도 대조 (빌드 없음 · 고정 깊이)
+
+# 배포 실물(엔진 릴리스 + gomocalc 배포본)의 변형끼리 순수 속도를 **같은 런 · 같은 국면 · 짝**으로 잰다 — 빌드하지 않는다.
+# docs/gomocalc-대국-분석.md §4 의 물음: relaxed ↔ 일반 NPS 가 Xeon 8488C 대국에서 +58%, AMD(B2) 에서는 +19.6% — CPU 의존인가.
+#
+#   simd     = rapfiweb single-simd128          (기준 — 첫 엔진)
+#   control  = simd 와 같은 파일을 다른 프로세스로 — A/A 대조. 구간이 0 을 품어야 하네스를 믿는다
+#   relaxed  = rapfiweb single-simd128-relaxed  (A1 · A3 포함 — 배포 1 스레드 주력)
+#   gomocalc = gomocalc single-simd128          (트리가 달라 짝 비교에서는 빠진다 — NPS 비만 본다)
+#
+# 하네스는 wasm-speed.yml 과 같다(bench/sprt/fixed-depth.mjs --det · speed-report.mjs). relaxed 는 fmadd 반올림으로 정책이
+# 갈리면 트리가 달라질 수 있다(1부 H5) — 그러면 그 짝은 speed-report 에서 빠지고, fixed-depth 의 국면별 NPS 비(기하)가 남는다.
+on:
+  workflow_dispatch:
+    inputs:
+      engine_tag:
+        description: "rapfiweb 엔진 릴리스 태그"
+        default: "engine-3c94c2a9-a3"
+        type: string
+      depth:
+        default: "15"
+        type: string
+      repeat:
+        default: "2"
+        type: string
+      positions:
+        default: "bench/sprt/openings-balanced.json,bench/gomocalc/mate-suite.json"
+        type: string
+      runner:
+        description: "러너"
+        default: "self-hosted"
+        type: choice
+        options: ["self-hosted", "ubuntu-latest"]
+
+permissions:
+  contents: read
+
+jobs:
+  speed:
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "26"
+
+      - name: 러너 정보
+        run: |
+          echo "nproc $(nproc) · $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2)"
+          grep -oE '\b(avx512_vnni|avx_vnni|avx512vnni|avx512bw|avx2)\b' /proc/cpuinfo | sort -u | tr '\n' ' '; echo
+          node --version
+
+      - name: 엔진 받기
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ENGINE_TAG: ${{ inputs.engine_tag }}
+        run: node bench/gomocalc/fetch-engines.mjs
+
+      - name: 고정 깊이 대조 (--det · simd · control · relaxed · gomocalc)
+        run: |
+          set -o pipefail
+          E="$PWD/bench/gomocalc/engines"
+          P="$PWD/bench/sprt/wasm-pbrain.mjs"
+          mkdir -p speed
+          node bench/sprt/fixed-depth.mjs --det \
+            --engine "simd|node $P --dir $E/rapfiweb --variant single-simd128" \
+            --engine "control|node $P --dir $E/rapfiweb --variant single-simd128" \
+            --engine "relaxed|node $P --dir $E/rapfiweb --variant single-simd128-relaxed" \
+            --engine "gomocalc|node $P --dir $E/gomocalc --variant single-simd128 --data $E/gomocalc/rapfi.data" \
+            --depth "${{ inputs.depth }}" --repeat "${{ inputs.repeat }}" \
+            --positions "${{ inputs.positions }}" --out speed/fixed-depth.json | tee speed/fixed-depth.log | tail -10
+          node bench/sprt/speed-report.mjs speed/fixed-depth.json --json speed/summary.json | tee speed/report.md
+          {
+            echo "### 배포 변형 속도 대조 — 깊이 ${{ inputs.depth }} · $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2)"
+            sed -n '/^| 엔진 |/,/^$/p' speed/fixed-depth.log
+            cat speed/report.md
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 결과
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: variant-speed
+          retention-days: 14
+          path: speed/
