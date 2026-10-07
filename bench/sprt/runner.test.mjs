@@ -229,3 +229,56 @@ test("탐색 통계 — INFO TOTALNODES · TOTALTIME 이 있으면 그것을 쓴
   assert.match(r.stdout, /탐색 B B: \d+수 · NPS 10,000 · 깊이 5\.00/, r.stdout);
   noLeak(r);
 });
+
+test(
+  "종료 신호(SIGTERM · SIGHUP) — 진행 중 판은 버리고 끝난 판까지로 요약을 쓰고 신호의 코드로 끝난다",
+  { skip: process.platform === "win32" && "윈도에는 POSIX 신호 처리가 없다" },
+  async () => {
+    const dir = mkdtempSync(join(tmpdir(), "sprt-sig-"));
+    const summary = join(dir, "summary.json");
+    try {
+      const { spawn } = await import("node:child_process");
+      const c = spawn(
+        process.execPath,
+        [
+          RUNNER,
+          "--a",
+          `${FAKE} --seed 51 --slow 20`,
+          "--b",
+          `${FAKE} --seed 52 --slow 20`,
+          "--referee",
+          "none",
+          "--max-plies",
+          "30",
+          "--games",
+          "400",
+          "--tc",
+          "turn=500",
+          "--summary",
+          summary,
+        ],
+        { stdio: ["ignore", "pipe", "pipe"] },
+      );
+      let out = "";
+      c.stdout.on("data", (b) => (out += b));
+      await new Promise((r) => {
+        const t = setInterval(() => {
+          if (/\[ *2\/400\]/.test(out)) {
+            clearInterval(t);
+            r();
+          }
+        }, 50);
+      });
+      c.kill("SIGHUP");
+      const code = await new Promise((r) => c.on("exit", (x) => r(x)));
+      assert.equal(code, 129, out);
+      assert.match(out, /SIGHUP — 진행 중 판을 버리고/);
+      assert.match(out, /결정 전\(신호 SIGHUP에서 멈춤\)/);
+      assert.match(out, /남은 엔진 0 · 남은 자식 핸들 0/);
+      const s = JSON.parse(readFileSync(summary, "utf8"));
+      assert.ok(s.summary.games >= 2 && s.summary.games < 400, String(s.summary.games));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  },
+);

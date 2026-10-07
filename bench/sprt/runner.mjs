@@ -521,6 +521,20 @@ process.on("SIGINT", () => {
     for (const e of LIVE) e.child?.kill("SIGKILL");
   }
 });
+// 밖에서 오는 종료 신호 — 러너를 띄운 터미널 세션이 끝나면 SIGHUP 이 온다(match-gomocalc 37633994087 이 181/200 판에서
+// 요약 없이 죽었다). 진행 중 판은 버리고 엔진을 내린 뒤, **끝난 판까지로 요약을 쓰고** 신호 번호의 종료 코드로 끝낸다.
+let signalled = null;
+for (const [sig, code] of [
+  ["SIGHUP", 129],
+  ["SIGTERM", 143],
+])
+  process.on(sig, () => {
+    if (signalled) return;
+    signalled = { sig, code };
+    console.log(`\n  ${sig} — 진행 중 판을 버리고 엔진을 내린 뒤, 끝난 판까지로 요약을 씁니다`);
+    stopRequested = aborting = true;
+    for (const e of LIVE) e.child?.kill("SIGKILL");
+  });
 
 // ── 실행 ────────────────────────────────────────────────────────────────
 const bounds = summary.sprt;
@@ -596,7 +610,7 @@ console.log(
     (decided
       ? `${decided.decision} 채택 — A 가 elo ${decided.decision === "H1" ? `≥ ${cfg.sprt.elo1}` : `≤ ${cfg.sprt.elo0}`} 쪽` +
         ` (${decided.game}판에서 경계를 넘음 · LLR ${fmt(decided.llr, 3)}; ${cfg.fixed ? "고정 판 수로 끝까지 둔 뒤" : "시작한 쌍을 마저 둔 뒤"} ${fmt(s.sprt.llr, 3)})`
-      : `결정 전(${budgetHit ? "시간 예산" : interrupts ? "사용자 중단" : "판 수 한도"}에서 멈춤)`),
+      : `결정 전(${budgetHit ? "시간 예산" : signalled ? `신호 ${signalled.sig}` : interrupts ? "사용자 중단" : "판 수 한도"}에서 멈춤)`),
 );
 const searchStats = searchSummary();
 for (const k of ["A", "B"]) {
@@ -641,4 +655,4 @@ if (leaked.length || childHandles) {
   console.error("엔진 프로세스 · 파이프가 남았습니다 — 누수");
   process.exit(1);
 }
-process.exitCode = interrupts ? 130 : 0;
+process.exitCode = signalled ? signalled.code : interrupts ? 130 : 0;

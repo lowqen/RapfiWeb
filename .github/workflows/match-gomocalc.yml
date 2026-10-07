@@ -168,7 +168,9 @@ jobs:
           if [ -n "$OPENINGS_FILE" ]; then extra+=(--openings-file "$OPENINGS_FILE"); fi
           if [ "$FIXED" = "true" ]; then extra+=(--fixed); fi
           if $multi; then extra+=(--a-init "INFO SHOW_DETAIL 3" --b-init "INFO SHOW_DETAIL 3"); fi
-          node bench/sprt/runner.mjs "${extra[@]}" \
+          # setsid -w: 러너 · 엔진을 새 세션에 둔다 — self-hosted 러너를 띄운 터미널 세션이 끝나며 오는 SIGHUP 이 대국을 죽이지 않게
+          # (37633994087 이 181/200 판에서 Hangup 으로 죽었다). -w 로 끝을 기다려 종료 코드를 그대로 받는다.
+          setsid -w node bench/sprt/runner.mjs "${extra[@]}" \
             --a "node $P --dir $E/rapfiweb --variant $TV" --a-name "rapfiweb-$TV" \
             --b "$bspec" --b-name "$bname" \
             --referee "node $P --dir $E/rapfiweb --variant single-simd128" \
