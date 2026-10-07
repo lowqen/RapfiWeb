@@ -10,13 +10,13 @@
  * 이미 있는 파일은 크기만 맞으면 건너뛴다. 폴더마다 `package.json`({"type":"commonjs"})을 둔다 — 저장소 루트의
  * `"type": "module"` 때문에 글루 .js 가 ESM 으로 읽혀 `bench/sprt/wasm-pbrain.mjs`(require)가 factory 를 못 찾는다.
  *
- * 우리 릴리스는 `gh` 로 받고, gh 가 없는 러너(갓 띄운 self-hosted 컨테이너)에서는 GH_TOKEN · GITHUB_TOKEN 으로
- * REST API 를 직접 부른다.
+ * 우리 릴리스는 tools/ci/release-download.mjs 로 받는다 — `gh` 가 있으면 그것, 없으면 GH_TOKEN · GITHUB_TOKEN 으로 REST API.
+ * 일시적 실패(네트워크 · 5xx · 429)는 물러서며 다시 — 릴리스 자산이 HTTP 500 을 한 번 내서 대국 런이 죽은 적이 있다(37633345358).
  */
-import { execFileSync } from "node:child_process";
 import { copyFile, mkdir, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { fetchRetry, releaseDownload } from "../../tools/ci/release-download.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 // 배포 중인 릴리스 — 변형 4종(relaxed 포함)과 공유 가중치 rapfi.data 하나.
@@ -51,31 +51,9 @@ const SOURCES = {
   },
 };
 
-/**
- * 일시적 실패(네트워크 · 5xx · 429)는 물러서며 다시 — GitHub 릴리스 자산이 HTTP 500 을 한 번 내서 대국 런이
- * 엔진 받기에서 죽었다(match-gomocalc 37633345358). 4xx(인증 · 없음)는 곧바로 실패.
- */
-async function fetchRetry(url, init, what, tries = 5) {
-  for (let i = 1; ; i++) {
-    let why;
-    try {
-      const res = await fetch(url, init);
-      if (res.ok) return res;
-      if (res.status < 500 && res.status !== 429) throw new Error(`${what} → HTTP ${res.status}`);
-      await res.body?.cancel();
-      why = `HTTP ${res.status}`;
-    } catch (e) {
-      if (/→ HTTP 4/.test(e.message)) throw e;
-      why = e.message;
-    }
-    if (i >= tries) throw new Error(`${what} → ${why}(${tries}번 시도)`);
-    console.log(`  ! ${what}: ${why} — ${2 * i}초 뒤 다시(${i}/${tries})`);
-    await new Promise((r) => setTimeout(r, 2000 * i));
-  }
-}
-
 async function fetchOne(url, dest) {
   const res = await fetchRetry(url, { redirect: "follow" }, url);
+  if (!res.ok) throw new Error(`${url} → HTTP ${res.status}`);
   const len = Number(res.headers.get("content-length") ?? NaN);
   try {
     const s = await stat(dest);
@@ -92,43 +70,6 @@ async function fetchOne(url, dest) {
   return { dest, bytes: buf.length, cached: false, lastModified: res.headers.get("last-modified") };
 }
 
-/**
- * 이 저장소는 비공개라 릴리스 자산이 익명 URL 로는 404 다 — CI(web.yml)처럼
- * `gh release download` 로 받는다(GH_TOKEN 또는 gh 로그인 필요).
- */
-const REPO = "lowqen/RapfiWeb";
-async function ghDownload(tag, files, dir) {
-  const args = ["release", "download", tag, "--repo", REPO, "--dir", dir, "--clobber"];
-  for (const f of files) args.push("--pattern", f);
-  try {
-    execFileSync("gh", args, { stdio: "inherit" });
-    return;
-  } catch (e) {
-    if (e.code !== "ENOENT") throw e; // gh 는 있는데 실패 — 인증 · 없는 태그. 그대로 알린다
-  }
-  const token = process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN;
-  if (!token)
-    throw new Error(
-      "gh 가 없고 GH_TOKEN · GITHUB_TOKEN 도 없습니다 — 비공개 릴리스를 받을 수 없음",
-    );
-  const auth = { Authorization: `Bearer ${token}`, "X-GitHub-Api-Version": "2022-11-28" };
-  const rel = await fetchRetry(
-    `https://api.github.com/repos/${REPO}/releases/tags/${tag}`,
-    { headers: { ...auth, Accept: "application/vnd.github+json" } },
-    `릴리스 ${tag}`,
-  );
-  const assets = new Map((await rel.json()).assets.map((a) => [a.name, a]));
-  for (const f of files) {
-    const a = assets.get(f);
-    if (!a) throw new Error(`릴리스 ${tag} 에 ${f} 가 없습니다`);
-    const res = await fetchRetry(
-      a.url,
-      { headers: { ...auth, Accept: "application/octet-stream" } },
-      f,
-    );
-    await writeFile(join(dir, f), Buffer.from(await res.arrayBuffer()));
-  }
-}
 const COMMONJS = '{ "type": "commonjs" }\n';
 
 const manifest = {};
@@ -137,7 +78,7 @@ for (const [name, src] of Object.entries(SOURCES)) {
   const dir = join(HERE, "engines", name);
   if (name === "rapfiweb") {
     await mkdir(dir, { recursive: true });
-    await ghDownload(ENGINE_TAG, src.files, dir);
+    await releaseDownload(ENGINE_TAG, dir, src.files);
     await writeFile(join(dir, "package.json"), COMMONJS);
     // 하네스는 변형마다 rapfi-<변형>.data 를 찾는다(글루 기본 이름) — 공유 파일을 그 이름들로 둔다.
     for (const v of RX_VARIANTS)

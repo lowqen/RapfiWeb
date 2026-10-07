@@ -90,9 +90,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p dist/engine
-          gh release download "$ENGINE_TAG" --dir dist/engine --clobber \
-            --pattern 'rapfi-*.js' --pattern 'rapfi-*.wasm' \
-            --pattern 'rapfi.data' --pattern 'engine-manifest.json' \
+          # gh 가 없는 self-hosted 러너(c4)에서도 받게 — tools/ci/release-download.mjs(gh 없으면 REST · 일시적 실패 재시도)
+          node tools/ci/release-download.mjs "$ENGINE_TAG" dist/engine 'rapfi-*.js' 'rapfi-*.wasm' 'rapfi.data' 'engine-manifest.json' \
             || { echo "::error::엔진 릴리스 $ENGINE_TAG 를 받지 못했습니다 — 엔진 없이 배포하지 않습니다."; exit 1; }
           echo '{ "type": "commonjs" }' > dist/engine/package.json
           ls -la dist/engine | sed 's/^/  /'
