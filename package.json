@@ -32,6 +32,7 @@
     "showcase:preview": "vite preview --config showcase/vite.config.ts"
   },
   "dependencies": {
+    "dexie": "^4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.0",
@@ -46,6 +47,7 @@
     "eslint": "^9.15.0",
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.14",
+    "fake-indexeddb": "^6",
     "globals": "^15.12.0",
     "playwright": "^1.49.0",
     "prettier": "^3.3.3",

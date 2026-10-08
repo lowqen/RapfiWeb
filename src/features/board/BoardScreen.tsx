@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState, type DragEvent } from "react";
 import { BoardCanvas } from "../../core/board/BoardCanvas";
 import { useBoardStore } from "./boardStore";
 import { useGameStore } from "./gameStore";
@@ -13,6 +13,7 @@ import { MoveTransport } from "./MoveTransport";
 import { QuickActions } from "./QuickActions";
 import { useBoardNotice } from "./boardNotice";
 import { useCurrentAnalysis } from "./currentAnalysis";
+import { openGameFile } from "./gameFileActions";
 import { useEngineStore } from "../../engine/engine-state";
 import { EMPTY_SNAPSHOT } from "../../engine/engine-types";
 import { useSettingsStore } from "../settings/settingsStore";
@@ -77,6 +78,23 @@ export function BoardScreen() {
   // 판에 최선수 링과 수순 고스트가 남으면 그것은 대국 중의 훈수다(탭 격리). 스토어를 둘로
   // 나눠 두고 여기서 잇는 이유는, 보드가 엔진을 **모르는 채로** 그려질 수 있어야 하기
   // 때문이다(내보내기·정석 미리보기 등).
+  // 기보 파일을 판에 끌어다 놓으면 연다. 파일을 끄는 동안에만 테두리를 그린다.
+  const [dropping, setDropping] = useState(false);
+  const hasFiles = (e: DragEvent) => e.dataTransfer.types.includes("Files");
+  const onDragOver = (e: DragEvent) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    setDropping(true);
+  };
+  const onDrop = (e: DragEvent) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    setDropping(false);
+    const file = e.dataTransfer.files[0];
+    if (file) void openGameFile(file).then((r) => showNotice(r.text));
+  };
+
   const overlay = mode === "analysis" ? analysis : EMPTY_SNAPSHOT;
   useEffect(() => {
     applyAnalysis(overlay);
@@ -89,7 +107,13 @@ export function BoardScreen() {
           <ModeTabs />
           <QuickActions />
         </div>
-        <div className="boardscreen__board">
+        <div
+          className="boardscreen__board"
+          data-drop={dropping || undefined}
+          onDragOver={onDragOver}
+          onDragLeave={() => setDropping(false)}
+          onDrop={onDrop}
+        >
           {/* 평가 바와 판을 한 줄로 — 판은 바 몫을 뺀 정사각형이고, 바는 판과 같은
               높이다(CSS 의 컨테이너 단위). 둘을 묶어 가운데 둔다. */}
           <div className="boardrow">

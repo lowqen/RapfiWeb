@@ -24,7 +24,7 @@ interface BoardState {
   undo: () => void;
   clear: () => void;
   toggleNumbers: () => void;
-  /** 롱프레스 자리 — W6 의 «보드 텍스트» 진입점이 될 곳. 지금은 표시만 한다. */
+  /** 롱프레스 자리 — W8(DB)의 «보드 텍스트» 진입점이 될 곳. 지금은 표시만 한다. */
   markBlocked: (m: Move) => void;
 
   /**
@@ -40,11 +40,10 @@ interface BoardState {
   clearAnalysis: () => void;
 
   /**
-   * 돌 목록을 통째로 갈아 끼운다. 지금 화면에서 부르는 곳은 없다 —
-   * 기보 불러오기(W5)와 정석 미리보기(W6)가 쓸 자리이고, 스토어의 공개 면이라
-   * 여기 남겨 둔다. Soosorv 의 5수 되감기가 쓰던 것이었다.
+   * 돌 목록을 통째로 갈아 끼운다 — 기보 열기와 자동 저장 되살리기(`gameStore.loadMoves`)가
+   * 쓴다. `future` 는 무른 수(다시 둘 차례대로)이고, 주지 않으면 비운다.
    */
-  setStones: (stones: readonly Move[]) => void;
+  setStones: (stones: readonly Move[], future?: readonly Move[]) => void;
 
   /** 렌주 금수 목록. 엔진의 `FORBID` 가 채운다(W4). */
   forbidden: readonly Move[];
@@ -128,9 +127,9 @@ export const useBoardStore = create<BoardState>((set, get) => ({
 
   clearAnalysis: () => set((s) => ({ render: { ...s.render, ...CLEARED } })),
 
-  setStones: (stones) =>
+  setStones: (stones, future = []) =>
     set((s) => ({
-      future: [],
+      future: [...future],
       render: { ...s.render, stones: [...stones], lastMove: stones.at(-1) ?? null, ...CLEARED },
     })),
 

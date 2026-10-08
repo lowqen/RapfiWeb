@@ -424,6 +424,12 @@ a:focus-visible {
   /* 판과 평가 바의 크기를 이 칸 기준으로 잰다(아래 `--board-side`). */
   container-type: size;
 }
+/* 기보 파일을 끌어 오는 동안 — 놓을 수 있는 곳이라는 표시. */
+.boardscreen__board[data-drop] {
+  outline: 2px dashed var(--c-primary);
+  outline-offset: -2px;
+  border-radius: var(--radius-m);
+}
 /* 평가 바 몫. 바를 끄면 0 이 되어 판이 그만큼 커진다. */
 .boardscreen {
   --evalbar-w: 28px;

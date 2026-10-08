@@ -32,6 +32,18 @@ export const fromKey = (key: number, size = DEFAULT_SIZE): Move => ({
 export const label = (m: Move, size = DEFAULT_SIZE): string =>
   `${String.fromCharCode(65 + m.x)}${size - m.y}`;
 
+/**
+ * `label()` 의 역 — 앱 `Move.fromLabel` 과 같은 규칙. 대소문자를 가리지 않고(`h8` = `H8`),
+ * 판 밖이거나 읽을 수 없으면 `null`.
+ */
+export function fromLabel(text: string, size = DEFAULT_SIZE): Move | null {
+  const t = text.trim();
+  if (t.length < 2 || !/^[A-Za-z]$/.test(t[0]!)) return null;
+  if (!/^\d+$/.test(t.slice(1))) return null;
+  const m = move(t[0]!.toUpperCase().charCodeAt(0) - 65, size - Number(t.slice(1)));
+  return inBoard(m, size) ? m : null;
+}
+
 export const inBoard = (m: Move, size = DEFAULT_SIZE): boolean =>
   m.x >= 0 && m.y >= 0 && m.x < size && m.y < size;
 

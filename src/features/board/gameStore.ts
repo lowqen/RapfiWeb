@@ -167,7 +167,22 @@ interface GameState {
    */
   refreshForbidden: () => void;
 
+  /**
+   * 지금 판의 이름 — 기보 파일에서 왔으면 그 `baseName`, 손으로 둔 판이면 `null`.
+   * 저장할 때 파일 이름이 되고, 자동 저장이 함께 남긴다.
+   */
+  gameName: string | null;
+
   newGame: () => void;
+  /**
+   * 수순을 통째로 판에 올린다 — 기보 열기와 자동 저장 되살리기. 대국 상태(결과 · 물음 ·
+   * 생각 중)는 새 판처럼 비우고 승패는 올린 판으로 다시 본다. 개시 절차는 밟지 않고,
+   * 엔진 차례여도 스스로 두지 않는다(새 대국과 같다 — 판을 눌러 «두어라»).
+   */
+  loadMoves: (
+    moves: readonly Move[],
+    opts?: { future?: readonly Move[]; name?: string | null; what?: string },
+  ) => void;
   tap: (cell: Move) => TapResult;
   /** 한 수 무르기. 끝난 대국도 다시 열린다. */
   undoMove: () => void;
@@ -446,6 +461,7 @@ export const useGameStore = create<GameState>((set, get) => {
     prompt: null,
     showForbidden: true,
     log: [],
+    gameName: null,
 
     setComputerSide: (computerSide) => {
       set({ computerSide });
@@ -497,11 +513,24 @@ export const useGameStore = create<GameState>((set, get) => {
       disarmWatchdog();
       board().clear();
       board().setForbidden([]);
-      set({ result: null, thinking: false, prompt: null, log: [] });
+      set({ result: null, thinking: false, prompt: null, log: [], gameName: null });
       send({ kind: "restart" });
       log("새 대국");
       // **엔진이 흑이어도 자동으로 두지 않는다** — 데스크톱·앱과 같이 사람이
       // 판을 한 번 눌러 «두어라»라고 해야 시작한다.
+      refreshForbidden();
+    },
+
+    loadMoves: (moves, opts = {}) => {
+      disarmWatchdog();
+      // 생각하던 수는 버린다 — 답이 와도 `thinking` 이 꺼져 있어 무시된다.
+      if (get().thinking) engine().stop();
+      board().setStones(moves, opts.future ?? []);
+      board().setForbidden([]);
+      set({ result: null, thinking: false, prompt: null, gameName: opts.name ?? null });
+      judge();
+      log(opts.what ?? `불러오기 — ${moves.length}수`);
+      // 엔진에 따로 알리지 않는다 — 다음 요청이 `BOARD`/`YXBOARD` 로 판을 통째로 준다.
       refreshForbidden();
     },
 
