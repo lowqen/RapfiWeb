@@ -4,12 +4,12 @@
 공유할 것이 생기면 `core/` 나 `components/` 로 내린다.
 
 ```
-board/      대국·분석 화면 (W4)
-research/   리뷰·증명 / 오프닝 / 수순 / 랭킹 (W6) — 탭 넷은 ResearchTabs 가 묶는다
-database/   yixindb 국면 저장소 (W6)
+board/      대국·분석 화면 (W4) · 기보 열기/저장 · 판 자동 저장 (W5a)
+research/   리뷰·증명 / 오프닝 / 수순 / 랭킹 (W6a~d · W7) — 탭 넷은 ResearchTabs 가 묶는다
+database/   yixindb 국면 저장소 (W8)
 engine/     엔진 상태·도구·piskvork 콘솔 (W3)
-settings/   settings.txt 67항목 왕복 (W5)
-joseki/     오프닝 정석 노트 — 신규 기능 (W8)
+settings/   설정 화면 (W4) · settings.txt 67항목 왕복 (W5b)
+joseki/     오프닝 정석 노트 — 신규 기능 (W9)
 ```
 
 **각 화면의 상태 슬라이스는 라우팅으로 초기화되지 않는다.** 앱과 같은 규칙이다:

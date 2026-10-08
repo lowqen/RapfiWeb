@@ -7,7 +7,7 @@ React 도 DOM 도 모르는 코드만 여기 온다. 앱(Kotlin)에서 옮겨 �
 |---|---|---|
 | `design/` | Oklch 색 수학, 아홉 램프, 역할 표, 치수 토큰 | W1 ✅ |
 | `board/` | 보드 기하 · 스킨 · 2레이어 렌더러 · 값 사다리 · 입력 | W2 ✅ |
-| `model/` | `Move` ✅ · `PosKey`(8대칭 정규 키) · `GameFile`(.psq/.sav/.pos) · 설정 67항목 | W4·W5 |
+| `model/` | `Move` ✅ · `PosKey`(8대칭 정규 키) ✅ · `GameFile`(.psq/.sav/.pos) ✅ · 설정 67항목 | W4·W5a ✅ · W5b |
 | `rif/` | `.rif` 스트리밍 파서와 팩 생성 — **결과는 IndexedDB 에만** | W7 |
 
 `board/BoardCanvas.tsx` 하나만 React 를 안다. 나머지는 DOM 도 프레임워크도 모르는

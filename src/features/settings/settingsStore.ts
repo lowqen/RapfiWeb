@@ -218,7 +218,7 @@ function save(s: Settings) {
 /**
  * 엔진에 밀어 넣을 명령. 앱 `EngineParams.infoPairs()` 의 순서에서 시간·규칙·DB 를
  * 뺀 것이다 — 규칙은 워커가 START 앞에서 렌주로 고정하고(가중치가 렌주뿐이다),
- * DB 는 DB 화면(W6)이 열릴 때 붙는다.
+ * DB 는 DB 화면(W8)이 열릴 때 붙는다.
  *
  * `thread_num` 은 여기 없다 — **떠 있는 변형**이 정하므로 엔진 스토어가 붙인다
  * (`threadCommand`: 단일 변형이면 언제나 1. 그 빌드는 1 이 아닌 값을 받고 무시해

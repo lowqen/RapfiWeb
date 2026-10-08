@@ -36,10 +36,10 @@ export const router = createBrowserRouter(
           path: "research/review",
           element: (
             <Placeholder
-              stage="W6"
+              stage="W6b · W6d"
               title="리뷰·증명"
               what="대국 전체를 엔진으로 되짚고, 한 수를 증명 트리로 파고든다. 진행 큐는 워커에 있고 체크포인트는 IndexedDB 에 남는다."
-              needs={["W3 엔진 워커", "W4 보드 화면"]}
+              needs={["W5a 기보 열기 · Dexie ✓", "증명(W6d)은 리뷰(W6b)의 큐 위에"]}
             />
           ),
         },
@@ -47,10 +47,10 @@ export const router = createBrowserRouter(
           path: "research/explorer",
           element: (
             <Placeholder
-              stage="W6"
+              stage="W6a"
               title="오프닝"
               what="주형 이름 249개와 흑5수 유불리 1,889모양은 기본 내장이라 팩 없이 동작한다. 빈도 통계는 사용자가 .rif 를 올렸을 때만."
-              needs={["W2 보드 렌더링"]}
+              needs={["W5a PosKey ✓"]}
             />
           ),
         },
@@ -58,10 +58,10 @@ export const router = createBrowserRouter(
           path: "research/sequence",
           element: (
             <Placeholder
-              stage="W6"
+              stage="W6c"
               title="수순"
               what="같은 국면에 이르는 다른 수순을 찾는다. 정규 키(PosKey, 8대칭)를 쓰므로 팩 없이도 동작한다."
-              needs={["W2 보드 렌더링"]}
+              needs={["W5a PosKey ✓"]}
             />
           ),
         },
@@ -69,7 +69,7 @@ export const router = createBrowserRouter(
           path: "research/ranking",
           element: (
             <Placeholder
-              stage="W6"
+              stage="W7"
               title="랭킹"
               what="기록과 순위. RenjuNet 팩이 있어야 의미가 있는 화면이라, 팩이 없으면 «.rif 를 올리세요» 안내로 끝난다."
               needs={["W7 .rif 변환 파이프라인"]}
@@ -81,10 +81,10 @@ export const router = createBrowserRouter(
           path: "database",
           element: (
             <Placeholder
-              stage="W6"
+              stage="W8"
               title="데이터베이스"
               what="yixindb 국면 저장소. Emscripten IDBFS 에 올리고, .db 파일 업로드/다운로드. 파일이 없으면 읽기 전용 + 보드 텍스트만."
-              needs={["W3 엔진 워커"]}
+              needs={["IDBFS 를 넣은 엔진 재빌드"]}
             />
           ),
         },
@@ -96,16 +96,16 @@ export const router = createBrowserRouter(
           path: "joseki",
           element: (
             <Placeholder
-              stage="W8"
+              stage="W9"
               title="정석"
               what="신규 기능. 수순 입력(보드 클릭 또는 좌표 텍스트), 분기, 수마다 서식 있는 메모, 저장·검색·분류, 단계별 재생."
-              needs={["W2 보드 렌더링", "W4 보드 화면"]}
+              needs={["W5a PosKey · Dexie ✓", "W6a 주형 이름", "W6c 수순"]}
             />
           ),
         },
 
         // 앱 `SettingsScreen.kt` 의 분류(대국·엔진·표시…)를 옮긴 것. 대국 설정·조작은
-        // 보드 옆 칸에서 이리로 왔다. settings.txt 67항목 파일 왕복은 여전히 W5 의 몫이다.
+        // 보드 옆 칸에서 이리로 왔다. settings.txt 67항목 파일 왕복은 여전히 W5b 의 몫이다.
         { path: "settings", element: <SettingsScreen /> },
 
         { path: "*", element: <Navigate to="/board" replace /> },
