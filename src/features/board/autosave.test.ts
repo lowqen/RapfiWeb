@@ -73,6 +73,30 @@ describe("되살리기", () => {
   });
 });
 
+describe("국면 딥링크", () => {
+  it("링크의 국면이 저장된 판을 이기고 자동 저장 자리를 덮는다", async () => {
+    await writeAutosave(d, { name: "old", size: 15, moves: [move(1, 1)], future: [] });
+    a = startAutosave(d, 10_000, [move(7, 7), move(8, 6)]);
+    await a.ready;
+    expect(board().render.stones).toEqual([move(7, 7), move(8, 6)]);
+    expect(game().gameName).toBeNull();
+    await a.flush();
+    expect(await readAutosave(d)).toEqual({
+      name: "",
+      size: 15,
+      moves: [move(7, 7), move(8, 6)],
+      future: [],
+    });
+  });
+
+  it("빈 링크는 빈 판이다", async () => {
+    await writeAutosave(d, { name: "", size: 15, moves: [move(1, 1)], future: [] });
+    a = startAutosave(d, 0, []);
+    await a.ready;
+    expect(board().render.stones).toEqual([]);
+  });
+});
+
 describe("저장", () => {
   it("되살리기 전의 빈 판으로 저장된 판을 덮어쓰지 않는다", async () => {
     await writeAutosave(d, { name: "", size: 15, moves: [move(1, 1)], future: [] });
