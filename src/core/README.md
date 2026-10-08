@@ -9,6 +9,7 @@ React 도 DOM 도 모르는 코드만 여기 온다. 앱(Kotlin)에서 옮겨 �
 | `board/` | 보드 기하 · 스킨 · 2레이어 렌더러 · 값 사다리 · 입력 | W2 ✅ |
 | `model/` | `Move` ✅ · `PosKey`(8대칭 정규 키) ✅ · `GameFile`(.psq/.sav/.pos) ✅ · 설정 67항목 | W4·W5a ✅ · W5b |
 | `opening/` | 26주형 · 프레임 키(4수 이름) · 흑 5수 유불리 표 · 환원 · 이론 다음 수 | W6a ✅ |
+| `review/` | 수 등급 판정기(데스크톱 4단계 분류기) · 정확도 · 리포트 CSV/MD/HTML · HTML 틀 | W6b ✅ |
 | `rif/` | `.rif` 스트리밍 파서와 팩 생성 — **결과는 IndexedDB 에만** | W7 |
 
 `board/BoardCanvas.tsx` 하나만 React 를 안다. 나머지는 DOM 도 프레임워크도 모르는
