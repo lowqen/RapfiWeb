@@ -57,8 +57,25 @@ jobs:
           for t in git cmake ninja g++ ccache valgrind; do command -v "$t" > /dev/null || missing+=("$t"); done
           if [ ${#missing[@]} -eq 0 ]; then echo "도구 모두 있음"; exit 0; fi
           echo "없는 도구: ${missing[*]} — 설치 시도"
-          sudo -n apt-get update -qq && sudo -n apt-get install -y git cmake ninja-build g++ ccache valgrind \
-            || { echo "::error::설치 실패(sudo 암호?) — 러너 기계에 직접 설치: sudo apt-get install -y git cmake ninja-build g++ ccache valgrind"; exit 1; }
+          if sudo -n apt-get update -qq && sudo -n apt-get install -y git cmake ninja-build g++ ccache valgrind; then exit 0; fi
+          # sudo 가 막힌 self-hosted(c4 등)에서 valgrind 만 빠졌으면: .deb 를 받아(apt-get download — root 불필요) 작업 폴더에
+          # 풀어 쓴다. 도구 본체가 실행 파일 옆이 아니라 libexec 에 있어 VALGRIND_LIB 로 알려 준다.
+          if [ "${missing[*]}" = "valgrind" ]; then
+            vg="$WORK/valgrind-user"
+            if [ ! -x "$vg/usr/bin/valgrind" ]; then
+              rm -rf "$vg" && mkdir -p "$vg"
+              ( cd "$vg" && apt-get download valgrind && dpkg -x valgrind_*.deb . ) \
+                || { echo "::error::valgrind .deb 를 받지 못함 — 러너 기계에 직접: sudo apt-get install -y valgrind"; exit 1; }
+            fi
+            lib=$(ls -d "$vg/usr/libexec/valgrind" "$vg/usr/lib/x86_64-linux-gnu/valgrind" "$vg/usr/lib/valgrind" 2> /dev/null | head -1)
+            VALGRIND_LIB="$lib" "$vg/usr/bin/valgrind" --version || { echo "::error::풀어 둔 valgrind 가 돌지 않음"; exit 1; }
+            echo "$vg/usr/bin" >> "$GITHUB_PATH"
+            echo "VALGRIND_LIB=$lib" >> "$GITHUB_ENV"
+            echo "valgrind 를 사용자 공간에서 씀: $vg"
+            exit 0
+          fi
+          echo "::error::설치 실패(sudo 암호?) — 러너 기계에 직접 설치: sudo apt-get install -y git cmake ninja-build g++ ccache valgrind"
+          exit 1
       - name: 러너 정보
         run: |
           echo "nproc $(nproc) · $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2)"
