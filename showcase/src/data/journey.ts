@@ -71,7 +71,7 @@ export const PHASES: Phase[] = [
   {
     key: "p2",
     name: "Phase 2 — 결과 불변 패치",
-    period: "2026-10-01 ~ 10-03",
+    period: "2026-10-01 ~ 10-03 · S1 재측정 10-08",
     goal: "탐색 트리를 바꾸지 않는 upstream 패치 후보 — BENCH 해시 게이트",
     steps: [
       {
@@ -95,8 +95,14 @@ export const PHASES: Phase[] = [
       {
         id: "P2-4",
         title: "TT 적중 쓰기 조건화",
-        status: "parked",
-        metric: "SMT 2 논리 러너로는 효과를 잴 수 없음",
+        status: "rejected",
+        metric: "S1 물리 4코어 재측정(종결) — 4 스레드 NPS +0.48% · −0.49%",
+      },
+      {
+        id: "P2-3",
+        title: "폴스 셰어링 alignas(64)",
+        status: "rejected",
+        metric: "S1 물리 4코어(종결) — 2 스레드 NPS +0.56% · −0.88%",
       },
       {
         id: "P2-5",
