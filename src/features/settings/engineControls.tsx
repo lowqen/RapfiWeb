@@ -16,7 +16,7 @@ import {
   resolveThreads,
   useSettingsStore,
 } from "./settingsStore";
-import { Segmented } from "./controls";
+import { Segmented } from "../../components/controls";
 import { PREFERENCE_LABEL, VARIANT_LABEL } from "./engineLabels";
 
 /**

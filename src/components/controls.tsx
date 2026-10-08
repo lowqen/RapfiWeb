@@ -1,8 +1,8 @@
 import { useEffect, useId, useState, type ReactNode } from "react";
-import { Icon, ICON } from "../board/icons";
+import { Icon, ICON } from "./icons";
 
 /**
- * 설정 화면의 입력 부품 — 앱의 `FilterChip`·`Switch`·스테퍼를 옮긴 것.
+ * 입력 부품 — 앱의 `FilterChip`·`Switch`·스테퍼를 옮긴 것. 설정 · 보드 옆 칸 · 연구가 함께 쓴다.
  *
  * 네이티브 `<input>`·`<select>` 를 그대로 두지 않는다. 브라우저 기본 모양은
  * 다크 테마에서 흰 상자로 튀고, 플랫폼마다 크기가 달라 줄이 흔들린다.

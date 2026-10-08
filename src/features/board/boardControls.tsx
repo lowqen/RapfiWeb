@@ -11,7 +11,7 @@ import {
 } from "../../core/model/game";
 import { RULE_LABEL } from "../../core/model/rules";
 import { ANALYSIS_SEC_CHOICES, useSettingsStore } from "../settings/settingsStore";
-import { Chip, ChipGroup, Segmented, Stepper, Switch } from "../settings/controls";
+import { Chip, ChipGroup, Segmented, Stepper, Switch } from "../../components/controls";
 
 /**
  * 보드 탭의 조작부 — 예전에 설정 화면의 「자주 쓰는 설정」에 있던 것들이다.

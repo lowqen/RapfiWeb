@@ -1,5 +1,5 @@
 /**
- * 보드 화면의 아이콘 — Material Symbols 24px 경로를 그대로 옮긴 것.
+ * 화면들이 함께 쓰는 아이콘(보드 · 설정 · 연구) — Material Symbols 24px 경로를 그대로 옮긴 것.
  *
  * 레일·하단 탭이 `destinations.ts` 의 경로 문자열을 `<svg><path/>` 로 그리는 것과
  * 같은 방식이다. 아이콘 폰트를 받지 않는 이유도 같다(`tokens.ts` 의 폰트 주석).

@@ -1,6 +1,6 @@
 import { useGameStore } from "./gameStore";
 import { COMPUTER_SIDE_LABEL, swappedSide } from "../../core/model/game";
-import { Icon, ICON } from "./icons";
+import { Icon, ICON } from "../../components/icons";
 
 /**
  * 보드 위의 퀵 액션 바 — **새 판 · 진영 전환**. 진영 전환과 컴퓨터 색 표시는 [대국] 탭에만

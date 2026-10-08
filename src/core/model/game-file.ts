@@ -12,6 +12,9 @@ export type GameFileFormat = "psq" | "sav" | "pos";
 
 export const GAME_FILE_FORMATS: readonly GameFileFormat[] = ["psq", "sav", "pos"];
 
+/** 열 수 있는 파일 — `<input accept>` 에 그대로 쓴다. */
+export const GAME_FILE_ACCEPT = GAME_FILE_FORMATS.map((f) => `.${f}`).join(",");
+
 export const GAME_FILE_LABEL: Record<GameFileFormat, string> = {
   /** Piskvork: 머리 줄, 그다음 `열,행,시간`(1부터), `-1` 로 끝. */
   psq: "Piskvork 기보",

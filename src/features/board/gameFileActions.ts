@@ -17,9 +17,6 @@ import {
  * 판에 올리는 일은 `gameStore.loadMoves` 한 문으로 간다 — 자동 저장도 그 문을 쓴다.
  */
 
-/** 열 수 있는 파일 — `<input accept>` 에 그대로 쓴다. */
-export const GAME_FILE_ACCEPT = ".psq,.sav,.pos";
-
 /** 열기의 결과 — 보드 위 안내 한 줄로 띄운다. */
 export type OpenResult = { ok: true; text: string } | { ok: false; text: string };
 

@@ -13,7 +13,7 @@ import {
   useSettingsStore,
   type VcThread,
 } from "./settingsStore";
-import { NumberField, Segmented, Switch } from "./controls";
+import { NumberField, Segmented, Switch } from "../../components/controls";
 import { EngineChoiceControl, ThreadControl } from "./engineControls";
 
 /**
