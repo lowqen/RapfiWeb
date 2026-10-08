@@ -6,9 +6,10 @@
  *
  *   node bench/sprt/mt-speed.mjs --engine "base|<명령줄>" --engine "control|<명령줄>" --engine "test|<명령줄>" …
  *        [--threads 2,4] [--ms 1500] [--repeat 2] [--positions bench/sprt/openings-balanced.json] [--hash-mb 64]
- *        [--limit N] [--out r.json] [--md r.md]
+ *        [--limit N] [--no-respawn] [--out r.json] [--md r.md]
  *
- * - 첫 엔진이 기준. 스레드 수마다 엔진을 모두 새로 띄운다(INFO THREAD_NUM 을 START 앞에 — 재구성 비용이 잼 밖에).
+ * - 첫 엔진이 기준. 스레드 수마다, 그리고 반복마다(--no-respawn 이 아니면) 엔진을 모두 새로 띄운다(INFO THREAD_NUM 을
+ *   START 앞에 — 재구성 비용이 잼 밖에). 프로세스마다 붙는 치우침(코어 배치 · 메모리)을 반복이 평균 내게 하려는 것이다.
  * - 국면마다 해시를 비우고(YXHASHCLEAR) 수당 <ms> 탐색 — NPS = 마지막 INFO TOTALNODES × 1000 ÷ TOTALTIME(SHOW_DETAIL 3).
  *   멀티 빌드의 요약 줄 Speed 는 믿을 수 없다(M-1 탐침 37628721845).
  * - 엔진 순서는 국면마다 한 칸씩 돌린다 — 러너의 시간 흐름(열 · 클럭)이 한 엔진에 몰리지 않고, 짝(같은 반복 · 같은 국면)의
@@ -43,6 +44,7 @@ const threadsList = opt("threads", "2,4").split(",").map(Number);
 const ms = Number(opt("ms", 1500));
 const repeat = Number(opt("repeat", 2));
 const hashKb = Number(opt("hash-mb", 64)) * 1024;
+const respawn = !argv.includes("--no-respawn");
 const positions = opt("positions", "bench/sprt/openings-balanced.json")
   .split(",")
   .flatMap((f) => {
@@ -87,14 +89,18 @@ const layout = {}; // `${threads}|${engine}` → 줄들
 let code = 0;
 const t0 = performance.now();
 try {
-  for (const threads of threadsList) {
+  // 엔진 프로세스는 반복마다 새로 띄운다(--respawn, 기본) — 프로세스마다 붙는 치우침(탐색 스레드가 앉은 코어 · 메모리 배치)이
+  // 한 엔진에 런 내내 붙어 있지 않게. S1 첫 런(37781942784)에서 프로세스를 한 번만 띄웠더니 A/A 가 2 스레드 +1.69%
+  // (95% +0.70 ~ +2.69)로 0 을 품지 않았다.
+  const start = async (threads, rep) => {
     const engines = [];
     for (const s of specs) {
       const e = new Engine({ ...s, startTimeoutMs: 120_000 });
       const key = `${threads}|${s.name}`;
-      e.tap((l) => {
-        if (/^MESSAGE LAYOUT /.test(l)) (layout[key] ??= []).push(l.replace(/^MESSAGE /, ""));
-      });
+      if (rep === 0)
+        e.tap((l) => {
+          if (/^MESSAGE LAYOUT /.test(l)) (layout[key] ??= []).push(l.replace(/^MESSAGE /, ""));
+        });
       await e.start({
         info: [`INFO HASH_SIZE ${hashKb}`, `INFO THREAD_NUM ${threads}`],
         warmup: true,
@@ -104,11 +110,20 @@ try {
       await measure(e, positions[0].moves);
       engines.push(e);
     }
+    return engines;
+  };
+  for (const threads of threadsList) {
     console.log(
-      `스레드 ${threads}: 엔진 ${engines.length} · 국면 ${positions.length} × 반복 ${repeat} · 수당 ${ms}ms`,
+      `스레드 ${threads}: 엔진 ${specs.length} · 국면 ${positions.length} × 반복 ${repeat} · 수당 ${ms}ms` +
+        (respawn ? " · 반복마다 엔진 새로" : ""),
     );
     let rot = 0;
-    for (let rep = 0; rep < repeat; rep++)
+    let engines = await start(threads, 0);
+    for (let rep = 0; rep < repeat; rep++) {
+      if (rep > 0 && respawn) {
+        await Promise.all(engines.map((e) => e.stop()));
+        engines = await start(threads, rep);
+      }
       for (const [pi, p] of positions.entries()) {
         const order = engines.map((_, i) => engines[(i + rot) % engines.length]);
         rot++;
@@ -121,6 +136,7 @@ try {
             `  스레드 ${threads} · 반복 ${rep + 1} · ${pi + 1}/${positions.length} · ${((performance.now() - t0) / 1000).toFixed(0)}s`,
           );
       }
+    }
     await Promise.all(engines.map((e) => e.stop()));
   }
 } catch (e) {
