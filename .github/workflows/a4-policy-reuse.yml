@@ -1,0 +1,105 @@
+name: A4 관문 0 — 정책 재계산 비율(정책 결과 캐시 착수 판단)
+
+# 카드 ④(정책 결과 캐시 — docs/최적화-마스터플랜.md 2부 §8.12)를 짓기 전의 싼 관문.
+# 배포 구성(P2-2 · A1 · P4-1 · A3) + 측정 전용 a4-diag-policy-reuse.patch 를 WASM 으로 짓고(결과 불변 — BENCH 해시 관문),
+# 고정 깊이(--det 와 같은 설정)로 국면을 풀며 evaluatePolicy 가 「이미 같은 칸들로 계산한 국면」을 다시 부르는 비율을
+# 표 크기 2^8 ~ 2^16 의 직접 사상 표로 흉내 내 센다 — bench/a4/policy-reuse.mjs.
+# 사전 등록한 관문: 2^12 이하 표에서 full 비율 ≥ 15% 면 캐시를 짓는다(정책 몫 ~10% × 15% ≈ NPS +1.5%), 아니면 접는다.
+on:
+  workflow_dispatch:
+    inputs:
+      variant:
+        description: "단일 스레드 변형"
+        default: "single-simd128-relaxed"
+        type: string
+      depth:
+        default: "16"
+        type: string
+      positions:
+        default: "bench/sprt/openings-balanced.json,bench/gomocalc/mate-suite.json"
+        type: string
+      runner_label:
+        description: "self-hosted 러너 라벨"
+        default: "c4"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ["self-hosted", "${{ inputs.runner_label }}"]
+    timeout-minutes: 300
+    env:
+      WORK: ${{ github.workspace }}/../rapfi-wasm-work
+      ENABLE_LTO: "ON"
+      V: ${{ inputs.variant }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "26"
+
+      - name: 러너 정보
+        run: |
+          echo "nproc $(nproc) · $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2)"
+
+      - name: 시스템 도구
+        run: |
+          missing=()
+          for t in git cmake ninja ccache file python3 xz; do command -v "$t" > /dev/null || missing+=("$t"); done
+          if [ ${#missing[@]} -eq 0 ]; then echo "도구 모두 있음"; exit 0; fi
+          echo "없는 도구: ${missing[*]} — 설치 시도"
+          sudo -n apt-get update -qq && sudo -n apt-get install -y git cmake ninja-build ccache file python3 xz-utils \
+            || { echo "::error::설치 실패(sudo 암호?)"; exit 1; }
+
+      - name: emsdk 캐시 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.WORK }}/emsdk
+          key: emsdk-latest-v1
+      - name: rapfi 소스 캐시 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.WORK }}/rapfi
+          key: rapfi-3c94c2a9-v1
+
+      - name: 빌드 — 배포 구성 + 진단(결과 불변 관문)
+        run: |
+          set -o pipefail
+          case "$V" in multi-*) echo "::error::단일 스레드 변형만(진단 표는 잠금 없는 전역)"; exit 1 ;; esac
+          extra=""; [ "$V" = "single-simd128" ] || extra="$V"
+          PATCHES="tools/patches/p2-2-keep-evaluators-on-rebuild.patch tools/patches/a1-q15mulr.patch tools/patches/p4-1-periodic-node-stats.patch tools/patches/a3-starblock-multi.patch tools/patches/a4-diag-policy-reuse.patch"
+          RAPFI_PATCHES="$PATCHES" EXTRA_VARIANTS="$extra" WASM_OPT_POST="-O4 --converge" bash tools/build_engine_wasm.sh
+          mkdir -p a4
+          # 결과 불변: 웹 기준선(spike/web-baseline.json)과 다르면 node-bench 가 0 이 아닌 코드로 끝난다
+          node spike/node-bench.mjs single-simd128 | tee a4/bench.json | grep -E '"(hash|webBaseline|nodes|pass)"'
+          E=bench/sprt/engines/diag
+          rm -rf "$E"; mkdir -p "$E"
+          cp out/engine/rapfi-$V.js out/engine/rapfi-$V.wasm out/engine/rapfi-$V.data \
+             out/engine/ENGINE_VERSION.txt out/engine/package.json "$E/"
+
+      - name: 측정 — 깊이 ${{ inputs.depth }}
+        run: |
+          set -o pipefail
+          E="$PWD/bench/sprt/engines/diag"
+          node bench/a4/policy-reuse.mjs \
+            --engine "diag|node $PWD/bench/sprt/wasm-pbrain.mjs --dir $E --variant $V" \
+            --depth "${{ inputs.depth }}" --positions "${{ inputs.positions }}" \
+            --out a4/policy-reuse.json --md a4/report.md | tee a4/policy-reuse.log
+          {
+            echo "### A4 관문 0 — 정책 재계산 비율 · \`$V\` · $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2)"
+            cat a4/report.md
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "--- 남은 wasm-pbrain 프로세스(0 이어야 함): $(pgrep -fc wasm-pbrain.mjs || true)"
+
+      - name: 결과
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: a4-policy-reuse
+          retention-days: 14
+          path: |
+            a4/
+            bench/sprt/engines/*/ENGINE_VERSION.txt

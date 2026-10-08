@@ -1,0 +1,133 @@
+diff --git a/Rapfi/eval/mix9svqnnue.cpp b/Rapfi/eval/mix9svqnnue.cpp
+index 9718436..9692040 100644
+--- a/Rapfi/eval/mix9svqnnue.cpp
++++ b/Rapfi/eval/mix9svqnnue.cpp
+@@ -29,8 +29,10 @@
+ #include "weightloader.h"
+ 
+ #include <algorithm>
++#include <bitset>
+ #include <cmath>
+ #include <cstring>
++#include <sstream>
+ 
+ 
+ namespace Evaluation::mix9svq {
+@@ -850,10 +852,93 @@ ValueType Evaluator::evaluateValue(const Board &board, AccLevel level)
+     return ValueType(win, loss, draw, true);
+ }
+ 
++// [a4-diag-policy-reuse — 측정용, 배포하지 않는다] 카드 ④(정책 결과 캐시)의 관문 0.
++// evaluatePolicy 가 불릴 때마다 「같은 국면(zobristKey — 둘 차례 포함)을 이미 같은 칸들로 계산했는가」를 크기별
++// 직접 사상 표로 흉내 낸다. 값은 재사용하지 않는다 — 결과 불변. 전역 표 · 잠금 없음이라 1 스레드 측정 전용이다.
++namespace {
++
++struct PolicyReuseProbe
++{
++    static constexpr int NumSizes           = 5;
++    static constexpr int LogSizes[NumSizes] = {8, 10, 12, 14, 16};
++
++    struct Entry
++    {
++        uint64_t               key = 0;
++        std::bitset<MAX_MOVES> flags;
++    };
++
++    std::vector<Entry> table[NumSizes];
++    uint64_t           calls = 0, cells = 0, repeatLast = 0, lastKey = 0;
++    uint64_t           full[NumSizes] = {}, fullCells[NumSizes] = {}, partial[NumSizes] = {};
++
++    PolicyReuseProbe()
++    {
++        for (int i = 0; i < NumSizes; i++)
++            table[i].resize(size_t(1) << LogSizes[i]);
++    }
++
++    void record(uint64_t key, const std::bitset<MAX_MOVES> &req, int numReq)
++    {
++        repeatLast += calls > 0 && key == lastKey;
++        lastKey = key;
++        calls++;
++        cells += numReq;
++        for (int i = 0; i < NumSizes; i++) {
++            Entry &e = table[i][key & ((uint64_t(1) << LogSizes[i]) - 1)];
++            if (e.key == key && e.flags.any()) {
++                if ((req & ~e.flags).none()) {
++                    full[i]++;
++                    fullCells[i] += numReq;
++                }
++                else {
++                    partial[i]++;
++                    e.flags |= req;  // 실제 캐시라면 모자란 칸을 계산해 합친다
++                }
++            }
++            else {
++                e.key   = key;
++                e.flags = req;
++            }
++        }
++    }
++};
++
++PolicyReuseProbe &reuseProbe()
++{
++    static PolicyReuseProbe probe;
++    return probe;
++}
++
++}  // namespace
++
++/// 누적 계수를 한 줄로(탐색이 끝날 때마다 — searchengine.cpp runSearch).
++void printPolicyReuseProbe()
++{
++    const auto        &p = reuseProbe();
++    std::ostringstream os;
++    os << "PREUSE calls " << p.calls << " cells " << p.cells << " repeat " << p.repeatLast;
++    for (int i = 0; i < PolicyReuseProbe::NumSizes; i++)
++        os << " | s" << PolicyReuseProbe::LogSizes[i] << " full " << p.full[i] << " fullcells "
++           << p.fullCells[i] << " part " << p.partial[i];
++    MESSAGEL(os.str());
++}
++
+ void Evaluator::evaluatePolicy(const Board &board, PolicyBuffer &policyBuffer, AccLevel level)
+ {
+     Color self = board.sideToMove();
+ 
++    {
++        std::bitset<MAX_MOVES> req;
++        int                    numReq = 0;
++        for (int i = 0; i < boardSize * boardSize; i++)
++            if (policyBuffer.getComputeFlag(i)) {
++                req.set(i);
++                numReq++;
++            }
++        reuseProbe().record(board.zobristKey(), req, numReq);
++    }
++
+     // Apply all incremental update and calculate policy
+     flushMoveCache(self);
+     accumulator[self]->evaluatePolicy(*weight[self], policyBuffer);
+diff --git a/Rapfi/search/searchengine.cpp b/Rapfi/search/searchengine.cpp
+index 0aad5a4..82f29a1 100644
+--- a/Rapfi/search/searchengine.cpp
++++ b/Rapfi/search/searchengine.cpp
+@@ -36,6 +36,10 @@
+ #include <algorithm>
+ #include <unordered_set>
+ 
++namespace Evaluation::mix9svq {
++void printPolicyReuseProbe();  // [a4-diag-policy-reuse — 측정용] eval/mix9svqnnue.cpp
++}
++
+ namespace Search {
+ 
+ namespace {
+@@ -471,6 +475,8 @@ void SearchEngine::runSearch(SearchThread &main)
+     // Run the algorithm's main search routine and finalize its result
+     if (const RootMove *finalMove = searcher()->searchMain(main))
+         finalizeResult(main, *finalMove);
++
++    Evaluation::mix9svq::printPolicyReuseProbe();  // [a4-diag-policy-reuse — 측정용]
+ }
+ 
+ void SearchEngine::clear(bool clearAllMemory)
