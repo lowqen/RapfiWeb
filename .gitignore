@@ -50,3 +50,7 @@ desktop.ini
 /bench/n1/out-log.txt
 /.pylib/
 __pycache__/
+
+# 엔진 가중치 묶음(~20MB) — README 대로 릴리스에서 받아 여기 둔다. 릴리스 자산이지 저장소의
+# 것이 아니다(GitHub 파일 한도 · 이력 무게). .js/.wasm 은 커밋하고 이것만 뺀다.
+/public/engine/rapfi.data
