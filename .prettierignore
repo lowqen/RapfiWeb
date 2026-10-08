@@ -20,3 +20,7 @@ docs
 
 # 생성물 — java tools/tone-dump/ToneDump.java 가 낸 그대로 두어야 재생성 diff 가 깨끗하다.
 src/core/design/tokens.golden.json
+
+# 리뷰 HTML 리포트 틀 — 데스크톱 · 앱과 같은 조각 셋(GAME 객체를 사이에 끼운다). 각자로는
+# 온전한 HTML 이 아니라 Prettier 가 읽지 못하고, 바이트를 바꾸면 이어 붙인 페이지가 깨진다.
+src/core/review/report-shell
