@@ -1,0 +1,53 @@
+diff --git a/Rapfi/search/searchengine.h b/Rapfi/search/searchengine.h
+index 24890ac..055f329 100644
+--- a/Rapfi/search/searchengine.h
++++ b/Rapfi/search/searchengine.h
+@@ -92,13 +92,16 @@ struct SearchContext
+     TimeControl timectl;
+     /// Printer for all search messages (main search thread only)
+     SearchPrinter printer;
+-    /// Calls count before exit condition check (main search thread only)
+-    uint32_t callsCnt;
++    /// Calls count before exit condition check (main search thread only). Decremented at every
++    /// node of the main thread, so it starts a cache line of its own, away from the options and
++    /// flags above that every search thread reads at every node.
++    alignas(64) uint32_t callsCnt;
+     /// Elapsed time of the last periodic node-count print (main search thread only)
+     Time lastStatsPrint;
+-    /// Should we start pondering after finishing this move?
++    /// Should we start pondering after finishing this move? (Starts a new cache line, ending the
++    /// main-thread-only line of callsCnt and lastStatsPrint.)
+     /// (set during search, read by the protocol thread)
+-    std::atomic_bool startPonderAfterThinking;
++    alignas(64) std::atomic_bool startPonderAfterThinking;
+     /// Database access parameters captured once per search from Config
+     DatabaseSearchParams dbParams;
+ 
+@@ -149,7 +152,8 @@ private:
+     void finalizeResult(SearchThread &main, const RootMove &finalMove);
+ 
+     std::vector<std::unique_ptr<SearchThread>> threads_;
+-    std::atomic_bool                           terminate;
++    /// Read at every node by all search threads, written only to stop the search.
++    alignas(64) std::atomic_bool terminate;
+     EvaluatorMaker                             evaluatorMaker;
+     std::unique_ptr<Searcher>                  searcherPtr;
+     std::unique_ptr<Database::DBStorage>       dbStoragePtr;
+diff --git a/Rapfi/search/searchthread.h b/Rapfi/search/searchthread.h
+index c7d88ac..7aba8ed 100644
+--- a/Rapfi/search/searchthread.h
++++ b/Rapfi/search/searchthread.h
+@@ -117,8 +117,11 @@ public:
+     // Common thread-related statistics
+     // ----------------------------------------------------
+ 
+-    /// Nodes count searched by this thread
+-    std::atomic<uint64_t> numNodes;
++    /// Nodes count searched by this thread. Written at every node by this thread only, so it is
++    /// kept on its own cache line (together with selDepth, also written only by this thread):
++    /// aligning it to 64 also aligns the whole SearchThread, whose objects are allocated one after
++    /// another, so the counter can no longer share a line with another thread's data.
++    alignas(64) std::atomic<uint64_t> numNodes;
+     /// Maximum depth reached by this thread
+     int selDepth;
+ };

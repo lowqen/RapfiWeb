@@ -1,0 +1,153 @@
+name: S1 — 멀티스레드 캐시 경합(P2-3 · P2-4) 속도 대조
+
+# 마스터플랜 2부 §5.2 S1 — 물리 코어 러너에서 P2-3(폴스 셰어링 alignas(64)) · P2-4(TT 적중 쓰기 조건화)를 다시 잰다.
+# 두 판정 모두 「GitHub 러너는 논리 2개(한 물리 코어의 SMT 형제)라 코어 사이 캐시 줄 무효화를 잴 수 없음 — 보류」였다.
+#
+# 빌드(WASM multi-simd128-relaxed — 배포 주력 · wasm-opt -O4 --converge), 모두 배포 구성 위에서:
+#   base     = 배포 패치(P2-2 · A1 · P4-1 · A3) + p2-3-diag-layout(측정용 — 첫 탐색에서 뜨거운 필드의 캐시 줄을 찍는다)
+#   control  = base 와 같은 파일(A/A — 하네스의 잡음 · 치우침)
+#   p23      = base + P2-3          p24 = base + P2-4          p23p24 = base + P2-3 + P2-4
+# 결과 불변 관문: 빌드마다 single-simd128 BENCH 해시가 웹 기준선(spike/web-baseline.json)과 같아야 한다(node-bench 가 막는다).
+#
+# 측정: bench/sprt/mt-speed.mjs — 스레드 2 · 4 에서 국면마다 해시를 비우고 같은 시간 탐색의 NPS(INFO TOTALNODES ÷ TOTALTIME)를
+# 짝지어 잰다(멀티스레드 탐색은 트리가 실행마다 달라 고정 깊이 · 같은 트리 비교가 안 된다). 엔진 프로세스는 **물리 코어마다
+# 논리 CPU 하나**에 묶는다(taskset) — SMT 형제에 두 탐색 스레드가 앉으면 L1/L2 를 같이 써서 이 측정이 보려는 코어 사이 경합이 가려진다.
+# 판정(1부 §5.3 · 2부 §7): 결과 불변 + 물리 2 · 4 스레드 NPS 가 두 런 연속 개선 · control 구간이 0 을 품을 것.
+on:
+  workflow_dispatch:
+    inputs:
+      threads:
+        default: "2,4"
+        type: string
+      ms:
+        description: "탐색마다 수당 시간(ms)"
+        default: "1500"
+        type: string
+      repeat:
+        default: "2"
+        type: string
+      positions:
+        default: "bench/sprt/openings-balanced.json"
+        type: string
+      pin:
+        description: "엔진을 물리 코어마다 논리 CPU 하나에 묶는다(taskset)"
+        default: true
+        type: boolean
+      runner_label:
+        description: "self-hosted 러너의 고유 라벨(c4 = Intel Xeon 8581C · 물리 4)"
+        default: "c4"
+        type: string
+      expect_cpu:
+        description: "러너 CPU 이름에 이 글자가 없으면 곧바로 멈춘다 — 비우면 검사 안 함"
+        default: "8581C"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  s1:
+    runs-on: ["self-hosted", "${{ inputs.runner_label }}"]
+    timeout-minutes: 360
+    env:
+      WORK: ${{ github.workspace }}/../rapfi-wasm-work
+      ENABLE_LTO: "ON"
+      V: multi-simd128-relaxed
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "26"
+
+      - name: 러너 정보
+        env:
+          EXPECT: ${{ inputs.expect_cpu }}
+        run: |
+          cpu=$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2)
+          echo "nproc $(nproc) · $cpu"
+          lscpu | grep -E '^(Thread|Core|Socket|L1d|L2|L3)' || true
+          grep -E 'MemTotal|MemAvailable' /proc/meminfo
+          if [ -n "$EXPECT" ] && ! echo "$cpu" | grep -qF "$EXPECT"; then
+            echo "::error::러너 CPU 가 '$EXPECT' 가 아닙니다: $cpu"; exit 1
+          fi
+
+      - name: 시스템 도구
+        run: |
+          missing=()
+          for t in git cmake ninja ccache file python3 xz taskset; do command -v "$t" > /dev/null || missing+=("$t"); done
+          if [ ${#missing[@]} -eq 0 ]; then echo "도구 모두 있음"; exit 0; fi
+          echo "없는 도구: ${missing[*]} — 설치 시도"
+          sudo -n apt-get update -qq && sudo -n apt-get install -y git cmake ninja-build ccache file python3 xz-utils util-linux \
+            || { echo "::error::설치 실패(sudo 암호?) — 러너 기계에 직접: sudo apt-get install -y git cmake ninja-build ccache file python3 xz-utils"; exit 1; }
+
+      - name: emsdk 캐시 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.WORK }}/emsdk
+          key: emsdk-latest-v1
+      - name: rapfi 소스 캐시 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.WORK }}/rapfi
+          key: rapfi-3c94c2a9-v1
+
+      - name: 빌드 — base · p23 · p24 · p23p24 (결과 불변 관문)
+        run: |
+          set -o pipefail
+          E=bench/sprt/engines
+          BASE="tools/patches/p2-2-keep-evaluators-on-rebuild.patch tools/patches/a1-q15mulr.patch tools/patches/p4-1-periodic-node-stats.patch tools/patches/a3-starblock-multi.patch tools/patches/p2-3-diag-layout.patch"
+          P23=tools/patches/p2-3-false-sharing-align.patch
+          P24=tools/patches/p2-4-tt-probe-generation-guard.patch
+          mkdir -p s1
+          build () {
+            local name=$1; shift
+            echo "::group::빌드 $name"
+            RAPFI_PATCHES="$BASE $*" EXTRA_VARIANTS="$V" WASM_OPT_POST="-O4 --converge" bash tools/build_engine_wasm.sh
+            echo "::endgroup::"
+            # 결과 불변: single-simd128 BENCH 해시가 웹 기준선과 같아야 한다 — 다르면 node-bench 가 0 이 아닌 코드로 끝나 잡이 멈춘다
+            node spike/node-bench.mjs single-simd128 | tee "s1/bench-$name.json" | grep -E '"(hash|webBaseline|nodes|pass)"'
+            rm -rf "$E/$name"; mkdir -p "$E/$name"
+            cp out/engine/rapfi-$V.js out/engine/rapfi-$V.wasm out/engine/rapfi-$V.data \
+               out/engine/ENGINE_VERSION.txt out/engine/package.json "$E/$name/"
+            ( cd "$E/$name" && sha256sum rapfi-$V.wasm )
+          }
+          build base
+          build p23 $P23
+          build p24 $P24
+          build p23p24 $P23 $P24
+          rm -rf "$E/control"; cp -r "$E/base" "$E/control"
+
+      - name: 측정 — 스레드 ${{ inputs.threads }} · 같은 시간 NPS 짝
+        env:
+          PIN: ${{ inputs.pin }}
+        run: |
+          set -o pipefail
+          E="$PWD/bench/sprt/engines"
+          pin=""
+          if [ "$PIN" = "true" ]; then
+            # 물리 코어(코어 · 소켓)마다 첫 논리 CPU — SMT 형제를 빼고 코어 수만큼
+            cpus=$(lscpu -p=CPU,Core,Socket | awk -F, '/^#/ { next } !seen[$2 "," $3]++ { printf "%s%s", (n++ ? "," : ""), $1 }')
+            pin="taskset -c $cpus"
+            echo "엔진을 물리 코어마다 논리 CPU 하나에 묶음: $cpus"
+          fi
+          eng () { echo "$1|$pin node $PWD/bench/sprt/wasm-pbrain.mjs --dir $E/$1 --variant $V"; }
+          node bench/sprt/mt-speed.mjs \
+            --engine "$(eng base)" --engine "$(eng control)" --engine "$(eng p23)" --engine "$(eng p24)" --engine "$(eng p23p24)" \
+            --threads "${{ inputs.threads }}" --ms "${{ inputs.ms }}" --repeat "${{ inputs.repeat }}" \
+            --positions "${{ inputs.positions }}" --out s1/mt-speed.json --md s1/report.md | tee s1/mt-speed.log
+          {
+            echo "### S1 — P2-3 · P2-4 멀티스레드 속도 대조 · $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2)"
+            cat s1/report.md
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "--- 남은 wasm-pbrain 프로세스(0 이어야 함): $(pgrep -fc wasm-pbrain.mjs || true)"
+
+      - name: 결과
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: s1-mt-speed
+          retention-days: 14
+          path: |
+            s1/
+            bench/sprt/engines/*/ENGINE_VERSION.txt

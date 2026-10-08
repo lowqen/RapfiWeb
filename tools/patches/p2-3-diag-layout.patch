@@ -1,0 +1,47 @@
+diff --git a/Rapfi/search/searchengine.cpp b/Rapfi/search/searchengine.cpp
+index 0aad5a4..be2dc6a 100644
+--- a/Rapfi/search/searchengine.cpp
++++ b/Rapfi/search/searchengine.cpp
+@@ -34,6 +34,7 @@
+ #include "searchthread.h"
+ 
+ #include <algorithm>
++#include <cstdint>
+ #include <unordered_set>
+ 
+ namespace Search {
+@@ -458,6 +459,34 @@ void SearchEngine::finalizeResult(SearchThread &main, const RootMove &finalMove)
+ 
+ void SearchEngine::runSearch(SearchThread &main)
+ {
++    // [p2-3-diag-layout — 측정용, 배포하지 않는다] 스레드 수가 바뀐 뒤 첫 탐색에서 뜨거운 필드가 어느 캐시 줄(64B)에
++    // 있는지 찍는다: 줄 번호(주소 >> 6) + 줄 안 오프셋. 같은 줄에 「한 스레드가 노드마다 쓰는 것」과 「다른 스레드가
++    // 노드마다 읽거나 쓰는 것」이 함께 있으면 폴스 셰어링이다.
++    static size_t diagThreads = 0;
++    if (diagThreads != threads_.size()) {
++        diagThreads    = threads_.size();
++        auto ln        = [](const void *p) { return (unsigned long long)((uintptr_t)p >> 6); };
++        auto of        = [](const void *p) { return (unsigned)((uintptr_t)p & 63); };
++        MESSAGEL("LAYOUT threads " << threads_.size() << " sizeof(SearchThread) " << sizeof(SearchThread)
++                                   << " alignof " << alignof(SearchThread) << " sizeof(SearchContext) "
++                                   << sizeof(SearchContext) << " alignof " << alignof(SearchContext));
++        MESSAGEL("LAYOUT engine terminate " << ln(&terminate) << "+" << of(&terminate) << " options "
++                                            << ln(&ctx.options) << "+" << of(&ctx.options) << " maxMoves "
++                                            << ln(&ctx.options.maxMoves) << "+" << of(&ctx.options.maxMoves)
++                                            << " inPonder " << ln(&ctx.inPonder) << "+" << of(&ctx.inPonder)
++                                            << " callsCnt " << ln(&ctx.callsCnt) << "+" << of(&ctx.callsCnt)
++                                            << " startPonder " << ln(&ctx.startPonderAfterThinking) << "+"
++                                            << of(&ctx.startPonderAfterThinking) << " dbParams "
++                                            << ln(&ctx.dbParams) << "+" << of(&ctx.dbParams));
++        for (auto &th : threads_) {
++            const char *b = reinterpret_cast<const char *>(th.get());
++            MESSAGEL("LAYOUT th" << th->id << " obj " << ln(b) << "+" << of(b) << ".."
++                                 << ln(b + sizeof(SearchThread) - 1) << " numNodes " << ln(&th->numNodes) << "+"
++                                 << of(&th->numNodes) << " board " << ln(th->board.get()) << " evaluator "
++                                 << ln(th->evaluator.get()) << " searchData " << ln(th->searchData.get()));
++        }
++    }
++
+     // Handle trivial cases that need no real search
+     if (tryTrivialBestmove(main))
+         return;
