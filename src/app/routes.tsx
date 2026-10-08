@@ -4,13 +4,14 @@ import { Placeholder } from "./Placeholder";
 import { BoardScreen } from "../features/board/BoardScreen";
 import { EngineScreen } from "../features/engine/EngineScreen";
 import { SettingsScreen } from "../features/settings/SettingsScreen";
+import { OpeningExplorer } from "../features/research/OpeningExplorer";
 
 /**
  * 아홉 화면. 계획서 §6 의 라우트 표를 그대로 옮긴 것이다.
  *
  * 국면 딥링크 `?p=…` 는 **전 화면 공통 쿼리**로 둔다 — 앱의 «국면 문자열» 기능이
  * 웹에서 자연스럽게 갖는 등가물이고, 링크로 국면을 주고받을 수 있게 된다.
- * (W1 에서는 자리만 잡는다. 파싱은 W4.)
+ * 읽기는 `main.tsx` 가 라우터가 뜨기 전에 한다(`features/board/positionLink.ts`).
  *
  * W1 은 **골격**이다. 각 화면은 `Placeholder` 로, 그 화면이 무엇을 하게 될지와
  * 어느 단계에서 채워지는지를 적어 둔다 — 빈 div 는 다음 사람에게 아무 말도 하지
@@ -43,17 +44,8 @@ export const router = createBrowserRouter(
             />
           ),
         },
-        {
-          path: "research/explorer",
-          element: (
-            <Placeholder
-              stage="W6a"
-              title="오프닝"
-              what="주형 이름 249개와 흑5수 유불리 1,889모양은 기본 내장이라 팩 없이 동작한다. 빈도 통계는 사용자가 .rif 를 올렸을 때만."
-              needs={["W5a PosKey ✓"]}
-            />
-          ),
-        },
+        // W6a: 팩 없이 되는 부분(이름 사슬 · 유불리 · 환원 · 이론 다음 수). 빈도 통계는 W7.
+        { path: "research/explorer", element: <OpeningExplorer /> },
         {
           path: "research/sequence",
           element: (

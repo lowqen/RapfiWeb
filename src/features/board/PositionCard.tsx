@@ -3,6 +3,10 @@ import { useBoardStore } from "./boardStore";
 import { useGameStore } from "./gameStore";
 import { useBoardNotice } from "./boardNotice";
 import { GAME_FILE_ACCEPT, openGameFile, saveGameFile } from "./gameFileActions";
+import { copyPositionLink } from "./positionLink";
+import { useOpeningTables } from "../../data/opening-tables";
+import { chain, gradeAt } from "../../core/opening/opening-name";
+import { GradeBadge } from "../../components/GradeBadge";
 import { OpeningProgress } from "./OpeningPanel";
 import { label } from "../../core/model/move";
 import { RULE_LABEL } from "../../core/model/rules";
@@ -14,6 +18,7 @@ import { OPENING_LABEL, describeResult } from "../../core/model/game";
  *
  * 기보 열기 · 저장은 두 탭 모두에 있다(판은 함께 쓴다). 열기는 보드에 파일을 끌어다
  * 놓아도 된다(`BoardScreen`). 저장은 지금 판까지 — 무른 수는 넣지 않는다(데스크톱과 같다).
+ * 「링크 복사」는 지금 판을 `?p=…` 주소로 — 받은 사람이 열면 그 국면이 뜬다.
  *
  * 스모크가 `dd[data-k=turn]`·`dd[data-k=last]` 를 이름으로 집는다(순서가 아니라).
  */
@@ -27,6 +32,10 @@ export function PositionCard({ game }: { game: boolean }) {
   const gameName = useGameStore((s) => s.gameName);
   const showNotice = useBoardNotice((s) => s.show);
   const fileInput = useRef<HTMLInputElement>(null);
+  const tables = useOpeningTables((s) => s.tables);
+  // 주형 이름(1~4수)과 흑 5수 유불리(4·5수) — 연구 ▸ 오프닝과 같은 계산이다.
+  const names = chain(render.stones, tables, render.size);
+  const grade = gradeAt(render.stones, tables, render.size);
   const playing = !result && render.stones.length > 0;
   const last = render.lastMove;
   const turn = render.stones.length % 2 === 0 ? "흑" : "백";
@@ -57,6 +66,20 @@ export function PositionCard({ game }: { game: boolean }) {
         <dd className="tnum" data-k="last">
           {last ? label(last, render.size) : "—"}
         </dd>
+        {names.length > 0 && (
+          <>
+            <dt>주형</dt>
+            <dd data-k="opening-name">
+              {names.join(" › ")}
+              {grade && (
+                <>
+                  {" "}
+                  <GradeBadge grade={grade} compact />
+                </>
+              )}
+            </dd>
+          </>
+        )}
         {gameName && (
           <>
             <dt>기보</dt>
@@ -81,6 +104,14 @@ export function PositionCard({ game }: { game: boolean }) {
           onClick={() => void saveGameFile("sav")}
         >
           .sav 저장
+        </button>
+        <button
+          type="button"
+          title="지금 판을 여는 주소(?p=…)를 복사합니다"
+          disabled={render.stones.length === 0}
+          onClick={() => void copyPositionLink()}
+        >
+          링크 복사
         </button>
         <input
           ref={fileInput}

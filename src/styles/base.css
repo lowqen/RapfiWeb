@@ -1904,3 +1904,77 @@ a:focus-visible {
   border-radius: 50%;
   cursor: help;
 }
+
+/* ── 연구 ▸ 오프닝 (W6a) ─────────────────────────────────────────────
+   계획서 §6: 연구 화면은 넓은 화면에서도 «국면 → 다음 수» 한 열, 가운데 정렬. */
+.explorer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-m);
+  width: 100%;
+  max-width: var(--reading-width);
+  margin: 0 auto;
+}
+/* 판은 화면 높이의 60% 를 넘지 않는다 — 넓은 화면에서 판 하나가 첫 화면을 다 먹으면
+   «국면 → 다음 수»의 다음 수가 접힌다. */
+.explorer__board {
+  width: min(100%, 60vh);
+  aspect-ratio: 1;
+  margin: 0 auto;
+}
+.explorer__nav {
+  justify-content: center;
+  margin-top: 0;
+}
+.explorer__note {
+  font: var(--type-body-small);
+  color: var(--c-on-surface-variant);
+}
+.theory {
+  display: flex;
+  flex-direction: column;
+  margin: var(--space-m) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.theory__row {
+  display: grid;
+  grid-template-columns: 4.5em minmax(0, 1fr) auto;
+  gap: var(--space-l);
+  align-items: center;
+  width: 100%;
+  min-height: 36px;
+  padding: var(--space-s) var(--space-m);
+  font: var(--type-body-medium);
+  color: var(--c-on-surface);
+  text-align: left;
+  border-radius: var(--radius-m);
+}
+button.theory__row:hover {
+  background: var(--c-surface-container-highest);
+}
+.theory__row--static {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+.theory__move {
+  font-weight: 600;
+}
+.theory__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gradebadge {
+  display: inline-flex;
+  gap: var(--space-s);
+  align-items: center;
+  font: var(--type-label-medium);
+  color: var(--c-on-surface);
+  white-space: nowrap;
+}
+.gradebadge__name {
+  color: var(--c-on-surface-variant);
+}
+.grademark {
+  flex: none;
+}
