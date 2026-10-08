@@ -18,7 +18,7 @@ import { useGameStore } from "../board/gameStore";
  * 판은 보드 화면과 **같은 판**이다 — 여기서 둔 수는 보드에도 있고, 보드에서 둔 수를
  * 여기서 이어 본다. 그래서 보드의 두 스토어를 직접 읽는다(`features/README.md` 의 예외). 계획서 §6 의 «국면 → 다음 수» 순서대로 한 열로 읽는다.
  *
- * 둘 수 있는 것은 표에 있는 수(판 위의 작은 점)뿐이다 — 이 화면은 이론을 훑는 곳이고,
+ * 둘 수 있는 것은 표에 있는 수(판 위의 점 · 등급 표식)뿐이다 — 이 화면은 이론을 훑는 곳이고,
  * 아무 데나 두는 것은 보드 화면의 일이다. 빈도 통계(몇 판 · 흑 승률)는 사용자가 `.rif`
  * 를 올린 뒤에야 생긴다(W7).
  */
@@ -45,6 +45,8 @@ export function OpeningExplorer() {
   }, [stones, tables, size]);
 
   // 판에는 돌과 «표에 있는 다음 수»만 — 값 칩이나 엔진 표식은 얹지 않는다(여기는 이론이다).
+  // 등급이 있는 수는 그 등급의 모양 표식(목록의 `GradeBadge` 와 같은 그림), 이름만 있는
+  // 수는 작은 점이다.
   const view: BoardRender = useMemo(
     () => ({
       ...render,
@@ -52,7 +54,21 @@ export function OpeningExplorer() {
       bestMark: null,
       ghosts: [],
       loseCells: new Set(),
-      candidates: new Map(rows.map((r) => [moveKey(r.move, size), "done" as const])),
+      candidates: new Map(
+        rows.filter((r) => !r.grade).map((r) => [moveKey(r.move, size), "done" as const]),
+      ),
+      marks: new Map(
+        rows.flatMap((r) =>
+          r.grade
+            ? [
+                [
+                  moveKey(r.move, size),
+                  { shape: r.grade.mark, fill: r.grade.fill, dot: r.grade.dot },
+                ] as const,
+              ]
+            : [],
+        ),
+      ),
     }),
     [render, rows, size],
   );

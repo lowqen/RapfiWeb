@@ -18,6 +18,17 @@ import {
  * 같은 분리를 했고, 그 덕에 같은 국면을 화면에는 밝게, 내보내기에는 어둡게
  * 그릴 수 있다.
  */
+/**
+ * 빈 점에 그리는 모양 표식 — 사람이 적은 값(흑 5수 유불리 등)용. 엔진 값 칩(`tags`)과
+ * 일부러 다른 그림이다: 색 사다리가 아니라 **모양**이 뜻을 나른다.
+ */
+export interface BoardMark {
+  shape: "circle" | "pentagon" | "square" | "triangle" | "cross";
+  fill: string;
+  /** 안쪽 점의 색, 없으면 `null`. */
+  dot: string | null;
+}
+
 export interface BoardRender {
   size: number;
   /** 둔 순서. 짝수 인덱스가 흑. */
@@ -31,6 +42,8 @@ export interface BoardRender {
   candidates: ReadonlyMap<number, "live" | "done">;
   loseCells: ReadonlySet<number>;
   blocked: ReadonlySet<number>;
+  /** 모양 표식(`BoardMark`) — `moveKey` → 표식. 돌이 놓인 점에는 그리지 않는다. */
+  marks: ReadonlyMap<number, BoardMark>;
   /** settings.txt 14행. */
   showNumbers: boolean;
   palette: TagPalette;
@@ -49,6 +62,7 @@ export const emptyRender = (size = 15): BoardRender => ({
   candidates: new Map(),
   loseCells: new Set(),
   blocked: new Set(),
+  marks: new Map(),
   showNumbers: true,
   palette: DEFAULT_PALETTE,
   textScale: 1,
@@ -260,8 +274,13 @@ export function drawDynamic(
     line(ctx, cx(m) - r * 0.5, cy(m), cx(m) + r * 0.5, cy(m));
   }
 
-  // 빈 점의 분석 태그. 돌이 놓인 점에는 그리지 않는다.
+  // 빈 점의 분석 태그와 모양 표식. 돌이 놓인 점에는 그리지 않는다.
   const occupied = new Set(render.stones.map((m) => moveKey(m, render.size)));
+  for (const [key, mark] of render.marks) {
+    if (occupied.has(key)) continue;
+    const m = fromKey(key, render.size);
+    drawMark(ctx, cx(m), cy(m), r * 0.62, mark, skin.line, hair);
+  }
   for (const [key, tag] of render.tags) {
     if (!tag.label || occupied.has(key)) continue;
     const m = fromKey(key, render.size);
@@ -376,4 +395,72 @@ export function drawBoard(
   const g = boardGeometry(side, render.size);
   drawStatic(ctx, g, skin);
   drawDynamic(ctx, render, g, skin);
+}
+
+/**
+ * 모양 표식 하나 — 앱 `MiniBoard.drawGradeMark` 의 다섯 모양. `GradeBadge`(SVG)와 같은
+ * 기하라 판 위의 표식과 목록의 표식이 같은 그림이다.
+ */
+function drawMark(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  r: number,
+  mark: BoardMark,
+  rim: string,
+  hair: number,
+): void {
+  ctx.save();
+  ctx.lineWidth = hair * 1.2;
+  ctx.strokeStyle = rim;
+  ctx.fillStyle = mark.fill;
+  const poly = (n: number, rr: number, dy = 0) => {
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      const a = ((-90 + (360 / n) * i) * Math.PI) / 180;
+      const px = x + rr * Math.cos(a);
+      const py = y + dy + rr * Math.sin(a);
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  };
+  switch (mark.shape) {
+    case "circle":
+      circle(ctx, x, y, r * 0.9);
+      ctx.fill();
+      ctx.stroke();
+      break;
+    case "pentagon":
+      poly(5, r);
+      break;
+    case "square":
+      ctx.beginPath();
+      ctx.rect(x - r * 0.78, y - r * 0.78, r * 1.56, r * 1.56);
+      ctx.fill();
+      ctx.stroke();
+      break;
+    case "triangle":
+      poly(3, r * 1.05, r * 0.12);
+      break;
+    case "cross":
+      ctx.strokeStyle = mark.fill;
+      ctx.lineWidth = r * 0.36;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(x - r * 0.7, y - r * 0.7);
+      ctx.lineTo(x + r * 0.7, y + r * 0.7);
+      ctx.moveTo(x + r * 0.7, y - r * 0.7);
+      ctx.lineTo(x - r * 0.7, y + r * 0.7);
+      ctx.stroke();
+      break;
+  }
+  if (mark.dot) {
+    ctx.fillStyle = mark.dot;
+    circle(ctx, x, y, r * 0.25);
+    ctx.fill();
+  }
+  ctx.restore();
 }
