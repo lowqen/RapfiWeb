@@ -9,6 +9,7 @@ import { GamePanel } from "./GamePanel";
 import { ModeTabs, MODE_PANEL_ID } from "./ModeTabs";
 import { PositionCard } from "./PositionCard";
 import { PromptPanel } from "./OpeningPanel";
+import { LinkBackupBanner } from "./LinkBackupBanner";
 import { MoveTransport } from "./MoveTransport";
 import { QuickActions } from "./QuickActions";
 import { useBoardNotice } from "./boardNotice";
@@ -137,6 +138,7 @@ export function BoardScreen() {
       >
         {/* 물음은 맨 위 — 답하기 전까지 판이 잠기므로 가장 먼저 보여야 한다. 두 탭 모두. */}
         <PromptPanel />
+        <LinkBackupBanner />
         {mode === "game" ? (
           <>
             <GamePanel />

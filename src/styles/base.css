@@ -616,6 +616,15 @@ a:focus-visible {
   border: 0;
   border-radius: var(--radius-l);
 }
+/* 고를 때까지 남는 안내(링크를 열기 전 판 등) — 카드와 구별되는 한 단 진한 면. */
+.panel--notice {
+  background: var(--c-secondary-container);
+  color: var(--c-on-secondary-container);
+}
+.panel--notice .panel__title,
+.panel--notice .panel__hint {
+  color: var(--c-on-secondary-container);
+}
 .panel--muted {
   background: transparent;
   border-style: dashed;

@@ -22,11 +22,15 @@ export interface GameRecord {
   future: Move[];
   savedAt: number;
   /**
-   * 특별한 자리. `"autosave"` 는 **지금 판** 한 건이고, 늘 같은 줄을 덮어쓴다.
-   * 사용자가 저장한 기보에는 없다(색인에 걸리지 않는다).
+   * 특별한 자리 — 자리마다 한 줄이고 늘 같은 줄을 덮어쓴다. 사용자가 저장한 기보에는
+   * 없다(색인에 걸리지 않는다).
+   *   `"autosave"`   지금 판
+   *   `"beforeLink"` 국면 딥링크를 열기 직전에 두던 판 — 되돌리거나 버릴 때까지 남는다
    */
-  slot?: "autosave";
+  slot?: GameSlot;
 }
+
+export type GameSlot = "autosave" | "beforeLink";
 
 export class RapfiDb extends Dexie {
   games!: EntityTable<GameRecord, "id">;

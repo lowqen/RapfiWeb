@@ -3,6 +3,7 @@ import { useGameStore } from "./gameStore";
 import { db as defaultDb, type RapfiDb } from "../../data/db";
 import { readAutosave, writeAutosave } from "../../data/games";
 import type { Move } from "../../core/model/move";
+import { prepareLinkBackup } from "./linkBackup";
 
 /**
  * 판 자동 저장 — 새로고침해도, 탭을 닫았다 열어도 보던 판이 그대로다.
@@ -16,7 +17,7 @@ import type { Move } from "../../core/model/move";
  *
  * **국면 딥링크(`?p=`)로 열었으면 되살리지 않는다** — `initial` 이 그 수순이고, 링크의
  * 국면이 곧 지금 판이 되어 자동 저장 자리를 덮는다. 링크를 연다는 것은 그 판을 보겠다는
- * 뜻이기 때문이다.
+ * 뜻이기 때문이다. 덮이기 전에 두던 판은 `linkBackup.ts` 가 따로 보관하고 되돌릴 길을 준다.
  *
  * 쓰기는 마지막 변화 뒤 `delayMs` 만큼 기다려 한 번(「끝으로」처럼 여러 수가 한꺼번에
  * 바뀌어도 한 번). 페이지가 숨겨질 때는 기다리지 않고 바로 쓴다 — 언로드 중에는 비동기
@@ -74,6 +75,8 @@ export function startAutosave(
   };
 
   const ready = (async () => {
+    // 덮기 **전에** 두던 판을 보관해 둔다(링크가 없으면 지난번 보관판을 다시 띄운다).
+    await prepareLinkBackup(d, initial);
     if (initial) {
       loadLink(initial);
       dirty = true; // 링크의 국면을 자동 저장 자리에 — 구독을 건 뒤 곧바로 쓴다

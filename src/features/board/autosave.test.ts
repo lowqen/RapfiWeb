@@ -4,7 +4,8 @@ import { startAutosave, type Autosave } from "./autosave";
 import { useBoardStore } from "./boardStore";
 import { useGameStore } from "./gameStore";
 import { RapfiDb } from "../../data/db";
-import { readAutosave, writeAutosave } from "../../data/games";
+import { readAutosave, readSlot, writeAutosave, writeSlot } from "../../data/games";
+import { useLinkBackup } from "./linkBackup";
 import { useEngineStore } from "../../engine/engine-state";
 import { move } from "../../core/model/move";
 
@@ -20,6 +21,7 @@ const game = () => useGameStore.getState();
 
 beforeEach(() => {
   d = new RapfiDb(`autosave-${Math.random()}`);
+  useLinkBackup.setState({ backup: null });
   useEngineStore.setState({ status: "idle", send: () => {} });
   board().clear();
   useGameStore.setState({ result: null, thinking: false, prompt: null, gameName: null });
@@ -87,6 +89,46 @@ describe("국면 딥링크", () => {
       moves: [move(7, 7), move(8, 6)],
       future: [],
     });
+  });
+
+  it("덮이기 전에 두던 판을 보관하고, 돌아가면 그 판이 다시 올라온다", async () => {
+    const old = { name: "mine", size: 15, moves: [move(1, 1), move(2, 2)], future: [move(3, 3)] };
+    await writeAutosave(d, old);
+    a = startAutosave(d, 10_000, [move(7, 7)]);
+    await a.ready;
+    expect(useLinkBackup.getState().backup).toEqual(old);
+    expect(await readSlot(d, "beforeLink")).toEqual(old);
+    await useLinkBackup.getState().restore();
+    expect(board().render.stones).toEqual(old.moves);
+    expect(board().future).toEqual(old.future);
+    expect(game().gameName).toBe("mine");
+    expect(useLinkBackup.getState().backup).toBeNull();
+    expect(await readSlot(d, "beforeLink")).toBeNull();
+  });
+
+  it("버리면 보관판이 사라진다", async () => {
+    await writeAutosave(d, { name: "", size: 15, moves: [move(1, 1)], future: [] });
+    a = startAutosave(d, 10_000, [move(7, 7)]);
+    await a.ready;
+    await useLinkBackup.getState().discard();
+    expect(useLinkBackup.getState().backup).toBeNull();
+    expect(await readSlot(d, "beforeLink")).toBeNull();
+    expect(board().render.stones).toEqual([move(7, 7)]);
+  });
+
+  it("두던 판이 비었거나 링크와 같으면 보관하지 않는다", async () => {
+    await writeAutosave(d, { name: "", size: 15, moves: [move(7, 7)], future: [] });
+    a = startAutosave(d, 10_000, [move(7, 7)]);
+    await a.ready;
+    expect(useLinkBackup.getState().backup).toBeNull();
+  });
+
+  it("고르지 않고 떠난 보관판은 다음에 다시 묻는다", async () => {
+    const kept = { name: "", size: 15, moves: [move(4, 4)], future: [] };
+    await writeSlot(d, "beforeLink", kept);
+    a = startAutosave(d, 10_000);
+    await a.ready;
+    expect(useLinkBackup.getState().backup).toEqual(kept);
   });
 
   it("빈 링크는 빈 판이다", async () => {
