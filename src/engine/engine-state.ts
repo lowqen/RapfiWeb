@@ -126,12 +126,42 @@ interface EngineState {
   ) => Promise<void>;
   /** 명령 몇 개를 그대로 보낸다(협상 단계 등). */
   send: (...cmds: EngineCommand[]) => void;
+  /**
+   * 엔진을 **독점**하는 작업(게임 리뷰). 있으면 분석(`analyze`)과 착수(`play`)를 받지 않는다 —
+   * 앱의 `EngineBusy.REVIEW` 와 같은 자물쇠다. 리뷰는 국면마다 따로 탐색을 걸고, 그 사이에
+   * 분석 따라가기나 대국의 착수가 끼면 리뷰의 국면이 엇갈린다.
+   */
+  owner: EngineOwner | null;
+  /** 자물쇠를 잡는다. 못 잡으면 까닭, 잡으면 `null`. 켜 둔 분석은 끈다. */
+  acquire: (owner: EngineOwner) => string | null;
+  release: (owner: EngineOwner) => void;
+  /**
+   * 독점 탐색 하나 — 국면을 세우고 `YXNBEST nbest` 로 `totalMs` 동안(무제한이면 정지까지)
+   * 읽고, 끝나면 마지막 스냅샷을 돌려준다. 엔진을 내리면(종료 · 변형 전환) `null`.
+   * `info` 는 이 탐색에만 얹는 `INFO`(리뷰의 `max_depth` 등) — 다음 분석은 설정값으로 돌아간다.
+   * `onSnapshot` 은 도중의 스냅샷마다(깊이 예산이 「다 읽었다」를 정한다).
+   */
+  exclusiveSearch: (
+    stones: readonly Placement[],
+    opts: { totalMs: number; nbest: number; info?: readonly EngineCommand[] },
+    onSnapshot?: (s: AnalysisSnapshot) => void,
+  ) => Promise<AnalysisSnapshot | null>;
   stop: () => void;
   terminate: () => void;
   clearConsole: () => void;
 }
 
 let client: EngineClient | null = null;
+
+/** 엔진을 독점할 수 있는 작업. */
+export type EngineOwner = "review";
+
+/** 독점 탐색이 기다리는 손잡이 — 그 탐색의 스냅샷과 끝을 받는다. */
+let exclusive: {
+  onSnapshot?: ((s: AnalysisSnapshot) => void) | undefined;
+  done: (s: AnalysisSnapshot | null) => void;
+  last: AnalysisSnapshot | null;
+} | null = null;
 
 /** 엔진에 밀어 넣는 설정 — 화면의 설정 스토어가 만들어 건넨다. */
 export interface EngineConfig {
@@ -356,6 +386,10 @@ export const useEngineStore = create<EngineState>((set, get) => {
             evalKey: view ? requestKey : s.evalKey,
           };
         });
+        if (exclusive) {
+          exclusive.last = snapshot;
+          exclusive.onSnapshot?.(snapshot);
+        }
       },
       onConsole: (lines) =>
         set((s) => {
@@ -407,7 +441,14 @@ export const useEngineStore = create<EngineState>((set, get) => {
         if (get().analyzing) runAnalysis(c, analysisStones);
       },
       onSearchDone: (mode, reason) => {
-        if (client !== c || mode !== "analyze" || !get().analyzing) return;
+        if (client !== c) return;
+        if (exclusive && mode === "analyze") {
+          const e = exclusive;
+          exclusive = null;
+          e.done(e.last);
+          return;
+        }
+        if (mode !== "analyze" || !get().analyzing) return;
         if (reason === "stopped") {
           // **밀려서 끝났다** — 정지 버튼이 아니라(그건 `analyzing` 을 먼저 끈다)
           // 줄에 선 다른 명령(기권 알림 등)이 비켜 달라고 한 것이다. 그 명령은
@@ -489,6 +530,11 @@ export const useEngineStore = create<EngineState>((set, get) => {
     },
 
     analyze: async (stones, totalMs) => {
+      // 리뷰가 엔진을 쥐고 있으면 분석을 받지 않는다 — 리뷰의 국면이 엇갈린다.
+      if (get().owner) {
+        set({ analyzing: false });
+        return;
+      }
       const c = ensure();
       set({ error: null, analyzing: true });
       try {
@@ -503,6 +549,7 @@ export const useEngineStore = create<EngineState>((set, get) => {
     },
 
     play: async (stones, emptyBoard, budget, info = []) => {
+      if (get().owner) return; // 대국 쪽이 먼저 거른다(gameStore) — 여기는 마지막 안전망
       const c = ensure();
       // 대국의 착수가 엔진을 가져간다 — 분석 의도는 여기서 끝난다. 켜 둔 채면
       // 엔진이 답하자마자 분석이 다시 붙어 대국과 엔진을 나눠 쓰게 된다.
@@ -526,6 +573,51 @@ export const useEngineStore = create<EngineState>((set, get) => {
       client?.send(...cmds);
     },
 
+    owner: null,
+
+    acquire: (owner) => {
+      const s = get();
+      if (s.owner)
+        return s.owner === owner ? "이미 진행 중입니다" : "엔진을 다른 작업이 쓰고 있습니다";
+      set({ owner });
+      // 켜 둔 분석은 끈다. 도는 탐색은 다음 독점 탐색 요청이 비켜 세운다(워커가 줄 뒤의
+      // 요청을 보면 앞 탐색을 멈춘다) — 그 탐색의 끝과 스냅샷은 클라이언트가 버린다.
+      if (s.analyzing) get().stop();
+      return null;
+    },
+
+    release: (owner) => {
+      if (get().owner === owner) set({ owner: null });
+    },
+
+    exclusiveSearch: async (stones, opts, onSnapshot) => {
+      const c = ensure();
+      set({ error: null });
+      try {
+        if (c.currentStatus === "idle" || c.currentStatus === "error") await boot(c);
+        else if (c.currentStatus === "starting") await c.whenReady();
+      } catch (e) {
+        bootFailed(c, e);
+        return null;
+      }
+      if (client !== c) return null;
+      // 앞선 독점 탐색이 아직 끝을 기다리고 있으면 비운다(정상 흐름에서는 없다).
+      exclusive?.done(exclusive.last);
+      return new Promise<AnalysisSnapshot | null>((resolve) => {
+        exclusive = { onSnapshot, done: resolve, last: null };
+        flushConfig(c, opts.info ?? []);
+        analysisStones = stones;
+        requestPly = stones.length;
+        requestKey = keyOf(stones);
+        c.analyze(
+          stones,
+          Number.isFinite(opts.totalMs)
+            ? { totalMs: opts.totalMs, nbest: opts.nbest }
+            : { nbest: opts.nbest },
+        );
+      });
+    },
+
     stop: () => {
       // 의도를 **먼저** 끈다 — 그래야 뒤따르는 searchDone 이 「밀렸다」로 읽혀
       // 분석이 다시 붙지 않는다.
@@ -535,6 +627,12 @@ export const useEngineStore = create<EngineState>((set, get) => {
 
     terminate: () => {
       const c = client;
+      // 독점 탐색이 끝을 기다리고 있었다면 — 그 끝은 오지 않는다. 빈손으로 풀어 준다.
+      if (exclusive) {
+        const e = exclusive;
+        exclusive = null;
+        e.done(null);
+      }
       // 먼저 떼어 낸다 — `terminate` 가 흘리는 마지막 사건(상태 idle 등)은 받지 않는다.
       client = null;
       c?.terminate();

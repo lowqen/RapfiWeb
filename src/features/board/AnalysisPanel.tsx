@@ -6,7 +6,7 @@ import { label } from "../../core/model/move";
 import { colorsForTag, DEFAULT_PALETTE } from "../../core/board/ladder";
 import { useSettingsStore } from "../settings/settingsStore";
 import { useCurrentAnalysis } from "./currentAnalysis";
-import { STATUS_TEXT, useStopAnalysis } from "./analysisActions";
+import { STATUS_TEXT, useStartAnalysis, useStopAnalysis } from "./analysisActions";
 import { AnalysisTimeControl, MultiPvControl, PlayBestOnStopControl, Row } from "./boardControls";
 
 /**
@@ -39,7 +39,7 @@ export function AnalysisPanel() {
   const caps = useEngineStore((s) => s.capabilities);
   const error = useEngineStore((s) => s.error);
   const start = useEngineStore((s) => s.start);
-  const analyze = useEngineStore((s) => s.analyze);
+  const startAnalysis = useStartAnalysis();
   const terminate = useEngineStore((s) => s.terminate);
   const multiPv = useEngineStore((s) => s.multiPv);
   const analysisMs = useEngineStore((s) => s.analysisMs);
@@ -48,7 +48,6 @@ export function AnalysisPanel() {
   const playBest = useSettingsStore((s) => s.playBestOnStop);
 
   const render = useBoardStore((s) => s.render);
-  const placements = useBoardStore((s) => s.placements);
   const size = render.size;
 
   const snapshot = useCurrentAnalysis();
@@ -82,7 +81,7 @@ export function AnalysisPanel() {
         <button
           type="button"
           className="button--tonal"
-          onClick={() => void analyze(placements())}
+          onClick={startAnalysis}
           disabled={searching || status === "starting"}
         >
           분석

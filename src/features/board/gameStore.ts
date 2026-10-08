@@ -119,6 +119,9 @@ function saveMode(m: BoardMode) {
   }
 }
 
+/** 리뷰가 엔진을 쥐고 있을 때의 안내 — 분석 · 정지 · 엔진 착수가 함께 쓴다. */
+export const REVIEW_BUSY = "게임 리뷰가 엔진을 쓰는 중입니다 — 리뷰가 끝나거나 멈춘 뒤에 하세요";
+
 /** 렌주에서는 장목이 흑의 **금수**라 승리 판정에서는 장목을 인정한다. */
 const ALLOW_OVERLINE = true;
 
@@ -347,6 +350,11 @@ export const useGameStore = create<GameState>((set, get) => {
     const s = get();
     // 분석 탭에서는 엔진이 차례를 받지 않는다(`BoardMode`).
     if (s.result || s.mode !== "game") return;
+    // 리뷰가 엔진을 쥐고 있다 — 착수를 걸면 리뷰의 국면이 엇갈린다. 기다리게 한다.
+    if (engine().owner) {
+      prompt({ kind: "info", text: REVIEW_BUSY });
+      return;
+    }
     const moves = board().render.stones;
     const info = levelInfo(s.level);
     set({ thinking: true });
@@ -631,6 +639,8 @@ export const useGameStore = create<GameState>((set, get) => {
 
     stopAnalysis: ({ playBest }) => {
       const e = engine();
+      // 지금 도는 탐색은 리뷰의 것이다 — 분석 정지가 그것을 끊으면 리뷰가 덜 읽은 값을 적는다.
+      if (e.owner) return { kind: "rejected", reason: REVIEW_BUSY };
       // 「분석 중」이었는가 — 의도가 켜져 있거나, 대국이 아닌 탐색이 돌고 있다.
       const running = e.analyzing || (e.status === "searching" && !get().thinking);
       const stones = board().render.stones;

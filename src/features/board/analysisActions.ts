@@ -1,4 +1,6 @@
-import { useGameStore } from "./gameStore";
+import { REVIEW_BUSY, useGameStore } from "./gameStore";
+import { useBoardStore } from "./boardStore";
+import { useEngineStore } from "../../engine/engine-state";
 import { useSettingsStore } from "../settings/settingsStore";
 import { useBoardNotice } from "./boardNotice";
 
@@ -10,6 +12,23 @@ export const STATUS_TEXT: Record<string, string> = {
   searching: "탐색 중",
   error: "오류",
 };
+
+/**
+ * 분석 시작 — 카드의 「분석」과 이동 바의 ▶ 가 같은 길을 걷는다. 게임 리뷰가 엔진을 쥐고
+ * 있으면 시작하지 않고 그 까닭을 보드 위에 띄운다(엔진 스토어는 조용히 거절만 한다).
+ */
+export function useStartAnalysis(): () => void {
+  const analyze = useEngineStore((s) => s.analyze);
+  const placements = useBoardStore((s) => s.placements);
+  const show = useBoardNotice((s) => s.show);
+  return () => {
+    if (useEngineStore.getState().owner) {
+      show(REVIEW_BUSY);
+      return;
+    }
+    void analyze(placements());
+  };
+}
 
 /**
  * 분석 정지 — 카드의 「정지」와 이동 바의 ⏸ 가 같은 길을 걷는다. 설정이 켜져 있으면

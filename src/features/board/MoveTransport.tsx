@@ -2,8 +2,8 @@ import { useEffect } from "react";
 import { useBoardStore } from "./boardStore";
 import { useGameStore } from "./gameStore";
 import { useEngineStore } from "../../engine/engine-state";
-import { Icon, ICON } from "./icons";
-import { useStopAnalysis } from "./analysisActions";
+import { Icon, ICON } from "../../components/icons";
+import { useStartAnalysis, useStopAnalysis } from "./analysisActions";
 
 /**
  * 보드 바로 아래의 이동 바 — `|<` `<` `▶` `>` `>|`. 앱의 재생 바 그대로다.
@@ -22,7 +22,6 @@ import { useStopAnalysis } from "./analysisActions";
 export function MoveTransport() {
   const stones = useBoardStore((s) => s.render.stones.length);
   const ahead = useBoardStore((s) => s.future.length);
-  const placements = useBoardStore((s) => s.placements);
 
   const thinking = useGameStore((s) => s.thinking);
   const blocked = useGameStore((s) => s.thinking || s.prompt !== null);
@@ -33,15 +32,17 @@ export function MoveTransport() {
 
   const status = useEngineStore((s) => s.status);
   const available = useEngineStore((s) => Boolean(s.capabilities.variant));
-  const analyze = useEngineStore((s) => s.analyze);
+  const startAnalysis = useStartAnalysis();
   const stopAnalysis = useStopAnalysis();
+  const owner = useEngineStore((s) => s.owner);
   const analysisTab = useGameStore((s) => s.mode === "analysis");
 
-  const analyzing = status === "searching" && !thinking;
+  // 리뷰의 탐색은 분석이 아니다 — ⏸ 로 보이면 누른 사람이 리뷰를 끊는다.
+  const analyzing = status === "searching" && !thinking && !owner;
   const playDisabled = !available || thinking || status === "starting";
   const toggleEngine = () => {
     if (analyzing) stopAnalysis();
-    else void analyze(placements());
+    else startAnalysis();
   };
 
   const canBack = stones > 0;
