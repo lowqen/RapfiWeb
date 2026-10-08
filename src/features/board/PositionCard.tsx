@@ -1,12 +1,15 @@
-import { useRef } from "react";
+import { useRef, type CSSProperties } from "react";
 import { useBoardStore } from "./boardStore";
 import { useGameStore } from "./gameStore";
 import { useBoardNotice } from "./boardNotice";
-import { GAME_FILE_ACCEPT, openGameFile, saveGameFile } from "./gameFileActions";
+import { openGameFile, saveGameFile } from "./gameFileActions";
+import { GAME_FILE_ACCEPT } from "../../core/model/game-file";
 import { copyPositionLink } from "./positionLink";
 import { useOpeningTables } from "../../data/opening-tables";
 import { chain, gradeAt } from "../../core/opening/opening-name";
 import { GradeBadge } from "../../components/GradeBadge";
+import { useCurrentReview } from "../../data/current-review";
+import { QUALITY_INFO, currentBadge, matchesPrefix } from "../../core/review/move-quality";
 import { OpeningProgress } from "./OpeningPanel";
 import { label } from "../../core/model/move";
 import { RULE_LABEL } from "../../core/model/rules";
@@ -36,6 +39,18 @@ export function PositionCard({ game }: { game: boolean }) {
   // 주형 이름(1~4수)과 흑 5수 유불리(4·5수) — 연구 ▸ 오프닝과 같은 계산이다.
   const names = chain(render.stones, tables, render.size);
   const grade = gradeAt(render.stones, tables, render.size);
+  // 고른 리뷰가 이 판의 수순이면 마지막 수의 등급(데스크톱처럼 지금 수 하나만).
+  const review = useCurrentReview();
+  const badge =
+    review.data && matchesPrefix(review.data, render.stones)
+      ? currentBadge(
+          render.stones,
+          render.size,
+          review.data.records,
+          review.preset,
+          review.skipOpening,
+        )
+      : null;
   const playing = !result && render.stones.length > 0;
   const last = render.lastMove;
   const turn = render.stones.length % 2 === 0 ? "흑" : "백";
@@ -77,6 +92,21 @@ export function PositionCard({ game }: { game: boolean }) {
                   <GradeBadge grade={grade} compact />
                 </>
               )}
+            </dd>
+          </>
+        )}
+        {badge && (
+          <>
+            <dt>평가</dt>
+            <dd data-k="move-grade">
+              <span
+                className="qtag"
+                style={{ "--q": QUALITY_INFO[badge].color } as CSSProperties}
+                title="연구 ▸ 리뷰에서 고른 리포트의 등급"
+              >
+                <span className="qtag__sym">{QUALITY_INFO[badge].symbol}</span>{" "}
+                {QUALITY_INFO[badge].korean}
+              </span>
             </dd>
           </>
         )}

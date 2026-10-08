@@ -5,6 +5,7 @@ import { BoardScreen } from "../features/board/BoardScreen";
 import { EngineScreen } from "../features/engine/EngineScreen";
 import { SettingsScreen } from "../features/settings/SettingsScreen";
 import { OpeningExplorer } from "../features/research/OpeningExplorer";
+import { ReviewScreen } from "../features/research/review/ReviewScreen";
 
 /**
  * 아홉 화면. 계획서 §6 의 라우트 표를 그대로 옮긴 것이다.
@@ -33,17 +34,8 @@ export const router = createBrowserRouter(
         { path: "board", element: <BoardScreen /> },
 
         { path: "research", element: <Navigate to="/research/review" replace /> },
-        {
-          path: "research/review",
-          element: (
-            <Placeholder
-              stage="W6b · W6d"
-              title="리뷰·증명"
-              what="대국 전체를 엔진으로 되짚고, 한 수를 증명 트리로 파고든다. 진행 큐는 워커에 있고 체크포인트는 IndexedDB 에 남는다."
-              needs={["W5a 기보 열기 · Dexie ✓", "증명(W6d)은 리뷰(W6b)의 큐 위에"]}
-            />
-          ),
-        },
+        // W6b: 리뷰(설정 · 큐 · 체크포인트 · 리포트). 증명(W6d)은 같은 화면의 다음 단계.
+        { path: "research/review", element: <ReviewScreen /> },
         // W6a: 팩 없이 되는 부분(이름 사슬 · 유불리 · 환원 · 이론 다음 수). 빈도 통계는 W7.
         { path: "research/explorer", element: <OpeningExplorer /> },
         {

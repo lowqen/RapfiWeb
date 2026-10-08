@@ -1987,3 +1987,328 @@ button.theory__row:hover {
 .grademark {
   flex: none;
 }
+
+/* ── 연구 ▸ 리뷰 (W6b) ─────────────────────────────────────────────
+   설정 · 실행 · 큐 · 리포트를 한 열로(계획서 §6 의 연구 화면 규칙). 리포트의 표만은
+   넓어야 읽히므로 읽기 폭보다 조금 넓게 둔다. */
+.review {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-m);
+  width: 100%;
+  max-width: 880px;
+  margin: 0 auto;
+}
+.review__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-m) var(--space-xl);
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--space-l);
+}
+.review__label {
+  font: var(--type-body-medium);
+  color: var(--c-on-surface);
+}
+.review__progress {
+  margin-top: var(--space-l);
+  font: var(--type-body-small);
+  color: var(--c-on-surface-variant);
+}
+.review__bar {
+  height: 6px;
+  margin-bottom: var(--space-s);
+  overflow: hidden;
+  background: var(--c-surface-container-highest);
+  border-radius: 3px;
+}
+.review__bar > span {
+  display: block;
+  height: 100%;
+  background: var(--c-primary);
+  transition: width var(--motion-quick) ease-out;
+}
+.review__log {
+  margin-top: var(--space-l);
+  font: var(--type-body-small);
+  color: var(--c-on-surface-variant);
+}
+.review__log pre {
+  max-height: 200px;
+  margin-top: var(--space-s);
+  overflow: auto;
+  white-space: pre-wrap;
+}
+.queue,
+.reports,
+.worst {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin: var(--space-m) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.queue__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s) var(--space-l);
+  align-items: center;
+  padding: var(--space-s) var(--space-m);
+  font: var(--type-body-medium);
+  border-radius: var(--radius-m);
+}
+.queue__status {
+  flex: none;
+  width: 4em;
+  font: var(--type-label-medium);
+  color: var(--c-on-surface-variant);
+}
+.queue__row[data-status="running"] .queue__status {
+  color: var(--c-primary);
+}
+.queue__row[data-status="failed"] .queue__status {
+  color: var(--c-error, #c0392b);
+}
+.queue__name {
+  flex: 1 1 8em;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.queue__meta,
+.queue__result {
+  font: var(--type-body-small);
+  color: var(--c-on-surface-variant);
+}
+.queue__result {
+  flex: 1 1 100%;
+  order: 9;
+  padding-left: calc(4em + var(--space-l));
+}
+.queue__result:empty {
+  display: none;
+}
+.reports__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-l);
+  align-items: baseline;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--space-s) var(--space-m);
+  color: var(--c-on-surface);
+  text-align: left;
+  border-radius: var(--radius-m);
+}
+.reports__row:hover,
+.worst__row:hover {
+  background: var(--c-surface-container-highest);
+}
+.reports__row[aria-pressed="true"] {
+  color: var(--c-on-secondary-container);
+  background: var(--c-secondary-container);
+}
+.reports__title {
+  font: var(--type-label-large);
+}
+.reports__meta {
+  font: var(--type-body-small);
+  opacity: 0.8;
+}
+.report {
+  margin-top: var(--space-l);
+  padding-top: var(--space-l);
+  border-top: 1px solid var(--c-outline-variant);
+  outline: none;
+}
+.report:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 4px;
+  border-radius: var(--radius-m);
+}
+.report__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-l);
+  align-items: center;
+  justify-content: space-between;
+}
+.report__title {
+  font: var(--type-title-small);
+}
+.report__meta {
+  font: var(--type-body-small);
+  color: var(--c-on-surface-variant);
+}
+.report__acc {
+  display: flex;
+  gap: var(--space-m);
+}
+/* 정확도 카드는 테마와 무관하게 흑 · 백 돌의 색이다 — 어느 쪽 숫자인지가 색으로 읽힌다. */
+.acc {
+  display: flex;
+  flex-direction: column;
+  min-width: 108px;
+  padding: var(--space-s) var(--space-l);
+  text-align: center;
+  border: 1px solid var(--c-outline-variant);
+  border-radius: var(--radius-m);
+}
+.acc--black {
+  color: #f1efe9;
+  background: #24221f;
+}
+.acc--white {
+  color: #1d1c1a;
+  background: #f4f2ec;
+}
+.acc__label {
+  font: var(--type-label-medium);
+  opacity: 0.8;
+}
+.acc__value {
+  font: 600 20px/28px var(--font-sans);
+}
+.report__board {
+  width: min(100%, 52vh);
+  aspect-ratio: 1;
+  margin: var(--space-l) auto 0;
+}
+.report__cursor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s);
+  align-items: center;
+  justify-content: center;
+  margin-top: var(--space-s);
+}
+.report__cursorText {
+  display: inline-flex;
+  gap: var(--space-m);
+  align-items: center;
+  justify-content: center;
+  min-width: 12em;
+  font: var(--type-label-large);
+}
+.report__comment {
+  margin-top: var(--space-s);
+  font: var(--type-body-medium);
+  text-align: center;
+}
+.report__best {
+  color: var(--c-on-surface-variant);
+}
+/* 형세 그래프 — 흑이 아래에서 차오르는 면. 데스크톱 리포트 그래프와 같은 읽기. */
+.wrgraph {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: var(--space-l);
+  cursor: pointer;
+}
+.wrgraph__white {
+  fill: #f4f2ec;
+  stroke: var(--c-outline-variant);
+}
+.wrgraph__black {
+  fill: #2a2825;
+}
+.wrgraph__mid {
+  stroke: #8c8a86;
+  stroke-dasharray: 4 4;
+}
+.wrgraph__cursor {
+  stroke: var(--c-primary);
+  stroke-width: 2;
+}
+.report__cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-xl);
+  margin-top: var(--space-l);
+}
+.report__sub {
+  margin: var(--space-l) 0 var(--space-s);
+  font: var(--type-label-large);
+  color: var(--c-on-surface);
+}
+.worst__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s) var(--space-m);
+  align-items: center;
+  width: 100%;
+  padding: var(--space-s) var(--space-m);
+  font: var(--type-body-medium);
+  color: var(--c-on-surface);
+  text-align: left;
+  border-radius: var(--radius-m);
+}
+.worst__best {
+  color: var(--c-on-surface-variant);
+}
+/* 등급 표 — 데스크톱 색은 왼쪽 띠와 기호에만. 글자는 테마 색이라 다크에서도 읽힌다. */
+.qtag {
+  display: inline-flex;
+  gap: var(--space-xs);
+  align-items: center;
+  padding: 0 var(--space-s);
+  font: var(--type-label-medium);
+  color: inherit;
+  white-space: nowrap;
+  border-left: 3px solid var(--q);
+  border-radius: 2px;
+}
+.qtag__sym {
+  font-weight: 700;
+  color: var(--q);
+}
+.rtable__wrap {
+  max-height: 420px;
+  overflow: auto;
+  border: 1px solid var(--c-outline-variant);
+  border-radius: var(--radius-m);
+}
+.rtable {
+  width: 100%;
+  font: var(--type-body-small);
+  border-collapse: collapse;
+}
+.rtable th,
+.rtable td {
+  padding: var(--space-s) var(--space-m);
+  text-align: left;
+  border-bottom: 1px solid var(--c-outline-variant);
+}
+.rtable th {
+  position: sticky;
+  top: 0;
+  font: var(--type-label-medium);
+  color: var(--c-on-surface-variant);
+  background: var(--c-surface-container);
+}
+.rtable--moves tbody tr {
+  cursor: pointer;
+}
+.rtable--moves tbody tr:hover {
+  background: var(--c-surface-container-high);
+}
+.rtable--moves tbody tr.is-active {
+  color: var(--c-on-secondary-container);
+  background: var(--c-secondary-container);
+}
+.rtable__side {
+  margin-left: var(--space-s);
+  color: var(--c-on-surface-variant);
+}
+.rtable__cmt {
+  min-width: 16em;
+}
+@media (max-width: 640px) {
+  .rtable__cmt {
+    display: none;
+  }
+}
