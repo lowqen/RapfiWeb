@@ -6,6 +6,7 @@ import { EngineScreen } from "../features/engine/EngineScreen";
 import { SettingsScreen } from "../features/settings/SettingsScreen";
 import { OpeningExplorer } from "../features/research/OpeningExplorer";
 import { ReviewScreen } from "../features/research/review/ReviewScreen";
+import { SequenceScreen } from "../features/research/sequence/SequenceScreen";
 
 /**
  * 아홉 화면. 계획서 §6 의 라우트 표를 그대로 옮긴 것이다.
@@ -38,17 +39,8 @@ export const router = createBrowserRouter(
         { path: "research/review", element: <ReviewScreen /> },
         // W6a: 팩 없이 되는 부분(이름 사슬 · 유불리 · 환원 · 이론 다음 수). 빈도 통계는 W7.
         { path: "research/explorer", element: <OpeningExplorer /> },
-        {
-          path: "research/sequence",
-          element: (
-            <Placeholder
-              stage="W6c"
-              title="수순"
-              what="같은 국면에 이르는 다른 수순을 찾는다. 정규 키(PosKey, 8대칭)를 쓰므로 팩 없이도 동작한다."
-              needs={["W5a PosKey ✓"]}
-            />
-          ),
-        },
+        // W6c: 같은 돌에 이르는 다른 수순(MoveOrder — 계산은 워커에서).
+        { path: "research/sequence", element: <SequenceScreen /> },
         {
           path: "research/ranking",
           element: (

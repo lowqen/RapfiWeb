@@ -2312,3 +2312,169 @@ button.theory__row:hover {
     display: none;
   }
 }
+
+/* ── 연구 ▸ 수순 (W6c) ─────────────────────────────────────────────
+   «국면 → 다음 수» 한 열(계획서 §6). 판은 화면 높이의 60% 를 넘지 않는다. */
+.sequence {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-m);
+  width: 100%;
+  max-width: var(--reading-width);
+  margin: 0 auto;
+}
+.sequence__rules {
+  margin-top: var(--space-l);
+}
+.sequence__crumb {
+  font: var(--type-body-medium);
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color: var(--c-on-surface);
+  word-break: break-word;
+}
+.sequence__prompt {
+  margin-top: var(--space-l);
+  padding: var(--space-l);
+  font: var(--type-body-medium);
+  color: var(--c-on-secondary-container);
+  background: var(--c-secondary-container);
+  border-radius: var(--radius-m);
+}
+.sequence__board {
+  width: min(100%, 60vh);
+  margin: 0 auto;
+}
+.moboard {
+  display: block;
+  width: 100%;
+  height: auto;
+  cursor: pointer;
+  user-select: none;
+}
+.moboard__wood {
+  fill: var(--c-board-wood);
+}
+.moboard__grid line {
+  stroke: var(--c-board-line);
+  stroke-width: 1;
+}
+.moboard__star {
+  fill: var(--c-board-line);
+}
+.moboard__dot {
+  fill: var(--c-board-line);
+  opacity: 0.55;
+}
+.moboard text {
+  font: 600 13px/1 var(--font-sans);
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+.moboard__num {
+  font-size: 16px;
+}
+.moboard__plies {
+  fill: var(--c-error);
+  font-size: 12px;
+}
+.moboard__share {
+  font-size: 11px;
+}
+.mocands {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin: var(--space-m) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.mocands__row {
+  display: grid;
+  grid-template-columns: 22px minmax(5em, max-content) minmax(0, 1fr) 64px;
+  gap: var(--space-m);
+  align-items: center;
+  width: 100%;
+  padding: var(--space-s) var(--space-m);
+  font: var(--type-body-medium);
+  color: var(--c-on-surface);
+  text-align: left;
+  border-radius: var(--radius-m);
+}
+.mocands__row:hover,
+.mocands__row[aria-pressed="true"] {
+  background: var(--c-surface-container-highest);
+}
+.mocands__stone {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+}
+.mocands__stone--black {
+  background: var(--c-board-black-low);
+}
+.mocands__stone--white {
+  background: var(--c-board-white-high);
+  box-shadow: inset 0 0 0 1px var(--c-outline);
+}
+.mocands__label {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.mocands__actual {
+  font-weight: 400;
+  color: var(--c-primary);
+}
+.mocands__count {
+  font: var(--type-body-small);
+  color: var(--c-on-surface-variant);
+}
+.mocands__bar {
+  height: 8px;
+  overflow: hidden;
+  background: var(--c-surface-container-highest);
+  border-radius: 4px;
+}
+.mocands__bar > span {
+  display: block;
+  height: 100%;
+  background: var(--c-primary);
+}
+@media (max-width: 480px) {
+  .mocands__row {
+    grid-template-columns: 22px minmax(0, 1fr) 48px;
+  }
+  .mocands__count {
+    grid-column: 2 / -1;
+    grid-row: 2;
+  }
+}
+/* 끝을 모르는 진행 — 수순을 세는 동안 */
+.review__bar--busy {
+  margin-top: var(--space-m);
+}
+.review__bar--busy > span {
+  width: 30%;
+  animation: busy-slide 1.1s ease-in-out infinite;
+}
+@keyframes busy-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(340%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .review__bar--busy > span {
+    width: 100%;
+    animation: none;
+    opacity: 0.4;
+  }
+}
+.linkish {
+  padding: 0;
+  font: inherit;
+  color: var(--c-primary);
+  text-decoration: underline;
+}
