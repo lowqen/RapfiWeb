@@ -274,12 +274,16 @@ export function drawDynamic(
     line(ctx, cx(m) - r * 0.5, cy(m), cx(m) + r * 0.5, cy(m));
   }
 
-  // 빈 점의 분석 태그와 모양 표식. 돌이 놓인 점에는 그리지 않는다.
+  // 빈 점의 분석 태그와 모양 표식. 돌이 놓인 점에는 그리지 않는다. 한 점에 둘 다 있으면(오프닝 탐색의
+  // «판 수 칩» + «흑 5수 유불리») 칩을 가운데, 표식을 오른쪽 위 모서리에 작게 — 예전에는 칩이 표식을
+  // 덮어 유불리가 판에서 사라졌다.
   const occupied = new Set(render.stones.map((m) => moveKey(m, render.size)));
+  const corner: [Move, BoardMark][] = [];
   for (const [key, mark] of render.marks) {
     if (occupied.has(key)) continue;
     const m = fromKey(key, render.size);
-    drawMark(ctx, cx(m), cy(m), r * 0.62, mark, skin.line, hair);
+    if (render.tags.get(key)?.label) corner.push([m, mark]);
+    else drawMark(ctx, cx(m), cy(m), r * 0.62, mark, skin.line, hair);
   }
   for (const [key, tag] of render.tags) {
     if (!tag.label || occupied.has(key)) continue;
@@ -294,6 +298,9 @@ export function drawDynamic(
       render.textScale,
       skin.chipRim,
     );
+  }
+  for (const [m, mark] of corner) {
+    drawMark(ctx, cx(m) + r * 0.62, cy(m) - r * 0.62, r * 0.34, mark, skin.line, hair);
   }
 
   render.stones.forEach((m, i) => {

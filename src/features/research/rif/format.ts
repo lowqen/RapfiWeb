@@ -2,8 +2,11 @@ import { isRifFile } from "./rifStore";
 
 /** W7 화면들이 함께 쓰는 형식 · 상수(컴포넌트 파일 밖 — 빠른 새로고침이 깨지지 않게). */
 
-/** RenjuNet 의 내려받기 화면 — 사용자가 직접 받는다(우리는 그 파일을 싣지도 거치지도 않는다). */
-export const RENJUNET_DOWNLOADS = "https://www.renju.net/downloads/";
+/**
+ * RenjuNet 의 기보 화면 — 사용자가 직접 받는다(우리는 그 파일을 싣지도 거치지도 않는다). 화면의
+ * [XML.GZ] [XML] 두 버튼 가운데 **[XML]** 이 이 앱이 읽는 파일이다(압축본은 받지 않는다).
+ */
+export const RENJUNET_DOWNLOADS = "https://www.renju.net/game/";
 export const fmtInt = (n: number): string => n.toLocaleString("ko-KR");
 export const fmtMB = (b: number): string => `${(b / 1048576).toFixed(1)}MB`;
 export const fmtSec = (ms: number): string =>

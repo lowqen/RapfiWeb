@@ -109,9 +109,10 @@ export function RifImportCard({ compact }: { compact?: boolean }) {
           </span>
           <span>
             <a href={RENJUNET_DOWNLOADS} target="_blank" rel="noreferrer noopener">
-              renju.net 내려받기 화면
+              renju.net 기보 화면
             </a>
-            에서 <b>games database</b>(.rif, 약 43MB)를 받습니다.
+            에서 <b>[XML]</b> 버튼을 눌러 기보 파일(약 43MB)을 받습니다. 옆의 [XML.GZ] 는 압축본이라
+            읽지 못합니다.
           </span>
         </li>
         <li>

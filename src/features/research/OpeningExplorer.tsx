@@ -126,6 +126,8 @@ export function OpeningExplorer() {
     for (const r of rows) {
       const k = moveKey(r.move, size);
       const decided = r.b + r.d + r.w;
+      // 둔 수는 판 수 칩, 등급이 있으면 표식도 — 둘 다 있으면 렌더러가 표식을 칩 모서리에 작게 단다.
+      if (r.grade) marks.set(k, { shape: r.grade.mark, fill: r.grade.fill, dot: r.grade.dot });
       if (r.n > 0) {
         // 칩의 색은 **둘 차례의** 점수 — 엔진 값 칩과 같은 읽기(높으면 그 수를 둔 쪽이 잘 됐다).
         const mover = blackToMove ? r.b : r.w;
@@ -134,9 +136,7 @@ export function OpeningExplorer() {
           kind: "rate",
           winRatePct: decided ? ((mover + r.d / 2) / decided) * 100 : 50,
         });
-      } else if (r.grade) {
-        marks.set(k, { shape: r.grade.mark, fill: r.grade.fill, dot: r.grade.dot });
-      } else candidates.set(k, "done");
+      } else if (!r.grade) candidates.set(k, "done");
     }
     return { ...render, tags, bestMark: null, ghosts: [], loseCells: new Set(), candidates, marks };
   }, [render, rows, size, blackToMove]);

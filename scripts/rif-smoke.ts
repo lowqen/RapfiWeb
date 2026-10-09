@@ -155,7 +155,7 @@ try {
   await page.locator(".rifcard").waitFor({ timeout: 10_000 });
   const link = await page.locator('.rifcard a[href*="renju.net"]').first().getAttribute("href");
   check(
-    link === "https://www.renju.net/downloads/",
+    link === "https://www.renju.net/game/",
     "renju.net 내려받기 링크가 있다",
     `링크가 다르다: ${link}`,
   );
