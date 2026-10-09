@@ -1,0 +1,13 @@
+diff --git a/Rapfi/CMakeLists.txt b/Rapfi/CMakeLists.txt
+index b2c8f6b..6a401a4 100644
+--- a/Rapfi/CMakeLists.txt
++++ b/Rapfi/CMakeLists.txt
+@@ -360,7 +360,7 @@ if(EMSCRIPTEN)
+         "-s MODULARIZE=1 "
+         "-s EXPORT_NAME=Rapfi "
+         "-s EXPORTED_FUNCTIONS=\"['_main','_gomocupLoopOnce','_emscripten_force_exit']\" "
+-        "-s EXPORTED_RUNTIME_METHODS=\"['cwrap']\" "
++        "-s EXPORTED_RUNTIME_METHODS=\"['cwrap','FS']\" "
+         "-s EXIT_RUNTIME=1 "
+         "-s ALLOW_MEMORY_GROWTH=1 "
+         "-s IMPORTED_MEMORY=1 "
