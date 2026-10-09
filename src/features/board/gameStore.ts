@@ -415,6 +415,16 @@ export const useGameStore = create<GameState>((set, get) => {
       log(`예상치 못한 협상 응답: ${r.kind}`);
     },
     onForbid: (cells) => board().setForbidden(get().showForbidden ? cells : []),
+    onEngineRecovered: () => {
+      // 멈춘 멀티 엔진이 단일로 갈아 끼워졌다 — 생각하던 수는 옛 워커와 함께 사라졌다. 그대로
+      // 두면 `thinking` 이 켜진 채라 무제한 대국은 「엔진이 생각 중」으로 영영 잠기고, 「지금 두기」도
+      // 새 엔진에는 멈출 탐색이 없어 아무 일도 하지 않는다. 같은 국면을 새 엔진에게 다시 묻는다.
+      if (!get().thinking) return;
+      disarmWatchdog();
+      set({ thinking: false });
+      log("엔진 복구 — 생각하던 수를 새 엔진에게 다시 묻습니다");
+      engineTurn();
+    },
     onEngineReset: () => {
       // 엔진을 내렸다(종료 · 엔진 전환) — 생각하던 수는 오지 않는다. 판을 풀어 둔다.
       disarmWatchdog();

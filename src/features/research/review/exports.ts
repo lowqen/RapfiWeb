@@ -1,3 +1,4 @@
+import { downloadBlob } from "../../../app/download";
 import { csv, dateStamp, html, markdown, type GameReport } from "../../../core/review/report";
 
 /**
@@ -5,14 +6,8 @@ import { csv, dateStamp, html, markdown, type GameReport } from "../../../core/r
  * HTML 틀(`report-shell/`, 15KB)은 누를 때 따로 받는다 — 첫 화면에 실을 까닭이 없다.
  */
 
-function download(name: string, text: string, mime: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: `${mime};charset=utf-8` }));
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 0);
-}
+const download = (name: string, text: string, mime: string) =>
+  downloadBlob(name, text, `${mime};charset=utf-8`);
 
 /** 파일 이름 — 제목의 공백은 밑줄로(`queue_basename` 과 같은 습관). */
 const fileName = (r: GameReport, ext: string) =>

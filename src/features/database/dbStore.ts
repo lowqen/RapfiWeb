@@ -403,11 +403,20 @@ export const useDbStore = create<DbState>((set, get) => {
         );
         const err = replyError(r);
         if (err) return { error: err };
+        // **장벽.** Rapfi 는 `Wrote … database to …` 를 CSV 의 `std::ofstream` 이 **아직 열려 있을 때**
+        // 낸다(dbcommand.cpp `databaseToTxt` — 파일은 그 뒤 스코프를 벗어나며 소멸자에서 비워진다).
+        // 멀티 변형은 명령이 엔진 스레드에서 돌아 그 소멸자와 우리 FS 읽기가 경주하고, 느린 기계
+        // (로컬 Celeron)에서는 0바이트를 읽었다 — CI 러너는 빨라서 이겼다. 엔진은 명령을 한 줄씩
+        // 차례로 처리하므로 다음 명령의 답이 오면 앞 명령은 소멸자까지 끝났다. 가장 싼 질의 하나를
+        // 왕복시키고 나서 읽는다(DB 저장은 `flush()` 가 파일을 닫은 뒤 알리므로 이것이 필요 없다).
+        const barrier = await ch().request(queryOne([]), untilOne, 30_000);
+        if (!barrier) return { error: "엔진이 CSV 쓰기를 마쳤는지 답하지 않았습니다" };
         const f = await engineFs("read", CSV_FILE);
         await engineFs("remove", CSV_FILE);
-        return f.ok && f.bytes
-          ? { bytes: f.bytes }
-          : { error: f.error ?? "CSV 를 읽지 못했습니다" };
+        if (!f.ok || !f.bytes) return { error: f.error ?? "CSV 를 읽지 못했습니다" };
+        // 머리줄(`index,key,…`)은 늘 있다 — 비었으면 다 쓰기 전에 읽은 것이다.
+        if (f.bytes.byteLength === 0) return { error: "엔진이 빈 CSV 를 남겼습니다" };
+        return { bytes: f.bytes };
       } finally {
         set({ busy: false });
       }

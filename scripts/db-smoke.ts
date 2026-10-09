@@ -87,9 +87,44 @@ async function until<T>(
   throw new Error(`${what}: 시간 초과 — 마지막 값 ${JSON.stringify(last)}`);
 }
 
+/**
+ * 「엔진 시작」을 **찾고 누르기를 페이지 안에서 한 번에.** 이 버튼은 엔진이 꺼져 있을 때만 있고
+ * 자동 기동이 시작되는 순간 사라진다 — `count()` 와 `click()` 을 Playwright 왕복 둘로 나누면 그
+ * 틈에 사라져 `click()` 이 없는 버튼을 30초 기다린다(대국 스모크의 「지금 두기」와 같은 꼴).
+ */
+const PRESS_START = `(() => {
+  const b = [...document.querySelectorAll("button")].find((x) => x.textContent.trim() === "엔진 시작");
+  if (!b || b.disabled) return false;
+  b.click();
+  return true;
+})()`;
+
+/** 화면의 DB 안내 — 내보내기가 실패하면 까닭이 여기 뜬다. */
+const dbNotice = (page: Page) =>
+  page
+    .locator('[data-k="db-notice"]')
+    .innerText({ timeout: 1_000 })
+    .catch(() => "(안내 없음)");
+
+/**
+ * 버튼을 누르고 내려받기를 기다린다. 내려받기가 오지 않으면(내보내기가 오류로 끝났다) 60초
+ * 「Timeout」 한 줄 대신 화면이 말한 까닭을 붙여 실패한다.
+ */
+async function download(page: Page, button: string) {
+  const [d] = await Promise.all([
+    page.waitForEvent("download", { timeout: 60_000 }).catch(async (e: unknown) => {
+      const why = e instanceof Error ? e.message.split("\n")[0] : String(e);
+      throw new Error(
+        `「${button}」 내려받기가 오지 않았습니다 — 화면 안내: ${await dbNotice(page)} (${why})`,
+      );
+    }),
+    page.locator(".database button", { hasText: button }).click(),
+  ]);
+  return readFileSync((await d.path())!);
+}
+
 async function startEngineAndAttach(page: Page) {
-  const start = page.getByRole("button", { name: "엔진 시작", exact: true });
-  if (await start.count()) await start.click();
+  await page.evaluate(PRESS_START);
   await until(
     page,
     "엔진 기동",
@@ -212,21 +247,16 @@ try {
   else ok("새로고침 뒤에도 칸 글자가 남았다");
 
   console.log("4. 내보내기");
-  const [csv] = await Promise.all([
-    page.waitForEvent("download", { timeout: 60_000 }),
-    page.locator(".database button", { hasText: "CSV 내보내기" }).click(),
-  ]);
-  const csvText = readFileSync((await csv.path())!, "utf8");
-  if (csvText.split("\n").filter(Boolean).length < 1) fail("CSV 가 비었다");
+  // 엔진은 `Wrote …` 를 CSV 파일을 닫기 전에 알린다 — 앱이 장벽 질의로 기다린 뒤 읽어야 머리줄부터
+  // 다 있다(dbStore.exportCsv). 예전에는 느린 기계에서 0바이트를 받았다.
+  const csvText = (await download(page, "CSV 내보내기")).toString("utf8");
+  if (!csvText.startsWith("index,key,label,"))
+    fail(`CSV 머리줄이 없다(${csvText.length} 바이트): ${JSON.stringify(csvText.slice(0, 60))}`);
   else
     ok(
       `CSV ${csvText.length} 바이트 — 첫 줄 ${JSON.stringify(csvText.split("\n")[0]!.slice(0, 80))}`,
     );
-  const [dbFile] = await Promise.all([
-    page.waitForEvent("download", { timeout: 60_000 }),
-    page.locator(".database button", { hasText: ".db 내려받기" }).click(),
-  ]);
-  const size = readFileSync((await dbFile.path())!).byteLength;
+  const size = (await download(page, ".db 내려받기")).byteLength;
   if (size <= 0) fail(".db 가 비었다");
   else ok(`.db ${size} 바이트`);
 

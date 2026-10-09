@@ -114,6 +114,14 @@ async function act<T>(what: string, fn: () => Promise<T>): Promise<T> {
   }
 }
 
+/**
+ * 정지(분석 정지 · 탭 전환 · 생각하던 수 버림) 뒤 엔진이 «대기»로 돌아오기까지. 보통은 1초 안이지만,
+ * 멀티 엔진이 정지에 5초 안에 답하지 않으면 앱이 단일 엔진으로 **다시 띄운다**(`recoverToSingle`) —
+ * 그것도 멈춤의 한 경로이고, 느린 2코어(Celeron N4500)에서 재기동만 ~15초 걸려 15초 대기가
+ * 끊겼다. 정지가 얼마나 빨랐는지는 엔진 스모크가 따로 잰다 — 여기서는 «돌아오는가»만 본다.
+ */
+const STOP_SETTLE_MS = 60_000;
+
 /** 선택자가 보일 때까지 — 이름을 붙여 기다린다. */
 const waitSel = (selector: string, what: string, timeout: number) =>
   act(`${what} 대기(${timeout}ms)`, () => page.locator(selector).first().waitFor({ timeout }));
@@ -352,7 +360,11 @@ async function runAnalysis(ms: number): Promise<string> {
   await tab("분석");
   lastAction = "「정지」 누르기(최선수 읽기와 한 번에)";
   const best = (await page.evaluate(STOP_AND_READ_BEST)) as string;
-  await waitSel('.panel__badge[data-status="ready"]', "정지 뒤 엔진 대기(배지 ready)", 15_000);
+  await waitSel(
+    '.panel__badge[data-status="ready"]',
+    "정지 뒤 엔진 대기(배지 ready)",
+    STOP_SETTLE_MS,
+  );
   await page.waitForTimeout(150);
   const placed = (await page.locator("dd[data-k=last]").innerText()).trim();
   if ((await stoneCount()) !== before + 1 || placed !== best) {
@@ -475,6 +487,26 @@ async function click(name: string) {
   }
 }
 
+/**
+ * 엔진 사고 — 멀티 엔진이 멈춰 단일로 다시 떴는가(`fallbackReason`)와 콘솔의 `!` 줄. 덤프의 «마지막
+ * 40줄»은 다시 뜬 엔진의 기동 · 예열 줄로 금세 덮여, 왜 다시 떴는지가 보이지 않았다(대국 스모크
+ * 6단계에서 3수를 90초 기다린 실패 — 끝 줄이 `· 예열 끝` 뿐이었다).
+ */
+async function engineIncidents(): Promise<string[]> {
+  try {
+    const lines = (await page.evaluate(`window.__rapfiConsole()`)) as string[];
+    const e = (await page.evaluate(`window.__rapfiEngine()`)) as {
+      variant: string;
+      fallbackReason: string | null;
+    };
+    const out = lines.filter((l) => l.startsWith("!"));
+    if (e.fallbackReason) out.push(`엔진 ${e.variant} — ${e.fallbackReason}`);
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 async function dump(why: string, err?: unknown) {
   console.error(`\n──── 실패 지점: ${why} ────`);
   console.error(`단계: ${step}`);
@@ -485,6 +517,8 @@ async function dump(why: string, err?: unknown) {
     // 콘솔은 엔진 탭에 있다 — 화면이 아니라 스토어에서 읽는다.
     const lines = (await page.evaluate(`window.__rapfiConsole()`)) as string[];
     console.error(`엔진 콘솔 (마지막 40줄):\n${lines.slice(-40).join("\n")}`);
+    const incidents = await engineIncidents();
+    if (incidents.length) console.error(`\n엔진 사고:\n${incidents.join("\n")}`);
   } catch {
     console.error("엔진 콘솔을 읽지 못했습니다.");
   }
@@ -573,7 +607,11 @@ try {
   await waitSel('.panel__badge[data-status="searching"]', "분석 시작(배지 searching)", 20_000);
   await page.waitForTimeout(1_500);
   await tab("대국");
-  await waitSel('.panel__badge[data-status="ready"]', "탭 전환 뒤 분석 멈춤(배지 ready)", 15_000);
+  await waitSel(
+    '.panel__badge[data-status="ready"]',
+    "탭 전환 뒤 분석 멈춤(배지 ready)",
+    STOP_SETTLE_MS,
+  );
   await page.waitForTimeout(800); // 정지에 늦게 온 답이 판에 떨어지지 않는지
   if ((await stoneCount()) !== 6)
     fail(`분석 → 대국 탭 전환이 판을 바꿨습니다: 돌 ${await stoneCount()}개`);
@@ -621,7 +659,11 @@ try {
   await waitStones(1, 5_000, "(사람 수)");
   await page.waitForTimeout(1_000);
   await tab("분석");
-  await waitSel('.panel__badge[data-status="ready"]', "생각하던 수 버림(배지 ready)", 20_000);
+  await waitSel(
+    '.panel__badge[data-status="ready"]',
+    "생각하던 수 버림(배지 ready)",
+    STOP_SETTLE_MS,
+  );
   await page.waitForTimeout(1_500);
   if ((await stoneCount()) !== 1)
     fail(`대국 → 분석 탭 전환 뒤 엔진의 수가 판에 떨어졌습니다 (${await stoneCount()})`);
@@ -906,6 +948,10 @@ try {
   ).trim();
   if (!notice.includes("Rapfi")) fail(`안내 문구가 없습니다: ${notice}`);
   else ok("왜 셋뿐인지 화면이 말한다");
+
+  // 멀티 엔진이 도중에 멈춰 단일로 다시 떴다면 통과해도 남긴다 — 앱은 그 수를 새 엔진에게 다시
+  // 묻지만(gameStore `onEngineRecovered`), 잦아지면 그 자체가 고칠 일이다.
+  for (const l of await engineIncidents()) console.log(`  ! 엔진 사고(복구됨): ${l}`);
 
   if (pageErrors.length) {
     fail(`페이지 오류 ${pageErrors.length}건:\n  ${pageErrors.slice(0, 5).join("\n  ")}`);

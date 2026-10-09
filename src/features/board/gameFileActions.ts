@@ -8,6 +8,7 @@ import {
   writeSav,
   type GameFileFormat,
 } from "../../core/model/game-file";
+import { downloadBlob } from "../../app/download";
 
 /**
  * 기보 파일 열기 · 저장 — 계획서 §4 「기보 파일 I/O」.
@@ -80,11 +81,6 @@ export async function saveGameFile(format: SaveFormat): Promise<string | null> {
       // 그 밖의 실패(권한 · 보안 정책)는 내려받기로 물러선다.
     }
   }
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 0);
+  downloadBlob(name, blob, blob.type);
   return name;
 }

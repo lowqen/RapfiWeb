@@ -95,8 +95,11 @@ const pageErrors: string[] = [];
  * 원인이 아니다 — 프로토콜 이식을 검증하는 시험에서 정작 엔진의 말은 로그에
  * 한 줄도 없었다.
  */
-async function dumpState(why: string) {
+async function dumpState(why: string, err?: unknown) {
   console.error(`\n──── 실패 지점: ${why} ────`);
+  // Playwright 오류의 첫 줄에는 «무엇을» 기다렸는지가 없다 — 콜 로그의 `waiting for …` 를 꺼낸다.
+  const waited = /waiting for (.+)/.exec(err instanceof Error ? err.message : "");
+  if (waited) console.error(`기다리던 대상: ${waited[1]!.trim()}`);
   if (!page) return;
   try {
     // 콘솔은 엔진 탭으로 갔다 — 화면이 아니라 스토어에서 전체를 읽는다.
@@ -104,6 +107,9 @@ async function dumpState(why: string) {
     if (lines.length === 0) throw new Error("빈 콘솔");
     console.error(`엔진 콘솔 (마지막 ${Math.min(60, lines.length)}줄):`);
     console.error(lines.slice(-60).join("\n"));
+    // 다시 뜬 엔진의 기동 줄이 끝을 덮으면 왜 다시 떴는지가 안 보인다 — 사고 줄은 따로.
+    const incidents = lines.filter((l) => l.startsWith("!"));
+    if (incidents.length) console.error(`\n엔진 사고:\n${incidents.join("\n")}`);
   } catch {
     console.error("엔진 콘솔이 화면에 없습니다 — 엔진이 한 줄도 뱉지 않았습니다.");
   }
@@ -203,7 +209,10 @@ try {
         `예열 ${engineInfo.warmupMs}ms · 재기동 ${rebootMs}ms`,
     );
   }
-  if (engineInfo.variant !== wantVariant) fail(`재기동 변형이 ${engineInfo.variant} 입니다`);
+  if (engineInfo.variant !== wantVariant)
+    fail(
+      `재기동 변형이 ${engineInfo.variant} 입니다 (${engineInfo.fallbackReason ?? "까닭 없음"})`,
+    );
 
   // 콘솔에 엔진이 실제로 말한 줄이 있어야 한다 — 파서가 아니라 엔진이 살아 있다는 증거.
   await page.waitForTimeout(300); // 콘솔은 100ms 배치로 온다
@@ -348,7 +357,8 @@ try {
   // 판에 둔다 — 누르기 직전에 화면의 BEST 를 읽어 두고, 둔 수와 맞춰 본다.
   const tStop = Date.now();
   const bestBeforeStop = (await page.evaluate(STOP_AND_READ_BEST)) as string;
-  await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 5000 });
+  // 5초에서 예외로 죽으면 «얼마나 늦었나»가 사라진다 — 넉넉히 기다리고 아래 측정값이 판정한다.
+  await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 15_000 });
   const stopMs = Date.now() - tStop;
   console.log(`정지까지 ${stopMs}ms`);
   if (stopMs > 3000) fail(`정지가 너무 늦습니다: ${stopMs}ms`);
@@ -410,7 +420,7 @@ try {
     )
     .catch(() => fail("무른 뒤 새 국면의 분석이 이어지지 않습니다"));
   const stopAgain = (await page.evaluate(STOP_AND_READ_BEST)) as string;
-  await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 5000 });
+  await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 15_000 });
   await page.waitForTimeout(150);
   const placedAgain = (await page.locator("dd[data-k=last]").innerText()).trim();
   if (placedAgain !== stopAgain)
@@ -447,13 +457,19 @@ try {
   };
   if (swapped.variant !== "single-simd128")
     fail(`Standard SIMD 로 바뀌지 않았습니다: ${swapped.variant}`);
-  await page
+  const resumed = await page
     .locator('.panel__badge[data-status="searching"]')
-    .waitFor({ timeout: 15_000 })
-    .catch(() => fail("엔진을 바꾼 뒤 켜 둔 분석이 이어지지 않습니다"));
+    .waitFor({ timeout: 30_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!resumed) {
+    // 여기서 「정지」를 누르러 가면 없는 버튼을 30초 기다린 뒤 이름 없는 Timeout 으로 죽는다.
+    throw new Error("엔진을 바꾼 뒤 켜 둔 분석이 이어지지 않습니다(배지 searching 30초 대기)");
+  }
   console.log(`엔진 교체 → single-simd128 · ${Date.now() - tSwap}ms · 분석 이어짐`);
-  await page.getByRole("button", { name: "정지" }).click();
-  await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 5000 });
+  // 찾기와 누르기를 한 번에 — 그 사이 분석이 끝나 버튼이 바뀌면 click() 이 30초 기다린다.
+  await page.evaluate(STOP_AND_READ_BEST);
+  await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 15_000 });
   await select.selectOption("auto");
   await page
     .waitForFunction(
@@ -474,7 +490,7 @@ try {
 } catch (e) {
   // 예외로 죽어도 **엔진이 뭐라고 했는지**는 남긴다.
   const first = e instanceof Error ? (e.message.split("\n")[0] ?? "") : String(e);
-  await dumpState(first);
+  await dumpState(first, e);
   fail(first);
 } finally {
   await browser.close();

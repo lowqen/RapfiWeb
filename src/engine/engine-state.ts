@@ -308,6 +308,12 @@ let gameHandlers: {
    * 풀어야 한다. 없으면 무제한 대국에서 판이 「엔진이 생각 중입니다」로 영영 잠겼다.
    */
   onEngineReset?: () => void;
+  /**
+   * 멈춘 멀티 엔진을 단일로 **스스로** 다시 띄웠다(`recoverToSingle`). 이때는 `onEngineReset`
+   * 이 오지 않는다 — 엔진을 내린 것이 아니라 갈아 끼운 것이다. 생각하던 대국의 수는 옛 워커와
+   * 함께 사라졌으므로 대국이 새 엔진에게 다시 물어야 한다(켜 둔 분석이 이어 읽는 것과 같다).
+   */
+  onEngineRecovered?: () => void;
 } = {};
 
 export const setGameHandlers = (h: typeof gameHandlers) => {
@@ -478,6 +484,7 @@ export const useEngineStore = create<EngineState>((set, get) => {
         if (!info.recovered) return;
         flushConfig(c);
         if (get().analyzing) runAnalysis(c, analysisStones);
+        gameHandlers.onEngineRecovered?.();
       },
       onSearchDone: (mode, reason) => {
         if (client !== c) return;

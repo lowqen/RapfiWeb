@@ -491,7 +491,12 @@ try {
         });
       });
       await page.getByRole("button", { name: "내보내기", exact: true }).click();
-      await Promise.race([got, page.waitForTimeout(10_000)]);
+      await Promise.race([got, page.waitForTimeout(20_000)]);
+      // 덜 왔으면 «내용이 다르다»가 아니라 «오지 않았다»로 말한다.
+      if (downloads.length < 2)
+        fail(
+          `설정 내보내기가 ${downloads.length}/2 파일만 내려받았습니다: ${downloads.map((d) => d.name).join(", ")}`,
+        );
       const back = Object.fromEntries(downloads.map((d) => [d.name, d.text]));
       if (back["settings.txt"] !== mainText) fail("내보낸 settings.txt 가 올린 파일과 다릅니다");
       if (back["settings_dev.txt"] !== devText)

@@ -156,6 +156,21 @@ describe("자유 렌주", () => {
     expect(plays).toHaveLength(2);
   });
 
+  it("멈춘 멀티 엔진이 단일로 복구되면 생각하던 수를 새 엔진에게 다시 묻는다", () => {
+    fresh({ computerSide: "white" });
+    g().tap(move(7, 7)); // 엔진(백)이 생각 중
+    expect(plays).toHaveLength(1);
+    getGameHandlers().onEngineRecovered?.(); // 옛 워커와 함께 그 수는 사라졌다
+    expect(plays).toHaveLength(2);
+    expect(plays[1]!.stones).toHaveLength(1);
+    expect(g().thinking).toBe(true);
+    engineMoves(move(8, 8));
+    expect(stones()).toHaveLength(2);
+    // 생각 중이 아니었으면 아무것도 묻지 않는다.
+    getGameHandlers().onEngineRecovered?.();
+    expect(plays).toHaveLength(2);
+  });
+
   it("둘 수 없는 답은 대국의 끝이다", () => {
     fresh({ computerSide: "white" });
     g().tap(move(7, 7));
