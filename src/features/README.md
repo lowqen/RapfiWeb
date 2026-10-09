@@ -9,6 +9,10 @@
 배지)는 `data/current-review.ts` 처럼 사이의 작은 칸을 지난다. 여러 화면이 쓰는 입력 부품 · 아이콘은
 `components/` 에 있다.
 
+**예외 둘: DB 와 설정 파일.** `database/` 의 DB 는 화면이기 전에 엔진에 붙은 자원이라 증명(`research/prove`)이
+그 손잡이(`proveDb()`)를 쓴다. `settings/desktopBridge.ts` 는 settings.txt 67칸이 여러 화면(리뷰 · 증명 · DB)에
+걸쳐 있어 그 스토어들을 읽고 쓴다 — 칸의 뜻은 `core/settings/` 에 있고 여기는 옮겨 담기만 한다.
+
 ```
 board/      대국·분석 화면 (W4) · 기보 열기/저장 · 판 자동 저장 (W5a)
 research/   리뷰·증명(review/ W6b · prove/ W6d) / 오프닝 (W6a) / 수순(sequence/ W6c) / 랭킹 (W7)

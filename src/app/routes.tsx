@@ -5,6 +5,7 @@ import { BoardScreen } from "../features/board/BoardScreen";
 import { EngineScreen } from "../features/engine/EngineScreen";
 import { SettingsScreen } from "../features/settings/SettingsScreen";
 import { DatabaseScreen } from "../features/database/DatabaseScreen";
+import { JosekiScreen } from "../features/joseki/JosekiScreen";
 import { OpeningExplorer } from "../features/research/OpeningExplorer";
 import { ReviewScreen } from "../features/research/review/ReviewScreen";
 import { SequenceScreen } from "../features/research/sequence/SequenceScreen";
@@ -60,20 +61,11 @@ export const router = createBrowserRouter(
         // 엔진 상태와 piskvork 콘솔. 콘솔은 보드 옆 칸에서 이리로 왔다.
         { path: "engine", element: <EngineScreen /> },
 
-        {
-          path: "joseki",
-          element: (
-            <Placeholder
-              stage="W9"
-              title="정석"
-              what="신규 기능. 수순 입력(보드 클릭 또는 좌표 텍스트), 분기, 수마다 서식 있는 메모, 저장·검색·분류, 단계별 재생."
-              needs={["W5a PosKey · Dexie ✓", "W6a 주형 이름", "W6c 수순"]}
-            />
-          ),
-        },
+        // W9: 정석 — 수순 입력(판 · 글), 분기, 메모(마크다운), 분류 자동, 국면으로 찾기.
+        { path: "joseki", element: <JosekiScreen /> },
 
         // 앱 `SettingsScreen.kt` 의 분류(대국·엔진·표시…)를 옮긴 것. 대국 설정·조작은
-        // 보드 옆 칸에서 이리로 왔다. settings.txt 67항목 파일 왕복은 여전히 W5b 의 몫이다.
+        // 보드 옆 칸에서 이리로 왔다. settings.txt 67항목 파일 왕복(W5b)은 고급 ▸ 시스템에 있다.
         { path: "settings", element: <SettingsScreen /> },
 
         { path: "*", element: <Navigate to="/board" replace /> },

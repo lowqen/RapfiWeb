@@ -2541,3 +2541,267 @@ button.theory__row:hover {
   color: var(--c-on-surface-variant);
   white-space: pre-line;
 }
+
+/* ── 정석 (W9) ───────────────────────────────────────────────────── */
+.jsearch {
+  width: 100%;
+  padding: var(--space-s) var(--space-m);
+  margin-bottom: var(--space-m);
+  border: 1px solid var(--c-outline-variant);
+  border-radius: var(--radius-m);
+}
+.jnotice {
+  white-space: pre-line;
+}
+.jlist {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin-top: var(--space-m);
+  list-style: none;
+}
+.jlist li {
+  display: flex;
+  gap: var(--space-m);
+  align-items: center;
+  padding: var(--space-s) 0;
+  border-bottom: 1px solid var(--c-outline-variant);
+}
+.jlist__open {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+  background: none;
+  border: 0;
+}
+.jlist__title {
+  font: var(--type-title-small);
+  color: var(--c-on-surface);
+}
+.jlist__meta {
+  font: var(--type-body-small);
+  color: var(--c-on-surface-variant);
+  overflow-wrap: anywhere;
+}
+.jlist__ask {
+  display: flex;
+  gap: var(--space-s);
+}
+.joseki-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-m);
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.jfield {
+  display: flex;
+  gap: var(--space-m);
+  align-items: center;
+  margin-top: var(--space-s);
+  font: var(--type-body-medium);
+}
+.jfield span {
+  flex: 0 0 3em;
+  color: var(--c-on-surface-variant);
+}
+.jfield input {
+  flex: 1;
+  min-width: 0;
+}
+.jbody {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(0, 2fr);
+  gap: var(--space-m);
+  align-items: start;
+}
+@media (max-width: 760px) {
+  .jbody {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .jboardbox {
+    order: -1;
+  }
+}
+.jtreebox {
+  max-height: 80vh;
+  overflow: auto;
+}
+.jtree {
+  font: var(--type-body-medium);
+  line-height: 1.9;
+}
+.jtree__line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-xs);
+  align-items: baseline;
+}
+.jtree__var {
+  flex-basis: 100%;
+  padding-left: var(--space-m);
+  margin: var(--space-xs) 0;
+  border-left: 2px solid var(--c-outline-variant);
+}
+.jtree__move {
+  padding: 0 var(--space-xs);
+  font: inherit;
+  color: var(--c-on-surface);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-s);
+}
+.jtree__move:hover {
+  background: var(--c-surface-container-highest);
+}
+.jtree__move.is-here {
+  color: var(--c-on-primary);
+  background: var(--c-primary);
+}
+.jtree__move.has-note::after {
+  content: "✎";
+  margin-left: 2px;
+  font-size: 0.75em;
+  opacity: 0.7;
+}
+.jtree__num {
+  margin-right: 2px;
+  color: var(--c-on-surface-variant);
+}
+.jtree__move.is-here .jtree__num {
+  color: inherit;
+}
+.jtree__mark {
+  margin-left: 1px;
+  font-weight: 700;
+}
+.jtree__empty {
+  font: var(--type-body-medium);
+  color: var(--c-on-surface-variant);
+}
+.jnav select {
+  max-width: 14em;
+}
+.jtext {
+  display: flex;
+  gap: var(--space-s);
+  margin-top: var(--space-m);
+}
+.jtext input {
+  flex: 1;
+  min-width: 0;
+}
+.jmarks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-top: var(--space-m);
+}
+.jcomment {
+  margin-top: var(--space-m);
+}
+.jcomment__bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-xs);
+}
+.jcomment textarea {
+  width: 100%;
+  font: var(--type-body-medium);
+  resize: vertical;
+}
+.jcomment__view {
+  padding: var(--space-m);
+  border: 1px solid var(--c-outline-variant);
+  border-radius: var(--radius-m);
+}
+.jmd {
+  font: var(--type-body-medium);
+  color: var(--c-on-surface);
+}
+.jmd p + p,
+.jmd ul,
+.jmd ol {
+  margin-top: var(--space-s);
+}
+.jmd ul,
+.jmd ol {
+  padding-left: 1.4em;
+}
+.jmd code {
+  padding: 0 3px;
+  font-family: var(--font-mono, monospace);
+  background: var(--c-surface-container-highest);
+  border-radius: 3px;
+}
+.jmd__coord {
+  padding: 0 2px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--c-primary);
+  text-decoration: underline dotted;
+  background: none;
+  border: 0;
+}
+
+/* 정석 · DB 화면의 글 입력 — 설정의 숫자 칸(`.field__box`)과 같은 윤곽. */
+.jfield input,
+.jtext input,
+.jsearch,
+.jcomment textarea,
+.db__comment textarea,
+.db__label,
+.jnav select,
+.database select {
+  min-height: 40px;
+  padding: var(--space-s) var(--space-m);
+  font: var(--type-body-large);
+  color: var(--c-on-surface);
+  background: var(--c-surface);
+  border: 1px solid var(--c-outline);
+  border-radius: var(--radius-s);
+  outline: 0;
+  transition: border-color var(--motion-quick) ease-out;
+}
+.jfield input:focus,
+.jtext input:focus,
+.jsearch:focus,
+.jcomment textarea:focus,
+.db__comment textarea:focus,
+.db__label:focus {
+  border-color: var(--c-primary);
+  box-shadow: inset 0 0 0 1px var(--c-primary);
+}
+.jfield input::placeholder,
+.jtext input::placeholder,
+.jcomment textarea::placeholder {
+  color: var(--c-on-surface-variant);
+}
+.jtext button,
+.jcomment__bar button {
+  min-height: 36px;
+  padding: 0 var(--space-l);
+  font: var(--type-label-large);
+  color: var(--c-on-surface);
+  border: 1px solid var(--c-outline);
+  border-radius: var(--radius-m);
+}
+.jtext button:hover:not(:disabled),
+.jcomment__bar button:hover {
+  background: var(--c-surface-container-highest);
+}
+.jtext button:disabled {
+  color: var(--c-outline);
+  border-color: var(--c-outline-variant);
+}
+.jcomment__bar button[aria-pressed="true"] {
+  color: var(--c-on-secondary-container);
+  background: var(--c-secondary-container);
+  border-color: var(--c-secondary-container);
+}

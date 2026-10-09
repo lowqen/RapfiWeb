@@ -76,7 +76,7 @@ export interface ProveOutcome {
   readonly blackToMove: boolean;
   readonly searches: number;
   readonly conclusions: number;
-  /** DB 기록 수 — DB 가 없는 실행(웹, W8 전)은 `null`. */
+  /** DB 기록 수 — DB 가 붙어 있지 않은 실행은 `null`. */
   readonly dbWrites: number | null;
   /** 못 정하고 끝났을 때의 공격 쪽 승률 추정. */
   readonly attackerWinRatePct: number;
