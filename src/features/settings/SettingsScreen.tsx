@@ -1,4 +1,4 @@
-import { useMemo, useState, type ComponentType } from "react";
+import { useMemo, useRef, useState, type ComponentType } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGameStore, type BoardMode } from "../board/gameStore";
 import { useBoardStore } from "../board/boardStore";
@@ -15,6 +15,9 @@ import {
 } from "./settingsStore";
 import { NumberField, Segmented, Switch } from "../../components/controls";
 import { EngineChoiceControl, ThreadControl } from "./engineControls";
+import { exportDesktopFiles, importDesktopFiles } from "./desktopBridge";
+import { MAPPED_IDS } from "../../core/settings/desktop-bridge";
+import { ALL_SPECS } from "../../core/settings/desktop-settings";
 
 /**
  * 설정 — 두 층.
@@ -204,6 +207,56 @@ function ThemeControl() {
   return <Segmented label="다크 모드" value={mode} options={THEMES} onChange={set} />;
 }
 
+/**
+ * 데스크톱 settings.txt · settings_dev.txt 가져오기 · 내보내기(W5b). 67칸 중 웹이 뜻을 가진 칸만
+ * 웹 값이 되고, 나머지는 들고 있다가 내보낼 때 돌려준다(`desktopBridge.ts`).
+ */
+function DesktopFileControl() {
+  const input = useRef<HTMLInputElement>(null);
+  const [result, setResult] = useState<string | null>(null);
+  return (
+    <div className="desktopfile">
+      <div className="actions">
+        <button type="button" className="btn" onClick={() => input.current?.click()}>
+          가져오기
+        </button>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => {
+            exportDesktopFiles();
+            setResult("settings.txt · settings_dev.txt 를 내려받았습니다");
+          }}
+        >
+          내보내기
+        </button>
+      </div>
+      <input
+        ref={input}
+        type="file"
+        accept=".txt,text/plain"
+        multiple
+        hidden
+        data-k="desktop-settings-input"
+        onChange={(e) => {
+          const files = [...(e.currentTarget.files ?? [])];
+          e.currentTarget.value = "";
+          if (!files.length) return;
+          void importDesktopFiles(files).then((r) => {
+            const got = r.files.map((f) => `${f.name}${f.file ? "" : "(모름)"}`).join(", ");
+            setResult([`가져옴: ${got}`, ...r.notes].join("\n"));
+          });
+        }}
+      />
+      {result && (
+        <p className="desktopfile__result" role="status" data-k="desktop-settings-result">
+          {result}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function ResetControl() {
   const reset = useSettingsStore((s) => s.reset);
   const [asking, setAsking] = useState(false);
@@ -367,6 +420,15 @@ const ROWS: readonly RowSpec[] = [
   },
 
   // 고급 — 시스템
+  {
+    id: "desktopFile",
+    sec: "system",
+    label: "데스크톱 설정 파일",
+    note: `settings.txt · settings_dev.txt (${ALL_SPECS.length}칸 중 ${MAPPED_IDS.length}칸이 웹에 반영, 나머지는 그대로 보관)`,
+    keywords: "settings.txt settings_dev.txt pc 데스크톱 가져오기 내보내기 import export yixin",
+    wide: true,
+    Control: DesktopFileControl,
+  },
   {
     id: "reset",
     sec: "system",

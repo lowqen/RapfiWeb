@@ -2533,3 +2533,11 @@ button.theory__row:hover {
   margin-top: var(--space-xl);
   font: var(--type-title-small);
 }
+
+/* ── 설정 ▸ 데스크톱 설정 파일 (W5b) ───────────────────────────────── */
+.desktopfile__result {
+  margin-top: var(--space-s);
+  font: var(--type-body-small);
+  color: var(--c-on-surface-variant);
+  white-space: pre-line;
+}

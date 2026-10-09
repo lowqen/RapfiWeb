@@ -14,6 +14,10 @@ import { ISOLATION_HEADERS, ISOLATE, hasEngine } from "./isolation.ts";
 import { readFileSync, existsSync } from "node:fs";
 import { extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  DESKTOP_DEFAULTS,
+  render as renderDesktop,
+} from "../src/core/settings/desktop-settings.ts";
 import { dirname } from "node:path";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -447,6 +451,65 @@ try {
     .catch(() => "없음(고급이 다시 접힘)");
   if (kept !== "true") fail(`해시 크기가 새로고침 뒤 남지 않았습니다: aria-checked=${kept}`);
   await page.evaluate(() => localStorage.removeItem("rapfi.settings"));
+
+  // W5b: 데스크톱 settings.txt 왕복 — 올리면 웹 값이 되고(해시는 웹 선택지로, 27행은 테마를
+  // 고정), 곧바로 내보내면 **올린 바이트 그대로** 나와야 한다(웹이 깎은 해시 8192 도 지킨다).
+  // 컴퓨터 흑(4행)과 DB(32행)는 꺼서 올린다 — 켜면 뒤 단계에서 엔진이 판에 끼어든다.
+  {
+    const crlf = (t: string) => t.replace(/\n/g, "\r\n");
+    const values = { ...DESKTOP_DEFAULTS, hashSizeMb: 8192, useDatabase: false };
+    const mainText = crlf(renderDesktop(values, "main"));
+    const devText = crlf(renderDesktop(values, "dev"));
+    const input = page.locator('[data-k="desktop-settings-input"]');
+    if ((await input.count()) !== 1) fail("설정에 데스크톱 설정 파일 가져오기가 없습니다");
+    else {
+      await input.setInputFiles([
+        { name: "settings.txt", mimeType: "text/plain", buffer: Buffer.from(mainText) },
+        { name: "settings_dev.txt", mimeType: "text/plain", buffer: Buffer.from(devText) },
+      ]);
+      const result = page.locator('[data-k="desktop-settings-result"]');
+      await result.waitFor({ timeout: 5_000 });
+      const said = await result.innerText();
+      if (!said.includes("8192MB → 512MB")) fail(`가져오기가 해시를 말하지 않습니다: ${said}`);
+      if (
+        (await page
+          .getByRole("radio", { name: "512", exact: true })
+          .getAttribute("aria-checked")) !== "true"
+      )
+        fail("가져온 해시(→512)가 설정에 들어가지 않았습니다");
+      if ((await page.evaluate("document.documentElement.dataset.theme")) !== "dark")
+        fail("27행(다크)이 테마를 고정하지 않았습니다");
+      const downloads: { name: string; text: string }[] = [];
+      const got = new Promise<void>((done) => {
+        page.on("download", async (d) => {
+          const path = await d.path();
+          downloads.push({
+            name: d.suggestedFilename(),
+            text: path ? readFileSync(path, "utf8") : "",
+          });
+          if (downloads.length === 2) done();
+        });
+      });
+      await page.getByRole("button", { name: "내보내기", exact: true }).click();
+      await Promise.race([got, page.waitForTimeout(10_000)]);
+      const back = Object.fromEntries(downloads.map((d) => [d.name, d.text]));
+      if (back["settings.txt"] !== mainText) fail("내보낸 settings.txt 가 올린 파일과 다릅니다");
+      if (back["settings_dev.txt"] !== devText)
+        fail("내보낸 settings_dev.txt 가 올린 파일과 다릅니다");
+    }
+    await page.evaluate(() => {
+      for (const k of [
+        "rapfi.desktop",
+        "rapfi.theme",
+        "rapfi.settings",
+        "rapfi.prove",
+        "rapfi.db",
+        "rapfi.review",
+      ])
+        localStorage.removeItem(k);
+    });
+    await page.reload({ waitUntil: "networkidle" });
+  }
   // 좁은 폭에서도 가로로 넘치지 않는가 — 칩·세그먼트가 줄을 밀어내면 여기서 잡힌다.
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForTimeout(150);
