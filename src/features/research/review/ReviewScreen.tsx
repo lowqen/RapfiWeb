@@ -262,7 +262,7 @@ export function ReviewScreen() {
             {report && selected && (
               <ReportView
                 report={report}
-                log={s.log.join("\n")}
+                log={selected.log ?? []}
                 onOpenOnBoard={s.openOnBoard}
                 onDelete={() => void s.removeReview(selected.id!)}
               />

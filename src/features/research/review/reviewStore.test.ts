@@ -194,3 +194,20 @@ describe("리포트", () => {
     expect(await listReviews(d)).toHaveLength(0);
   });
 });
+
+describe("엔진 로그", () => {
+  it("리포트에 국면마다 한 줄이 남고, 중단한 작업은 이어서 잇는다", async () => {
+    for (const m of line(4)) board().place(m);
+    cancelAtPly = 2;
+    await s().reviewBoard();
+    let [job] = await listJobs(d);
+    expect(job!.log).toHaveLength(2); // 0 · 1 국면
+    cancelAtPly = Infinity;
+    await s().start();
+    [job] = await listJobs(d);
+    const [row] = await listReviews(d);
+    expect(row!.log).toHaveLength(5);
+    expect(row!.log![0]).toMatch(/^#0 흑 차례 · 깊이 0 · 최선 a15/); // 가짜 엔진의 통계는 비어 있다
+    expect(job!.log).toEqual(row!.log);
+  });
+});

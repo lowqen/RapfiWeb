@@ -310,11 +310,18 @@ export const useReviewStore = create<ReviewState>((set, get) => {
           patchJob(id, { status: "running", result: "" });
           const { budget, skipOpening } = get().settings;
           const outcome = await runReview(
-            { moves: job.moves, size: job.size, records: job.records, index: job.index },
+            {
+              moves: job.moves,
+              size: job.size,
+              records: job.records,
+              index: job.index,
+              log: job.log ?? [],
+            },
             { budget, skipOpening },
             enginePort,
             {
-              onCheckpoint: (records, index) => patchJob(id, { records: [...records], index }),
+              onCheckpoint: (records, index, log) =>
+                patchJob(id, { records: [...records], index, log: [...log] }),
               onProgress: (index, total) =>
                 set({
                   progress: { jobId: id, name: job.name, index, total, queueIndex, queueTotal },
@@ -332,6 +339,7 @@ export const useReviewStore = create<ReviewState>((set, get) => {
               records: outcome.records,
               budget,
               skipOpening,
+              log: outcome.log,
               createdAt,
             };
             const row = db ? await addReview(db, draft) : { ...draft, id: -createdAt };
@@ -356,6 +364,7 @@ export const useReviewStore = create<ReviewState>((set, get) => {
               status: "paused",
               records: outcome.records,
               index: outcome.index,
+              log: outcome.log,
               result: `중단 — ${at}에서 이어서`,
             });
             note(`게임 리뷰 취소 (${at})`);
@@ -364,6 +373,7 @@ export const useReviewStore = create<ReviewState>((set, get) => {
               status: "paused",
               records: outcome.records,
               index: outcome.index,
+              log: outcome.log,
               result: `${outcome.reason} — ${at}에서 이어서`,
             });
             note(outcome.reason);

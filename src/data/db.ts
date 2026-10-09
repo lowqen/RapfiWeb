@@ -56,6 +56,8 @@ export interface ReviewJob {
   result: string;
   /** 끝났으면 그 리포트(`reviews`)의 id. */
   reviewId?: number;
+  /** 국면마다 엔진 로그 한 줄(깊이 · 노드 · 시간) — 체크포인트와 함께. 예전 작업에는 없다. */
+  log?: string[];
   createdAt: number;
 }
 
@@ -71,6 +73,8 @@ export interface ReviewRow {
   records: PositionRecord[];
   budget: ReviewBudget;
   skipOpening: boolean;
+  /** 국면마다 엔진 로그 한 줄 — HTML 리포트의 「엔진 로그」. 예전 리포트에는 없다. */
+  log?: string[];
   createdAt: number;
 }
 

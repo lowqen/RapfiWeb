@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   budgetInfo,
   depthReached,
+  engineLogLine,
   placementsOf,
   recordFromSnapshot,
   runReview,
@@ -273,5 +274,61 @@ describe("루프", () => {
     if (out.kind !== "done") throw new Error(out.kind);
     expect(out.records[2]!.blackWinRate).toBe(0.42);
     expect(out.records[3]!.blackWinRate).toBeCloseTo(0.4); // 백 차례 0.6 → 흑 0.4
+  });
+});
+
+describe("엔진 로그", () => {
+  it("국면마다 깊이 · 노드 · 시간 · 속도 · 최선 · 값 · 차를 한 줄로", () => {
+    const s = snap([pv(0, 0.7), pv(1, 0.5)], {
+      bestMove: move(8, 6),
+      stats: {
+        ...EMPTY_SNAPSHOT.stats,
+        depth: 14,
+        selDepth: 22,
+        nodes: 1_250_000,
+        timeMs: 1002,
+        speed: 1_247_000,
+      },
+    });
+    const rec = recordFromSnapshot(s, 7);
+    expect(engineLogLine(7, s, rec, 15)).toBe(
+      "#7 백 차례 · 깊이 14-22 · 1.25M 노드 · 1002ms · 1.25M/s · 최선 i9 · 흑 30.0% · 차 20%p",
+    );
+  });
+
+  it("즉답과 메이트는 그렇다고 적는다", () => {
+    const instant = snap([], { instant: true, bestMove: move(7, 7) });
+    expect(engineLogLine(0, instant, recordFromSnapshot(instant, 0), 15)).toBe(
+      "#0 흑 차례 · 즉답 · 최선 h8",
+    );
+    const mate = snap([pv(0, 1, { mate: 5 })]);
+    expect(engineLogLine(2, mate, recordFromSnapshot(mate, 2), 15)).toMatch(/흑 M5$/);
+  });
+
+  it("읽은 국면 · 종국 국면마다 한 줄, 이어서 하면 앞의 줄에 잇는다", async () => {
+    const f = fakePort(() => snap([pv(0, 0.5)]));
+    const checkpointLogs: number[] = [];
+    const h = {
+      ...hooks().h,
+      onCheckpoint: (_r: unknown, _i: number, log: readonly string[]) =>
+        void checkpointLogs.push(log.length),
+    };
+    const out = await runReview(
+      { moves: line(3), size: 15, records: [], index: 0 },
+      { budget, skipOpening: false },
+      f.port,
+      h,
+    );
+    expect(out.log).toHaveLength(4);
+    expect(out.log[0]).toMatch(/^#0 흑 차례/);
+    expect(checkpointLogs).toEqual([1, 2, 3, 4]);
+    const resumed = await runReview(
+      { moves: line(3), size: 15, records: [], index: 2, log: ["앞의 줄 A", "앞의 줄 B"] },
+      { budget, skipOpening: false },
+      f.port,
+      hooks().h,
+    );
+    expect(resumed.log.slice(0, 2)).toEqual(["앞의 줄 A", "앞의 줄 B"]);
+    expect(resumed.log).toHaveLength(4);
   });
 });

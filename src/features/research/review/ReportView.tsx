@@ -109,7 +109,8 @@ export function ReportView({
   onDelete,
 }: {
   report: GameReport;
-  log: string;
+  /** 국면마다 엔진 로그 한 줄(예전 리포트에는 없다). */
+  log: readonly string[];
   onOpenOnBoard: (ply: number) => void;
   onDelete: () => void;
 }) {
@@ -311,6 +312,13 @@ export function ReportView({
         </table>
       </div>
 
+      {log.length > 0 && (
+        <details className="review__log">
+          <summary>엔진 로그 ({log.length}국면)</summary>
+          <pre data-k="report-engine-log">{log.join("\n")}</pre>
+        </details>
+      )}
+
       <div className="panel__actions">
         <button type="button" className="button--tonal" onClick={() => onOpenOnBoard(cursor)}>
           이 국면을 보드로
@@ -324,7 +332,7 @@ export function ReportView({
         <button type="button" onClick={() => exportMarkdown(report)}>
           Markdown
         </button>
-        <button type="button" onClick={() => void exportHtml(report, log)}>
+        <button type="button" onClick={() => void exportHtml(report, log.join("\n"))}>
           HTML 리포트
         </button>
         <button type="button" className="btn--danger" onClick={onDelete}>

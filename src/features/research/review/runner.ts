@@ -52,20 +52,26 @@ export interface RunState {
   readonly records: readonly PositionRecord[];
   /** 다음에 읽을 국면 번호 0..moves.length. */
   readonly index: number;
+  /** 지금까지의 엔진 로그(국면마다 한 줄) — 이어서 할 때 앞부분. */
+  readonly log?: readonly string[];
 }
 
 export interface RunHooks {
   /** 국면 하나를 끝낼 때마다 — 체크포인트. */
-  onCheckpoint(records: readonly PositionRecord[], index: number): void | Promise<void>;
+  onCheckpoint(
+    records: readonly PositionRecord[],
+    index: number,
+    log: readonly string[],
+  ): void | Promise<void>;
   onProgress(index: number, total: number): void;
   isCancelled(): boolean;
   log(text: string): void;
 }
 
 export type RunOutcome =
-  | { kind: "done"; records: PositionRecord[] }
-  | { kind: "cancelled"; records: PositionRecord[]; index: number }
-  | { kind: "failed"; records: PositionRecord[]; index: number; reason: string };
+  | { kind: "done"; records: PositionRecord[]; log: string[] }
+  | { kind: "cancelled"; records: PositionRecord[]; index: number; log: string[] }
+  | { kind: "failed"; records: PositionRecord[]; index: number; reason: string; log: string[] };
 
 /** 엔진이 받는 모양으로 — `own` 은 «엔진이 둘 색», 곧 다음 차례다. */
 export function placementsOf(moves: readonly Move[]): Placement[] {
@@ -127,6 +133,44 @@ export function depthReached(snap: AnalysisSnapshot, depth: number): boolean {
   return snap.pvs.length < 2 ? true : deep >= 2;
 }
 
+const compact = (n: number) =>
+  n >= 1e9
+    ? `${(n / 1e9).toFixed(2)}G`
+    : n >= 1e6
+      ? `${(n / 1e6).toFixed(2)}M`
+      : n >= 1e3
+        ? `${(n / 1e3).toFixed(1)}k`
+        : String(n);
+
+/**
+ * 국면 하나의 엔진 로그 한 줄 — HTML 리포트의 「엔진 로그」 칸과 리포트 화면이 보여 준다.
+ * 데스크톱 리포트가 담던 «그 국면을 엔진이 얼마나 읽었나»를 웹에서도 남긴다:
+ * `#7 백 차례 · 깊이 14-22 · 1.25M 노드 · 1002ms · 1.2M/s · 최선 i8 · 흑 72.0% · 차 3%p`
+ */
+export function engineLogLine(
+  index: number,
+  snap: AnalysisSnapshot,
+  rec: PositionRecord,
+  size: number,
+): string {
+  const st = snap.stats;
+  const parts = [`#${index} ${index % 2 === 0 ? "흑" : "백"} 차례`];
+  if (snap.instant && snap.pvs.length === 0) parts.push("즉답");
+  else {
+    parts.push(`깊이 ${st.depth}${st.selDepth !== null ? `-${st.selDepth}` : ""}`);
+    if (st.nodes !== null) parts.push(`${compact(st.nodes)} 노드`);
+    if (st.timeMs !== null) parts.push(`${Math.round(st.timeMs)}ms`);
+    if (st.speed !== null) parts.push(`${compact(st.speed)}/s`);
+  }
+  const best = rec.best ? `${String.fromCharCode(97 + rec.best.x)}${size - rec.best.y}` : "-";
+  parts.push(`최선 ${best}`);
+  if (rec.blackMate !== 0)
+    parts.push(`${rec.blackMate > 0 ? "흑" : "백"} M${Math.abs(rec.blackMate)}`);
+  else if (rec.blackWinRate !== null) parts.push(`흑 ${(rec.blackWinRate * 100).toFixed(1)}%`);
+  if (rec.gap !== null) parts.push(`차 ${Math.round(rec.gap * 100)}%p`);
+  return parts.join(" · ");
+}
+
 /**
  * 한 수순을 리뷰한다. `state` 의 `index` 부터 이어 간다(체크포인트에서 되살린 경우).
  * 취소되거나 엔진이 사라지면 그 자리까지의 기록과 번호를 돌려준다 — 다음에 거기서 잇는다.
@@ -147,12 +191,13 @@ export async function runReview(
   const info = budgetInfo(budget, size);
   const totalMs = budget.byDepth ? Infinity : budget.seconds * 1000;
   let index = Math.max(0, Math.min(state.index, total + 1));
+  const log: string[] = [...(state.log ?? [])];
 
   if (index === 0) hooks.log(`게임 리뷰 시작: ${total + 1}개 국면, 수당 ${budgetLabel(budget)}`);
   else hooks.log(`게임 리뷰 이어서: ${index}/${total + 1}부터, 수당 ${budgetLabel(budget)}`);
 
   while (index <= total) {
-    if (hooks.isCancelled()) return { kind: "cancelled", records, index };
+    if (hooks.isCancelled()) return { kind: "cancelled", records, index, log };
     hooks.onProgress(index, total);
     // 첫 국면들은 아예 읽지 않는다(등급도 매기지 않는다).
     if (skipOpening && index < SKIP_OPENING_N) {
@@ -168,8 +213,9 @@ export async function runReview(
         best: null,
         gap: null,
       };
+      log.push(`#${index} 종국 — ${index % 2 === 1 ? "흑" : "백"} 승(탐색 없음)`);
       index++;
-      await hooks.onCheckpoint(records, index);
+      await hooks.onCheckpoint(records, index, log);
       continue;
     }
 
@@ -198,15 +244,16 @@ export async function runReview(
       },
     );
     clearTimeout(watchdog);
-    if (hooks.isCancelled()) return { kind: "cancelled", records, index };
+    if (hooks.isCancelled()) return { kind: "cancelled", records, index, log };
     if (!snap) {
-      return { kind: "failed", records, index, reason: "엔진이 내려가 리뷰를 멈췄습니다" };
+      return { kind: "failed", records, index, reason: "엔진이 내려가 리뷰를 멈췄습니다", log };
     }
     records[index] = recordFromSnapshot(snap, index);
+    log.push(engineLogLine(index, snap, records[index]!, size));
     index++;
-    await hooks.onCheckpoint(records, index);
+    await hooks.onCheckpoint(records, index, log);
   }
   hooks.onProgress(total + 1, total);
   hooks.log(`게임 리뷰 완료: ${total + 1}개 국면`);
-  return { kind: "done", records };
+  return { kind: "done", records, log };
 }
