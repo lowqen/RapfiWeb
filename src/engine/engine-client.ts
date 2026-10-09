@@ -306,6 +306,15 @@ export interface EngineEvents {
   onBooted?: (info: BootInfo) => void;
   /** 기동이 어느 단계인가(로딩 표시용). 멈춘 멀티 엔진을 다시 띄울 때도 온다. */
   onBootPhase?: (phase: BootPhase, variant: EngineVariant) => void;
+  /** yixindb 가 말한 줄(W8) — `DATABASE ONE …` · `DATABASE …` · `Saved database file …`. */
+  onDbLine?: (text: string) => void;
+}
+
+/** 엔진 메모리 FS 요청의 답(W8). */
+export interface FsResult {
+  ok: boolean;
+  bytes?: Uint8Array;
+  error?: string;
 }
 
 export interface EngineOptions extends EngineEvents {
@@ -486,6 +495,8 @@ export class EngineClient {
     this.worker?.terminate();
     this.worker = null;
     this.variant = null;
+    for (const p of this.fsPending.values()) p({ ok: false, error: "엔진을 내렸습니다" });
+    this.fsPending.clear();
     this.snapshot = EMPTY_SNAPSHOT;
     this.events.onConsole?.([`! 멀티스레드 엔진이 멈춰 단일 스레드로 다시 띄웁니다: ${reason}`]);
     this.setStatus("starting");
@@ -610,6 +621,18 @@ export class EngineClient {
         case "forbid":
           this.events.onForbid?.(m.cells);
           break;
+        case "dbLine":
+          this.events.onDbLine?.(m.text);
+          break;
+        case "fs": {
+          const p = this.fsPending.get(m.id);
+          this.fsPending.delete(m.id);
+          const r: FsResult = { ok: m.ok };
+          if (m.bytes) r.bytes = m.bytes;
+          if (m.error) r.error = m.error;
+          p?.(r);
+          break;
+        }
         case "searchDone":
           // 밀려난 탐색의 끝이면 무시한다. 새 요청이 이미 돌고 있는데 「대기」로
           // 바꾸면, 그 틈에 금수 조회(YXBOARD+YXSHOWFORBID)가 나가 도는 분석을
@@ -762,6 +785,30 @@ export class EngineClient {
    */
   stop(): void {
     this.post({ type: "stop" });
+  }
+
+  private fsSeq = 0;
+  private readonly fsPending = new Map<number, (r: FsResult) => void>();
+
+  /**
+   * 엔진 메모리 FS 요청(W8) — 요청 줄에 서므로 앞뒤 명령과 순서가 지켜진다. 엔진이 없거나
+   * 내려가면 실패로 끝난다.
+   */
+  fs(
+    op: "write" | "read" | "remove" | "save",
+    path: string,
+    bytes?: Uint8Array,
+  ): Promise<FsResult> {
+    if (!this.worker) return Promise.resolve({ ok: false, error: "엔진이 떠 있지 않습니다" });
+    const id = ++this.fsSeq;
+    return new Promise((resolve) => {
+      this.fsPending.set(id, resolve);
+      const msg: ToWorker = bytes
+        ? { type: "fs", id, op, path, bytes }
+        : { type: "fs", id, op, path };
+      if (bytes) this.worker!.postMessage(msg, [bytes.buffer]);
+      else this.post(msg);
+    });
   }
 
   /**

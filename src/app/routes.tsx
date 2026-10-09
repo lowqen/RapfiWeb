@@ -4,6 +4,7 @@ import { Placeholder } from "./Placeholder";
 import { BoardScreen } from "../features/board/BoardScreen";
 import { EngineScreen } from "../features/engine/EngineScreen";
 import { SettingsScreen } from "../features/settings/SettingsScreen";
+import { DatabaseScreen } from "../features/database/DatabaseScreen";
 import { OpeningExplorer } from "../features/research/OpeningExplorer";
 import { ReviewScreen } from "../features/research/review/ReviewScreen";
 import { SequenceScreen } from "../features/research/sequence/SequenceScreen";
@@ -53,17 +54,8 @@ export const router = createBrowserRouter(
           ),
         },
 
-        {
-          path: "database",
-          element: (
-            <Placeholder
-              stage="W8"
-              title="데이터베이스"
-              what="yixindb 국면 저장소. Emscripten IDBFS 에 올리고, .db 파일 업로드/다운로드. 파일이 없으면 읽기 전용 + 보드 텍스트만."
-              needs={["IDBFS 를 넣은 엔진 재빌드"]}
-            />
-          ),
-        },
+        // W8: 엔진 yixindb — 파일은 IndexedDB, 엔진이 뜰 때 메모리 FS 로 올린다.
+        { path: "database", element: <DatabaseScreen /> },
 
         // 엔진 상태와 piskvork 콘솔. 콘솔은 보드 옆 칸에서 이리로 왔다.
         { path: "engine", element: <EngineScreen /> },

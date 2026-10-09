@@ -75,6 +75,15 @@ interface EmscriptenModule {
    * **동기**이고 `ArrayBuffer`(SharedArrayBuffer 아님)여야 한다(글루가 생성자 이름을 본다).
    */
   getPreloadedPackage?: (name: string, size: number) => ArrayBuffer | null;
+  /**
+   * Emscripten 의 메모리 FS — `w8-export-fs.patch` 로 글루가 내보낸다(그 전 엔진에는 없다).
+   * yixindb 파일을 웹 저장소와 주고받는 데만 쓴다.
+   */
+  FS?: {
+    writeFile(path: string, data: Uint8Array): void;
+    readFile(path: string): Uint8Array;
+    unlink(path: string): void;
+  };
 }
 type ModuleFactory = (opts: Partial<EmscriptenModule>) => Promise<EmscriptenModule>;
 
@@ -373,9 +382,29 @@ let currentSearchId = 0;
  * **한 줄도 나가지 않았다** — 엔진은 392ms 만에 잘 떴는데 콘솔이 영원히 비었다.
  * 만약을 위해 split 은 남기되 보류는 하지 않는다.
  */
+/**
+ * yixindb(W8) 쪽으로 넘기는 MESSAGE 줄 — `DATABASE …` 흐름과 파일 작업의 맺음말
+ * (`Saved database file …`, `Wrote (all) N records …`, `Deleting child records …`,
+ * `Done deleting …`). 넘겨도 콘솔에는 그대로 남는다.
+ */
+const DB_LINE = /database|^Wrote |^Deleting child|^Done deleting/i;
+let dbTextOpen = false;
+/** DB 명령의 ERROR 를 기다리는 쪽이 있는가 — 탐색 중의 ERROR 를 DB 로 흘리지 않는다. */
+let dbErrorUntil = 0;
+const dbErrorsWanted = () => performance.now() < dbErrorUntil;
+
+/** `start` 부터 읽어 닫는 따옴표(`\"` · `\` 는 건너뜀)가 있는가. */
+function closesQuote(s: string, start: number): boolean {
+  for (let i = start; i < s.length; i++) {
+    if (s[i] === "\\") i++;
+    else if (s[i] === '"') return true;
+  }
+  return false;
+}
+
 function drain(chunk: string) {
   for (const part of chunk.split("\n")) {
-    const line = part.replace(/\r$/, "");
+    const line = fromWireBytes(part.replace(/\r$/, ""));
     if (!line) continue;
     pushConsole(line);
     lastLineAt = performance.now();
@@ -384,6 +413,13 @@ function drain(chunk: string) {
         lineWaiters.splice(lineWaiters.indexOf(w), 1);
         w.resolve(line);
       }
+    }
+    // 여러 줄 DB 주석(`DATABASE TEXT "…` 의 닫히지 않은 따옴표)의 이어지는 줄은 MESSAGE 머리가
+    // 없다 — 파서에 넣지 않고 그대로 DB 쪽에 넘긴다(앱 `DatabaseAggregator` 와 같다).
+    if (dbTextOpen) {
+      dbTextOpen = !closesQuote(line, 0);
+      post({ type: "dbLine", text: line });
+      continue;
     }
     const r = parse(line, coord);
     if (!warming && agg.consume(r)) snapshotDirty = true;
@@ -404,6 +440,12 @@ function drain(chunk: string) {
     } else if (warming) {
       // 예열 중의 나머지 줄은 콘솔에만.
     } else if (r.kind === "forbid") post({ type: "forbid", cells: r.cells });
+    else if (r.kind === "message" && DB_LINE.test(r.text)) {
+      const t = /^DATABASE TEXT\s*"/i.exec(r.text);
+      if (t) dbTextOpen = !closesQuote(r.text, t[0].length);
+      post({ type: "dbLine", text: r.text });
+    } else if (r.kind === "error" && dbErrorsWanted())
+      post({ type: "dbLine", text: `ERROR ${r.text}` });
     else if (r.kind === "openingMove" || r.kind === "openingSwap" || r.kind === "soosorvFifth") {
       post({ type: "opening", response: r });
     }
@@ -460,8 +502,27 @@ const sendCommand = (lines: readonly string[]) => {
     // 설계상 오지 않는 자리다(요청 줄이 앞 탐색의 끝을 기다린다). 오면 흔적을 남긴다.
     pushConsole(`! 탐색 중에 보낸 명령: ${lines[0]}`);
   }
-  mod?.sendCommand(lines.join("\n"));
+  mod?.sendCommand(toWireBytes(lines.join("\n")));
 };
+
+/**
+ * 글루의 stdin 은 **글자 하나를 바이트 하나로** 읽는다(`b.charCodeAt(c++)`) — UTF-16 코드 단위의
+ * 아래 바이트만 엔진에 닿는다. 한글 DB 주석이 «¤¨l»로 깨졌고, 깨진 바이트 중 `0x5C`(`\`)가 주석의
+ * 따옴표 이스케이프를 먹어 뒤의 수순 줄이 좌표 오류가 됐다(DB 스모크). 그래서 ASCII 밖이 있으면
+ * UTF-8 바이트를 한 글자씩 담은 문자열로 바꿔 넘긴다 — 엔진(`ConsoleCPToUTF8`)은 UTF-8 을 받는다.
+ */
+function toWireBytes(s: string): string {
+  if (!/[\u0080-￿]/.test(s)) return s;
+  let out = "";
+  for (const b of new TextEncoder().encode(s)) out += String.fromCharCode(b);
+  return out;
+}
+
+/** stdout 도 바이트 하나가 글자 하나다(`String.fromCharCode(char)`) — UTF-8 로 다시 읽는다. */
+function fromWireBytes(s: string): string {
+  if (!/[\x80-\xff]/.test(s)) return s;
+  return new TextDecoder().decode(Uint8Array.from(s, (c) => c.charCodeAt(0) & 0xff));
+}
 
 /** 멀티 변형: 탐색을 거는 명령. 좌표 줄이 올 때까지 엔진은 바쁘다. */
 const sendSearch = (cmds: readonly EngineCommand[]) => {
@@ -903,6 +964,55 @@ if (!IS_PTHREAD) {
   };
 }
 
+/** 저장 메시지를 기다리는 한도 — 큰 DB 도 몇 초면 쓴다(데스크톱 로그 기준). */
+const DB_SAVE_MS = 60_000;
+
+/**
+ * 엔진 메모리 FS 요청(W8). 실패는 던지지 않고 `ok: false` 로 답한다 — DB 를 못 다뤄도 엔진은
+ * 멀쩡하다.
+ */
+async function fsOp(msg: Extract<ToWorker, { type: "fs" }>) {
+  const reply = (r: { ok: boolean; bytes?: Uint8Array; error?: string }) => {
+    const m: FromWorker = { type: "fs", id: msg.id, ...r };
+    if (r.bytes) (self as unknown as Worker).postMessage(m, [r.bytes.buffer]);
+    else post(m);
+  };
+  const fs = mod?.FS;
+  if (!fs) {
+    reply({ ok: false, error: "이 엔진 빌드는 파일 시스템을 내보내지 않습니다(w8 이전 엔진)" });
+    return;
+  }
+  try {
+    switch (msg.op) {
+      case "write":
+        fs.writeFile(msg.path, msg.bytes ?? new Uint8Array(0));
+        reply({ ok: true });
+        return;
+      case "read":
+        reply({ ok: true, bytes: fs.readFile(msg.path).slice() });
+        return;
+      case "remove":
+        try {
+          fs.unlink(msg.path);
+        } catch {
+          /* 없으면 이미 지워진 것이다 */
+        }
+        reply({ ok: true });
+        return;
+      case "save": {
+        // 단일 변형은 이 명령 안에서 저장까지 끝나고 줄도 동기로 온다 — 기다림을 먼저 건다.
+        const saved = waitLine(/Saved database file/i, DB_SAVE_MS, "DB 저장");
+        sendCommand(["YXSAVEDATABASE"]);
+        await saved;
+        reply({ ok: true, bytes: fs.readFile(msg.path).slice() });
+        return;
+      }
+    }
+  } catch (e) {
+    reply({ ok: false, error: describe(e) });
+  }
+}
+
 async function handle(msg: ToWorker, epoch: number): Promise<void> {
   try {
     // 멀티 변형: 앞 탐색의 좌표 뒤 정착 대기를 **모든 요청 앞에서** 지킨다(`SETTLE_MS`).
@@ -913,6 +1023,8 @@ async function handle(msg: ToWorker, epoch: number): Promise<void> {
         await boot(msg);
         break;
       case "send":
+        if (msg.commands.some((c) => c.kind === "dbPosition"))
+          dbErrorUntil = performance.now() + 5000;
         sendAll(msg.commands);
         maybeEmitSnapshot(true);
         break;
@@ -981,6 +1093,9 @@ async function handle(msg: ToWorker, epoch: number): Promise<void> {
       }
       case "stop":
         // onmessage 가 줄 밖에서 처리한다 — 여기로 오지 않는다.
+        break;
+      case "fs":
+        await fsOp(msg);
         break;
       case "shutdown":
         try {

@@ -102,6 +102,9 @@ export function serialize(cmd: EngineCommand, coord: CoordMapper): string[] {
       return ["END"];
     case "raw":
       return [cmd.line];
+    case "dbPosition":
+      // 여러 줄이다 — 워커가 개행으로 이어 **한 번에** 보낸다(yxsoosorvstep 과 같은 까닭).
+      return [cmd.head, ...cmd.moves.map((m) => coord.toWire(m)), "done"];
   }
 }
 

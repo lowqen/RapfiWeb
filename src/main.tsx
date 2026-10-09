@@ -12,9 +12,13 @@ import { readPositionLink, withoutPositionParam } from "./features/board/positio
 import { useBoardNotice } from "./features/board/boardNotice";
 import { DEFAULT_SIZE } from "./core/model/move";
 import { loadOpeningTables } from "./data/opening-tables";
+import { wireDatabase } from "./features/database/dbStore";
 
 // 오프닝 표(4수 이름 · 흑 5수 유불리, 50KB)는 따로 떨어진 조각으로 뒤에서 받는다.
 void loadOpeningTables();
+
+// 엔진 DB(W8): 엔진이 뜰 때마다 저장된 rapfi.db 를 다시 붙이고, 자동 저장을 돌린다.
+wireDatabase();
 
 // 국면 딥링크(`?p=…`)가 있으면 그 국면으로, 없으면 지난 판을 되살린다. 이 뒤로 판이
 // 바뀔 때마다 IndexedDB 에 남긴다. 링크는 읽고 나서 주소에서 걷어낸다 — 새로고침이

@@ -1,3 +1,4 @@
+import { proveVerdict } from "../../../core/database/yixindb";
 import { result as refereeResult } from "../../../core/model/referee";
 import type { Move } from "../../../core/model/move";
 import {
@@ -11,6 +12,7 @@ import {
 } from "../../../core/prove/prove-tree";
 import type { ProveOutcome, ProveProgress } from "../../../core/prove/prove-models";
 import type { AnalysisSnapshot, EngineCommand, PvSnapshot } from "../../../engine/engine-types";
+import type { ProveDb } from "../../database/dbStore";
 import { placementsOf } from "../review/runner";
 
 /**
@@ -21,10 +23,9 @@ import { placementsOf } from "../review/runner";
  *  가장 싼 열린 마디 → yxnbest k (공격) / yxsearchdefend (방어) → 결론 → 다음 마디
  * ```
  *
- * **웹에는 아직 yixindb 가 없다(W8).** 데스크톱 · 앱은 마디마다 먼저 DB 를 묻고
- * (`yxquerydatabaseone`), 증명된 메이트를 DB 에 쓴다(`yxedittvddatabase`). 여기서는 두 단계를
- * 건너뛴다 — 결론은 이 실행 안에서만 쓰이고, 쓰기 큐는 비우기만 한다. DB 가 붙으면(W8) 그
- * 두 단계가 이 루프의 `query` · `edit` 자리에 들어간다.
+ * **DB 단계(W8).** 데스크톱 · 앱처럼 마디마다 먼저 DB 를 묻고(`yxquerydatabaseone`), 증명된
+ * 메이트를 DB 에 쓴다(`yxedittvddatabase 7`). DB 가 붙어 있지 않으면(`port.db` 가 null) 두 단계를
+ * 건너뛴다 — 결론은 이 실행 안에서만 쓰이고, 쓰기 큐는 비우기만 한다.
  *
  * 리뷰처럼 **보이는 판을 걷지 않는다** — 뿌리는 시작할 때의 수순이고, 국면마다 따로 세운다.
  */
@@ -39,6 +40,8 @@ export interface ProvePort {
     onSnapshot: (s: AnalysisSnapshot) => void,
   ): Promise<AnalysisSnapshot | null>;
   stop(): void;
+  /** 붙어 있는 엔진 DB. 없으면 질의 · 기록 단계를 건너뛴다. */
+  db?: ProveDb | null;
 }
 
 export interface ProveHooks {
@@ -85,7 +88,9 @@ export async function runProve(
 ): Promise<{ outcome: ProveOutcome; tree: ProveTree; failed: string | null }> {
   const tree = new ProveTree(options, size, hooks.log);
   let searches = 0;
+  let dbWrites = 0;
   let current = -1;
+  const dbp = port.db ?? null;
   let failed: string | null = null;
   const rootLen = rootMoves.length;
   const info = (budget: number): EngineCommand[] => [
@@ -102,7 +107,7 @@ export async function runProve(
       phase: "idle",
       resolved: tree.resolvedCount,
       searches,
-      dbWrites: 0,
+      dbWrites,
       open: tree.openCount(),
       nodes: tree.count,
       path: tree.path(Math.max(0, current)),
@@ -122,18 +127,29 @@ export async function runProve(
   hooks.log(
     `증명: ${rootLen % 2 === 0 ? "흑" : "백"} 차례, 노드당 예산 ` +
       `${options.byDepth ? `d${options.depth0}..${options.depthMax}` : `${options.budget0Sec}..${options.budgetMaxSec}초`}, ` +
-      `nbest ${options.nbest} · DB 없음(결론은 이 실행 안에서만)`,
+      `nbest ${options.nbest} · ${dbp ? "DB 붙음(질의 · 기록)" : "DB 없음(결론은 이 실행 안에서만)"}`,
   );
   hooks.onOverlay(tree.overlay(null, rootLen));
+
+  /**
+   * `prove_flush_writes`(main.c:9505) — 쌓인 결론을 DB 에 쓴다. yixindb 라벨은 **둔 쪽 관점**이라
+   * 둘 차례가 이기는 마디는 `L` 로 적는다(`proveWriteTag`). DB 가 없으면 비우기만 한다.
+   */
+  const flushWrites = async () => {
+    for (let i = tree.popWrite(); i !== null; i = tree.popWrite()) {
+      if (!dbp || hooks.isCancelled()) continue;
+      const w = tree.get(i);
+      const winForStm = (w.result === "win") === w.isOr;
+      progress({ phase: "edit" });
+      if (await dbp.write([...rootMoves, ...w.moves], winForStm, w.value, w.recDepth)) dbWrites++;
+    }
+  };
 
   let forced: number | null = null;
   for (;;) {
     if (hooks.isCancelled()) break;
     if (tree.root.state === "resolved") {
-      // DB 가 없어 쓸 곳이 없다 — 쓰기 큐는 비우기만 한다.
-      while (tree.popWrite() !== null) {
-        /* W8 에서 yxedittvddatabase 로 */
-      }
+      await flushWrites();
       break;
     }
     const next: number | null = forced ?? tree.pickNext();
@@ -142,6 +158,27 @@ export async function runProve(
     current = next;
     hooks.onOverlay(tree.overlay(current, rootLen));
     const n = tree.get(next);
+    // `prove_send_query`(main.c:9435) — DB 가 이미 아는 마디는 탐색하지 않는다.
+    if (dbp) {
+      progress({ phase: "query" });
+      const rec = await dbp.query([...rootMoves, ...n.moves]);
+      if (hooks.isCancelled()) break;
+      const verdict = rec ? proveVerdict(rec.label, n.isOr) : null;
+      if (rec && verdict) {
+        tree.resolve(
+          next,
+          verdict,
+          "db",
+          rec.value,
+          rec.depth,
+          rec.label === 0x64 ? "db draw" : "db",
+        );
+        await flushWrites();
+        hooks.onOverlay(tree.overlay(current, rootLen));
+        progress();
+        continue;
+      }
+    }
     const budget = Math.min(n.budget, maxBudget(options));
     // 시간 방식은 예산이 곧 끈이다. 깊이 방식은 초 상한을 끈으로 빌린다 — 깊이만으로는 모든
     // 방어를 그 깊이로 읽는 AND 마디를 묶지 못한다(main.c:9484).
@@ -201,6 +238,7 @@ export async function runProve(
       step = tree.onSearchResult(next, pvs, complete);
     }
     if (step === "retry") forced = next;
+    await flushWrites();
     hooks.onOverlay(tree.overlay(current, rootLen));
     progress();
   }
@@ -214,7 +252,7 @@ export async function runProve(
     blackToMove: rootLen % 2 === 0,
     searches,
     conclusions: tree.resolvedCount,
-    dbWrites: null,
+    dbWrites: dbp ? dbWrites : null,
     attackerWinRatePct: Math.round(root.wratt * 100),
   };
   return { outcome, tree, failed };

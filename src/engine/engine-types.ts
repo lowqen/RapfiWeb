@@ -58,6 +58,13 @@ export type EngineCommand =
   /** 무승부 제안·기권을 엔진에게 알린다. 엔진은 답하지 않고 기록만 한다. */
   | { kind: "yxdraw" }
   | { kind: "yxresign" }
+  /**
+   * yixindb 의 **국면 단위** 명령(W8) — 머리 줄, 지금 국면까지의 수마다 `y,x` 한 줄, `done`.
+   * 데스크톱 `DbPositionCommand` 와 같은 모양이다(`yxquerydatabaseallt` · `yxquerydatabaseone` ·
+   * `yxedittvddatabase <mask> <tag> <value> <depth>` · `yxeditlabeldatabase <y,x> <label>` …).
+   * Rapfi 는 `getDatabasePosition` 으로 `DONE` 까지 읽는다.
+   */
+  | { kind: "dbPosition"; head: string; moves: readonly Move[] }
   | { kind: "stop" }
   | { kind: "end" }
   | { kind: "raw"; line: string };
@@ -316,7 +323,19 @@ export type ToWorker =
       id: number;
     }
   | { type: "stop" }
-  | { type: "shutdown" };
+  | { type: "shutdown" }
+  /**
+   * 엔진의 메모리 파일 시스템(W8) — yixindb 파일을 웹 저장소와 주고받는다. 요청 줄에 선다
+   * (앞뒤 명령과 순서가 지켜진다). `save` 는 `YXSAVEDATABASE` 를 보내고 저장 메시지를
+   * 기다린 뒤 그 파일을 읽어 돌려준다. 글루가 FS 를 내보내지 않는 옛 엔진이면 실패로 답한다.
+   */
+  | {
+      type: "fs";
+      id: number;
+      op: "write" | "read" | "remove" | "save";
+      path: string;
+      bytes?: Uint8Array;
+    };
 
 /**
  * 탐색이 끝난 까닭. `finished` 는 엔진이 스스로 끝낸 것(유한 착수), `timeout` 은
@@ -366,6 +385,10 @@ export type FromWorker =
       >;
     }
   | { type: "forbid"; cells: readonly Move[] }
+  /** `fs` 요청의 답. */
+  | { type: "fs"; id: number; ok: boolean; bytes?: Uint8Array; error?: string }
+  /** yixindb 가 말한 줄(`DATABASE …` · `Saved database file …`) — DB 화면과 증명이 받는다. */
+  | { type: "dbLine"; text: string }
   /**
    * 탐색 하나가 끝났다. `id` 는 그 요청의 번호다 — 새 요청에 밀려 끝난 탐색의
    * `searchDone` 은 **뒤따르는 탐색이 도는 중에** 도착한다. 번호로 가르지 않으면

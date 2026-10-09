@@ -1,6 +1,10 @@
 # public/engine/
 
-Rapfi WebAssembly 산출물 — **네 변형**이 같은 빌드(릴리스 `engine-3c94c2a9-a3`)에서 나온다.
+Rapfi WebAssembly 산출물 — **네 변형**이 같은 빌드(릴리스 `engine-3c94c2a9-w8`)에서 나온다.
+
+`w8` 은 `a3` 에 `tools/patches/w8-export-fs.patch` 하나를 얹었다 — 글루가 Emscripten `FS` 를
+내보내(`EXPORTED_RUNTIME_METHODS` 에 `'FS'`) 엔진 DB 파일 `rapfi.db` 를 워커가 메모리 FS 로
+넣고 꺼낼 수 있게 한다(W8, `src/features/database/`). 탐색 코드는 그대로라 NPS · BENCH 는 `a3` 와 같다.
 
 ```
 rapfi-multi-simd128-relaxed.js/.wasm   멀티스레드 + relaxed SIMD — 격리 + relaxed 를 아는 브라우저(Chromium 114+)에서 먼저

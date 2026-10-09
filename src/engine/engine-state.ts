@@ -8,6 +8,7 @@ import {
   type Capabilities,
   type EnginePreference,
   type EngineVariant,
+  type FsResult,
   type OpeningResponse,
 } from "./engine-client";
 import {
@@ -152,6 +153,36 @@ interface EngineState {
 }
 
 let client: EngineClient | null = null;
+
+/**
+ * yixindb(W8)의 귀 — DB 화면 · 증명이 엔진의 `DATABASE …` 줄과 기동 소식을 받는다. 엔진 스토어는
+ * DB 를 모른다: 줄을 건네고, 새 엔진이 떴다고 알릴 뿐이다(메모리 DB 는 엔진과 함께 사라지므로
+ * DB 쪽이 다시 붙여야 한다).
+ */
+const dbLineListeners = new Set<(text: string) => void>();
+const bootListeners = new Set<() => void>();
+
+export function onDbLine(fn: (text: string) => void): () => void {
+  dbLineListeners.add(fn);
+  return () => dbLineListeners.delete(fn);
+}
+
+export function onEngineBooted(fn: () => void): () => void {
+  bootListeners.add(fn);
+  return () => bootListeners.delete(fn);
+}
+
+/** 엔진 메모리 FS(W8). 엔진이 떠 있지 않으면 실패로 답한다 — 띄우지는 않는다. */
+export function engineFs(
+  op: "write" | "read" | "remove" | "save",
+  path: string,
+  bytes?: Uint8Array,
+): Promise<FsResult> {
+  if (!client || client.currentStatus === "idle" || client.currentStatus === "error") {
+    return Promise.resolve({ ok: false, error: "엔진이 떠 있지 않습니다" });
+  }
+  return client.fs(op, path, bytes);
+}
 
 /** 엔진을 독점할 수 있는 작업. */
 export type EngineOwner = "review" | "prove";
@@ -412,6 +443,10 @@ export const useEngineStore = create<EngineState>((set, get) => {
       onError: (error) => {
         if (client === c) set({ error: tidy(error) });
       },
+      onDbLine: (text) => {
+        if (client !== c) return;
+        for (const fn of dbLineListeners) fn(text);
+      },
       // 띄울 변형마다 — 멀티에서 단일로 물러서면 thread_num 은 1 이 된다.
       bootSettings: (variant) =>
         bootCommands(config, isMultiVariant(variant), get().capabilities.hardwareConcurrency),
@@ -433,6 +468,10 @@ export const useEngineStore = create<EngineState>((set, get) => {
             weightsMs: info.weights.ms,
             warmupMs: info.warmupMs,
           },
+        });
+        // 새 엔진의 메모리 FS 는 비어 있다 — DB 를 쓰는 쪽이 다시 붙인다(W8).
+        queueMicrotask(() => {
+          if (client === c) for (const fn of bootListeners) fn();
         });
         // 멈춘 멀티 엔진을 단일로 다시 띄웠다 — 새 엔진은 설정을 모르고, 켜 둔 분석은
         // 끊겼다. 처음 기동은 `start`·`analyze` 가 이 일을 하므로 여기서는 복구만 본다.

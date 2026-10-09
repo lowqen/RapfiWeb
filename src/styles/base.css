@@ -2510,3 +2510,26 @@ button.theory__row:hover {
   margin-bottom: var(--space-s);
   font: var(--type-title-small);
 }
+
+/* ── 데이터베이스 (W8) ───────────────────────────────────────────── */
+.db__picked {
+  margin-top: var(--space-m);
+}
+.db__label {
+  width: 8ch;
+}
+.db__comment {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s);
+  margin-top: var(--space-l);
+}
+.db__comment textarea {
+  width: 100%;
+  font: var(--type-body-medium);
+  resize: vertical;
+}
+.db__sub {
+  margin-top: var(--space-xl);
+  font: var(--type-title-small);
+}

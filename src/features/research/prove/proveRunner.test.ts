@@ -171,6 +171,66 @@ describe("루프", () => {
   });
 });
 
+describe("DB 단계(W8)", () => {
+  /** 수순 키 → 라벨 문자. 쓰기는 따로 모은다. */
+  function fakeDb(known: Record<string, string>) {
+    const queries: number[] = [];
+    const writes: { len: number; win: boolean; value: number; depth: number }[] = [];
+    const key = (ms: readonly Move[]) => ms.map((x) => `${x.x},${x.y}`).join(" ");
+    return {
+      queries,
+      writes,
+      db: {
+        query: async (ms: readonly Move[]) => {
+          queries.push(ms.length);
+          const l = known[key(ms)];
+          return l
+            ? { label: l.charCodeAt(0), value: 29990, depth: 4 }
+            : { label: 0, value: 0, depth: 0 };
+        },
+        write: async (ms: readonly Move[], win: boolean, value: number, depth: number) => {
+          writes.push({ len: ms.length, win, value, depth });
+          return true;
+        },
+      },
+      key,
+    };
+  }
+
+  it("DB 가 아는 뿌리는 탐색 없이 결론 — 다시 쓰지 않는다", async () => {
+    const f = fakeDb({});
+    // 둘 차례(백)가 이기는 국면은 둔 쪽(흑) 관점의 'l'
+    f.db.query = async (ms) => {
+      f.queries.push(ms.length);
+      return { label: 0x6c, value: 29990, depth: 4 };
+    };
+    const h = harness(() => null);
+    const { outcome } = await runProve(root, size, opts, { ...h.port, db: f.db }, h.hooks);
+    expect(h.calls).toEqual([]);
+    expect(outcome.resolved).toBe(true);
+    expect(outcome.win).toBe(true);
+    expect(outcome.kind).toBe("db");
+    expect(outcome.dbWrites).toBe(0);
+    expect(f.writes).toEqual([]);
+  });
+
+  it("대문자나 빈 기록은 «모름» — 탐색하고, 증명된 메이트는 L 쪽(둘 차례 승)으로 적는다", async () => {
+    const f = fakeDb({});
+    f.db.query = async (ms) => {
+      f.queries.push(ms.length);
+      return { label: 0x57, value: 0, depth: 0 }; // 'W' — main.c 는 소문자만 맞춘다
+    };
+    const h = harness(() => snap([pv(0, m("k11"), 0.99, 3)]));
+    const { outcome } = await runProve(root, size, opts, { ...h.port, db: f.db }, h.hooks);
+    expect(f.queries).toEqual([3]);
+    expect(h.calls).toHaveLength(1);
+    expect(outcome.kind).toBe("mate");
+    expect(outcome.dbWrites).toBe(1);
+    expect(f.writes).toHaveLength(1);
+    expect(f.writes[0]).toMatchObject({ len: 3, win: true });
+  });
+});
+
 describe("거절", () => {
   it("이미 승부가 난 국면은 증명하지 않는다", () => {
     const five = [7, 8, 9, 10, 11].flatMap((x, i) =>

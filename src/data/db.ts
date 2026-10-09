@@ -6,7 +6,8 @@ import type { ReviewBudget } from "../core/review/report";
 /**
  * 앱 자신의 데이터베이스 `rapfiweb` — 계획서 §4 의 Dexie 층.
  *
- * **v1 은 `games` 하나, v2 가 리뷰의 `reviews` · `queue` 를 더했다(W6b).** 계획서의 나머지
+ * **v1 은 `games` 하나, v2 가 리뷰의 `reviews` · `queue` 를, v3 가 엔진 DB 파일 `dbfiles` 를
+ * 더했다(W6b · W8).** 계획서의 나머지
  * 표(정석 · 팩 …)는 그 기능이 들어올 때 `version(n)` 을 올리며 더한다 — 쓰지 않는 표를 미리 파 두면 그 모양이
  * 실제 요구보다 먼저 굳는다. 이미 있는 표의 색인을 바꿀 때도 버전을 올린다.
  *
@@ -78,10 +79,22 @@ export interface ReviewRow {
   createdAt: number;
 }
 
+/**
+ * 엔진의 yixindb 파일 한 벌(W8) — 엔진 메모리 FS 의 `rapfi.db` 바이트 그대로. 엔진이 뜰 때
+ * 메모리 FS 에 써 넣고(`info usedatabase 1` 이 그 파일을 연다), 저장할 때 엔진이 쓴 파일을
+ * 읽어 여기 덮어쓴다. IDBFS 대신 이 길을 쓰는 까닭은 `features/database/dbStore.ts`.
+ */
+export interface DbFileRow {
+  name: string;
+  bytes: Uint8Array;
+  savedAt: number;
+}
+
 export class RapfiDb extends Dexie {
   games!: EntityTable<GameRecord, "id">;
   reviews!: EntityTable<ReviewRow, "id">;
   queue!: EntityTable<ReviewJob, "id">;
+  dbfiles!: EntityTable<DbFileRow, "name">;
 
   constructor(name = "rapfiweb") {
     super(name);
@@ -93,6 +106,9 @@ export class RapfiDb extends Dexie {
     this.version(2).stores({
       reviews: "++id, createdAt",
       queue: "++id, order, status",
+    });
+    this.version(3).stores({
+      dbfiles: "&name",
     });
   }
 }

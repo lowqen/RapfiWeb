@@ -7,6 +7,7 @@ import { moveKey } from "../../../core/model/move";
 import { budgetText, optionsLabel } from "../../../core/prove/prove-tree";
 import { badgeLines, outcomeMessage, outcomeTitle } from "../../../core/prove/prove-models";
 import { useBoardStore } from "../../board/boardStore";
+import { useDbStore } from "../../database/dbStore";
 import { useProveStore } from "./proveStore";
 
 /**
@@ -16,7 +17,8 @@ import { useProveStore } from "./proveStore";
  * 상태(승 · 패 · 열림의 남은 예산 · 소진 · 대기)와 지금 탐색 중인 줄(반투명 번호 돌)을 그린다
  * — 데스크톱 `prove_update_overlay` 와 같다.
  *
- * 웹에는 아직 DB 가 없어(W8) 결론이 이 실행 안에서만 쓰인다 — 화면이 그렇게 말한다.
+ * 엔진 DB(W8)가 붙어 있으면 데스크톱처럼 마디마다 DB 를 먼저 묻고 증명된 메이트를 적는다.
+ * 붙어 있지 않으면 결론이 이 실행 안에서만 쓰인다 — 화면이 어느 쪽인지 말한다.
  */
 
 const START_SEC = [2, 5, 10, 20] as const;
@@ -28,6 +30,8 @@ const NBEST = [2, 3, 4, 6, 8] as const;
 export function ProveSection() {
   const s = useProveStore();
   const board = useBoardStore((b) => b.render);
+  const dbOn = useDbStore((d) => d.status === "on");
+  const dbReadonly = useDbStore((d) => d.settings.readonly);
   const [notice, setNotice] = useState<string | null>(null);
   const o = s.options;
   const p = s.progress;
@@ -76,7 +80,12 @@ export function ProveSection() {
       <p className="panel__hint">
         지금 판에서 둘 차례({board.stones.length % 2 === 0 ? "흑" : "백"})의 승리를 엔진이 모는
         AND/OR 탐색으로 증명하거나 반증합니다. 메이트만 결론으로 칩니다 — 높은 승률은 증거일
-        뿐입니다. 웹에는 아직 데이터베이스가 없어 결론은 이 실행 안에서만 쓰입니다.
+        뿐입니다.{" "}
+        {dbOn
+          ? dbReadonly
+            ? "데이터베이스(읽기 전용)를 먼저 묻습니다 — 결론은 적지 않습니다."
+            : "데이터베이스를 먼저 묻고, 증명된 메이트를 데이터베이스에 적습니다."
+          : "데이터베이스가 붙어 있지 않아 결론은 이 실행 안에서만 쓰입니다(데이터베이스 화면에서 켤 수 있습니다)."}
       </p>
 
       <div className="review__row">

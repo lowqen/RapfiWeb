@@ -13,6 +13,7 @@ import {
   type ProveProgress,
 } from "../../../core/prove/prove-models";
 import { useEngineStore } from "../../../engine/engine-state";
+import { proveDb } from "../../database/dbStore";
 import { useBoardStore } from "../../board/boardStore";
 import { useGameStore } from "../../board/gameStore";
 import { proveRefusal, runProve, type ProvePort } from "./proveRunner";
@@ -63,6 +64,9 @@ const enginePort: ProvePort = {
   search: (stones, opts, onSnapshot) =>
     useEngineStore.getState().exclusiveSearch(stones, opts, onSnapshot),
   stop: () => useEngineStore.getState().stop(),
+  get db() {
+    return proveDb();
+  },
 };
 let port: ProvePort = enginePort;
 
