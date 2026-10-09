@@ -305,43 +305,6 @@ a:focus-visible {
   background: var(--c-secondary-container);
 }
 
-/* ── 자리표시자 (W1 한정) ───────────────────────────────────────── */
-.placeholder {
-  display: flex;
-  justify-content: center;
-}
-.placeholder__card {
-  width: 100%;
-  max-width: var(--reading-width);
-  padding: var(--space-xxl);
-  background: var(--c-surface-container-low);
-  border: 1px solid var(--c-outline-variant);
-  border-radius: var(--radius-l);
-}
-.placeholder__stage {
-  display: inline-block;
-  padding: 2px var(--space-m);
-  font: var(--type-label-small);
-  color: var(--c-on-tertiary-container);
-  background: var(--c-tertiary-container);
-  border-radius: var(--radius-xs);
-}
-.placeholder__title {
-  margin-top: var(--space-m);
-  font: var(--type-headline-small);
-  letter-spacing: var(--track-headline-small);
-}
-.placeholder__what {
-  margin-top: var(--space-m);
-  font: var(--type-body-large);
-  color: var(--c-on-surface-variant);
-}
-.placeholder__needs {
-  margin-top: var(--space-l);
-  font: var(--type-body-small);
-  color: var(--c-outline);
-}
-
 /* ── 보드 ───────────────────────────────────────────────────────────
    캔버스 두 장을 겹친다. 아래가 정적(나무·격자·좌표), 위가 동적(돌·링·칩).
    확대/이동은 CSS transform 이 지고 캔버스는 다시 그리지 않는다 — 확대하면서
@@ -3002,4 +2965,520 @@ button.theory__row:hover {
   color: var(--c-on-secondary-container);
   background: var(--c-secondary-container);
   border-color: var(--c-secondary-container);
+}
+
+/* ── W7 · RenjuNet 통계(랭킹 · 오프닝 빈도) ───────────────────────────
+   승·무·패 막대는 결과 배지와 같은 세 역할(흑 = 파랑 · 백 = 초록 · 무 = 중립)을 쓴다 — 다른 화면에서
+   이미 그렇게 읽힌다. 막대 옆 글자는 흑 점수 하나(무 = 반 점), 자세한 것은 툴팁. */
+.wdl {
+  display: inline-flex;
+  gap: var(--space-m);
+  align-items: center;
+  min-width: 0;
+}
+.wdl__bar {
+  display: flex;
+  flex: none;
+  width: 120px;
+  height: 8px;
+  overflow: hidden;
+  background: var(--c-surface-container-highest);
+  border-radius: 4px;
+}
+.wdl--compact .wdl__bar {
+  width: 72px;
+  height: 6px;
+}
+.wdl__b {
+  background: var(--c-result-black);
+}
+.wdl__d {
+  background: var(--c-result-draw);
+  opacity: 0.55;
+}
+.wdl__w {
+  background: var(--c-result-white);
+}
+.wdl__none {
+  flex: 1;
+}
+.wdl__score {
+  min-width: 4.2em;
+  font: var(--type-label-medium);
+  color: var(--c-on-surface-variant);
+  text-align: right;
+}
+
+/* 가져오기 안내 — 세 걸음을 번호 원으로. 첫 화면에서 «무엇을 · 어디서 · 얼마나»가 한눈에. */
+.rifcard {
+  background: linear-gradient(
+    160deg,
+    var(--c-secondary-container) 0%,
+    var(--c-surface-container) 55%
+  );
+}
+.rifcard--compact {
+  background: var(--c-surface-container);
+  border: 1px dashed var(--c-outline-variant);
+}
+.rifcard__lead {
+  margin-top: var(--space-m);
+  font: var(--type-body-medium);
+  color: var(--c-on-surface);
+}
+.rifsteps {
+  display: grid;
+  gap: var(--space-m);
+  margin: var(--space-l) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.rifsteps li {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: var(--space-m);
+  align-items: start;
+  font: var(--type-body-medium);
+  color: var(--c-on-surface);
+}
+.rifsteps__n {
+  display: inline-grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  font: var(--type-label-medium);
+  color: var(--c-on-primary);
+  background: var(--c-primary);
+  border-radius: 50%;
+}
+.rifsteps a {
+  color: var(--c-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.rifcard--compact .rifsteps {
+  gap: var(--space-s);
+}
+.rifcard__legal {
+  margin-top: var(--space-m);
+}
+
+/* 지금 보는 자료 — 한 줄. 좁으면 버튼이 다음 줄로. */
+.packbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-m);
+  align-items: center;
+  padding: var(--space-m) var(--space-l);
+  background: var(--c-surface-container);
+  border-radius: var(--radius-l);
+}
+.packbar__meta {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: var(--type-label-large);
+  color: var(--c-on-surface-variant);
+}
+.packbar__actions,
+.packbar__confirm {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-s);
+  align-items: center;
+}
+.packbar__confirm {
+  font: var(--type-body-small);
+  color: var(--c-on-surface);
+}
+
+/* 파일을 끄는 동안 위에 뜨는 한 줄. 누르는 것을 막지 않는다. */
+.riftip {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  z-index: 50;
+  max-width: calc(100vw - 32px);
+  padding: var(--space-m) var(--space-xl);
+  font: var(--type-label-large);
+  color: var(--c-on-primary);
+  pointer-events: none;
+  background: var(--c-primary);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.22);
+  transform: translateX(-50%);
+  animation: riftip-in 180ms cubic-bezier(0.2, 0, 0, 1);
+}
+@keyframes riftip-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -6px);
+  }
+}
+
+/* 변환 진행 · 결과 카드 — 오른쪽 아래. 화면을 옮겨도 남는다. */
+.rifjob {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 40;
+  width: min(360px, calc(100vw - 32px));
+  padding: var(--space-l) var(--space-xl);
+  background: var(--c-surface-container-high);
+  border: 1px solid var(--c-outline-variant);
+  border-radius: var(--radius-l);
+  box-shadow: 0 10px 32px rgb(0 0 0 / 0.24);
+  animation: rifjob-in 220ms cubic-bezier(0.2, 0, 0, 1);
+}
+@keyframes rifjob-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+.shell[data-compact] .rifjob {
+  right: 16px;
+  bottom: 84px; /* 아래 탭 위 */
+}
+.rifjob__head {
+  display: flex;
+  gap: var(--space-m);
+  align-items: baseline;
+  justify-content: space-between;
+}
+.rifjob__title {
+  font: var(--type-title-small);
+  color: var(--c-on-surface);
+}
+.rifjob__pct {
+  font: var(--type-title-medium);
+  color: var(--c-primary);
+}
+.rifjob__bar {
+  height: 6px;
+  margin-top: var(--space-m);
+  overflow: hidden;
+  background: var(--c-surface-container-highest);
+  border-radius: 3px;
+}
+.rifjob__bar > span {
+  display: block;
+  height: 100%;
+  background: var(--c-primary);
+  border-radius: 3px;
+  transition: width 240ms cubic-bezier(0.2, 0, 0, 1);
+}
+.rifjob__meta {
+  display: flex;
+  gap: var(--space-m);
+  justify-content: space-between;
+  margin-top: var(--space-m);
+  font: var(--type-body-small);
+  color: var(--c-on-surface-variant);
+}
+.rifjob__time {
+  flex: none;
+}
+.rifjob__warn {
+  margin-top: var(--space-s);
+  font: var(--type-body-small);
+  color: var(--c-error);
+}
+.rifjob__actions {
+  display: flex;
+  gap: var(--space-s);
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: var(--space-m);
+}
+.rifjob__file {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font: var(--type-label-small);
+  color: var(--c-outline);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rifjob__close {
+  width: 28px;
+  height: 28px;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--c-on-surface-variant);
+  border-radius: 50%;
+}
+.rifjob__close:hover {
+  background: var(--c-surface-container-highest);
+}
+.rifjob--error {
+  border-color: var(--c-error);
+}
+@media (prefers-reduced-motion: reduce) {
+  .riftip,
+  .rifjob {
+    animation: none;
+  }
+}
+
+/* 랭킹 — 리뷰 화면과 같은 한 열. */
+.ranking {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-m);
+  width: 100%;
+  max-width: 880px;
+  margin: 0 auto;
+}
+.ranking__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-m);
+  align-items: center;
+  justify-content: space-between;
+}
+.ranking__filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-m);
+  margin-top: var(--space-l);
+}
+.ranking__search {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  max-width: 420px;
+}
+.ranking__input {
+  height: 40px;
+  padding: 0 var(--space-l);
+  font: var(--type-body-medium);
+  color: var(--c-on-surface);
+  background: var(--c-surface-container-high);
+  border: 1px solid var(--c-outline-variant);
+  border-radius: var(--radius-s);
+  outline: 0;
+}
+.ranking__input:focus {
+  border-color: var(--c-primary);
+  box-shadow: inset 0 0 0 1px var(--c-primary);
+}
+.ranking__suggest {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: 0;
+  z-index: 5;
+  margin: 4px 0 0;
+  padding: var(--space-xs);
+  list-style: none;
+  background: var(--c-surface-container-highest);
+  border-radius: var(--radius-m);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.2);
+}
+.ranking__suggest button {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--space-s) var(--space-m);
+  font: var(--type-body-medium);
+  color: var(--c-on-surface);
+  text-align: left;
+  border-radius: var(--radius-s);
+}
+.ranking__suggest button:hover {
+  background: var(--c-surface-container-high);
+}
+.ranking__country {
+  font: var(--type-label-medium);
+  color: var(--c-on-surface-variant);
+}
+.ranklist {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rankrow {
+  display: grid;
+  grid-template-columns: 2em 44px minmax(0, 1fr) auto auto;
+  gap: var(--space-l);
+  align-items: center;
+  width: 100%;
+  min-height: 56px;
+  padding: var(--space-s) var(--space-m);
+  color: var(--c-on-surface);
+  text-align: left;
+  border-radius: var(--radius-m);
+}
+.rankrow:hover:not(:disabled) {
+  background: var(--c-surface-container-highest);
+}
+.rankrow:disabled {
+  cursor: default;
+}
+.rankrow__rank {
+  font: var(--type-label-medium);
+  color: var(--c-outline);
+  text-align: right;
+}
+.rankrow__thumb {
+  width: 44px;
+  height: 44px;
+}
+.rankrow__thumb--none {
+  display: block;
+  background: var(--c-surface-container-highest);
+  border-radius: 3px;
+}
+.rankrow__name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font: var(--type-body-medium);
+}
+.rankrow__name b {
+  font-weight: 600;
+}
+.rankrow__sub {
+  overflow: hidden;
+  font: var(--type-label-small);
+  color: var(--c-on-surface-variant);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rankrow__games {
+  font: var(--type-label-large);
+  text-align: right;
+}
+@media (max-width: 560px) {
+  .rankrow {
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+    gap: var(--space-m);
+  }
+  .rankrow__rank {
+    display: none;
+  }
+  .rankrow .wdl {
+    grid-column: 2 / -1;
+  }
+  .rankrow__thumb {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+/* 개시 썸네일 — 판과 같은 나무 · 돌 색. */
+.miniboard {
+  display: block;
+}
+.miniboard__wood {
+  fill: var(--c-board-wood);
+}
+.miniboard__grid line {
+  stroke: var(--c-board-line);
+  stroke-width: 0.6;
+  opacity: 0.55;
+}
+.miniboard__black {
+  fill: var(--c-board-black-low);
+}
+.miniboard__white {
+  fill: var(--c-board-white-high);
+  stroke: var(--c-board-white-rim);
+  stroke-width: 0.8;
+}
+
+/* 오프닝: 다음 수 표에 판 수 · 막대 두 칸을 더한다. */
+.theory__row--stat {
+  grid-template-columns: 4.5em minmax(0, 1fr) auto auto;
+}
+.theory__games {
+  min-width: 4em;
+  font: var(--type-label-medium);
+  color: var(--c-on-surface-variant);
+  text-align: right;
+}
+.explorer__stat {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-m);
+  align-items: center;
+  justify-content: flex-end;
+}
+@media (max-width: 560px) {
+  .theory__row--stat {
+    grid-template-columns: 3.5em minmax(0, 1fr) auto;
+  }
+  .theory__row--stat .wdl {
+    display: none;
+  }
+}
+.explorer__needle {
+  width: 100%;
+  margin-top: var(--space-m);
+}
+.gamelist {
+  display: flex;
+  flex-direction: column;
+  margin: var(--space-m) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.gamelist__row {
+  display: grid;
+  grid-template-columns: 3.2em minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  column-gap: var(--space-l);
+  align-items: baseline;
+  width: 100%;
+  padding: var(--space-s) var(--space-m);
+  font: var(--type-body-medium);
+  color: var(--c-on-surface);
+  text-align: left;
+  border-radius: var(--radius-m);
+}
+.gamelist__row:hover {
+  background: var(--c-surface-container-highest);
+}
+.gamelist__year {
+  font: var(--type-label-medium);
+  color: var(--c-on-surface-variant);
+}
+.gamelist__players {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gamelist__vs {
+  color: var(--c-outline);
+}
+.gamelist__res {
+  font: var(--type-label-medium);
+}
+.gamelist__res[data-res="2"] {
+  color: var(--c-result-black);
+}
+.gamelist__res[data-res="0"] {
+  color: var(--c-result-white);
+}
+.gamelist__tour {
+  grid-column: 2 / -1;
+  overflow: hidden;
+  font: var(--type-label-small);
+  color: var(--c-on-surface-variant);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ranking__rules {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.ranking__more {
+  align-self: center;
+  padding: 0 var(--space-m);
+  font: var(--type-label-large);
 }

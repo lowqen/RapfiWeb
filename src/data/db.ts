@@ -3,12 +3,13 @@ import type { Move } from "../core/model/move";
 import type { PositionRecord } from "../core/review/move-quality";
 import type { ReviewBudget } from "../core/review/report";
 import type { JosekiTree } from "../core/joseki/tree";
+import type { RenjuPack } from "../core/rif/pack";
 
 /**
  * 앱 자신의 데이터베이스 `rapfiweb` — 계획서 §4 의 Dexie 층.
  *
  * **v1 은 `games` 하나, v2 가 리뷰의 `reviews` · `queue` 를, v3 가 엔진 DB 파일 `dbfiles` 를,
- * v4 가 정석 `joseki` · `josekiIndex` 를 더했다(W6b · W8 · W9).** 계획서의 나머지
+ * v4 가 정석 `joseki` · `josekiIndex` 를, v5 가 `.rif` 변환 팩 `packs` 를 더했다(W6b · W8 · W9 · W7).** 계획서의 나머지
  * 표(정석 · 팩 …)는 그 기능이 들어올 때 `version(n)` 을 올리며 더한다 — 쓰지 않는 표를 미리 파 두면 그 모양이
  * 실제 요구보다 먼저 굳는다. 이미 있는 표의 색인을 바꿀 때도 버전을 올린다.
  *
@@ -104,6 +105,17 @@ export interface JosekiIndexRow {
   ply: number;
 }
 
+/**
+ * `.rif` 변환 팩 한 벌(W7) — RenjuNet 파생물이라 **이 브라우저에만** 둔다(서버 · 번들 금지). 15MB
+ * 남짓의 타입드 배열 묶음이 구조화 복제로 통째 들어간다. 지금은 `"renjunet"` 한 줄뿐이다(내 기보
+ * 팩은 그때그때 만든다).
+ */
+export interface PackRow {
+  name: "renjunet";
+  pack: RenjuPack;
+  savedAt: number;
+}
+
 export class RapfiDb extends Dexie {
   games!: EntityTable<GameRecord, "id">;
   reviews!: EntityTable<ReviewRow, "id">;
@@ -111,6 +123,7 @@ export class RapfiDb extends Dexie {
   dbfiles!: EntityTable<DbFileRow, "name">;
   joseki!: EntityTable<JosekiTree, "id">;
   josekiIndex!: EntityTable<JosekiIndexRow, "id">;
+  packs!: EntityTable<PackRow, "name">;
 
   constructor(name = "rapfiweb") {
     super(name);
@@ -130,6 +143,9 @@ export class RapfiDb extends Dexie {
     this.version(4).stores({
       joseki: "id, title, category, updatedAt",
       josekiIndex: "++id, key, josekiId",
+    });
+    this.version(5).stores({
+      packs: "&name",
     });
   }
 }

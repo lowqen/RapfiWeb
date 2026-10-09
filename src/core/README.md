@@ -15,7 +15,7 @@ React 도 DOM 도 모르는 코드만 여기 온다. 앱(Kotlin)에서 옮겨 �
 | `moveorder/` | 수순 DAG(경로 수 메모 · 규칙 넷 · 환원) · 세션 · 문구 | W6c ✅ |
 | `prove/` | AND/OR 증명 트리 · 비용 · 전파 · 덧그림 · 진행/결과 문구 | W6d ✅ |
 | `review/` | 수 등급 판정기(데스크톱 4단계 분류기) · 정확도 · 리포트 CSV/MD/HTML · HTML 틀 | W6b ✅ |
-| `rif/` | `.rif` 스트리밍 파서와 팩 생성 — **결과는 IndexedDB 에만** | W7 |
+| `rif/` | `.rif` 바이트 스트리밍 파서 · 64비트 정규 해시(`pos-key` 와 같은 동치류) · 정렬 기반 팩 생성 · 조회 · 랭킹 — **결과는 IndexedDB 에만** | W7 ✅ |
 
 `board/BoardCanvas.tsx` 하나만 React 를 안다. 나머지는 DOM 도 프레임워크도 모르는
 순수 함수라 브라우저 없이 시험이 돈다 — 렌더러가 `CanvasRenderingContext2D` 만 받는

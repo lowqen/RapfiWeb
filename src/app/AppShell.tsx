@@ -6,6 +6,7 @@ import { ResearchTabs } from "../features/research/ResearchTabs";
 import { titleFor } from "./destinations";
 import { useIsCompact } from "./useIsCompact";
 import { useAutoBoot } from "./useAutoBoot";
+import { RifImportLayer } from "../features/research/rif/RifImportLayer";
 
 /**
  * 레일 + 상단 바 + 내용. 스낵바 호스트도 결국 여기 하나가 된다(앱과 같이).
@@ -32,6 +33,8 @@ export function AppShell() {
         </main>
       </div>
       {compact && <BottomTabs />}
+      {/* W7: 어느 화면에 .rif 를 놓아도 변환하고, 진행 · 결과 카드를 띄운다. */}
+      <RifImportLayer />
     </div>
   );
 }

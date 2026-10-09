@@ -15,5 +15,5 @@
 
 지금 들어 있는 것: Dexie v1 의 `games` 표(`db.ts`)와 판 자동 저장 · 링크로 덮인 판(`games.ts`, W5a),
 v2 의 리뷰 큐 · 리포트(`reviews.ts`, W6b), 고른 리포트를 보드에 건네는 `current-review.ts`, v3 의 엔진 DB
-파일 `dbfiles`(W8), v4 의 정석 문서 · 국면 색인(`joseki.ts`, W9 — 문서와 색인을 한 트랜잭션으로). 오프닝 표 둘을
+파일 `dbfiles`(W8), v4 의 정석 문서 · 국면 색인(`joseki.ts`, W9 — 문서와 색인을 한 트랜잭션으로), v5 의 `.rif` 변환 팩 `packs`(W7 — RenjuNet 파생물이라 이 브라우저에만, 스토어는 `features/research/rif/rifStore.ts`). 오프닝 표 둘을
 받아 두는 `opening-tables.ts`(W6a)도 여기다. 가중치 캐시는 `src/engine/weights-cache.ts` 에 있다. 나머지 표는 그 기능이 들어올 때 버전을 올리며 더한다.
