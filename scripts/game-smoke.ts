@@ -76,6 +76,63 @@ const fail = (m: string) => {
 };
 const ok = (m: string) => console.log(`  ✓ ${m}`);
 
+// ── 실패했을 때 «어디서 무엇을» ──────────────────────────────────────
+//
+// 예전 실패 보고는 `locator.click: Timeout 30000ms exceeded.` 한 줄이었다 — 어느 단계의 어느
+// 버튼인지는 Playwright 오류의 둘째 줄 아래(콜 로그)에만 있었고, 첫 줄만 찍었다. 이제 단계 ·
+// 마지막 손짓 · 기다리던 대상을 함께 남긴다.
+
+/** 지금 도는 단계(「1. 자유 렌주」 …). */
+let step = "기동";
+/** 마지막으로 한 손짓 — 무엇을 기다리다 멈췄는지. */
+let lastAction = "";
+
+function section(title: string) {
+  step = title.trim();
+  console.log(title);
+}
+
+/** Playwright 오류에서 «무엇을 기다렸나»(콜 로그의 `waiting for …`)를 꺼낸다. */
+function waitedFor(e: unknown): string | null {
+  const msg = e instanceof Error ? e.message : String(e);
+  const m = /waiting for (.+)/.exec(msg);
+  return m ? m[1]!.trim() : null;
+}
+
+/**
+ * `what` 을 하는 손짓 — 시간이 다 되면 무엇을 얼마나 기다렸는지 말하는 오류로 바꾼다.
+ * `lastAction` 도 여기서 적는다.
+ */
+async function act<T>(what: string, fn: () => Promise<T>): Promise<T> {
+  lastAction = what;
+  try {
+    return await fn();
+  } catch (e) {
+    const first = e instanceof Error ? (e.message.split("\n")[0] ?? "") : String(e);
+    const target = waitedFor(e);
+    throw new Error(`${what} — ${first}${target ? ` (기다린 대상: ${target})` : ""}`);
+  }
+}
+
+/** 선택자가 보일 때까지 — 이름을 붙여 기다린다. */
+const waitSel = (selector: string, what: string, timeout: number) =>
+  act(`${what} 대기(${timeout}ms)`, () => page.locator(selector).first().waitFor({ timeout }));
+
+/**
+ * 「지금 두기」를 **찾고 누르기를 페이지 안에서 한 번에.** 눌렀으면 true, 버튼이 없으면 false.
+ *
+ * 엔진은 무제한 대국에서도 **메이트를 읽으면 스스로 둔다** — 버튼이 그 순간 사라진다. 찾기
+ * (`count()`)와 누르기(`click()`)를 Playwright 왕복 둘로 나누면 그 틈에 엔진이 두고, `click()` 은
+ * 없는 버튼을 30초 기다리다 실패한다(W9 CI 1차 시도: `Eval +M9 · Time 2165ms` 로 스스로 둔
+ * 직후 「locator.click: Timeout 30000ms exceeded」 — 판은 이미 8돌로 맞았다).
+ */
+const PRESS_MOVE_NOW = `(() => {
+  const b = [...document.querySelectorAll("button")].find((x) => x.textContent.trim() === "지금 두기");
+  if (!b || b.disabled) return false;
+  b.click();
+  return true;
+})()`;
+
 /**
  * 화면의 BEST 를 읽고 **같은 순간에** 「정지」를 누른다 — 페이지 안에서 한 번에.
  *
@@ -123,7 +180,7 @@ async function tab(name: Tab) {
   await goto("board");
   const t = page.getByRole("tab", { name, exact: true });
   if ((await t.getAttribute("aria-selected")) === "true") return;
-  await t.click();
+  await act(`「${name}」 탭 누르기`, () => t.click({ timeout: 15_000 }));
   await page.waitForTimeout(120);
 }
 
@@ -131,8 +188,10 @@ async function goto(screen: Screen) {
   const marker = screen === "board" ? ".boardscreen" : ".settings";
   if (await page.locator(marker).count()) return;
   const label = screen === "board" ? "보드" : "설정";
-  await page.locator(".rail__link", { hasText: label }).click();
-  await page.locator(marker).waitFor({ timeout: 5_000 });
+  await act(`레일 「${label}」 누르기`, () =>
+    page.locator(".rail__link", { hasText: label }).click({ timeout: 15_000 }),
+  );
+  await waitSel(marker, `${label} 화면`, 10_000);
   // 보드는 다시 붙을 때 ResizeObserver 로 크기를 잡는다 — 한 프레임을 기다린다.
   if (screen === "board") await page.locator(".board__view").waitFor({ timeout: 5_000 });
   await page.waitForTimeout(120);
@@ -198,6 +257,7 @@ const stoneCount = async (): Promise<number> => {
 
 /** 돌 수가 `n` 이 될 때까지. 엔진의 답을 기다리는 거의 모든 자리가 이것이다. */
 async function waitStones(n: number, timeoutMs = 60_000, why = "") {
+  lastAction = `돌 ${n}개 대기(${timeoutMs}ms) ${why}`;
   const t0 = Date.now();
   while (Date.now() - t0 < timeoutMs) {
     if ((await stoneCount()) === n) return;
@@ -213,9 +273,13 @@ async function waitStones(n: number, timeoutMs = 60_000, why = "") {
  */
 async function engineReply(n: number, why: string, thinkMs = 2_000) {
   await page.waitForTimeout(thinkMs);
-  await goto("board"); // 「지금 두기」는 보드의 엔진 카드에 있다
-  const now = page.getByRole("button", { name: "지금 두기", exact: true });
-  if (await now.count()) await now.click();
+  await goto("board"); // 「지금 두기」는 보드의 대국 카드에 있다
+  // 그 사이 엔진이 스스로 뒀으면(메이트 · 즉답) 누를 것이 없다. 아니면 찾기와 누르기를 한 번에.
+  if ((await stoneCount()) !== n) {
+    lastAction = `「지금 두기」 누르기 ${why}`;
+    const pressed = (await page.evaluate(PRESS_MOVE_NOW)) as boolean;
+    if (!pressed) lastAction = `「지금 두기」 없음 — 엔진이 스스로 두기를 기다림 ${why}`;
+  }
   await waitStones(n, 90_000, why);
 }
 
@@ -281,13 +345,14 @@ async function runAnalysis(ms: number): Promise<string> {
   await tab("분석");
   const before = await stoneCount();
   await click("분석");
-  await page.locator('.panel__badge[data-status="searching"]').waitFor({ timeout: 10_000 });
+  await waitSel('.panel__badge[data-status="searching"]', "분석 시작(배지 searching)", 20_000);
   await page.waitForTimeout(ms);
   const still = await page.locator(".panel__badge").first().getAttribute("data-status");
   if (still !== "searching") fail(`무제한 분석이 ${ms}ms 안에 저절로 멈췄습니다 (${still})`);
   await tab("분석");
+  lastAction = "「정지」 누르기(최선수 읽기와 한 번에)";
   const best = (await page.evaluate(STOP_AND_READ_BEST)) as string;
-  await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 5_000 });
+  await waitSel('.panel__badge[data-status="ready"]', "정지 뒤 엔진 대기(배지 ready)", 15_000);
   await page.waitForTimeout(150);
   const placed = (await page.locator("dd[data-k=last]").innerText()).trim();
   if ((await stoneCount()) !== before + 1 || placed !== best) {
@@ -296,7 +361,9 @@ async function runAnalysis(ms: number): Promise<string> {
     );
   }
   // 대국의 기보로 돌아간다 — 정지가 둔 수를 무르고 대국 탭으로.
-  await page.getByRole("button", { name: "한 수 뒤로" }).click();
+  await act("「한 수 뒤로」 누르기", () =>
+    page.getByRole("button", { name: "한 수 뒤로" }).click({ timeout: 15_000 }),
+  );
   await page.waitForTimeout(120);
   if ((await stoneCount()) !== before)
     fail(`정지가 둔 수를 무르지 못했습니다 (${await stoneCount()})`);
@@ -386,12 +453,34 @@ async function thought(label: string) {
  * 탭으로 먼저 간다(`ON_SETTINGS`).
  */
 async function click(name: string) {
-  await tab(ON_ANALYSIS.has(name) ? "분석" : "대국");
-  await page.getByRole("button", { name, exact: true }).click();
+  const where = ON_ANALYSIS.has(name) ? "분석" : "대국";
+  await tab(where);
+  const btn = page.getByRole("button", { name, exact: true });
+  try {
+    await act(`${where} 탭의 「${name}」 버튼 누르기`, () => btn.click({ timeout: 20_000 }));
+  } catch (e) {
+    // 왜 못 눌렀나 — 버튼이 없나, 잠겼나, 엔진이 무엇을 하던 중인가.
+    const state = (await page
+      .evaluate(
+        `(() => {
+          const bs = [...document.querySelectorAll("button")];
+          const b = bs.find((x) => x.textContent.trim() === ${JSON.stringify(name)});
+          const badge = document.querySelector(".panel__badge");
+          return (b ? (b.disabled ? "있음(잠김)" : "있음") : "없음") +
+            " · 엔진 " + (badge ? badge.getAttribute("data-status") : "?");
+        })()`,
+      )
+      .catch(() => "?")) as string;
+    throw new Error(`${e instanceof Error ? e.message : String(e)} — 버튼 ${state}`);
+  }
 }
 
-async function dump(why: string) {
+async function dump(why: string, err?: unknown) {
   console.error(`\n──── 실패 지점: ${why} ────`);
+  console.error(`단계: ${step}`);
+  console.error(`마지막 손짓: ${lastAction || "(없음)"}`);
+  const target = waitedFor(err);
+  if (target) console.error(`기다리던 대상: ${target}`);
   try {
     // 콘솔은 엔진 탭에 있다 — 화면이 아니라 스토어에서 읽는다.
     const lines = (await page.evaluate(`window.__rapfiConsole()`)) as string[];
@@ -422,9 +511,7 @@ try {
   // 엔진은 앱이 뜨면 스스로 기동한다 — 누르지 않고 기다린다.
   const t0 = Date.now();
   await page.goto(`${BASE}/board`, { waitUntil: "domcontentloaded" });
-  await page
-    .locator('[data-k="engine-indicator"][data-status="ready"]')
-    .waitFor({ timeout: 180_000 });
+  await waitSel('[data-k="engine-indicator"][data-status="ready"]', "엔진 자동 기동", 180_000);
   console.log(`엔진 자동 기동 ${Date.now() - t0}ms`);
   await tab("대국");
   // 대국 전체를 **어느 변형으로** 도는지 — 멀티면 착수·분석이 비동기 경로를 탄다.
@@ -444,7 +531,7 @@ try {
   }
 
   // ── 1. 렌주 자유 규칙으로 대국 ────────────────────────────────────
-  console.log("1. 자유 렌주 — 차례가 오가는가");
+  section("1. 자유 렌주 — 차례가 오가는가");
   await click("컴퓨터 백");
   await tap(7, 7);
   // 사람 돌부터 따로 본다 — 「클릭이 빗나갔다」와 「엔진이 답하지 않았다」는
@@ -483,10 +570,10 @@ try {
   // 이제 대국 탭으로 가는 순간 분석이 멈추므로 그 뒤의 착수가 깨끗한지를 본다.
   await tab("분석");
   await click("분석");
-  await page.locator('.panel__badge[data-status="searching"]').waitFor({ timeout: 10_000 });
+  await waitSel('.panel__badge[data-status="searching"]', "분석 시작(배지 searching)", 20_000);
   await page.waitForTimeout(1_500);
   await tab("대국");
-  await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 5_000 });
+  await waitSel('.panel__badge[data-status="ready"]', "탭 전환 뒤 분석 멈춤(배지 ready)", 15_000);
   await page.waitForTimeout(800); // 정지에 늦게 온 답이 판에 떨어지지 않는지
   if ((await stoneCount()) !== 6)
     fail(`분석 → 대국 탭 전환이 판을 바꿨습니다: 돌 ${await stoneCount()}개`);
@@ -519,21 +606,22 @@ try {
   else if ((await stoneCount()) !== 1)
     fail(`엔진이 저절로 두었습니다 (돌 ${await stoneCount()}개)`);
   else ok("무제한: 20초가 지나도 끊기지 않고 계속 읽는다");
-  await nowBtn.click();
-  await waitStones(2, 10_000, "(「지금 두기」 뒤 엔진의 수)");
+  lastAction = "무제한 20초 뒤 「지금 두기」 누르기";
+  await page.evaluate(PRESS_MOVE_NOW);
+  await waitStones(2, 15_000, "(「지금 두기」 뒤 엔진의 수)");
   await page.waitForTimeout(300);
   await thought("「지금 두기」로 둔 수");
 
   // **탭 격리 — 엔진이 대국의 수를 생각하는 중에 분석 탭으로.** 그 수는 버려져야 한다:
   // 분석 탭에서 판에 엔진의 돌이 떨어지면 두 모드가 한 판을 두고 다툰 것이다. 대국 탭으로
   // 돌아와 판을 누르면(«두어라») 엔진이 다시 생각해 둔다.
-  console.log("\n1b. 탭 격리 — 생각 중 탭 전환");
+  section("\n1b. 탭 격리 — 생각 중 탭 전환");
   await click("새 판");
   await tap(7, 7);
   await waitStones(1, 5_000, "(사람 수)");
   await page.waitForTimeout(1_000);
   await tab("분석");
-  await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 10_000 });
+  await waitSel('.panel__badge[data-status="ready"]', "생각하던 수 버림(배지 ready)", 20_000);
   await page.waitForTimeout(1_500);
   if ((await stoneCount()) !== 1)
     fail(`대국 → 분석 탭 전환 뒤 엔진의 수가 판에 떨어졌습니다 (${await stoneCount()})`);
@@ -550,9 +638,11 @@ try {
   // 「입문」은 착수에 `INFO max_node 20000` 을 얹는다. 착수 시간이 무제한이어도 엔진이 그
   // 노드에서 **스스로** 둔다(「지금 두기」가 필요 없다). 그 값은 대국 착수에만 머물고 다음
   // 분석은 설정값(-1)으로 되돌린다 — 대국의 레벨이 분석을 얕게 만들지 않는다.
-  console.log("\n1c. 레벨 — 입문");
+  section("\n1c. 레벨 — 입문");
   await click("새 판");
-  await page.getByRole("radio", { name: "입문", exact: true }).click();
+  await act("레벨 「입문」 고르기", () =>
+    page.getByRole("radio", { name: "입문", exact: true }).click({ timeout: 15_000 }),
+  );
   await tap(7, 7);
   const tLevel = Date.now();
   await waitStones(2, 60_000, "(입문 레벨 엔진의 답 — 「지금 두기」 없이)");
@@ -577,13 +667,30 @@ try {
           .join("\n"),
     );
   } else ok("분석은 max_node -1 로 돌아갔다 — 레벨은 대국 착수에만");
-  await page.getByRole("radio", { name: "최강", exact: true }).click();
+  await act("레벨 「최강」 고르기", () =>
+    page.getByRole("radio", { name: "최강", exact: true }).click({ timeout: 15_000 }),
+  );
+
+  // ── 1d. 빈 판 첫 수 — 엔진이 흑이면 천원에 곧바로 ─────────────────
+  //
+  // 무제한 대국에서 엔진은 그 뻔한 한 수(천원)도 「지금 두기」까지 붙들고 있었다. 이제 빈 판의
+  // 흑 첫 수는 엔진에 묻지 않고 곧바로 천원(H8)이다 — 「지금 두기」가 뜨지 않아야 한다.
+  section("\n1d. 빈 판 첫 수 — 엔진이 흑이면 천원에 곧바로");
+  await click("새 판");
+  await click("컴퓨터 흑");
+  await tap(3, 3); // 엔진 차례 — «두어라»
+  await waitStones(1, 3_000, "(빈 판 첫 수 — 「지금 두기」 없이)");
+  const firstMove = (await page.locator("dd[data-k=last]").innerText()).trim();
+  if (firstMove !== "H8") fail(`빈 판 첫 수가 천원이 아닙니다: ${firstMove}`);
+  else if ((await page.getByRole("button", { name: "지금 두기", exact: true }).count()) !== 0)
+    fail("빈 판 첫 수 뒤에도 엔진이 생각 중입니다");
+  else ok("빈 판: 「지금 두기」 없이 천원 H8 에 곧바로 두었다");
 
   // ── 2. 엔진 착수 시간 — 대국 시계 없이 ───────────────────────────
   //
   // 대국 시계는 걷어냈다. 엔진의 한 수 시간만 정하고(`timeout_turn`), 대국
   // 예산(`timeout_match`)은 늘 0 이다. 그래도 엔진이 그 시간만큼 읽는가.
-  console.log("\n2. 엔진 착수 시간 — 3초");
+  section("\n2. 엔진 착수 시간 — 3초");
   await goto("board");
   if ((await page.locator(".clock").count()) !== 0) fail("보드에 시계가 남아 있습니다");
   else ok("보드에 시계가 없다");
@@ -599,7 +706,7 @@ try {
   await analysisHealthy("시간 착수 뒤 분석");
 
   // ── 3. 평가 바 ────────────────────────────────────────────────────
-  console.log("\n3. 평가 바 — 값이 오고, 판과 같은 높이이고, 다크에서 읽히는가");
+  section("\n3. 평가 바 — 값이 오고, 판과 같은 높이이고, 다크에서 읽히는가");
   await goto("board");
   const bar = page.getByRole("meter", { name: "평가 바" });
   const text = (await bar.getAttribute("aria-valuetext")) ?? "";
@@ -643,8 +750,47 @@ try {
   else ok(`다크 모드 평가 바 라벨 대비 ${contrast.toFixed(2)}:1`);
   await page.evaluate(() => (document.documentElement.dataset.theme = "light"));
 
+  // ── 3b. 착수 시간 직접 입력 ───────────────────────────────────────
+  //
+  // 칩에 없는 시간(2.5초)을 「직접」 칸에 적으면 그 값이 `timeout_turn` 으로 엔진에 닿아야 하고,
+  // 뜻을 알 수 없는 값(음수)은 기본값(무제한)으로 돌아가며 까닭을 띄워야 한다.
+  section("\n3b. 착수 시간 직접 입력");
+  await click("새 판");
+  await click("컴퓨터 백");
+  const timeField = page.getByLabel("엔진 착수 시간 직접 입력", { exact: true });
+  await act("착수 시간 칸에 2.5 적기", async () => {
+    await timeField.fill("2.5", { timeout: 15_000 });
+    await timeField.press("Enter");
+  });
+  const chipsOn = await page
+    .locator('[role=group][aria-label="엔진 착수 시간"] .chip[aria-pressed=true]')
+    .count();
+  if (chipsOn !== 0) fail(`직접 입력 뒤에도 칩 ${chipsOn}개가 켜져 있습니다`);
+  await tap(7, 7);
+  await waitStones(2, 60_000, "(직접 입력 2.5초 착수에서 엔진의 답)");
+  await page.waitForTimeout(300);
+  const sentTurn = ((await page.evaluate(`window.__rapfiConsole()`)) as string[]).filter((l) =>
+    l.startsWith("> INFO timeout_turn"),
+  );
+  if (sentTurn.at(-1) !== "> INFO timeout_turn 2500")
+    fail(`직접 입력 2.5초가 엔진에 닿지 않았습니다: ${sentTurn.at(-1) ?? "(없음)"}`);
+  else ok("직접 입력 2.5초 → INFO timeout_turn 2500");
+  await thought("직접 입력 2.5초 착수");
+  await act("착수 시간 칸에 -3 적기", async () => {
+    await timeField.fill("-3", { timeout: 15_000 });
+    await timeField.press("Enter");
+  });
+  const fieldNote = page.locator(".field--duration .field__note");
+  const noteText = (await fieldNote.count()) ? (await fieldNote.innerText()).trim() : "";
+  const unlimitedOn = await page
+    .getByRole("button", { name: "무제한", exact: true })
+    .getAttribute("aria-pressed");
+  if (unlimitedOn !== "true") fail(`음수 입력이 기본값(무제한)으로 돌아가지 않았습니다`);
+  else if (!noteText.includes("기본값")) fail(`음수 입력의 까닭이 뜨지 않습니다: «${noteText}»`);
+  else ok(`음수 입력 → 기본값(무제한) · «${noteText}»`);
+
   // ── 4. 기권 · 무승부 ──────────────────────────────────────────────
-  console.log("\n4. 기권 · 무승부");
+  section("\n4. 기권 · 무승부");
   await click("사람 대 사람"); // 엔진이 끼어들면 기권·무승부가 탐색과 엇갈린다
   await click("새 판");
   await click("무제한");
@@ -665,7 +811,7 @@ try {
   //
   // RIF 는 협상 명령이 오가지 않는다. 첫 세 수를 개시 영역 안에 손으로 놓고
   // 그 뒤는 평범한 대국이다 — 그래서 이 엔진에서도 온전히 돈다.
-  console.log("\n5. RIF 오프닝");
+  section("\n5. RIF 오프닝");
   await click("RIF 오프닝"); // 규칙을 바꾸면 새 대국이다
   await click("컴퓨터 백");
   await tap(7, 7);
@@ -682,7 +828,7 @@ try {
   //
   // 교환 여부를 **데스크톱이 스스로** 정하는 규칙이라(main.c:2771) 엔진의
   // 협상 명령이 필요 없다. 그래서 이 엔진에서도 온전히 돈다.
-  console.log("\n6. 첫 수 이후 교환");
+  section("\n6. 첫 수 이후 교환");
   await click("첫 수 이후 교환");
   await click("컴퓨터 백");
   await tap(7, 7); // 천원 — 먼 개시라 교환 조건에 걸린다
@@ -704,7 +850,7 @@ try {
   //
   // 손으로 놓는 개시(RIF)에서 천원 둘레를 벗어나면 판을 되돌리고 알린다.
   // **엔진과 무관하다** — 데스크톱도 이건 스스로 판정한다(main.c:2786).
-  console.log("\n7. 개시 영역 검사");
+  section("\n7. 개시 영역 검사");
   await click("RIF 오프닝"); // 개시를 고르면 새 대국이다
   await click("컴퓨터 백");
 
@@ -737,7 +883,7 @@ try {
   // Soosorv-8 과 스왑2 는 엔진에게 협상을 시키는데 Rapfi 가 그 명령을 모른다
   // (`docs/오프닝-협상-엔진-지원.md`). 화면에 남아 있으면 못 하는 일을 계속
   // 제안하게 되므로 목록에서 내렸다 — **배포본에서 그것을 확인한다.**
-  console.log("\n8. 개시 목록");
+  section("\n8. 개시 목록");
   await tab("대국"); // 개시 칩과 안내는 보드의 대국 탭 「룰셋」 줄에 있다
   const chips = await page.locator('[role=group][aria-label="오프닝"] .chip').allInnerTexts();
   const names = chips.map((c) => c.trim()).sort();
@@ -766,8 +912,8 @@ try {
   }
 } catch (e) {
   const first = e instanceof Error ? (e.message.split("\n")[0] ?? "") : String(e);
-  await dump(first);
-  fail(first);
+  await dump(first, e);
+  fail(`[${step}] ${first}`);
 } finally {
   await browser.close();
   if (!REMOTE) server.close();

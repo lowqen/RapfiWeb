@@ -229,6 +229,47 @@ try {
   const size = readFileSync((await dbFile.path())!).byteLength;
   if (size <= 0) fail(".db 가 비었다");
   else ok(`.db ${size} 바이트`);
+
+  // 보드 화면(/board)에서도 DB 의 기록이 보여야 한다 — 국면 카드의 주석, 분석 탭 판의 칸 글자,
+  // 그리고 자식 값으로 읽은 국면 값이 평가 바에(엔진이 이 국면을 읽고 있지 않을 때).
+  console.log("5. 보드 화면 — 주석 · 칸 글자 · 평가 바");
+  await page.locator(".rail__link", { hasText: "보드" }).click();
+  await page.locator(".boardscreen").waitFor({ timeout: 15_000 });
+  const analysisTab = page.getByRole("tab", { name: "분석", exact: true });
+  if ((await analysisTab.getAttribute("aria-selected")) !== "true") await analysisTab.click();
+  await until(
+    page,
+    "보드 국면 카드의 DB 주석",
+    () =>
+      page
+        .locator('[data-k="db-comment"]')
+        .innerText()
+        .catch(() => ""),
+    (t) => t === note,
+    20_000,
+  );
+  ok("국면 카드에 DB 주석이 떴다");
+  const boardTags = await until(
+    page,
+    "보드 판의 DB 칸 글자",
+    () => page.evaluate("window.__rapfiBoard()") as Promise<{ tags: { label: string }[] }>,
+    (b) => b.tags.some((t) => t.label === "AB"),
+    20_000,
+  );
+  ok(`분석 탭 판에 DB 칩 ${boardTags.tags.length}개(칸 글자 AB 포함)`);
+  // h8 i9 로 무르면 j10 이 자식이 되고, 거기 적은 W 기록이 이 국면의 값이 된다.
+  await page.getByRole("button", { name: "한 수 뒤로" }).click();
+  const meterText = await until(
+    page,
+    "평가 바의 DB 값",
+    () =>
+      page.getByRole("meter", { name: "평가 바" }).getAttribute("aria-valuetext") as Promise<
+        string | null
+      >,
+    (t) => (t ?? "").includes("DB 기록"),
+    20_000,
+  );
+  ok(`평가 바가 DB 값을 그린다 — «${meterText}»`);
 } catch (e) {
   fail(e instanceof Error ? e.message : String(e));
   try {

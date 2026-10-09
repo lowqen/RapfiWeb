@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type DragEvent } from "react";
 import { BoardCanvas } from "../../core/board/BoardCanvas";
 import { useBoardStore } from "./boardStore";
 import { useGameStore } from "./gameStore";
@@ -7,7 +7,10 @@ import { EvalBar } from "./EvalBar";
 import { EvalGraph } from "./EvalGraph";
 import { GamePanel } from "./GamePanel";
 import { ModeTabs, MODE_PANEL_ID } from "./ModeTabs";
-import { PositionCard } from "./PositionCard";
+import { PositionCard, PositionStrip } from "./PositionCard";
+import { useBoardDb, useBoardDbSync } from "./boardDb";
+import { dbCellTag } from "../database/dbTags";
+import { useDbStore } from "../database/dbStore";
 import { PromptPanel } from "./OpeningPanel";
 import { LinkBackupBanner } from "./LinkBackupBanner";
 import { MoveTransport } from "./MoveTransport";
@@ -33,8 +36,15 @@ import type { Move } from "../../core/model/move";
  *     → 국면(기권 · 무승부). 판에 분석 오버레이(값 칩 · 최선수 링 · 고스트)를 얹지 않는다.
  *   - **분석**: 엔진 카드(DEPTH · NPS · PV · 분석/정지) → 형세 그래프 → 분석 설정 → 국면
  *
+ * 국면 카드는 넓은 화면에서 옆 칸 **맨 위**에, 좁은 화면에서는 탭의 카드 뒤에 놓이고 대신
+ * 국면 요약 한 줄이 옆 칸 맨 위에 붙는다(`PositionCard` 주석).
+ *
  * 탭을 바꿀 때 엔진을 어떻게 넘기는지(생각하던 대국의 수는 버리고, 분석은 멈추기만)는
  * `gameStore.setMode` 가 정한다 — 화면은 그리기만 한다.
+ *
+ * **DB(W8).** 붙어 있으면 지금 국면의 기록을 묻고(`useBoardDbSync`), 분석 탭의 판에 DB 칩
+ * (자식 값 · 칸 글자)을 엔진 칩 위에 얹는다 — 증명되거나 사람이 적은 기록이 실시간 추정보다
+ * 앞선다. 대국 탭에는 얹지 않는다(엔진 분석과 같은 탭 격리).
  */
 export function BoardScreen() {
   const render = useBoardStore((s) => s.render);
@@ -47,6 +57,9 @@ export function BoardScreen() {
   const refreshForbidden = useGameStore((s) => s.refreshForbidden);
   const status = useEngineStore((s) => s.status);
   const analysis = useCurrentAnalysis();
+  useBoardDbSync();
+  const db = useBoardDb();
+  const dbShowText = useDbStore((s) => s.settings.showBoardText);
 
   // 엔진이 **놀게 되는 순간**마다 금수를 물어본다. 기동 직후와 탐색이 끝난
   // 직후가 여기다 — 엔진의 착수 응답은 상태가 아직 searching 일 때 도착하므로,
@@ -96,7 +109,14 @@ export function BoardScreen() {
     if (file) void openGameFile(file).then((r) => showNotice(r.text));
   };
 
-  const overlay = mode === "analysis" ? analysis : EMPTY_SNAPSHOT;
+  const overlay = useMemo(() => {
+    if (mode !== "analysis") return EMPTY_SNAPSHOT;
+    if (!db || db.snap.cells.size === 0) return analysis;
+    const tags = new Map(analysis.tags);
+    // round 는 엔진 태그를 낡은 순으로 지울 때만 쓴다 — DB 칩은 매번 새로 얹으므로 0.
+    for (const [k, c] of db.snap.cells) tags.set(k, { ...dbCellTag(c, dbShowText), round: 0 });
+    return { ...analysis, tags };
+  }, [mode, analysis, db, dbShowText]);
   useEffect(() => {
     applyAnalysis(overlay);
   }, [overlay, applyAnalysis]);
@@ -139,17 +159,15 @@ export function BoardScreen() {
         {/* 물음은 맨 위 — 답하기 전까지 판이 잠기므로 가장 먼저 보여야 한다. 두 탭 모두. */}
         <PromptPanel />
         <LinkBackupBanner />
+        <PositionStrip game={mode === "game"} />
+        <PositionCard game={mode === "game"} />
         {mode === "game" ? (
-          <>
-            <GamePanel />
-            <PositionCard game />
-          </>
+          <GamePanel />
         ) : (
           <>
             <AnalysisPanel />
             <EvalGraph />
             <AnalysisOptions />
-            <PositionCard game={false} />
           </>
         )}
       </aside>

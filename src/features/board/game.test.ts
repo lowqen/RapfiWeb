@@ -103,11 +103,37 @@ describe("자유 렌주", () => {
 
   it("엔진 차례에 누르면 «두어라»라는 뜻이다", () => {
     fresh({ computerSide: "black" });
+    g().loadMoves([move(7, 7), move(8, 8)]); // 흑 차례 — 엔진의 몫
+    resetSpies();
     expect(g().tap(move(3, 3))).toEqual({ kind: "ignored" });
     // 누른 자리에 돌이 놓이지는 않는다.
-    expect(stones()).toHaveLength(0);
+    expect(stones()).toHaveLength(2);
     expect(plays).toHaveLength(1);
-    expect(plays[0]!.empty).toBe(true);
+    expect(plays[0]!.empty).toBe(false);
+    expect(g().thinking).toBe(true);
+  });
+
+  it("빈 판에서 엔진이 흑이면 첫 수는 묻지 않고 천원(H8)에 곧바로 둔다", () => {
+    // 무제한 대국이면 엔진은 그 뻔한 수를 「지금 두기」까지 붙들고 있었다.
+    fresh({ computerSide: "black" });
+    expect(g().tap(move(3, 3))).toEqual({ kind: "ignored" });
+    expect(stones()).toEqual([move(7, 7)]);
+    expect(plays).toHaveLength(0);
+    expect(g().thinking).toBe(false);
+    // 다음은 사람(백) 차례 — 사람이 두면 평소처럼 엔진에게 묻는다.
+    expect(g().tap(move(8, 8))).toEqual({ kind: "placed" });
+    expect(plays).toHaveLength(1);
+    expect(plays[0]!.stones).toHaveLength(2);
+  });
+
+  it("시간제 대국에서도, 진영 전환으로 엔진이 흑이 되어도 첫 수는 곧바로 천원이다", () => {
+    fresh({ computerSide: "white" });
+    g().setMoveTime(3_000);
+    g().swapSides(); // 빈 판 · 흑 차례 · 컴퓨터 흑
+    expect(g().computerSide).toBe("black");
+    expect(stones()).toEqual([move(7, 7)]);
+    expect(plays).toHaveLength(0);
+    expect(g().thinking).toBe(false);
   });
 
   it("탐색 중과 종국 뒤의 탭은 거절된다", () => {
@@ -122,9 +148,10 @@ describe("자유 렌주", () => {
 
   it("양쪽을 다 잡으면 엔진이 이어서 둔다", () => {
     fresh({ computerSide: "both" });
-    g().tap(move(7, 7)); // «두어라»
+    g().tap(move(3, 3)); // «두어라» — 첫 수는 천원에 곧바로, 백은 엔진에게 묻는다
+    expect(stones()).toEqual([move(7, 7)]);
     expect(plays).toHaveLength(1);
-    engineMoves(move(7, 7));
+    engineMoves(move(8, 8));
     // 다음 차례도 엔진 것이므로 곧바로 다시 묻는다.
     expect(plays).toHaveLength(2);
   });

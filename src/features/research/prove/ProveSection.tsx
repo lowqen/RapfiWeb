@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Segmented, Switch } from "../../../components/controls";
+import { DurationField, Segmented, Switch } from "../../../components/controls";
+import { PROVE_MAX_SPEC, PROVE_START_SPEC } from "../../../core/settings/duration";
 import { BoardCanvas } from "../../../core/board/BoardCanvas";
 import { emptyRender, type BoardRender } from "../../../core/board/board-renderer";
 import type { TagKind } from "../../../core/board/ladder";
@@ -26,6 +27,8 @@ const MAX_SEC = [60, 120, 320, 600] as const;
 const DEPTH0 = [8, 10, 12, 14] as const;
 const DEPTH_MAX = [20, 24, 30, 40] as const;
 const NBEST = [2, 3, 4, 6, 8] as const;
+const START_MS = START_SEC.map((v) => v * 1000);
+const MAX_MS = MAX_SEC.map((v) => v * 1000);
 
 export function ProveSection() {
   const s = useProveStore();
@@ -127,24 +130,44 @@ export function ProveSection() {
       ) : (
         <div className="review__row">
           <span className="review__label">시작 예산</span>
-          <Segmented
-            label="마디당 시작 예산(초)"
-            value={o.budget0Sec}
-            options={START_SEC.map((v) => ({ value: v, label: `${v}초` }))}
-            onChange={(budget0Sec) => s.setOptions({ budget0Sec })}
-            disabled={s.running}
-          />
+          <div className="timepick">
+            <Segmented
+              label="마디당 시작 예산(초)"
+              value={o.budget0Sec}
+              options={START_SEC.map((v) => ({ value: v, label: `${v}초` }))}
+              onChange={(budget0Sec) => s.setOptions({ budget0Sec })}
+              disabled={s.running}
+            />
+            <DurationField
+              label="마디당 시작 예산"
+              valueMs={o.budget0Sec * 1000}
+              spec={PROVE_START_SPEC}
+              presetsMs={START_MS}
+              onCommit={(ms) => s.setOptions({ budget0Sec: ms / 1000 })}
+              disabled={s.running}
+            />
+          </div>
         </div>
       )}
       <div className="review__row">
         <span className="review__label">{o.byDepth ? "마디당 시간 끈" : "마디당 상한"}</span>
-        <Segmented
-          label="마디당 상한(초)"
-          value={o.budgetMaxSec}
-          options={MAX_SEC.map((v) => ({ value: v, label: `${v}초` }))}
-          onChange={(budgetMaxSec) => s.setOptions({ budgetMaxSec })}
-          disabled={s.running}
-        />
+        <div className="timepick">
+          <Segmented
+            label="마디당 상한(초)"
+            value={o.budgetMaxSec}
+            options={MAX_SEC.map((v) => ({ value: v, label: `${v}초` }))}
+            onChange={(budgetMaxSec) => s.setOptions({ budgetMaxSec })}
+            disabled={s.running}
+          />
+          <DurationField
+            label="마디당 상한"
+            valueMs={o.budgetMaxSec * 1000}
+            spec={PROVE_MAX_SPEC}
+            presetsMs={MAX_MS}
+            onCommit={(ms) => s.setOptions({ budgetMaxSec: ms / 1000 })}
+            disabled={s.running}
+          />
+        </div>
       </div>
       <div className="review__row">
         <span className="review__label">공격 후보 수</span>

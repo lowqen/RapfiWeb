@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Segmented, Switch } from "../../../components/controls";
+import { DurationField, Segmented, Switch } from "../../../components/controls";
+import { REVIEW_TIME_SPEC } from "../../../core/settings/duration";
 import { PRESET_LABEL, type GradingPreset } from "../../../core/review/move-quality";
 import { budgetLabel, dateStamp, fixed } from "../../../core/review/report";
 import { GAME_FILE_ACCEPT } from "../../../core/model/game-file";
@@ -21,6 +22,7 @@ import type { JobStatus } from "../../../data/db";
 
 const SECONDS = [1, 2, 3, 5, 10, 30] as const;
 const DEPTHS = [10, 12, 14, 16, 18, 22] as const;
+const SECONDS_MS = SECONDS.map((sec) => sec * 1000);
 
 const STATUS_LABEL: Record<JobStatus, string> = {
   pending: "대기",
@@ -80,13 +82,23 @@ export function ReviewScreen() {
               disabled={s.running}
             />
           ) : (
-            <Segmented
-              label="국면당 시간(초)"
-              value={budget.seconds}
-              options={SECONDS.map((sec) => ({ value: sec, label: `${sec}초` }))}
-              onChange={(seconds) => s.setBudget({ seconds })}
-              disabled={s.running}
-            />
+            <div className="timepick">
+              <Segmented
+                label="국면당 시간(초)"
+                value={budget.seconds}
+                options={SECONDS.map((sec) => ({ value: sec, label: `${sec}초` }))}
+                onChange={(seconds) => s.setBudget({ seconds })}
+                disabled={s.running}
+              />
+              <DurationField
+                label="국면당 시간"
+                valueMs={budget.seconds * 1000}
+                spec={REVIEW_TIME_SPEC}
+                presetsMs={SECONDS_MS}
+                onCommit={(ms) => s.setBudget({ seconds: ms / 1000 })}
+                disabled={s.running}
+              />
+            </div>
           )}
         </div>
         <div className="review__row">

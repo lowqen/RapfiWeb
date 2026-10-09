@@ -137,3 +137,17 @@ export const useBoardStore = create<BoardState>((set, get) => ({
   setForbidden: (cells) =>
     set((s) => ({ forbidden: cells, render: { ...s.render, forbidden: cells } })),
 }));
+
+/**
+ * 스모크 · 개발자 도구가 판의 덧그림을 꺼내 보는 손잡이(`__rapfiBoard()`). 캔버스는 글자를
+ * 읽을 수 없으므로 DB 칩이 판에 얹혔는지 같은 것은 여기서 본다.
+ */
+if (typeof window !== "undefined") {
+  (window as unknown as { __rapfiBoard: () => unknown }).__rapfiBoard = () => {
+    const r = useBoardStore.getState().render;
+    return {
+      stones: r.stones.length,
+      tags: [...r.tags.entries()].map(([key, t]) => ({ key, label: t.label, kind: t.kind })),
+    };
+  };
+}

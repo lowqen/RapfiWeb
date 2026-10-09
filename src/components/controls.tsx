@@ -1,5 +1,6 @@
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { Icon, ICON } from "./icons";
+import { durationText, parseDuration, type DurationSpec } from "../core/settings/duration";
 
 /**
  * 입력 부품 — 앱의 `FilterChip`·`Switch`·스테퍼를 옮긴 것. 설정 · 보드 옆 칸 · 연구가 함께 쓴다.
@@ -218,6 +219,93 @@ export function NumberField({
         />
         {unit && <span className="field__unit">{unit}</span>}
       </span>
+    </label>
+  );
+}
+
+/**
+ * 시간 직접 입력 — 칩 · 눈금 옆에 붙는 「직접」 칸. 착수 시간 · 분석 시간 · 리뷰 · 증명 예산이 쓴다.
+ *
+ * `NumberField` 처럼 **치는 도중에는 반영하지 않고** 칸을 떠나거나 Enter 에서 한 번 넘긴다.
+ * 해석은 `parseDuration` 이 한다 — `2.5` · `1500ms` · `1분` · `무제한` 을 받고, 범위를 벗어나면
+ * 끝값으로 자르고, 음수 · 글자 · 빈칸이면 그 칸의 기본값으로 돌린다. 자르거나 돌렸으면 칸 밑에
+ * 까닭을 잠깐 띄운다(`role="status"` — 스크린 리더도 읽는다).
+ *
+ * 지금 값이 프리셋(`presetsMs`) 중 하나면 칸은 비어 있고(옆 칩이 켜져 있다), 아니면 그 값을
+ * 칸의 기본 단위로 보여 주고 켜진 모양이 된다 — 값 하나에 켜진 표시도 하나다.
+ */
+export function DurationField({
+  label,
+  valueMs,
+  spec,
+  presetsMs = [],
+  onCommit,
+  disabled,
+}: {
+  label: string;
+  valueMs: number;
+  spec: DurationSpec;
+  presetsMs?: readonly number[];
+  onCommit: (ms: number) => void;
+  disabled?: boolean;
+}) {
+  const id = useId();
+  const custom = !presetsMs.includes(valueMs);
+  const shown = custom ? durationText(valueMs, spec.unit) : "";
+  const [text, setText] = useState(shown);
+  const [note, setNote] = useState<string | null>(null);
+  useEffect(() => setText(shown), [shown]);
+  useEffect(() => {
+    if (!note) return;
+    const t = window.setTimeout(() => setNote(null), 3_500);
+    return () => window.clearTimeout(t);
+  }, [note]);
+
+  const commit = () => {
+    // 손대지 않고 떠난 칸 — 비어 있는 것은 «기본값으로»가 아니라 «그대로»다.
+    if (text.trim() === shown.trim()) return;
+    const r = parseDuration(text, spec);
+    setNote(r.kind === "ok" ? null : r.note);
+    const next = presetsMs.includes(r.ms) ? "" : durationText(r.ms, spec.unit);
+    setText(next);
+    if (r.ms !== valueMs) onCommit(r.ms);
+  };
+
+  return (
+    <label
+      className="field field--duration"
+      htmlFor={id}
+      data-on={(custom && valueMs > 0) || undefined}
+      data-disabled={disabled || undefined}
+    >
+      <span className="field__box">
+        <input
+          id={id}
+          className="field__input tnum"
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
+          spellCheck={false}
+          placeholder="직접"
+          aria-label={`${label} 직접 입력`}
+          title={`${label} — 2.5 · 1500ms · 1분 · 무제한처럼 적고 Enter`}
+          value={text}
+          disabled={disabled}
+          aria-invalid={note !== null || undefined}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            if (e.key === "Escape") setText(shown);
+          }}
+        />
+        <span className="field__unit">{spec.unit === "s" ? "초" : "ms"}</span>
+      </span>
+      {note && (
+        <span className="field__note" role="status">
+          {note}
+        </span>
+      )}
     </label>
   );
 }

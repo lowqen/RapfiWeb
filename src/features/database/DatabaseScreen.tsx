@@ -12,16 +12,14 @@ import {
   MASK_VALUE,
   deleteScopeTitle,
   entrySummary,
-  kindOf,
   positionValue,
-  winRatePct,
-  type DbCell,
   type DbDeleteScope,
 } from "../../core/database/yixindb";
 import { label as moveLabel, moveKey, sameMove, type Move } from "../../core/model/move";
 import { useEngineStore } from "../../engine/engine-state";
 import { useBoardStore } from "../board/boardStore";
 import { DB_FILE, useDbStore } from "./dbStore";
+import { dbCellTag, dbValueText } from "./dbTags";
 
 /**
  * 데이터베이스(W8) — 엔진의 yixindb. 앱 `DatabaseScreen` · 데스크톱 `show_database` 의 이식.
@@ -40,17 +38,6 @@ const TAGS = [
 
 const fmtSize = (n: number) =>
   n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)}MB` : `${(n / 1024).toFixed(1)}KB`;
-
-function tagOf(
-  c: DbCell,
-  showText: boolean,
-): { label: string; kind: TagKind; winRatePct?: number } {
-  const label = showText && c.text ? c.text : c.tag || c.text;
-  const k = kindOf(c.tag || c.text);
-  if (k === "win") return { label, kind: "win" };
-  if (k === "loss") return { label, kind: "lose" };
-  return { label, kind: "rate", winRatePct: k === "rate" ? (winRatePct(c) ?? 50) : 50 };
-}
 
 export function DatabaseScreen() {
   const s = useDbStore();
@@ -105,7 +92,7 @@ export function DatabaseScreen() {
 
   const render: BoardRender = useMemo(() => {
     const tags = new Map<number, { label: string; kind: TagKind; winRatePct?: number }>();
-    if (snap) for (const [k, c] of snap.cells) tags.set(k, tagOf(c, s.settings.showBoardText));
+    if (snap) for (const [k, c] of snap.cells) tags.set(k, dbCellTag(c, s.settings.showBoardText));
     const candidates = new Map<number, "live" | "done">();
     if (picked) candidates.set(moveKey(picked, board.size), "live");
     return {
@@ -327,9 +314,7 @@ export function DatabaseScreen() {
             <p className="panel__hint tnum" data-k="db-value">
               {snap
                 ? `기록된 자식 ${snap.cells.size}개` +
-                  (value
-                    ? ` · DB 값: ${value.stmMate !== null ? `${value.stmMate > 0 ? "승" : "패"} ${Math.abs(value.stmMate) || "*"}` : `${Math.round(value.stmWinRate * 100)}%`} (둘 차례)`
-                    : "")
+                  (value ? ` · DB 값: ${dbValueText(value)} (둘 차례)` : "")
                 : "읽는 중…"}
             </p>
             {snap?.entry && (

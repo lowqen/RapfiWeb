@@ -1,6 +1,9 @@
 import { useEngineStore } from "../../engine/engine-state";
 import type { EvalView } from "../../engine/eval-view";
 import { useCurrentEval } from "./currentAnalysis";
+import { useBoardDb } from "./boardDb";
+import { useGameStore } from "./gameStore";
+import { dbEvalView } from "../database/dbTags";
 
 /**
  * 평가 바 — 체스닷컴의 세로 게이지를 오목에 옮긴 것.
@@ -14,17 +17,27 @@ import { useCurrentEval } from "./currentAnalysis";
  *
  * 움직임은 **채움의 높이만** 200ms 로 옮긴다(`Motion.kt` 의 상한). 숫자는
  * 보간하지 않는다 — 실시간 값의 애니메이션은 지나간 값에 대한 거짓말이다.
+ *
+ * **DB(W8).** 분석 탭에서 DB 가 지금 국면의 값을 말하면(`positionValue` — 데스크톱
+ * `evalbar_update_from_db`) 엔진이 이 국면을 읽고 있지 않은 동안 그 값을 그린다. 엔진이 읽는
+ * 중이면 실시간 값이 앞선다. DB 값이면 라벨 밑에 「DB」를 적어 출처를 말한다.
  */
 export function EvalBar({ empty }: { empty: boolean }) {
   const view = useCurrentEval();
   const analyzing = useEngineStore((s) => s.analyzing);
   const status = useEngineStore((s) => s.status);
+  const db = useBoardDb();
+  const analysisTab = useGameStore((s) => s.mode === "analysis");
+  const live = analyzing || status === "searching";
   // 빈 판에서 아무것도 읽지 않고 있으면 앞 대국의 값이 남아 있을 이유가 없다.
-  const v = empty && !analyzing && status !== "searching" ? null : view;
+  const engineView = empty && !live ? null : view;
+  const dbView = analysisTab && db?.value ? dbEvalView(db.value) : null;
+  const fromDb = dbView !== null && !(live && engineView);
+  const v = fromDb ? dbView : engineView;
 
   const black = v ? v.blackPct : 50;
   const lead: "black" | "white" | null = v ? (black >= 50 ? "black" : "white") : null;
-  const { main, sub } = labels(v);
+  const { main, sub } = labels(v, fromDb);
 
   return (
     <div
@@ -34,10 +47,11 @@ export function EvalBar({ empty }: { empty: boolean }) {
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={Math.round(black)}
-      aria-valuetext={describe(v)}
+      aria-valuetext={describe(v, fromDb)}
       data-lead={lead ?? undefined}
       data-live={status === "searching" || undefined}
-      title={describe(v)}
+      title={describe(v, fromDb)}
+      data-source={fromDb ? "db" : undefined}
     >
       <div className="evalbar__black" style={{ height: `${black}%` }} />
       <div className="evalbar__mid" aria-hidden="true" />
@@ -49,18 +63,20 @@ export function EvalBar({ empty }: { empty: boolean }) {
   );
 }
 
-function labels(v: EvalView | null): { main: string; sub: string | null } {
+function labels(v: EvalView | null, fromDb: boolean): { main: string; sub: string | null } {
   if (!v) return { main: "—", sub: null };
-  if (v.mate) return { main: `M${v.mate.plies}`, sub: null };
+  if (v.mate) return { main: `M${v.mate.plies}`, sub: fromDb ? "DB" : null };
+  if (fromDb) return { main: `${Math.round(Math.max(v.blackPct, 100 - v.blackPct))}%`, sub: "DB" };
   const leadPct = Math.round(Math.max(v.blackPct, 100 - v.blackPct));
   // 평가값은 앞선 쪽 기준의 크기만 — 어느 편인지는 라벨이 붙은 끝이 말한다.
   const sub = v.blackEval === null ? null : String(Math.abs(v.blackEval));
   return { main: `${leadPct}%`, sub };
 }
 
-function describe(v: EvalView | null): string {
+function describe(v: EvalView | null, fromDb: boolean): string {
   if (!v) return "평가 없음";
-  if (v.mate) return `${v.mate.winner === "black" ? "흑" : "백"} ${v.mate.plies}수 외통`;
+  const src = fromDb ? " · DB 기록" : "";
+  if (v.mate) return `${v.mate.winner === "black" ? "흑" : "백"} ${v.mate.plies}수 외통${src}`;
   const e = v.blackEval === null ? "" : ` · 평가 ${v.blackEval > 0 ? "+" : ""}${v.blackEval}`;
-  return `흑 ${Math.round(v.blackPct)}% · 백 ${Math.round(100 - v.blackPct)}%${e}`;
+  return `흑 ${Math.round(v.blackPct)}% · 백 ${Math.round(100 - v.blackPct)}%${e}${src}`;
 }

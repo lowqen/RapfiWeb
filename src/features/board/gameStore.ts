@@ -357,6 +357,19 @@ export const useGameStore = create<GameState>((set, get) => {
       return;
     }
     const moves = board().render.stones;
+    // **빈 판의 첫 수는 묻지 않고 천원(H8)에 둔다.** 렌주의 흑 첫 수는 천원이다(RIF 개시도
+    // 천원에서 연다) — 엔진에 물어도 같은 답인데, 무제한 대국이면 엔진은 그 뻔한 한 수를
+    // 「지금 두기」까지 붙들고 있었다. 그 뒤는 엔진의 답이 온 것과 같은 길(`onEngineMove`)이다.
+    if (moves.length === 0) {
+      const first = center(board().render.size);
+      place(first);
+      log(`빈 판 — 첫 수 천원 ${label(first, board().render.size)} 바로 착수`);
+      const next = get();
+      if (!next.result && enginePlays(next.computerSide, sideToMove(board().render.stones))) {
+        engineTurn();
+      }
+      return;
+    }
     const info = levelInfo(s.level);
     set({ thinking: true });
     if (isUnlimitedTurn(s)) {

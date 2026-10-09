@@ -11,7 +11,15 @@ import {
 } from "../../core/model/game";
 import { RULE_LABEL } from "../../core/model/rules";
 import { ANALYSIS_SEC_CHOICES, useSettingsStore } from "../settings/settingsStore";
-import { Chip, ChipGroup, Segmented, Stepper, Switch } from "../../components/controls";
+import {
+  Chip,
+  ChipGroup,
+  DurationField,
+  Segmented,
+  Stepper,
+  Switch,
+} from "../../components/controls";
+import { ANALYSIS_TIME_SPEC, MOVE_TIME_SPEC } from "../../core/settings/duration";
 
 /**
  * 보드 탭의 조작부 — 예전에 설정 화면의 「자주 쓰는 설정」에 있던 것들이다.
@@ -75,18 +83,30 @@ export function ComputerControl() {
 
 const moveTimeLabel = (ms: number) => (ms === 0 ? "무제한" : `${ms / 1000}초`);
 
-/** 시간 제어 — 엔진 한 수의 시간. 대국 시계 없이 `timeout_turn` 하나만 정한다. */
+/**
+ * 시간 제어 — 엔진 한 수의 시간. 대국 시계 없이 `timeout_turn` 하나만 정한다. 칩에 없는
+ * 시간(2.5초 · 1500ms · 2분)은 옆 「직접」 칸에 적는다.
+ */
 export function MoveTimeControl() {
   const v = useGameStore((s) => s.moveTimeMs);
   const set = useGameStore((s) => s.setMoveTime);
   return (
-    <ChipGroup label="엔진 착수 시간">
-      {MOVE_TIME_CHOICES.map((ms) => (
-        <Chip key={ms} on={v === ms} onClick={() => set(ms)}>
-          {moveTimeLabel(ms)}
-        </Chip>
-      ))}
-    </ChipGroup>
+    <div className="timepick">
+      <ChipGroup label="엔진 착수 시간">
+        {MOVE_TIME_CHOICES.map((ms) => (
+          <Chip key={ms} on={v === ms} onClick={() => set(ms)}>
+            {moveTimeLabel(ms)}
+          </Chip>
+        ))}
+      </ChipGroup>
+      <DurationField
+        label="엔진 착수 시간"
+        valueMs={v}
+        spec={MOVE_TIME_SPEC}
+        presetsMs={MOVE_TIME_CHOICES}
+        onCommit={set}
+      />
+    </div>
   );
 }
 
@@ -114,16 +134,28 @@ export function LevelControl() {
 
 const secLabel = (s: number) => (s === 0 ? "무제한" : `${s}초`);
 
+const ANALYSIS_PRESETS_MS = ANALYSIS_SEC_CHOICES.map((s) => s * 1000);
+
+/** 분석 시간 — 눈금(무제한 · 5 · 10 · 30 · 60초) 밖의 시간은 「직접」 칸에(정수 초). */
 export function AnalysisTimeControl() {
   const v = useSettingsStore((s) => s.analysisSec);
   const update = useSettingsStore((s) => s.update);
   return (
-    <Segmented
-      label="분석 시간"
-      value={v}
-      options={ANALYSIS_SEC_CHOICES.map((s) => ({ value: s, label: secLabel(s) }))}
-      onChange={(analysisSec) => update({ analysisSec })}
-    />
+    <div className="timepick">
+      <Segmented
+        label="분석 시간"
+        value={v}
+        options={ANALYSIS_SEC_CHOICES.map((s) => ({ value: s, label: secLabel(s) }))}
+        onChange={(analysisSec) => update({ analysisSec })}
+      />
+      <DurationField
+        label="분석 시간"
+        valueMs={v * 1000}
+        spec={ANALYSIS_TIME_SPEC}
+        presetsMs={ANALYSIS_PRESETS_MS}
+        onCommit={(ms) => update({ analysisSec: ms / 1000 })}
+      />
+    </div>
   );
 }
 
