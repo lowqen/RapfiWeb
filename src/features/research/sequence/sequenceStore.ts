@@ -136,7 +136,7 @@ export const useSequenceStore = create<SequenceState>((set, get) => {
       const prompt = get().applyPrompt;
       // 리뷰가 엔진을 쥐고 있으면 판을 바꾸지 않는다(main.c:6225 — reviewactive).
       if (useEngineStore.getState().owner) {
-        set({ notice: "게임 리뷰가 진행 중입니다 — 먼저 멈추세요" });
+        set({ notice: "게임 리뷰나 국면 증명이 진행 중입니다 — 먼저 멈추세요" });
         return;
       }
       const done = confirmed && prompt ? prompt : await svc().call({ op: "complete" });

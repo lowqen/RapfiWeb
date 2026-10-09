@@ -693,14 +693,21 @@ export class EngineClient {
    * `YXBOARD` 는 Rapfi 확장이라 착수 없이 분석 국면만 세운다. 그 뒤 `YXNBEST` 로
    * 상위 후보 여러 개를 요청한다 — 보드의 값 칩이 그 결과다.
    */
-  analyze(stones: readonly Placement[], opts: { totalMs?: number; nbest?: number } = {}): void {
+  analyze(
+    stones: readonly Placement[],
+    opts: { totalMs?: number; nbest?: number; defend?: boolean } = {},
+  ): void {
     this.setStatus("searching");
     this.post({
       type: "search",
       mode: "analyze",
       // 국면과 탐색을 조각마다 — YXNBEST 가 끝에 엔진 판에 수를 두기 때문이다.
       setup: [{ kind: "yxboard", stones }],
-      repeat: [{ kind: "yxnbest", n: opts.nbest ?? 5 }],
+      // `defend` 는 증명의 AND 마디 — `YXSEARCHDEFEND` 는 빈칸 전부를 다중 PV 로 읽는다
+      // (Rapfi gomocup.cpp `searchDefend`: multiPV = movesLeft).
+      repeat: opts.defend
+        ? [{ kind: "raw", line: "YXSEARCHDEFEND" }]
+        : [{ kind: "yxnbest", n: opts.nbest ?? 5 }],
       // 기본은 **무제한** — 분석은 정지나 새 국면이 올 때까지 읽는다(앱의 분석과
       // 같다). 예전 기본값 5초는 「무제한 분석」이 5초 뒤 저절로 멈추게 했다.
       totalMs: opts.totalMs ?? Infinity,

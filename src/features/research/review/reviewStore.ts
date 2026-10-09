@@ -294,7 +294,11 @@ export const useReviewStore = create<ReviewState>((set, get) => {
         get().jobs.filter((j) => j.status === "pending" || j.status === "paused");
       if (runnable().length === 0) return "리뷰할 작업이 없습니다";
       const lock = useEngineStore.getState().acquire("review");
-      if (lock) return lock;
+      if (lock) {
+        return useEngineStore.getState().owner === "prove"
+          ? "국면 증명이 진행 중입니다 — 먼저 멈추세요"
+          : lock;
+      }
       cancelFlag = false;
       set({ running: true });
       const queueTotal = runnable().length;

@@ -5,6 +5,7 @@ import { budgetLabel, dateStamp, fixed } from "../../../core/review/report";
 import { GAME_FILE_ACCEPT } from "../../../core/model/game-file";
 import { reportOf, useReviewStore } from "./reviewStore";
 import { ReportView } from "./ReportView";
+import { ProveSection } from "../prove/ProveSection";
 import type { JobStatus } from "../../../data/db";
 
 /**
@@ -15,7 +16,7 @@ import type { JobStatus } from "../../../data/db";
  * 것이다 — 분석과 대국의 엔진 착수는 기다린다. 국면 하나를 끝낼 때마다 체크포인트를
  * 남기므로, 멈추거나 탭을 닫아도 다음에 그 자리부터 잇는다.
  *
- * 증명(W6d)은 이 화면의 다음 단계다.
+ * 아래의 **증명**(W6d, `../prove/ProveSection`)은 같은 엔진 자물쇠를 쓴다 — 둘은 겹쳐 돌지 않는다.
  */
 
 const SECONDS = [1, 2, 3, 5, 10, 30] as const;
@@ -271,12 +272,7 @@ export function ReviewScreen() {
         )}
       </section>
 
-      <section className="panel panel--muted">
-        <h2 className="panel__title">국면 증명 (W6d)</h2>
-        <p className="panel__hint">
-          한 수를 증명 트리로 파고드는 기능은 리뷰의 작업 큐 위에 얹는 다음 단계입니다.
-        </p>
-      </section>
+      <ProveSection />
     </div>
   );
 }

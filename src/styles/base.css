@@ -2478,3 +2478,35 @@ button.theory__row:hover {
   color: var(--c-primary);
   text-decoration: underline;
 }
+
+/* ── 연구 ▸ 리뷰·증명 의 증명 (W6d) ─────────────────────────────────── */
+.prove__badge {
+  margin-top: var(--space-l);
+  padding: var(--space-m) var(--space-l);
+  font: var(--type-body-small);
+  color: var(--c-on-secondary-container);
+  background: var(--c-secondary-container);
+  border-radius: var(--radius-m);
+}
+.prove__path {
+  margin-top: var(--space-xs);
+  opacity: 0.8;
+  word-break: break-word;
+}
+.prove__board {
+  width: min(100%, 52vh);
+  aspect-ratio: 1;
+  margin: var(--space-l) auto 0;
+}
+.prove__outcome {
+  margin-top: var(--space-l);
+  padding: var(--space-l);
+  font: var(--type-body-medium);
+  white-space: pre-line;
+  border: 1px solid var(--c-outline-variant);
+  border-radius: var(--radius-m);
+}
+.prove__outcome h3 {
+  margin-bottom: var(--space-s);
+  font: var(--type-title-small);
+}

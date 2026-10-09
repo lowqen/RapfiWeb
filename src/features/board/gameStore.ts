@@ -120,7 +120,8 @@ function saveMode(m: BoardMode) {
 }
 
 /** 리뷰가 엔진을 쥐고 있을 때의 안내 — 분석 · 정지 · 엔진 착수가 함께 쓴다. */
-export const REVIEW_BUSY = "게임 리뷰가 엔진을 쓰는 중입니다 — 리뷰가 끝나거나 멈춘 뒤에 하세요";
+export const REVIEW_BUSY =
+  "게임 리뷰나 국면 증명이 엔진을 쓰는 중입니다 — 끝나거나 멈춘 뒤에 하세요";
 
 /** 렌주에서는 장목이 흑의 **금수**라 승리 판정에서는 장목을 인정한다. */
 const ALLOW_OVERLINE = true;

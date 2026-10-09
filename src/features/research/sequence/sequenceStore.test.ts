@@ -126,7 +126,7 @@ describe("파고들기 · 보드에 놓기", () => {
     useEngineStore.setState({ owner: "review" });
     const before = useBoardStore.getState().render.stones;
     await st().apply();
-    expect(st().notice).toMatch(/리뷰가 진행 중/);
+    expect(st().notice).toMatch(/리뷰나 국면 증명이 진행 중/);
     expect(useBoardStore.getState().render.stones).toBe(before);
   });
 });

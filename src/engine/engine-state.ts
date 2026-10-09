@@ -143,7 +143,7 @@ interface EngineState {
    */
   exclusiveSearch: (
     stones: readonly Placement[],
-    opts: { totalMs: number; nbest: number; info?: readonly EngineCommand[] },
+    opts: { totalMs: number; nbest: number; info?: readonly EngineCommand[]; defend?: boolean },
     onSnapshot?: (s: AnalysisSnapshot) => void,
   ) => Promise<AnalysisSnapshot | null>;
   stop: () => void;
@@ -154,7 +154,7 @@ interface EngineState {
 let client: EngineClient | null = null;
 
 /** 엔진을 독점할 수 있는 작업. */
-export type EngineOwner = "review";
+export type EngineOwner = "review" | "prove";
 
 /** 독점 탐색이 기다리는 손잡이 — 그 탐색의 스냅샷과 끝을 받는다. */
 let exclusive: {
@@ -612,8 +612,8 @@ export const useEngineStore = create<EngineState>((set, get) => {
         c.analyze(
           stones,
           Number.isFinite(opts.totalMs)
-            ? { totalMs: opts.totalMs, nbest: opts.nbest }
-            : { nbest: opts.nbest },
+            ? { totalMs: opts.totalMs, nbest: opts.nbest, defend: opts.defend ?? false }
+            : { nbest: opts.nbest, defend: opts.defend ?? false },
         );
       });
     },
