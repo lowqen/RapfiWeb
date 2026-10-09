@@ -11,7 +11,8 @@
 
 ```
 board/      대국·분석 화면 (W4) · 기보 열기/저장 · 판 자동 저장 (W5a)
-research/   리뷰·증명(review/, W6b) / 오프닝 (W6a) / 수순 / 랭킹 (W6c · W7) — 탭 넷은 ResearchTabs 가 묶는다
+research/   리뷰·증명(review/ W6b · prove/ W6d) / 오프닝 (W6a) / 수순(sequence/ W6c) / 랭킹 (W7)
+            — 탭 넷은 ResearchTabs 가 묶는다
 database/   yixindb 국면 저장소 (W8)
 engine/     엔진 상태·도구·piskvork 콘솔 (W3)
 settings/   설정 화면 (W4) · settings.txt 67항목 왕복 (W5b)
