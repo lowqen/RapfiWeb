@@ -205,7 +205,7 @@ jobs:
       # .js/.wasm 은 커밋 대상이다 — 릴리스에서 `gh release download` 로 받아
       # public/engine/ 에 넣는다. 아티팩트는 덤이고, 계정 저장 한도가 차 있으면
       # 올라가지 않으므로 잡을 깨지 않게 둔다.
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         continue-on-error: true
         with:
           name: engine-committable

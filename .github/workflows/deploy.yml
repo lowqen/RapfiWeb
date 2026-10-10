@@ -107,7 +107,7 @@ jobs:
           find dist -name '*.map' -delete
           echo "소스맵 $(find sourcemaps -name '*.map' | wc -l)개를 배포본에서 뺐습니다."
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         continue-on-error: true
         with:
           name: sourcemaps-${{ github.sha }}
@@ -137,7 +137,7 @@ jobs:
           echo "깨끗합니다."
 
       # 기록용일 뿐 뒤 단계가 받아 쓰지 않는다 — 저장 한도가 차도 배포를 막지 않는다.
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         continue-on-error: true
         with:
           name: dist

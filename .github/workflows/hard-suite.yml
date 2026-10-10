@@ -59,7 +59,7 @@ jobs:
             --offsets "${{ inputs.offsets }}" --deep "${{ inputs.deep }}" --max-out "${{ inputs.max_out }}" \
             ${{ inputs.extra }} --out hard-candidates.json | tee extract.log
           { echo '```'; grep -E '^\[|^→' extract.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: hard-candidates
@@ -114,7 +114,7 @@ jobs:
           node bench/sprt/make-hard-suite.mjs finalize --candidates hard-candidates.json \
             --probe bench/gomocalc/results/hard-probe.json --out bench/gomocalc/mate-suite-hard.json | tee finalize.log
           { echo '```'; cat finalize.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: mate-suite-hard
