@@ -2110,6 +2110,24 @@ a:focus-visible {
     max-width: 128px;
   }
 }
+/* 휴대폰 세로(≤420px): 위 줄만으로는 제목이 10px 남짓만 남아 «Settings» 가 «S» 로, «설정» 도
+   잘렸다. 오른쪽 조작부의 틈 · 여백 · 엔진 선택 폭을 줄여 제목 몫(짧은 제목 하나)을 돌려준다.
+   긴 제목(연구 · 하위 탭)은 여전히 말줄임으로 끝난다. */
+@media (max-width: 420px) {
+  .topbar {
+    padding-inline: var(--space-m);
+  }
+  .topbar__end,
+  .enginechip-wrap {
+    gap: var(--space-s);
+  }
+  .themetoggle {
+    padding-inline: var(--space-s);
+  }
+  .select--compact .select__input {
+    max-width: 84px;
+  }
+}
 
 /* 형세 그래프 — 한 계열(흑 승률). 선 2px, 면은 ~10% 물빛, 축과 기준선은 머리카락 굵기. */
 .evalgraph__readout {
