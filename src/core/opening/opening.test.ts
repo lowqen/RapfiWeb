@@ -24,8 +24,7 @@ import {
  * 골든 둘은 앱 시험 자원의 사본이다:
  *   `openname_golden.txt` — `rif_crosscheck.py` 가 `rifkey.framekey` 와 `test_openname.exe`
  *     (= openname.h)의 합의만 싣는다
- *   `openeval_golden.txt` — `atlas_import.py` 가 대표 수순 + 환원된 다른 수순을 싣는다
- *     (등급의 출처: Renju Atlas, CC0 1.0)
+ *   `openeval_golden.txt` — `rifdb/` 가 대표 수순 + 환원된 다른 수순을 싣는다
  */
 
 const size = DEFAULT_SIZE;

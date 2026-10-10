@@ -381,8 +381,8 @@ export const EN: Readonly<Record<string, string>> = {
   "환원: 같은 돌, 다른 수순": "Transpositions: same stones, different order",
   "돌과 색이 같으니 한 판이고 유불리와 통계도 하나지만, 수순이 달라 이름은 다를 수 있습니다.":
     "Same stones and colors make one position with one grade and one set of statistics, but a different order can give a different name.",
-  "1~3수 이름은 계산하고, 4수 이름 249개와 흑 5수 유불리 1,889모양은 내장 표에서 읽습니다(유불리 출처: Renju Atlas, CC0 1.0).":
-    "Names for moves 1 to 3 are computed; the 249 fourth move names and the 1,889 Black 5th move grades come from built in tables (grades: Renju Atlas, CC0 1.0).",
+  "1~3수 이름은 계산하고, 4수 이름 249개와 흑 5수 유불리 1,889모양은 내장 표에서 읽습니다.":
+    "Names for moves 1 to 3 are computed; the 249 fourth move names and the 1,889 Black 5th move grades come from built in tables.",
   "표를 받는 중입니다…": "Loading tables…",
   "빈도 통계는 RenjuNet .rif 를 넣으면(이 브라우저 안에서만 만들고 보관) 세계 대국으로, 없으면 내 기보로 셉니다.":
     "Frequency statistics use world games once you add the RenjuNet .rif (built and kept in this browser only), and your own games otherwise.",

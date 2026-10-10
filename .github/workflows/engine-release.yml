@@ -75,8 +75,8 @@ jobs:
           sudo -n apt-get update -qq && sudo -n apt-get install -y git cmake ninja-build ccache file python3 xz-utils \
             || { echo "::error::설치 실패(sudo 암호?) — 러너 기계에 직접 설치: sudo apt-get install -y git cmake ninja-build ccache file python3 xz-utils"; exit 1; }
 
-      # w0-spike.yml 과 같은 키. restore/save 를 따로 쓰는 이유는 그쪽 주석에 있다
-      # (한 덩어리 actions/cache 는 잡이 실패하면 저장을 건너뛴다).
+      # emsdk 는 2GB 가까이 된다. restore/save 를 **따로** 쓴다 — 한 덩어리 actions/cache 는
+      # 잡이 실패하면 저장을 건너뛰어, 실패할 때마다 2GB 를 다시 받았다(W0 스파이크 때 겪었다).
       - name: emsdk 캐시 복원
         uses: actions/cache/restore@v4
         with:

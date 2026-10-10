@@ -23,7 +23,6 @@ on:
       - "spike/**"
       - "tools/**"
       - "bench/**"
-      - ".github/workflows/w0-*.yml"
       - ".github/workflows/bench-*.yml"
       - ".github/workflows/n1-*.yml"
       - ".github/workflows/tone-dump.yml"

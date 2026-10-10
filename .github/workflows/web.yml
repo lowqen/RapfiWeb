@@ -1,8 +1,7 @@
 name: web
 
 # W1 스캐폴딩부터 이 워크플로가 «빌드된다»를 지킨다.
-# 엔진(WASM) 쪽 게이트는 w0-spike.yml 이 따로 본다 — 주기가 다르기 때문이다
-# (웹은 매 푸시, 엔진은 커밋을 올릴 때).
+# 엔진(WASM) 빌드 · 검증 게이트는 engine-release.yml 이 릴리스를 낼 때 본다.
 on:
   push:
     paths-ignore:
@@ -10,11 +9,14 @@ on:
       - "spike/**"
       - "tools/**"
       - "bench/**"
-      - ".github/workflows/w0-*.yml"
       - ".github/workflows/bench-*.yml"
       - ".github/workflows/n1-*.yml"
   pull_request:
   workflow_dispatch:
+
+# 공개 저장소에서 포크 PR 이 돌리는 잡이다 — 토큰은 읽기만.
+permissions:
+  contents: read
 
 env:
   # 엔진 릴리스 — src/engine/engine-manifest.json 의 tag 와 같아야 한다(verify-engine.ts 가 본다).
@@ -24,7 +26,9 @@ jobs:
   build:
     # 저장소 변수 CI_RUNNER(예: self-hosted)가 있으면 그 러너로 — GitHub 호스트 러너가 결제 · 지출 한도로 막혔을 때.
     # 변수를 지우면 ubuntu-latest 로 돌아간다.
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    # **pull_request 는 언제나 GitHub 호스트 러너다** — 포크 PR 의 코드가 self-hosted 기계에서
+    # 돌면 그 기계가 남의 손에 넘어간다(공개 저장소의 self-hosted 러너 경고).
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
