@@ -104,7 +104,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GATE: ${{ inputs.reload_gate && '1' || '' }}
         run: |
-          pnpm install --no-frozen-lockfile
+          pnpm install --frozen-lockfile
           pnpm exec playwright install --with-deps chromium
           E=bench/gomocalc/engines
           mkdir -p "$E/base" "$E/patched"

@@ -58,7 +58,7 @@ jobs:
         with:
           node-version: "26"
       - uses: pnpm/action-setup@v4
-      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm install --frozen-lockfile
       - name: chromium
         # --with-deps 는 apt(sudo)를 쓴다 — 암호가 걸린 러너면 브라우저만 받는다(의존 라이브러리는 러너에 이미 있어야 함).
         run: pnpm exec playwright install --with-deps chromium || pnpm exec playwright install chromium

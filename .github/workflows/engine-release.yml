@@ -120,7 +120,7 @@ jobs:
       # 멀티 변형 관문 — 앱과 같은 구성(전용 워커 + pthread 가드)으로 chromium 에서
       # 기동·왕복·정지가 되는지. 실패하면 릴리스를 내지 않는다.
       - uses: pnpm/action-setup@v4
-      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm install --frozen-lockfile
       - name: 멀티 변형 관문 (W0c 하네스, chromium)
         env:
           BROWSERS: chromium

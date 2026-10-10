@@ -73,7 +73,7 @@ jobs:
         with:
           node-version: "26"
       - uses: pnpm/action-setup@v4
-      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
 
       - name: 엔진 받기 (gomocalc · 우리 릴리스)
