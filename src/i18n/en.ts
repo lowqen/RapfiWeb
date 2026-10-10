@@ -1057,4 +1057,23 @@ export const EN: Readonly<Record<string, string>> = {
   오목판: "gomoku board",
   "오목판: 방향키로 칸을 고르고 Enter 로 둡니다":
     "Gomoku board: choose a point with the arrow keys and press Enter to play",
+
+  // 설정 ▸ 정보(라이선스 고지)
+  정보: "About",
+  "RapfiWeb 은 자유 소프트웨어입니다. GNU 일반 공중 사용 허가서(GPL) 3판 또는 그 이후 판의 조건에 따라 다시 배포하거나 고칠 수 있습니다.":
+    "RapfiWeb is free software. You can redistribute it and modify it under the terms of the GNU General Public License, version 3 or any later version.",
+  "이 프로그램은 쓸모 있기를 바라며 배포되지만, 상품성이나 특정 목적 적합성에 대한 묵시적 보증을 포함해 어떠한 보증도 하지 않습니다.":
+    "This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+  "소스 코드": "Source code",
+  "라이선스 전문": "License text",
+  "서드파티 고지": "Third party notices",
+  "구성 요소": "Components",
+  "탐색 엔진(WebAssembly 빌드)": "Search engine (WebAssembly build)",
+  "엔진 가중치": "Engine weights",
+  "이식한 데스크톱 로직(프로토콜 · 국면 키 · 설정 · 리뷰)":
+    "Ported desktop logic (protocol, position keys, settings, review)",
+  "이식 원본 안드로이드 앱": "Android app this port is based on",
+  "화면 라이브러리": "UI libraries",
+  "저장 라이브러리(IndexedDB)": "Storage library (IndexedDB)",
+  "엔진 소스": "Engine source",
 };

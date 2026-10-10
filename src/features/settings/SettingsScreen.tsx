@@ -16,6 +16,7 @@ import {
 import { NumberField, Segmented, Switch } from "../../components/controls";
 import { EngineChoiceControl, ThreadControl } from "./engineControls";
 import { exportDesktopFiles, importDesktopFiles } from "./desktopBridge";
+import { AboutPanel } from "./AboutPanel";
 import { MAPPED_IDS } from "../../core/settings/desktop-bridge";
 import { ALL_SPECS } from "../../core/settings/desktop-settings";
 import { msg, pick, setLang, t, useLang, type Lang } from "../../i18n/i18n";
@@ -609,6 +610,8 @@ export function SettingsScreen() {
           ))}
         </>
       )}
+      {/* 정보 · 라이선스 고지(GPLv3) — 검색과 고급 스위치와 무관하게 맨 아래에 늘 있다. */}
+      {!q && <AboutPanel />}
     </div>
   );
 }

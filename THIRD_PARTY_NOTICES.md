@@ -5,6 +5,8 @@ RapfiWeb as a whole is distributed under the **GNU General Public License v3.0 o
 Code written for this repository may additionally be used under the BSD 2-Clause License.
 
 This file lists what is bundled or ported, and the notices each license requires.
+The same notices (license terms, no-warranty statement, component list and engine source) are
+shown inside the app under **Settings ▸ About**.
 
 | Component | Where | Upstream | License |
 |---|---|---|---|

@@ -1039,6 +1039,11 @@ a:focus-visible {
   width: 5ch;
   font: var(--type-label-large);
 }
+/* 영어 자리표시 «Custom» 은 6자라 5ch 에서 «Custo» 로 잘렸다(비례 글꼴 — ch 는 «0» 폭이다).
+   한국어 «직접» 은 5ch 에 넉넉해 그대로 둔다. */
+:root:lang(en) .field--duration .field__input {
+  width: 7.5ch;
+}
 .field--duration .field__input::placeholder {
   color: var(--c-outline);
   text-align: left;
@@ -1252,6 +1257,73 @@ a:focus-visible {
 @media (max-width: 640px) {
   .sadvanced {
     padding: var(--space-l);
+  }
+}
+
+/* 설정 ▸ 정보 — 라이선스 고지(GPLv3) · 구성요소 · 엔진 소스. */
+.about__body {
+  display: grid;
+  gap: var(--space-s);
+  padding: 0 var(--space-xl) var(--space-l);
+  font: var(--type-body-medium);
+  color: var(--c-on-surface);
+}
+.about__warranty {
+  font: var(--type-body-small);
+  color: var(--c-on-surface-variant);
+}
+.about__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s) var(--space-xl);
+  /* 24px 터치 타깃 — 링크 줄 높이를 띄운다. */
+  line-height: 28px;
+}
+.about__subtitle {
+  padding: var(--space-m) var(--space-xl) var(--space-s);
+  font: var(--type-title-small);
+  border-top: 1px solid var(--c-outline-variant);
+}
+.about__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.about__item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "name license" "role license";
+  gap: 2px var(--space-l);
+  align-items: center;
+  padding: var(--space-s) var(--space-xl);
+  line-height: 24px;
+}
+.about__name {
+  grid-area: name;
+  font: var(--type-body-medium);
+}
+.about__role {
+  grid-area: role;
+  font: var(--type-body-small);
+  color: var(--c-on-surface-variant);
+}
+.about__license {
+  grid-area: license;
+}
+.about__source {
+  padding: var(--space-m) var(--space-xl) var(--space-l);
+  font: var(--type-body-small);
+  line-height: 24px;
+  color: var(--c-on-surface-variant);
+  border-top: 1px solid var(--c-outline-variant);
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .about__body,
+  .about__subtitle,
+  .about__item,
+  .about__source {
+    padding-inline: var(--space-l);
   }
 }
 /* 좁으면 조작부도 제 줄로 내려간다 — 스위치 하나 때문에 설명이 두 글자 폭이 되지 않게. */
