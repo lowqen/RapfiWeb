@@ -145,7 +145,8 @@ Cloudflare Pages 배포는 [`deploy.yml`](.github/workflows/deploy.yml) 이 자�
 
 ### 브라우저 요구사항
 
-WebAssembly SIMD 가 필수다: **Chrome/Edge 91+, Firefox 89+, Safari 16.4+**. 멀티스레드는 교차 출처 격리
+WebAssembly SIMD 와 CSP 의 `'wasm-unsafe-eval'` 이 필수다: **Chrome/Edge 97+, Firefox 102+, Safari 16.4+**.
+멀티스레드는 교차 출처 격리
 (`public/_headers`)가 더 필요하고, 그것이 안 되는 호스팅에서는 단일 스레드 엔진으로 저절로 물러선다.
 
 이 웹 빌드는 **렌주** 가중치만 싣는다(Cloudflare 파일당 25MB 상한).

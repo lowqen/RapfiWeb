@@ -6,16 +6,8 @@
     <title>RapfiWeb — 오목·렌주 분석반</title>
     <meta name="description" content="Rapfi 엔진을 브라우저에서 돌리는 오목·렌주 분석반." />
     <meta name="color-scheme" content="light dark" />
-    <script>
-      // 페인트 전에 테마를 확정한다. 이게 없으면 다크 사용자가 첫 프레임에
-      // 흰 화면을 한 번 본다(FOUC). 3상태 중 명시 선택만 data-theme 로 붙는다.
-      try {
-        var t = localStorage.getItem("rapfi.theme");
-        if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
-      } catch (_) {
-        /* 사생활 보호 모드 등 — 무시하고 system 으로 둔다 */
-      }
-    </script>
+    <!-- 페인트 전에 테마 확정(FOUC 방지). CSP 가 인라인 스크립트를 막아 public/ 의 파일로 둔다. -->
+    <script src="%BASE_URL%theme-init.js"></script>
   </head>
   <body>
     <div id="root"></div>

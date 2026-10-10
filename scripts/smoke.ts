@@ -10,7 +10,8 @@
  */
 import { chromium } from "playwright";
 import { createServer } from "node:http";
-import { ISOLATION_HEADERS, ISOLATE, hasEngine } from "./isolation.ts";
+import { SITE_HEADERS, ISOLATE, hasEngine } from "./isolation.ts";
+import { watchBrowser } from "./csp-watch.ts";
 import { readFileSync, existsSync } from "node:fs";
 import { extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -44,7 +45,7 @@ const server = createServer((req, res) => {
   try {
     const body = readFileSync(file);
     res.writeHead(200, {
-      ...ISOLATION_HEADERS,
+      ...SITE_HEADERS,
       "content-type": MIME[extname(file)] ?? "application/octet-stream",
     });
     res.end(body);
@@ -59,7 +60,7 @@ const fail = (m: string) => {
 };
 
 await new Promise<void>((r) => server.listen(PORT, r));
-const browser = await chromium.launch();
+const browser = watchBrowser(await chromium.launch());
 
 try {
   // 한국어 화면으로 고정한다 — 앱은 브라우저 언어가 한국어가 아니면 영어로 뜬다(W10).
@@ -327,12 +328,12 @@ try {
     // 크기가 섞인 판을 잰 적이 있다. 3초 안에 맞지 않으면 아래 검사가 진짜로 실패한다.
     await page
       .waitForFunction(
-        `(() => {
-          var r = document.querySelector(".board__view").getBoundingClientRect();
-          var e = document.querySelector(".evalbar");
-          var barH = e ? e.getBoundingClientRect().height : r.height;
+        () => {
+          const r = document.querySelector(".board__view")!.getBoundingClientRect();
+          const e = document.querySelector(".evalbar");
+          const barH = e ? e.getBoundingClientRect().height : r.height;
           return Math.abs(r.width - r.height) < 1 && Math.abs(r.height - barH) < 2;
-        })()`,
+        },
         null,
         { timeout: 3000, polling: 100 },
       )

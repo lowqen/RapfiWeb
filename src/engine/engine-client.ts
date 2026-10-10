@@ -233,7 +233,7 @@ export function detectCapabilities(): Capabilities {
     note: simd
       ? null
       : t(
-          "이 브라우저는 WebAssembly SIMD 를 지원하지 않아 엔진을 실행할 수 없습니다. Chrome/Edge 91+, Firefox 89+, Safari 16.4+ 가 필요합니다.",
+          "이 브라우저는 WebAssembly SIMD 를 지원하지 않아 엔진을 실행할 수 없습니다. Chrome/Edge 97+, Firefox 102+, Safari 16.4+ 가 필요합니다.",
         ),
   };
 }

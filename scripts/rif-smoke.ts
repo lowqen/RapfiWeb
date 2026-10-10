@@ -10,6 +10,8 @@
  */
 import { chromium, type Page } from "playwright";
 import { createServer } from "node:http";
+import { SITE_HEADERS } from "./isolation.ts";
+import { watchBrowser } from "./csp-watch.ts";
 import { readFileSync, existsSync } from "node:fs";
 import { extname, join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -31,7 +33,10 @@ const server = createServer((req, res) => {
   let file = join(DIST, decodeURIComponent(url.pathname));
   if (!existsSync(file) || extname(file) === "") file = join(DIST, "index.html");
   try {
-    res.writeHead(200, { "content-type": MIME[extname(file)] ?? "application/octet-stream" });
+    res.writeHead(200, {
+      ...SITE_HEADERS,
+      "content-type": MIME[extname(file)] ?? "application/octet-stream",
+    });
     res.end(readFileSync(file));
   } catch {
     res.writeHead(404).end("not found");
@@ -143,7 +148,7 @@ type PackView = {
 const packView = (page: Page) => page.evaluate("window.__rapfiPack()") as Promise<PackView>;
 
 await new Promise<void>((r) => server.listen(PORT, r));
-const browser = await chromium.launch();
+const browser = watchBrowser(await chromium.launch());
 const page = await browser.newPage({ viewport: { width: 1280, height: 1000 }, locale: "ko-KR" });
 const pageErrors: string[] = [];
 page.on("pageerror", (e) => pageErrors.push(String(e)));
@@ -169,7 +174,12 @@ try {
   ok("진행 카드가 떴다");
   const done = await page
     .waitForFunction(
-      `(() => { const p = window.__rapfiPack(); return p.done || p.error; })()`,
+      () => {
+        const p = (
+          window as unknown as { __rapfiPack(): { done: boolean; error: unknown } }
+        ).__rapfiPack();
+        return p.done || p.error;
+      },
       null,
       {
         timeout: 60_000,

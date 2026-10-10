@@ -934,8 +934,8 @@ export const EN: Readonly<Record<string, string>> = {
     "Cross origin isolation (COOP/COEP headers) is off, so multi threading is unavailable. The host cannot set headers (GitHub Pages etc.) or the dev server setup is missing",
   "이 브라우저는 SharedArrayBuffer 를 허용하지 않습니다":
     "This browser does not allow SharedArrayBuffer",
-  "이 브라우저는 WebAssembly SIMD 를 지원하지 않아 엔진을 실행할 수 없습니다. Chrome/Edge 91+, Firefox 89+, Safari 16.4+ 가 필요합니다.":
-    "This browser does not support WebAssembly SIMD, so the engine cannot run. Chrome/Edge 91+, Firefox 89+ or Safari 16.4+ is required.",
+  "이 브라우저는 WebAssembly SIMD 를 지원하지 않아 엔진을 실행할 수 없습니다. Chrome/Edge 97+, Firefox 102+, Safari 16.4+ 가 필요합니다.":
+    "This browser does not support WebAssembly SIMD, so the engine cannot run. Chrome/Edge 97+, Firefox 102+ or Safari 16.4+ is required.",
   "엔진 기동을 취소했습니다": "Engine startup was cancelled",
   "엔진을 실행할 수 없습니다": "The engine cannot run",
   "{v} 기동 실패: {why}": "{v} failed to start: {why}",

@@ -18,7 +18,8 @@ import { createServer } from "node:http";
 import { readFileSync, existsSync } from "node:fs";
 import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ISOLATION_HEADERS } from "./isolation.ts";
+import { SITE_HEADERS } from "./isolation.ts";
+import { watchBrowser } from "./csp-watch.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DIST = resolve(HERE, "../dist");
@@ -43,7 +44,7 @@ const server = createServer((req, res) => {
   try {
     const body = readFileSync(file);
     res.writeHead(200, {
-      ...ISOLATION_HEADERS,
+      ...SITE_HEADERS,
       "content-type": MIME[extname(file)] ?? "application/octet-stream",
     });
     res.end(body);
@@ -267,7 +268,7 @@ async function sweep(
 }
 
 await new Promise<void>((r) => server.listen(PORT, r));
-const browser = await chromium.launch();
+const browser = watchBrowser(await chromium.launch());
 
 try {
   // 1. 영어 브라우저 → 영어 화면
@@ -335,9 +336,21 @@ try {
     await ctx.addInitScript(SEED);
     const page = await ctx.newPage();
     await page.goto(`${BASE}/board`, { waitUntil: "networkidle" });
+    // 모양은 CSSOM(`el.style.x = …`)으로 준다. HTML 의 `style="…"` 속성은 CSP(style-src 'self')가
+    // 막아(Report-Only 면 위반으로 잡혀) 검사기가 넣은 상자가 모양을 잃는다.
     await page.evaluate(`(() => {
       const d = document.createElement("div");
-      d.innerHTML = '<p style="color:#888;background:#999">저대비 — 글</p><p lang="ko">면제되는 한글</p><button style="width:10px;height:10px">x</button><div style="width:2000px;height:1px"></div>';
+      const add = (tag, text, style, attrs) => {
+        const el = document.createElement(tag);
+        el.textContent = text;
+        Object.assign(el.style, style);
+        for (const [k, v] of Object.entries(attrs || {})) el.setAttribute(k, v);
+        d.appendChild(el);
+      };
+      add("p", "저대비 — 글", { color: "#888", background: "#999" });
+      add("p", "면제되는 한글", {}, { lang: "ko" });
+      add("button", "x", { width: "10px", height: "10px" });
+      add("div", "", { width: "2000px", height: "1px" });
       document.querySelector("main")?.appendChild(d);
     })()`);
     const a = await audit(page);

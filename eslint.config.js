@@ -19,6 +19,8 @@ export default tseslint.config(
       "spike",
       "bench",
       "public",
+      // 쇼케이스의 정적 파일(theme-init.js) — public/ 과 같이 손대지 않고 그대로 나간다.
+      "showcase/public",
       "src/styles/tokens.css",
     ],
   },

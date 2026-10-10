@@ -9,14 +9,8 @@
       content="Gomocalc 순정 엔진 대 RapfiWeb 배포 엔진 — 대국 Elo · 연산 속도 · 최적화 여정(P1~P3 · A1 · A3)."
     />
     <meta name="color-scheme" content="light dark" />
-    <script>
-      try {
-        var t = localStorage.getItem("rapfi.showcase.theme");
-        if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
-      } catch (_) {
-        /* 저장소가 막힌 환경 — 시스템 테마를 따른다 */
-      }
-    </script>
+    <!-- 페인트 전에 테마 확정. CSP 가 인라인 스크립트를 막아 showcase/public/ 의 파일로 둔다. -->
+    <script src="%BASE_URL%theme-init.js"></script>
   </head>
   <body>
     <div id="root"></div>

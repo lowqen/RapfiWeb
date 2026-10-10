@@ -10,7 +10,8 @@
  */
 import { chromium } from "playwright";
 import { createServer } from "node:http";
-import { ISOLATION_HEADERS, ISOLATE, expectedVariant, hasEngine } from "./isolation.ts";
+import { SITE_HEADERS, ISOLATE, expectedVariant, hasEngine } from "./isolation.ts";
+import { watchBrowser } from "./csp-watch.ts";
 import { readFileSync, existsSync } from "node:fs";
 import { extname, join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -53,7 +54,7 @@ const server = createServer((req, res) => {
   try {
     const body = readFileSync(file);
     res.writeHead(200, {
-      ...ISOLATION_HEADERS,
+      ...SITE_HEADERS,
       "content-type": MIME[extname(file)] ?? "application/octet-stream",
     });
     res.end(body);
@@ -84,7 +85,7 @@ const STOP_AND_READ_BEST = `(() => {
 })()`;
 
 if (!REMOTE) await new Promise<void>((r) => server.listen(PORT, r));
-const browser = await chromium.launch();
+const browser = watchBrowser(await chromium.launch());
 let page: import("playwright").Page | null = null;
 const pageErrors: string[] = [];
 
@@ -231,8 +232,10 @@ try {
     const best = panel.locator(".kv dd").last();
     await page
       .waitForFunction(
-        `(() => { const dds = [...document.querySelectorAll(".kv.stats dd")];
-                  return dds.length > 0 && dds[dds.length - 1].textContent.trim() === "H8"; })()`,
+        () => {
+          const dds = [...document.querySelectorAll(".kv.stats dd")];
+          return dds.length > 0 && dds[dds.length - 1]!.textContent?.trim() === "H8";
+        },
         undefined,
         { timeout: 10_000 },
       )
@@ -383,9 +386,14 @@ try {
   await page.getByRole("button", { name: "분석", exact: true }).click();
   await page
     .waitForFunction(
-      `(() => { const dds = [...document.querySelectorAll(".kv.stats dd")];
-                return document.querySelectorAll(".pvlist__row").length > 0 &&
-                       dds.length > 0 && dds[dds.length - 1].textContent.trim() !== "없음"; })()`,
+      () => {
+        const dds = [...document.querySelectorAll(".kv.stats dd")];
+        return (
+          document.querySelectorAll(".pvlist__row").length > 0 &&
+          dds.length > 0 &&
+          dds[dds.length - 1]!.textContent?.trim() !== "없음"
+        );
+      },
       undefined,
       { timeout: 30_000 },
     )
@@ -413,8 +421,10 @@ try {
   // 분석은 켜져 있으므로 1수 국면을 이어 읽어 다시 차오른다.
   await page
     .waitForFunction(
-      `(() => { const dds = [...document.querySelectorAll(".kv.stats dd")];
-                return dds[dds.length - 1].textContent.trim() !== "없음"; })()`,
+      () => {
+        const dds = [...document.querySelectorAll(".kv.stats dd")];
+        return dds[dds.length - 1]?.textContent?.trim() !== "없음";
+      },
       undefined,
       { timeout: 30_000 },
     )
@@ -447,10 +457,16 @@ try {
   const tSwap = Date.now();
   await select.selectOption("simd");
   await page
-    .waitForFunction(`window.__rapfiEngine().variant === "single-simd128"`, undefined, {
-      timeout: 60_000,
-      polling: 100,
-    })
+    .waitForFunction(
+      () =>
+        (window as unknown as { __rapfiEngine(): { variant: string } }).__rapfiEngine().variant ===
+        "single-simd128",
+      undefined,
+      {
+        timeout: 60_000,
+        polling: 100,
+      },
+    )
     .catch(() => undefined);
   const swapped = (await page.evaluate(`window.__rapfiEngine()`)) as EngineInfo & {
     status: string;
@@ -473,8 +489,10 @@ try {
   await select.selectOption("auto");
   await page
     .waitForFunction(
-      `window.__rapfiEngine().variant === ${JSON.stringify(wantVariant)}`,
-      undefined,
+      (want) =>
+        (window as unknown as { __rapfiEngine(): { variant: string } }).__rapfiEngine().variant ===
+        want,
+      wantVariant,
       {
         timeout: 60_000,
         polling: 100,

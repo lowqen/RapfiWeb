@@ -49,6 +49,8 @@ env:
   PROJECT: rapfiweb
   # src/engine/engine-manifest.json 의 tag 와 같아야 한다(verify-engine.ts 가 본다).
   ENGINE_TAG: engine-3c94c2a9-w8
+  # 배포 토큰을 쥐는 도구라 정확한 판으로 고정한다(보안 강화 계획 F4). 3.x 의 마지막 판(legacy 태그).
+  WRANGLER: wrangler@3.114.17
 
 jobs:
   build:
@@ -64,7 +66,7 @@ jobs:
           node-version: "26"
           cache: pnpm
 
-      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm install --frozen-lockfile
       - run: pnpm build
 
       # 엔진 쇼케이스(showcase/) — 앱과 따로 빌드해 같은 배포의 /showcase/ 에 싣는다. 앱 번들 · 라우팅과 섞이지 않는다
@@ -95,6 +97,33 @@ jobs:
           echo '{ "type": "commonjs" }' > dist/engine/package.json
           ls -la dist/engine | sed 's/^/  /'
           pnpm exec tsx scripts/verify-engine.ts
+
+      # 소스맵 — `build.sourcemap: "hidden"` 이라 .map 은 만들되 번들에 주석으로 잇지 않는다. 배포본에서는
+      # 빼고(보안 강화 계획 F2) 프로덕션 오류 스택을 맞춰 볼 수 있게 CI 아티팩트로만 90일 둔다.
+      - name: 소스맵 분리
+        run: |
+          mkdir -p sourcemaps
+          (cd dist && find . -name '*.map' -exec cp --parents {} ../sourcemaps/ \;)
+          find dist -name '*.map' -delete
+          echo "소스맵 $(find sourcemaps -name '*.map' | wc -l)개를 배포본에서 뺐습니다."
+
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: sourcemaps-${{ github.sha }}
+          path: sourcemaps/
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: 소스맵 게이트
+        run: |
+          if find dist -name '*.map' | grep -q .; then
+            echo "::error::배포물에 .map 이 남아 있습니다."; find dist -name '*.map'; exit 1
+          fi
+          if grep -rl --include='*.js' 'sourceMappingURL=' dist | grep -q .; then
+            echo "::error::sourceMappingURL 주석이 남은 번들이 있습니다."; grep -rl --include='*.js' 'sourceMappingURL=' dist; exit 1
+          fi
+          echo "깨끗합니다."
 
       # 배포 직전 마지막 관문. 앱의 릴리스 게이트와 같은 발상이고 웹에서는 더 중요하다:
       # 앱은 실수로 포함해도 기기에 머물지만 웹은 그 순간 「온라인 시스템에 게시」가 된다.
@@ -150,15 +179,15 @@ jobs:
           # 그러면 「비밀값은 넣었는데 프로젝트가 없어서」 배포가 실패한다 —
           # 실제로 그렇게 한 번 걸렸다(code 8000007 Project not found).
           # 「Pages: Edit」 토큰이면 생성도 되므로 그 단계를 없앤다.
-          if pnpm dlx wrangler@3 pages project list 2>/dev/null \
+          if pnpm dlx "$WRANGLER" pages project list 2>/dev/null \
                | grep -qE "(^|[[:space:]])${PROJECT}([[:space:]]|$)"; then
             echo "프로젝트 $PROJECT — 있음"
           else
             echo "프로젝트 $PROJECT 가 없어 만듭니다."
-            pnpm dlx wrangler@3 pages project create "$PROJECT" --production-branch main
+            pnpm dlx "$WRANGLER" pages project create "$PROJECT" --production-branch main
           fi
 
-          pnpm dlx wrangler@3 pages deploy dist \
+          pnpm dlx "$WRANGLER" pages deploy dist \
             --project-name "$PROJECT" \
             --branch "${{ github.ref_name }}" \
             --commit-dirty=true | tee deploy.log
@@ -194,6 +223,36 @@ jobs:
           code=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "$BASE_URL/showcase")
           echo "/showcase → $code"
           echo "- 쇼케이스: $BASE_URL/showcase/" >> "$GITHUB_STEP_SUMMARY"
+
+      # 보안 헤더가 **실제 응답**에 붙었는가 — 페이지 · 엔진 워커 스크립트 · 엔진 산출물(docs/보안-강화-계획.md
+      # Phase 1). 워커는 자기 응답의 CSP 를 따르므로 워커 스크립트도 본다. 소스맵은 배포본에서 뺐으므로
+      # .map 주소는 SPA 폴백(HTML)이 나와야 한다 — 상태 코드가 아니라 내용이 맵인지로 본다.
+      - name: 배포 검증 — 보안 헤더 · 소스맵
+        if: env.TARGET == 'cloudflare'
+        env:
+          BASE_URL: ${{ steps.cf.outputs.url }}
+        run: |
+          set -e
+          need() {
+            local path=$1; shift
+            local h; h=$(curl -fsSI --retry 5 --retry-delay 5 "$BASE_URL$path")
+            for name in "$@"; do
+              echo "$h" | grep -qi "^$name:" || { echo "::error::$path 에 $name 헤더가 없습니다"; echo "$h"; exit 1; }
+            done
+            echo "$path — 확인: $*"
+          }
+          need / content-security-policy cross-origin-opener-policy cross-origin-embedder-policy                  cross-origin-resource-policy x-frame-options strict-transport-security permissions-policy
+          curl -fsSI "$BASE_URL/" | grep -i '^content-security-policy:' | grep -q "'wasm-unsafe-eval'"             || { echo "::error::CSP 에 'wasm-unsafe-eval' 이 없습니다 — 엔진이 뜨지 않습니다"; exit 1; }
+          index=$(curl -fsSL "$BASE_URL/" | grep -oE '/assets/index-[^"]+\.js' | head -1)
+          worker=$(curl -fsSL "$BASE_URL$index" | grep -oE 'assets/engine-worker-[A-Za-z0-9_-]+\.js' | head -1)
+          [ -n "$worker" ] || { echo "::error::번들에서 엔진 워커 주소를 찾지 못했습니다"; exit 1; }
+          need "/$worker" content-security-policy cross-origin-embedder-policy
+          need /engine/rapfi-single-simd128.wasm cross-origin-resource-policy
+          if curl -fsSL "$BASE_URL$index.map" 2>/dev/null | head -c 40 | grep -q '"version"'; then
+            echo "::error::소스맵이 배포되어 있습니다: $index.map"; exit 1
+          fi
+          echo "소스맵 없음 확인: $index.map"
+          echo "- 보안 헤더 · 소스맵: 확인" >> "$GITHUB_STEP_SUMMARY"
 
       - name: 배포 검증 — 실제 주소에서 렌주 엔진
         if: env.TARGET == 'cloudflare'

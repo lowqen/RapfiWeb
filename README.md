@@ -155,7 +155,8 @@ see [`docs/배포-cloudflare.md`](docs/배포-cloudflare.md) for the one-time se
 
 ### Browser support
 
-WebAssembly SIMD is required: **Chrome/Edge 91+, Firefox 89+, Safari 16.4+**. Multi-threading
+WebAssembly SIMD and the CSP keyword `'wasm-unsafe-eval'` are required: **Chrome/Edge 97+, Firefox 102+,
+Safari 16.4+**. Multi-threading
 additionally needs cross-origin isolation (`public/_headers`). On hosts without it, RapfiWeb falls
 back to the single-threaded engine automatically.
 

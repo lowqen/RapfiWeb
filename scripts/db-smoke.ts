@@ -10,7 +10,8 @@
  */
 import { chromium, type Page } from "playwright";
 import { createServer } from "node:http";
-import { ISOLATION_HEADERS, hasEngine } from "./isolation.ts";
+import { SITE_HEADERS, hasEngine } from "./isolation.ts";
+import { watchBrowser } from "./csp-watch.ts";
 import { readFileSync, existsSync } from "node:fs";
 import { extname, join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -41,7 +42,7 @@ const server = createServer((req, res) => {
   if (!existsSync(file) || extname(file) === "") file = join(DIST, "index.html");
   try {
     res.writeHead(200, {
-      ...ISOLATION_HEADERS,
+      ...SITE_HEADERS,
       "content-type": MIME[extname(file)] ?? "application/octet-stream",
     });
     res.end(readFileSync(file));
@@ -153,7 +154,7 @@ async function tapDbBoard(page: Page, x: number, y: number) {
 }
 
 await new Promise<void>((r) => server.listen(PORT, r));
-const browser = await chromium.launch();
+const browser = watchBrowser(await chromium.launch());
 const context = await browser.newContext({
   // 화면 문구를 한국어로 고정한다 — 앱은 브라우저 언어가 한국어가 아니면 영어로 뜬다(W10).
   locale: "ko-KR",
