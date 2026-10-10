@@ -15,7 +15,11 @@ export function LangToggle() {
       aria-label={next === "en" ? "Switch to English" : "한국어로 바꾸기"}
       onClick={() => setLang(next)}
     >
-      {next === "en" ? "English" : "한국어"}
+      {/* 좁은 폭에서는 짧은 표기(«EN» · «한») — 이름은 aria-label 이 진다. */}
+      <span className="langtoggle__long">{next === "en" ? "English" : "한국어"}</span>
+      <span className="langtoggle__short" aria-hidden="true">
+        {next === "en" ? "EN" : "한"}
+      </span>
     </button>
   );
 }

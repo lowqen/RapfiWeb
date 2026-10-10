@@ -136,6 +136,15 @@ const AUDIT = `(() => {
   const de = document.documentElement;
   const main = document.querySelector("main");
   out.overflow = Math.max(0, de.scrollWidth - de.clientWidth, main ? main.scrollWidth - main.clientWidth : 0);
+  // 상단 바는 넘쳐도 스크롤이 생기지 않고 잘린다 — 자식이 오른쪽 끝을 넘는지 따로 잰다.
+  const bar = document.querySelector(".topbar");
+  if (bar) {
+    const right = bar.getBoundingClientRect().right;
+    for (const e of bar.querySelectorAll("*")) {
+      const b = e.getBoundingClientRect();
+      if (b.width) out.overflow = Math.max(out.overflow, b.right - right);
+    }
+  }
 
   // 누르는 것의 크기 — 휴대폰 폭에서만 의미가 있다(부르는 쪽이 고른다).
   if (window.innerWidth < 700) {

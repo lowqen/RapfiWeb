@@ -285,6 +285,21 @@ a:focus-visible {
 .themetoggle:hover {
   background: var(--c-surface-container);
 }
+.langtoggle__short {
+  display: none;
+}
+/* 좁은 폭(W10): 상단 바에 엔진 칩 · 테마 · 언어가 한 줄로 서도록 단추를 줄인다. */
+@media (max-width: 640px) {
+  .themetoggle {
+    padding: var(--space-s) var(--space-m);
+  }
+  .langtoggle__long {
+    display: none;
+  }
+  .langtoggle__short {
+    display: inline;
+  }
+}
 
 /* ── 연구 탭 ────────────────────────────────────────────────────── */
 .rtabs {
