@@ -21,12 +21,25 @@ export const MARK_LABEL: Readonly<Record<JosekiMark, string>> = localized({
   "??": msg("큰 실수"),
 });
 
+/**
+ * 갈래의 쓰임 — 평가 기호와 따로 단다(공식 커리큘럼, docs/공식-정석-설계.md §3).
+ *   `trap`   함정수 — 그럴듯하지만 걸려드는 수, 또는 상대가 놓는 덫
+ *   `refute` 응징 · 대응 — 나쁜 수나 함정을 벌하는 답
+ */
+export type JosekiRole = "trap" | "refute";
+export const ROLES: readonly JosekiRole[] = ["trap", "refute"];
+export const ROLE_LABEL: Readonly<Record<JosekiRole, string>> = localized({
+  trap: msg("함정수"),
+  refute: msg("응징"),
+});
+
 export interface JosekiNode {
   /** 뿌리만 null. */
   move: Move | null;
   /** 마크다운(굵게 · 기울임 · 목록 · 링크 · 좌표). */
   comment: string;
   mark?: JosekiMark;
+  role?: JosekiRole;
   /** `[0]` 이 주 변화. */
   children: JosekiNode[];
 }
@@ -262,6 +275,15 @@ export function setMark(root: JosekiNode, path: Path, mark: JosekiMark | null): 
     const next = { ...n };
     if (mark) next.mark = mark;
     else delete next.mark;
+    return next;
+  });
+}
+
+export function setRole(root: JosekiNode, path: Path, role: JosekiRole | null): JosekiNode {
+  return replaceAt(root, path, (n) => {
+    const next = { ...n };
+    if (role) next.role = role;
+    else delete next.role;
     return next;
   });
 }

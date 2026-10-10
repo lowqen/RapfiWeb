@@ -4,12 +4,14 @@ import { keyOf as posKeyOf } from "../model/pos-key";
 import { t } from "../../i18n/i18n";
 import {
   MARKS,
+  ROLES,
   emptyNode,
   movesTo,
   newId,
   walk,
   type JosekiMark,
   type JosekiNode,
+  type JosekiRole,
   type JosekiTree,
   type Path,
 } from "./tree";
@@ -56,6 +58,8 @@ function cleanNode(
   out.comment = str(r.comment, MAX_COMMENT);
   if (typeof r.mark === "string" && (MARKS as readonly string[]).includes(r.mark))
     out.mark = r.mark as JosekiMark;
+  if (typeof r.role === "string" && (ROLES as readonly string[]).includes(r.role))
+    out.role = r.role as JosekiRole;
   const kids = Array.isArray(r.children) ? r.children : [];
   if (depth >= size * size) {
     drop.n += kids.length;

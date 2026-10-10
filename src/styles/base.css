@@ -2920,6 +2920,9 @@ button.theory__row:hover {
   border-left: 2px solid var(--c-outline-variant);
 }
 .jtree__move {
+  /* 누르는 크기 24px 이상(WCAG 2.5.8) — 휴대폰에서 수 하나가 21×20 이었다. */
+  min-width: 24px;
+  min-height: 24px;
   padding: 0 var(--space-xs);
   font: inherit;
   color: var(--c-on-surface);
@@ -2944,12 +2947,34 @@ button.theory__row:hover {
   margin-right: 2px;
   color: var(--c-on-surface-variant);
 }
-.jtree__move.is-here .jtree__num {
+.jtree__move.is-here .jtree__num,
+.jtree__move.is-here .jtree__mark {
+  /* 고른 수의 바탕(primary) 위에서는 결 색(초록 · 빨강)이 명암비를 잃는다 — 글자색을 따른다. */
   color: inherit;
 }
 .jtree__mark {
   margin-left: 1px;
   font-weight: 700;
+}
+/* 평가 기호의 결 · 갈래 쓰임(함정 · 응징) — 트리 · 커리큘럼 공통. */
+.jtree__mark[data-quality="good"] {
+  color: var(--c-positive);
+}
+.jtree__mark[data-quality="bad"] {
+  color: var(--c-error);
+}
+.jtree__role {
+  margin-left: 3px;
+  padding: 0 var(--space-s);
+  font: var(--type-label-small);
+  color: var(--c-on-tertiary-container);
+  vertical-align: 1px;
+  background: var(--c-tertiary-container);
+  border-radius: var(--radius-xs);
+}
+.jtree__role[data-role="refute"] {
+  color: var(--c-on-secondary-container);
+  background: var(--c-secondary-container);
 }
 .jtree__empty {
   font: var(--type-body-medium);
@@ -3012,6 +3037,10 @@ button.theory__row:hover {
   border-radius: 3px;
 }
 .jmd__coord {
+  /* 누르는 크기 24px 이상(WCAG 2.5.8) — 글줄 안의 좌표라 높이만 줄 높이를 넘지 않게 맞춘다. */
+  display: inline-block;
+  min-width: 24px;
+  min-height: 24px;
   padding: 0 2px;
   font: inherit;
   font-weight: 600;
@@ -3601,4 +3630,98 @@ button.theory__row:hover {
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+/* ── 정석 ▸ 공식 커리큘럼(docs/공식-정석-설계.md) ─────────────────────── */
+.josekiscreen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-m);
+}
+.josekiscreen__tabs {
+  align-self: flex-start;
+}
+.course__level {
+  margin-left: var(--space-s);
+  padding: 1px var(--space-m);
+  font: var(--type-label-small);
+  color: var(--c-on-secondary-container);
+  background: var(--c-secondary-container);
+  border-radius: var(--radius-xl);
+}
+.course__level[data-level="advanced"] {
+  color: var(--c-on-tertiary-container);
+  background: var(--c-tertiary-container);
+}
+.lessonlist {
+  display: grid;
+  gap: var(--space-s);
+  margin: var(--space-m) 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: lesson;
+}
+.lessonlist__item {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-m) var(--space-l);
+  text-align: left;
+  background: var(--c-surface-container);
+  border: 1px solid var(--c-outline-variant);
+  border-radius: var(--radius-s);
+}
+.lessonlist__item:hover {
+  background: var(--c-surface-container-high);
+}
+.lessonlist__item[data-done] {
+  border-color: var(--c-positive);
+}
+.lessonlist__title {
+  font: var(--type-title-small);
+  color: var(--c-on-surface);
+}
+.lessonlist__title::before {
+  content: counter(lesson) ". ";
+  counter-increment: lesson;
+}
+.lessonlist__meta {
+  font: var(--type-body-small);
+  color: var(--c-on-surface-variant);
+}
+.lesson__legend {
+  margin-top: var(--space-m);
+}
+.lesson__bar {
+  width: 100%;
+  height: 6px;
+  accent-color: var(--c-primary);
+}
+.lesson__fb {
+  margin: var(--space-m) 0;
+  padding: var(--space-m) var(--space-l);
+  background: var(--c-surface-container);
+  border-radius: var(--radius-s);
+}
+.lesson__verdict {
+  font: var(--type-title-small);
+}
+.lesson__verdict[data-good] {
+  color: var(--c-positive);
+}
+.lesson__verdict[data-bad] {
+  color: var(--c-error);
+}
+.lesson__score {
+  font: var(--type-title-medium);
+}
+.adminexport {
+  display: grid;
+  gap: var(--space-s);
+  margin-top: var(--space-m);
+  background: var(--c-surface-container);
+}
+.adminexport select {
+  min-height: 32px;
 }

@@ -17,6 +17,7 @@ import { NumberField, Segmented, Switch } from "../../components/controls";
 import { EngineChoiceControl, ThreadControl } from "./engineControls";
 import { exportDesktopFiles, importDesktopFiles } from "./desktopBridge";
 import { AboutPanel } from "./AboutPanel";
+import { useAdminTools } from "../joseki/admin";
 import { MAPPED_IDS } from "../../core/settings/desktop-bridge";
 import { ALL_SPECS } from "../../core/settings/desktop-settings";
 import { msg, pick, setLang, t, useLang, type Lang } from "../../i18n/i18n";
@@ -79,6 +80,13 @@ function AutoBootControl() {
       onChange={(autoBoot) => update({ autoBoot })}
     />
   );
+}
+
+/** 관리자 도구 — 정석 편집기에 «공식 커리큘럼으로 내보내기»를 보인다(보안 장치 아님, `joseki/admin.ts`). */
+function AdminToolsControl() {
+  const on = useAdminTools((a) => a.on);
+  const set = useAdminTools((a) => a.set);
+  return <Switch label={t("관리자 도구")} on={on} onChange={set} />;
 }
 
 /** 대국·분석 설정이 옮겨 간 자리로 — 누르면 그 탭을 연 보드로 간다. */
@@ -479,6 +487,14 @@ const ROWS: readonly RowSpec[] = [
     keywords: "settings.txt settings_dev.txt pc 데스크톱 가져오기 내보내기 import export yixin",
     wide: true,
     Control: DesktopFileControl,
+  },
+  {
+    id: "adminTools",
+    sec: "system",
+    label: msg("관리자 도구"),
+    note: msg("정석 편집기에 공식 커리큘럼 내보내기를 보입니다. 배포는 저장소 커밋으로만 됩니다"),
+    keywords: "admin 관리자 커리큘럼 curriculum 공식 정석 내보내기",
+    Control: AdminToolsControl,
   },
   {
     id: "reset",

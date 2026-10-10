@@ -1,5 +1,5 @@
 import { label } from "../../core/model/move";
-import type { JosekiNode } from "../../core/joseki/tree";
+import { ROLE_LABEL, type JosekiNode } from "../../core/joseki/tree";
 import { t } from "../../i18n/i18n";
 
 /**
@@ -89,7 +89,16 @@ function Line({
           </span>
         )}
         {label(c.move!, size)}
-        {c.mark && <span className="jtree__mark">{c.mark}</span>}
+        {c.mark && (
+          <span className="jtree__mark" data-quality={markQuality(c.mark)}>
+            {c.mark}
+          </span>
+        )}
+        {c.role && (
+          <span className="jtree__role" data-role={c.role}>
+            {t(ROLE_LABEL[c.role])}
+          </span>
+        )}
       </button>,
     );
     lead = false;
@@ -110,4 +119,11 @@ function Line({
     idx = 0;
   }
   return <div className="jtree__line">{items}</div>;
+}
+
+/** 평가 기호의 결 — 좋은 수는 초록, 나쁜 수는 빨강으로 칠한다(트리 · 커리큘럼 공통). */
+function markQuality(mark: string): "good" | "bad" | "odd" {
+  if (mark === "!!" || mark === "!") return "good";
+  if (mark === "?" || mark === "??") return "bad";
+  return "odd";
 }

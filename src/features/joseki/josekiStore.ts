@@ -16,9 +16,11 @@ import {
   removeAt,
   setComment,
   setMark,
+  setRole,
   stepForward,
   type JosekiMark,
   type JosekiNode,
+  type JosekiRole,
   type JosekiTree,
 } from "../../core/joseki/tree";
 import { formatOf, parseGameFile } from "../../core/model/game-file";
@@ -78,6 +80,8 @@ interface JosekiState {
   shift: (dir: -1 | 1) => void;
   setNodeComment: (text: string) => void;
   setNodeMark: (mark: JosekiMark | null) => void;
+  /** 갈래의 쓰임(함정수 · 응징) — 공식 커리큘럼의 학습 판정에 쓰인다. */
+  setNodeRole: (role: JosekiRole | null) => void;
   undoEdit: () => void;
 
   importFiles: (files: readonly File[]) => Promise<void>;
@@ -296,6 +300,12 @@ export const useJosekiStore = create<JosekiState>((set, get) => {
       const t = get().current;
       if (!t) return;
       commit({ root: setMark(t.root, get().path, mark) });
+    },
+
+    setNodeRole: (role) => {
+      const t = get().current;
+      if (!t) return;
+      commit({ root: setRole(t.root, get().path, role) });
     },
 
     undoEdit: () => {

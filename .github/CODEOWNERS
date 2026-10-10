@@ -5,7 +5,9 @@
 #   _headers      CSP · 교차 출처 격리 — 앱 전체의 실행 정책
 #   dependabot    무엇을 언제 올릴지
 #   CODEOWNERS    이 목록 자체
+#   joseki/       공식 정석 커리큘럼(docs/공식-정석-관리.md) — 모든 사용자가 배우는 내용
 /.github/workflows/     @lowqen
 /.github/dependabot.yml @lowqen
 /.github/CODEOWNERS     @lowqen
 /public/_headers        @lowqen
+/public/joseki/         @lowqen

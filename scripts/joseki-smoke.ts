@@ -79,6 +79,8 @@ try {
     localStorage.setItem("rapfi.settings", JSON.stringify({ autoBoot: false, v: 3 })),
   );
   await page.goto(`${BASE}/joseki`);
+  // 정석 화면은 [공식 커리큘럼] 탭으로 연다(처음). 내 정석은 둘째 탭 — 고른 탭은 남는다.
+  await page.locator('[data-tab="mine"]').click();
   await page.getByRole("button", { name: "새 정석", exact: true }).click();
   await page.locator(".joseki-editor").waitFor();
 
@@ -166,6 +168,86 @@ try {
     json.format === "rapfiweb-joseki" && json.trees[0].title === "스모크 정석",
     "JSON 내보내기",
     "JSON 이 이상하다",
+  );
+
+  console.log("6. 갈래 쓰임 · 관리자 내보내기(공식 커리큘럼 JSON)");
+  await page.evaluate(() => localStorage.setItem("rapfi.adminTools", "1"));
+  await page.reload(); // 관리자 스위치는 뜰 때 읽는다 — 새로고침하면 목록으로 돌아와 다시 연다
+  await page.locator(".jlist__open", { hasText: "스모크 정석" }).first().click();
+  await page.locator(".joseki-editor").waitFor();
+  await page.getByRole("button", { name: "앞으로", exact: true }).click();
+  await page.getByRole("button", { name: "함정수", exact: true }).click();
+  check(
+    (await page
+      .getByRole("button", { name: "함정수", exact: true })
+      .getAttribute("aria-pressed")) === "true",
+    "지금 마디에 «함정수» 쓰임",
+    "함정수 단추가 눌리지 않았다",
+  );
+  await page.getByRole("button", { name: "공식 커리큘럼으로 내보내기" }).click();
+  await page.locator('[data-k="admin-export"]').waitFor();
+  await page.getByLabel("레슨 id").fill("smoke-lesson");
+  const [cdl] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "curriculum.json 내려받기" }).click(),
+  ]);
+  const cur = JSON.parse(readFileSync((await cdl.path())!, "utf8"));
+  const lessons = cur.courses.flatMap((c: { lessons: { id: string }[] }) => c.lessons);
+  const text = JSON.stringify(cur);
+  check(
+    cur.format === "rapfiweb-curriculum" &&
+      lessons.some((l: { id: string }) => l.id === "smoke-lesson") &&
+      lessons.some((l: { id: string }) => l.id === "first-three-moves") &&
+      text.includes('"role":"trap"'),
+    `커리큘럼 내보내기 — 배포 레슨 ${lessons.length - 1}개에 새 레슨을 넣고 함정 쓰임을 지켰다`,
+    `커리큘럼 JSON 이 이상하다: ${text.slice(0, 200)}`,
+  );
+  check(
+    (await page.locator('[data-k="admin-export-result"]').innerText()).includes("내려받았습니다"),
+    "내보내기 검증 경고 없음",
+    `내보내기 결과: ${await page.locator('[data-k="admin-export-result"]').innerText()}`,
+  );
+
+  console.log("7. 공식 커리큘럼 — 살펴보기 · 학습");
+  await page.goto(`${BASE}/joseki`);
+  await page.locator('[data-tab="official"]').click();
+  await page.locator('[data-k="curriculum"]').waitFor();
+  check(
+    (await page.locator(".lessonlist__item").count()) >= 3,
+    "코스 · 레슨 목록(배포 파일)",
+    "레슨 목록이 비었다",
+  );
+  await page.locator('.lessonlist__item[data-lesson="first-three-moves"]').click();
+  await page.locator('[data-k="lesson"]').waitFor();
+  await page.locator(".jtree__move").first().click();
+  check(
+    (await page.locator('[data-k="lesson-comment"]').innerText()).includes("천원"),
+    "살펴보기: 마디 해설",
+    "해설이 없다",
+  );
+  await page.getByRole("tab", { name: "학습", exact: true }).click();
+  const fb = () => page.locator('[data-k="quiz-feedback"]').getAttribute("data-kind");
+  await tap(page, 7, 7); // h8 — 정답, 백 h9 는 저절로
+  check((await fb()) === "correct", "학습: 1수 정답 · 상대 수 자동", `학습 1수: ${await fb()}`);
+  await tap(page, 11, 3); // l12 — 알려진 나쁜 수
+  check((await fb()) === "mistake", "학습: 나쁜 수는 해설과 함께 오답", `나쁜 수: ${await fb()}`);
+  await tap(page, 1, 1); // b14 — 정석 밖
+  check((await fb()) === "outside", "학습: 정석 밖의 수", `정석 밖: ${await fb()}`);
+  check(
+    await page.getByRole("button", { name: "힌트", exact: true }).isDisabled(),
+    "두 번 틀리면 힌트가 저절로 열린다",
+    "힌트가 열리지 않았다",
+  );
+  await tap(page, 6, 6); // g9 — 정답, 끝
+  const done = await page.locator('[data-k="quiz-done"]').innerText();
+  check(done.includes("50점"), `학습 끝: ${done.replace(/\s+/g, " ")}`, `학습 끝: ${done}`);
+  await page.getByRole("button", { name: /코스 목록/ }).click();
+  check(
+    (await page.locator('.lessonlist__item[data-lesson="first-three-moves"]').innerText()).includes(
+      "최고 50점",
+    ),
+    "진도가 목록에 남는다",
+    "진도가 없다",
   );
 } catch (e) {
   fail(e instanceof Error ? e.message : String(e));

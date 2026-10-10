@@ -11,14 +11,19 @@ import {
   MARKS,
   MARK_LABEL,
   NODE_WARN,
+  ROLES,
+  ROLE_LABEL,
   countNodes,
   movesTo,
   nodeAt,
   type JosekiMark,
+  type JosekiRole,
 } from "../../core/joseki/tree";
 import { label, moveKey } from "../../core/model/move";
 import { useOpeningTables } from "../../data/opening-tables";
 import { useBoardStore } from "../board/boardStore";
+import { AdminExport } from "./AdminExport";
+import { useAdminTools } from "./admin";
 import { JosekiComment } from "./JosekiComment";
 import { useJosekiStore } from "./josekiStore";
 import { TreeView } from "./TreeView";
@@ -61,6 +66,8 @@ export function JosekiEditor() {
   const [preview, setPreview] = useState(true);
   const [asking, setAsking] = useState(false);
   const [tagText, setTagText] = useState(jk.tags.join(", "));
+  const admin = useAdminTools((a) => a.on);
+  const [exporting, setExporting] = useState(false);
   const area = useRef<HTMLTextAreaElement>(null);
 
   const node = nodeAt(jk.root, s.path) ?? jk.root;
@@ -147,7 +154,17 @@ export function JosekiEditor() {
           <span className="panel__status tnum" data-k="joseki-save">
             {s.saving ? t("저장 중…") : t("저장됨")} · {t("{n}수", { n: total })}
           </span>
+          {admin && (
+            <button
+              type="button"
+              onClick={go(() => setExporting((x) => !x))}
+              aria-expanded={exporting}
+            >
+              {t("공식 커리큘럼으로 내보내기")}
+            </button>
+          )}
         </div>
+        {admin && exporting && <AdminExport tree={jk} onClose={() => setExporting(false)} />}
         <label className="jfield">
           <span>{t("제목")}</span>
           <input
@@ -324,6 +341,20 @@ export function JosekiEditor() {
                     onClick={() => s.setNodeMark(node.mark === mk ? null : mk)}
                   >
                     {mk}
+                  </button>
+                ))}
+              </div>
+              <div className="jmarks" role="group" aria-label={t("갈래 쓰임")}>
+                {ROLES.map((r: JosekiRole) => (
+                  <button
+                    key={r}
+                    type="button"
+                    aria-pressed={node.role === r}
+                    title={t(ROLE_LABEL[r])}
+                    className={`chip${node.role === r ? " is-on" : ""}`}
+                    onClick={() => s.setNodeRole(node.role === r ? null : r)}
+                  >
+                    {t(ROLE_LABEL[r])}
                   </button>
                 ))}
               </div>

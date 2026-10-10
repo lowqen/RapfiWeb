@@ -75,11 +75,37 @@ const ROUTES: readonly { path: string; prepare?: (p: Page) => Promise<void> }[] 
   { path: "/research/ranking" },
   { path: "/database" },
   { path: "/engine" },
-  { path: "/joseki" },
+  // 정석은 [공식 커리큘럼] 탭으로 연다 — 코스 목록, 레슨의 살펴보기 · 학습, 그리고 [내 정석]의 편집기.
+  {
+    path: "/joseki",
+    prepare: async (p) => {
+      await p.locator('[data-tab="official"]').click();
+      await p.locator('[data-k="curriculum"]').waitFor({ timeout: 5000 });
+    },
+  },
+  {
+    path: "/joseki",
+    prepare: async (p) => {
+      await p.locator('[data-tab="official"]').click();
+      await p.locator(".lessonlist__item").first().click();
+      await p.locator('[data-k="lesson"]').waitFor({ timeout: 5000 });
+      await p.locator(".jtree__move").first().click();
+    },
+  },
+  {
+    path: "/joseki",
+    prepare: async (p) => {
+      await p.locator('[data-tab="official"]').click();
+      await p.locator(".lessonlist__item").first().click();
+      await p.locator('[role="tab"][data-mode="learn"]').click();
+      await p.locator('[data-k="quiz"]').waitFor({ timeout: 5000 });
+    },
+  },
   {
     path: "/joseki",
     // 새 정석을 열어 편집기까지 — 목록의 첫 주 단추가 «새 정석»이다.
     prepare: async (p) => {
+      await p.locator('[data-tab="mine"]').click();
       await p.locator(".joseki .button--primary").first().click();
       await p.locator(".joseki-editor").waitFor({ timeout: 5000 });
     },

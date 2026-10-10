@@ -9,6 +9,9 @@ bench/gomocalc/engines
 bench/sprt/engines
 public/engine
 public/weights
+# 공식 정석 커리큘럼 — 관리자 도구가 내보낸 JSON 을 그대로 싣는다(docs/공식-정석-관리.md). 서식 검사에 걸려
+# 관리자가 손으로 고칠 일이 없게. 내용 검증은 단위 시험(curriculum.test.ts)이 한다.
+public/joseki
 src/styles/tokens.css
 pnpm-lock.yaml
 
