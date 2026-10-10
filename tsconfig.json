@@ -24,9 +24,9 @@
     /* scripts/ 는 tsx 로 직접 돌아가므로 .ts 확장자를 붙여 import 한다. */
     "allowImportingTsExtensions": true,
     "noEmit": true,
-    "baseUrl": ".",
+    /* baseUrl 없이 tsconfig 기준 상대 경로로 — TypeScript 6 은 baseUrl 을 폐기 예정으로 막는다(TS5101). */
     "paths": {
-      "~/*": ["src/*"]
+      "~/*": ["./src/*"]
     }
   },
   "include": ["src", "scripts", "vite.config.ts", "showcase"],

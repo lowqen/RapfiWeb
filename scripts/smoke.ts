@@ -116,6 +116,9 @@ try {
   // 4. 연구로 이동하면 서브탭 넷이 나오고 제목이 바뀐다 — 1클릭이어야 한다
   await page.locator('.rail__link[href="/research"]').click();
   await page.waitForURL("**/research/review");
+  // react-router 7 은 탐색을 startTransition 으로 감싸 URL 이 먼저 바뀌고 화면은 그 뒤에 그려진다 —
+  // URL 만 기다리고 세면 느린 러너에서 0개를 읽는다(아래 설정 · 엔진 탭도 같다).
+  await page.locator(".rtabs__tab").first().waitFor();
   const tabs = await page.locator(".rtabs__tab").allInnerTexts();
   if (tabs.length !== 4) fail(`연구 탭이 4개가 아닙니다: ${tabs.length}`);
   // URL 이 /research/review 로 바뀐 것과 상단 바가 탭 제목으로 다시 그려진 것은 따로 일어난다 —
@@ -389,6 +392,7 @@ try {
   // 대국 스모크가 이름으로 집는 칩들이 이 화면에 있어야 한다.
   await page.locator(".rail__link", { hasText: "설정" }).click();
   await page.waitForURL("**/settings");
+  await page.locator(".settings .sgroup").first().waitFor();
   // 처음에는 「자주 쓰는 설정」 카드 하나와 고급 설정 스위치만 — 고급은 접혀 있다.
   const basicGroups = await page.locator(".sgroup").count();
   const basicRows = await page.locator(".srow").count();
@@ -540,6 +544,7 @@ try {
   // ── 10. 엔진 탭 ───────────────────────────────────────────────────
   await page.locator(".rail__link", { hasText: "엔진" }).click();
   await page.waitForURL("**/engine");
+  await page.locator(".enginescreen").waitFor();
   if ((await page.locator(".enginescreen .panel__badge").count()) !== 1) {
     fail("엔진 탭에 상태 표시가 없습니다");
   }
