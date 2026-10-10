@@ -74,7 +74,7 @@ inside one browser tab.
   import and export desktop `settings.txt` byte for byte.
 
 ### 🌏 Korean / English, responsive and accessible
-- Full **Korean and English UI** (~900 strings) with auto-detection and a one-click toggle.
+- Full **Korean and English UI** (~900 strings) with auto-detection and a switch in Settings.
   A test scans the source so no string ships untranslated.
 - **Responsive from 360 px phones to desktops**, in portrait and landscape, light and dark themes.
 - **Accessibility built in**: keyboard play on every board (arrows + Enter), screen-reader
