@@ -91,11 +91,11 @@ function BoardTabsControl() {
   };
   return (
     <div className="actions">
-      <button type="button" className="btn" onClick={() => open("game")}>
-        {t("보드 › 대국 탭")}
-      </button>
       <button type="button" className="btn" onClick={() => open("analysis")}>
         {t("보드 › 분석 탭")}
+      </button>
+      <button type="button" className="btn" onClick={() => open("game")}>
+        {t("보드 › 대국 탭")}
       </button>
     </div>
   );

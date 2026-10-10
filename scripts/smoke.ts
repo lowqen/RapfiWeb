@@ -90,14 +90,14 @@ try {
   if (booted !== wantBoot) fail(`자동 기동이 «${wantBoot}» 로 끝나지 않았습니다: ${booted}`);
   if (wantBoot === "error" && (await page.getByRole("button", { name: "엔진 기동" }).count()) !== 1)
     fail("엔진이 뜨지 못했는데 상단 바에 「다시 시도」가 없습니다");
-  const engineSelect = page.getByRole("combobox", { name: "엔진 선택" });
-  if ((await engineSelect.count()) !== 1) fail("상단 바에 엔진 선택 드롭다운이 없습니다");
-  else {
-    const opts = await engineSelect.locator("option").allInnerTexts();
-    if (opts.length !== 4) fail(`엔진 선택 항목이 넷이 아닙니다: ${opts.join(" · ")}`);
-    if ((await engineSelect.inputValue()) !== "auto")
-      fail("엔진 선택의 기본이 「자동」이 아닙니다");
-  }
+  // 상단 바는 제목 · 엔진 표시 · 테마뿐이다 — 엔진 선택과 언어는 설정으로 옮겼다(붐볐다).
+  if ((await page.locator(".topbar select, .topbar .langtoggle").count()) !== 0)
+    fail("상단 바에 엔진 선택이나 언어 단추가 남아 있습니다 — 설정 ▸ 자주 쓰는 설정의 것입니다");
+  // 기동 중의 점은 깜빡이지 않는다(맥박 애니메이션을 뺐다 — 눈이 아프다는 의견).
+  const dotAnim = await page.evaluate(
+    `getComputedStyle(document.querySelector(".enginechip__dot")).animationName`,
+  );
+  if (dotAnim !== "none") fail(`엔진 표시 점에 애니메이션이 있습니다: ${dotAnim}`);
 
   // 1. 루트가 /board 로 간다. 이 이동은 **클라이언트 라우터**가 첫 렌더에서 한다 —
   // networkidle 은 그 렌더를 기다려 주지 않아, 곧바로 URL 을 읽으면 부하에 따라
@@ -235,10 +235,10 @@ try {
   const woodDark = await pixel();
   if (woodDark === woodLight) fail(`다크에서 나무 색이 그대로입니다: ${woodDark}`);
 
-  // 보드 옆 칸은 엔진 상태 · 국면 둘뿐이다. 대국 설정은 설정 탭, 콘솔은 엔진 탭으로
-  // 갔고 대국 시계는 없앴다 — 옆 칸에 다시 쌓이기 시작하면 여기서 잡는다.
+  // 보드 옆 칸 — 기본(분석) 탭은 국면 · 엔진 · 형세 그래프 · 분석 설정 넷이다. 대국 설정은 대국 탭,
+  // 콘솔은 엔진 탭으로 갔고 대국 시계는 없앴다 — 옆 칸에 다시 쌓이기 시작하면 여기서 잡는다.
   const sideCards = await page.locator(".boardscreen__side > .panel").count();
-  if (sideCards !== 2) fail(`보드 옆 칸 카드가 둘(엔진·국면)이 아닙니다: ${sideCards}`);
+  if (sideCards !== 4) fail(`분석 탭 옆 칸 카드가 넷이 아닙니다: ${sideCards}`);
   if ((await page.locator(".clock, .clocks").count()) !== 0) fail("보드에 시계가 남아 있습니다");
   // 평가 바 — 엔진 없이도 자리를 잡고 있어야 한다(값은 「—」, 50:50).
   const meter = page.getByRole("meter", { name: "평가 바" });
@@ -246,11 +246,20 @@ try {
   else if ((await meter.getAttribute("aria-valuenow")) !== "50") {
     fail(`엔진 없이 평가 바가 50 이 아닙니다: ${await meter.getAttribute("aria-valuenow")}`);
   }
-  // [대국] | [분석] 탭 — 기본은 대국. 대국 설정(흑/백 · 시간 · 레벨 · 개시)은 대국 탭 카드에 있다.
+  // [분석] | [대국] 탭 — 분석이 먼저이고 기본이다. 대국 설정(흑/백 · 시간 · 레벨 · 개시)은 대국 탭
+  // 카드에 있다. 아래에서 대국 탭부터 보고(그 뒤 분석 탭 · 새로고침 기억) 대국 탭으로 끝낸다.
   const modeTabs = page.getByRole("tablist", { name: "보드 모드" });
-  if ((await modeTabs.getByRole("tab").count()) !== 2) fail("보드에 [대국] | [분석] 탭이 없습니다");
+  const tabNames = await modeTabs.getByRole("tab").allInnerTexts();
+  if (tabNames.join("|") !== "분석|대국")
+    fail(`보드 탭이 [분석] | [대국] 순서가 아닙니다: ${tabNames}`);
+  const analysisFirst = modeTabs.getByRole("tab", { name: "분석", exact: true });
+  if ((await analysisFirst.getAttribute("aria-selected")) !== "true")
+    fail("처음 연 보드의 기본 탭이 분석이 아닙니다");
   const gameTab = modeTabs.getByRole("tab", { name: "대국", exact: true });
-  if ((await gameTab.getAttribute("aria-selected")) !== "true") fail("기본 탭이 대국이 아닙니다");
+  await gameTab.click();
+  await page.waitForTimeout(150);
+  const gameCards = await page.locator(".boardscreen__side > .panel").count();
+  if (gameCards !== 2) fail(`대국 탭 옆 칸 카드가 둘(국면 · 대국)이 아닙니다: ${gameCards}`);
   for (const name of ["컴퓨터 백", "3초", "RIF 오프닝"]) {
     const n = await page.getByRole("button", { name, exact: true }).count();
     if (n !== 1) fail(`대국 탭에 「${name}」 이 하나가 아닙니다: ${n}개`);
@@ -302,14 +311,14 @@ try {
     fail("분석 탭의 이동 바에 분석 ▶ 가 없습니다");
   const keptStones = await page.locator("canvas[role=img]").getAttribute("aria-label");
   if (!keptStones?.includes("돌 2개")) fail(`탭을 바꾸자 판이 바뀌었습니다: ${keptStones}`);
-  // 새로고침해도 고른 탭이 남는다.
-  await page.reload({ waitUntil: "networkidle" });
-  const keptTab = await page
-    .getByRole("tab", { name: "분석", exact: true })
-    .getAttribute("aria-selected");
-  if (keptTab !== "true") fail("새로고침 뒤 분석 탭이 남지 않았습니다");
+  // 새로고침해도 고른 탭이 남는다 — 기본(분석)이 아닌 대국을 골라 두고 본다.
   await page.getByRole("tab", { name: "대국", exact: true }).click();
   await page.waitForTimeout(150);
+  await page.reload({ waitUntil: "networkidle" });
+  const keptTab = await page
+    .getByRole("tab", { name: "대국", exact: true })
+    .getAttribute("aria-selected");
+  if (keptTab !== "true") fail("새로고침 뒤 고른 대국 탭이 남지 않았습니다");
 
   // 한 화면에 들어오는가 — 휴대폰 · 노트북 · 데스크톱 · 가로 휴대폰에서
   // **페이지가 스크롤되지 않고** 보드 전체가 뷰포트 안에 있어야 한다.
@@ -409,8 +418,17 @@ try {
     fail("설정 탭에 분석 시간이 아직 있습니다 — 보드의 분석 탭의 것입니다");
   if ((await page.getByRole("button", { name: "보드 › 대국 탭" }).count()) !== 1)
     fail("설정 탭에 대국·분석 설정의 길잡이가 없습니다");
-  if ((await page.getByRole("combobox", { name: "엔진 선택" }).count()) !== 2)
-    fail("설정 탭의 「엔진」 줄에 엔진 선택이 없습니다(상단 바와 둘이어야 합니다)");
+  const engineSelect = page.getByRole("combobox", { name: "엔진 선택" });
+  if ((await engineSelect.count()) !== 1)
+    fail("설정 탭의 「엔진」 줄에 엔진 선택이 하나가 아닙니다(상단 바에서는 빠졌다)");
+  else {
+    const opts = await engineSelect.locator("option").allInnerTexts();
+    if (opts.length !== 4) fail(`엔진 선택 항목이 넷이 아닙니다: ${opts.join(" · ")}`);
+    if ((await engineSelect.inputValue()) !== "auto")
+      fail("엔진 선택의 기본이 「자동」이 아닙니다");
+  }
+  if ((await page.getByRole("radiogroup", { name: "언어" }).count()) !== 1)
+    fail("설정 탭에 언어 선택이 없습니다(상단 바에서는 빠졌다)");
   if (
     (await page
       .getByRole("switch", { name: "앱을 열면 엔진 시작" })
@@ -529,7 +547,7 @@ try {
               return c.scrollWidth - c.clientWidth; })()`,
   )) as number;
   if (overflowX > 1) fail(`좁은 폭 설정 화면이 가로로 ${overflowX}px 넘칩니다`);
-  // 상단 바(제목 · 엔진 표시 · 엔진 선택 · 테마)도 좁은 폭에서 넘치지 않는다.
+  // 상단 바(제목 · 엔진 표시 · 테마)도 좁은 폭에서 넘치지 않는다.
   const topOverflow = (await page.evaluate(
     `(() => { var t = document.querySelector(".topbar"); var r = t.getBoundingClientRect();
               var over = 0;
@@ -557,7 +575,7 @@ try {
   if (!process.exitCode) {
     console.log(
       "스모크 통과 — 레일 6 · 연구 탭 4 · 라우팅 · 토큰(라이트/다크) · 좁은 폭 전환\n" +
-        `             자동 기동(${wantBoot}) · 엔진 선택 · [대국]|[분석] 탭 · 탭 기억\n` +
+        `             자동 기동(${wantBoot}) · 상단 바 정리 · [분석]|[대국] 탭(기본 분석) · 탭 기억\n` +
         "             보드 2레이어 · 나무 렌더 · H8 착수 · 중복 착수 무시 · 다크 나무\n" +
         `             보드 옆 칸 2장 · 퀵 바 · 평가 바(판 높이) · 설정 ${basicRows}+${rows - basicRows}줄(고급 스위치·검색·저장·좁은 폭) · 엔진 탭`,
     );

@@ -21,7 +21,7 @@ import { PREFERENCE_LABEL, VARIANT_LABEL } from "./engineLabels";
 import { t } from "../../i18n/i18n";
 
 /**
- * 엔진 조작부 — 상단 바 · 설정 · 보드의 대국 탭이 함께 쓴다. 값은 모두 설정 스토어
+ * 엔진 조작부 — 설정 · 보드의 대국 탭이 함께 쓴다. 값은 모두 설정 스토어
  * 하나가 주인이라 어디서 바꾸든 같은 값이다.
  */
 
@@ -33,13 +33,13 @@ import { t } from "../../i18n/i18n";
  * 네이티브 `<select>` 다 — 펼친 목록은 운영체제의 것이라야 키보드·스크린 리더·휴대폰
  * 휠이 그대로 돈다. 겉모양만 토큰으로 칠한다(`.select`, `color-scheme`).
  */
-export function EngineSelect({ compact = false }: { compact?: boolean }) {
+export function EngineSelect() {
   const id = useId();
   const caps = useEngineStore((s) => s.capabilities);
   const pref = useSettingsStore((s) => s.enginePreference);
   const update = useSettingsStore((s) => s.update);
   return (
-    <span className={"select" + (compact ? " select--compact" : "")}>
+    <span className="select">
       <label htmlFor={id} className="select__label">
         {t("엔진")}
       </label>
@@ -53,7 +53,7 @@ export function EngineSelect({ compact = false }: { compact?: boolean }) {
       >
         {ENGINE_PREFERENCES.map((p) => {
           const why = preferenceBlocker(caps, p);
-          const name = t(compact ? PREFERENCE_LABEL[p].short : PREFERENCE_LABEL[p].long);
+          const name = t(PREFERENCE_LABEL[p]);
           return (
             <option key={p} value={p} disabled={why !== null && p !== pref} title={why ?? ""}>
               {why ? t("{name} (사용 불가)", { name }) : name}

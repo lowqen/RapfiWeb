@@ -8,10 +8,10 @@ export const VARIANT_LABEL: Readonly<Record<EngineVariant, string>> = localized(
   "single-simd128": msg("단일 스레드"),
 });
 
-/** 드롭다운 항목 — 짧은 이름(상단 바)과 긴 이름(설정). 사전 열쇠라 그릴 때 `t()`. */
-export const PREFERENCE_LABEL: Record<EnginePreference, { short: string; long: string }> = {
-  auto: { short: msg("자동"), long: msg("자동 (가장 빠른 것)") },
-  multi: { short: "Multi-thread", long: "Multi-thread (pthread)" },
-  relaxed: { short: "Relaxed SIMD", long: msg("WASM Relaxed SIMD (단일 스레드)") },
-  simd: { short: "Standard SIMD", long: msg("WASM Standard SIMD (단일 스레드)") },
+/** 드롭다운 항목 이름(설정). 사전 열쇠라 그릴 때 `t()`. */
+export const PREFERENCE_LABEL: Record<EnginePreference, string> = {
+  auto: msg("자동 (가장 빠른 것)"),
+  multi: "Multi-thread (pthread)",
+  relaxed: msg("WASM Relaxed SIMD (단일 스레드)"),
+  simd: msg("WASM Standard SIMD (단일 스레드)"),
 };

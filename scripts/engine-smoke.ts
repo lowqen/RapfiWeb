@@ -448,13 +448,20 @@ try {
   if (painted === 0) fail("동적 레이어가 비어 있습니다 — 돌도 칩도 그려지지 않았습니다");
   else console.log(`동적 레이어 픽셀 ${painted.toLocaleString()}개`);
 
-  // 7. **엔진 선택 — 바이너리 교체.** 상단 바에서 Standard SIMD 를 고르면 떠 있는 엔진을
-  // 깨끗이 내리고 단일 · 일반 SIMD 로 다시 띄운다. 분석을 켜 둔 채 바꾸면 새 엔진이 이어 읽는다.
-  // 자동으로 되돌리면 처음과 같은 변형이다.
+  // 7. **엔진 선택 — 바이너리 교체.** 설정 ▸ 자주 쓰는 설정에서 Standard SIMD 를 고르면 떠 있는
+  // 엔진을 깨끗이 내리고 단일 · 일반 SIMD 로 다시 띄운다(상단 바의 선택은 빠졌다). 보드에서 분석을
+  // 켜 둔 채 바꾸고 돌아오면 새 엔진이 이어 읽는다. 자동으로 되돌리면 처음과 같은 변형이다.
   const select = page.getByRole("combobox", { name: "엔진 선택" });
+  const goto = async (label: string, path: string, ready: string) => {
+    if (!page) throw new Error("페이지가 없습니다");
+    await page.locator(".rail__link", { hasText: label }).click();
+    await page.waitForURL(`**${path}`);
+    await page.locator(ready).first().waitFor();
+  };
   await page.getByRole("button", { name: "분석", exact: true }).click();
   await page.locator('.panel__badge[data-status="searching"]').waitFor({ timeout: 10_000 });
   const tSwap = Date.now();
+  await goto("설정", "/settings", ".settings .sgroup");
   await select.selectOption("simd");
   await page
     .waitForFunction(
@@ -473,6 +480,7 @@ try {
   };
   if (swapped.variant !== "single-simd128")
     fail(`Standard SIMD 로 바뀌지 않았습니다: ${swapped.variant}`);
+  await goto("보드", "/board", ".boardscreen__board");
   const resumed = await page
     .locator('.panel__badge[data-status="searching"]')
     .waitFor({ timeout: 30_000 })
@@ -486,6 +494,7 @@ try {
   // 찾기와 누르기를 한 번에 — 그 사이 분석이 끝나 버튼이 바뀌면 click() 이 30초 기다린다.
   await page.evaluate(STOP_AND_READ_BEST);
   await page.locator('.panel__badge[data-status="ready"]').waitFor({ timeout: 15_000 });
+  await goto("설정", "/settings", ".settings .sgroup");
   await select.selectOption("auto");
   await page
     .waitForFunction(

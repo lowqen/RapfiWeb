@@ -64,9 +64,9 @@ const ROUTES: readonly { path: string; prepare?: (p: Page) => Promise<void> }[] 
   { path: "/board" },
   {
     path: "/board",
-    // 대국 탭 — 모드 탭 둘 중 첫째(문구가 아니라 순서로 집는다: 언어와 무관하게).
+    // 대국 탭 — 문구가 아니라 data-mode 로 집는다(언어와 무관하게). 기본 탭은 분석이다.
     prepare: async (p) => {
-      await p.locator('[role="tablist"] [role="tab"]').first().click();
+      await p.locator('[role="tablist"] [role="tab"][data-mode="game"]').click();
     },
   },
   { path: "/research/review" },
@@ -299,7 +299,7 @@ try {
     await ctx.close();
   }
 
-  // 6. 언어 전환 — 한국어로 열고 상단 바 단추로 영어, 새로고침 뒤 유지, 설정의 «한국어» 로 되돌리기.
+  // 6. 언어 전환 — 한국어로 열고 설정의 «English» 로 영어, 새로고침 뒤 유지, «한국어» 로 되돌리기.
   {
     const ctx = await browser.newContext({
       locale: "ko-KR",
@@ -310,7 +310,10 @@ try {
     await page.goto(`${BASE}/settings`, { waitUntil: "networkidle" });
     if ((await page.evaluate("document.documentElement.lang")) !== "ko")
       fail("한국어 브라우저인데 lang 이 ko 가 아닙니다");
-    await page.locator(".langtoggle").click();
+    await page
+      .getByRole("radiogroup", { name: "언어" })
+      .getByRole("radio", { name: "English" })
+      .click();
     await page.getByRole("heading", { name: "Frequently used" }).waitFor({ timeout: 3000 });
     await page.reload({ waitUntil: "networkidle" });
     if ((await page.evaluate("document.documentElement.lang")) !== "en")
@@ -322,7 +325,7 @@ try {
     await page.getByRole("heading", { name: "자주 쓰는 설정" }).waitFor({ timeout: 3000 });
     const stored = await page.evaluate("localStorage.getItem('rapfi.lang')");
     if (stored !== "ko") fail(`설정에서 고른 언어가 저장되지 않았습니다 (${stored})`);
-    console.log("언어 전환: 상단 바 → English, 새로고침 유지, 설정 → 한국어 ✓");
+    console.log("언어 전환: 설정 → English, 새로고침 유지, 설정 → 한국어 ✓");
     await ctx.close();
   }
 

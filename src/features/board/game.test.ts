@@ -58,6 +58,8 @@ function fresh(
     },
   });
   useGameStore.setState({
+    // 대국 탭의 시험이다 — 보드의 기본 탭은 분석이라 명시한다.
+    mode: "game",
     computerSide: opts.computerSide ?? "none",
     opening: opts.opening ?? "none",
     showForbidden: opts.showForbidden ?? false,

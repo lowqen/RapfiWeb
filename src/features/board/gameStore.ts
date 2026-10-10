@@ -103,12 +103,16 @@ export type StopResult =
 
 const MODE_KEY = "rapfi.boardMode";
 
+/**
+ * 처음 여는 사람의 기본 탭은 **분석**이다. 대국을 고른 적이 있으면 그것이 남는다 — 저장값은
+ * 사용자가 탭을 바꿀 때만 생기므로, 예전 기본(대국)을 그냥 쓰던 사람은 분석으로 열린다.
+ */
 function loadMode(): BoardMode {
   try {
     const v = typeof localStorage === "undefined" ? null : localStorage.getItem(MODE_KEY);
-    return v === "analysis" ? "analysis" : "game";
+    return v === "game" ? "game" : "analysis";
   } catch {
-    return "game";
+    return "analysis";
   }
 }
 

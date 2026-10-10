@@ -285,19 +285,10 @@ a:focus-visible {
 .themetoggle:hover {
   background: var(--c-surface-container);
 }
-.langtoggle__short {
-  display: none;
-}
-/* 좁은 폭(W10): 상단 바에 엔진 칩 · 테마 · 언어가 한 줄로 서도록 단추를 줄인다. */
+/* 좁은 폭(W10): 상단 바에 엔진 칩 · 테마가 한 줄로 서도록 단추를 줄인다. */
 @media (max-width: 640px) {
   .themetoggle {
     padding: var(--space-s) var(--space-m);
-  }
-  .langtoggle__long {
-    display: none;
-  }
-  .langtoggle__short {
-    display: inline;
   }
 }
 
@@ -1929,9 +1920,6 @@ a:focus-visible {
 .enginechip[data-status="searching"] .enginechip__dot {
   background: var(--c-caution);
 }
-.enginechip[data-status="starting"] .enginechip__dot {
-  animation: chip-pulse 1.6s ease-in-out infinite alternate;
-}
 .enginechip[data-status="error"] {
   color: var(--c-error);
 }
@@ -1953,14 +1941,6 @@ a:focus-visible {
   color: var(--c-on-secondary-container);
   background: var(--c-secondary-container);
   border-radius: var(--radius-xl);
-}
-@keyframes chip-pulse {
-  from {
-    opacity: 0.35;
-  }
-  to {
-    opacity: 1;
-  }
 }
 /* 기동 중 — 상단 바 밑으로 가는 줄이 흐른다. 비율을 모르므로 양을 그리지 않는다.
    **늘 붙어 있고 투명도로만 드나든다.** 예전에는 기동 동안만 붙였다 떼어, 캐시에서 2초 만에
@@ -2073,10 +2053,6 @@ a:focus-visible {
   appearance: none;
   cursor: pointer;
 }
-.select--compact .select__input {
-  height: 32px;
-  font: var(--type-label-medium);
-}
 .select__input:focus-visible {
   outline: 2px solid var(--c-primary);
   outline-offset: 2px;
@@ -2093,39 +2069,22 @@ a:focus-visible {
   .topbar__subtitle {
     display: none;
   }
-  /* 좁은 폭: 표시는 점 하나(상태는 툴팁·스크린 리더가 읽는다). */
+  /* 좁은 폭: 표시는 점 하나(상태는 툴팁·스크린 리더가 읽는다). 숨긴 글자 칸은 상단 바의 왼쪽 위에
+     둔다 — 제자리(칩 안)에 두면 칩이 오른쪽 끝에 붙은 뒤로 그 안의 긴 글자(«· 멀티 · relaxed»)의 상자가
+     상단 바 밖으로 삐져나가 측정에 걸렸다(보이지는 않는다). */
   .enginechip {
     padding: 0 var(--space-m);
   }
   .enginechip__text {
     position: absolute;
+    top: 0;
+    left: 0;
     width: 1px;
     min-width: 0;
     height: 1px;
     overflow: hidden;
     clip: rect(0 0 0 0);
     white-space: nowrap;
-  }
-  .select--compact .select__input {
-    max-width: 128px;
-  }
-}
-/* 휴대폰 세로(≤420px): 위 줄만으로는 제목이 10px 남짓만 남아 «Settings» 가 «S» 로, «설정» 도
-   잘렸다. 오른쪽 조작부의 틈 · 여백 · 엔진 선택 폭을 줄여 제목 몫(짧은 제목 하나)을 돌려준다.
-   긴 제목(연구 · 하위 탭)은 여전히 말줄임으로 끝난다. */
-@media (max-width: 420px) {
-  .topbar {
-    padding-inline: var(--space-m);
-  }
-  .topbar__end,
-  .enginechip-wrap {
-    gap: var(--space-s);
-  }
-  .themetoggle {
-    padding-inline: var(--space-s);
-  }
-  .select--compact .select__input {
-    max-width: 84px;
   }
 }
 

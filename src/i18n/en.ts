@@ -870,7 +870,6 @@ export const EN: Readonly<Record<string, string>> = {
   멀티스레드: "Multi thread",
   "단일 스레드 · relaxed SIMD": "Single thread · relaxed SIMD",
   "단일 스레드": "Single thread",
-  자동: "Auto",
   "자동 (가장 빠른 것)": "Auto (fastest)",
   "WASM Relaxed SIMD (단일 스레드)": "WASM Relaxed SIMD (single thread)",
   "WASM Standard SIMD (단일 스레드)": "WASM Standard SIMD (single thread)",

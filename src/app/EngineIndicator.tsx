@@ -3,10 +3,9 @@ import { msg, t } from "../i18n/i18n";
 import { useEngineStore } from "../engine/engine-state";
 import type { BootPhase, EngineStatus } from "../engine/engine-types";
 import { isMultiVariant, isRelaxedVariant } from "../engine/engine-client";
-import { EngineSelect } from "../features/settings/engineControls";
 
 /**
- * 상단 바의 엔진 표시 — 지금 엔진이 어떤지 한 줄과, 엔진 선택 드롭다운.
+ * 상단 바의 엔진 표시 — 지금 엔진이 어떤지 한 줄. 엔진 선택은 설정 ▸ 자주 쓰는 설정에 있다.
  *
  * 앱이 뜨면 엔진이 뒤에서 기동한다(`useAutoBoot`). 그동안 이 표시가 **무엇을 기다리는지**
  * (가중치 받기 → 엔진 → 예열) 말하고, 상단 바 밑에 가는 진행 줄이 흐른다. 끝나면 「준비」와
@@ -24,7 +23,11 @@ import { EngineSelect } from "../features/settings/engineControls";
  *     뒤(«다 됐다») 천천히 사라진다(`LEAVE_MS`). 예전에는 끝나는 순간 흐름을 멈춰 세워
  *     반쯤 지나던 조각이 그 자리에 얼어붙은 채로 꺼졌다.
  *
- * 칩의 글자 칸은 폭을 고정해 단계 글자가 바뀌어도 옆의 드롭다운이 들썩이지 않는다.
+ * 칩의 글자 칸은 폭을 고정해 단계 글자가 바뀌어도 칩이 들썩이지 않는다.
+ *
+ * **점은 깜빡이지 않는다.** 기동 중(«준비 중»)의 점은 주황으로 멈춰 있다. 예전에는 투명도를
+ * 오르내리는 맥박이 있었는데, 처음 접속하면 가중치 · 엔진 · 예열로 수 초(느린 기기는 더) 이어져
+ * 눈이 아프다는 의견이 있었다. 진행은 상단 바 밑의 진행 줄과 단계 글자가 말한다.
  */
 const PHASE_TEXT: Record<BootPhase, string> = {
   weights: msg("가중치 받는 중"),
@@ -130,7 +133,6 @@ export function EngineIndicator() {
           </button>
         )}
       </span>
-      <EngineSelect compact />
       {/* 늘 붙어 있고 투명도만 바뀐다 — 붙였다 떼면 짧은 기동(캐시 ~2초)에서 번쩍인다. */}
       <span className="bootbar" data-phase={bar} aria-hidden="true" />
     </div>
