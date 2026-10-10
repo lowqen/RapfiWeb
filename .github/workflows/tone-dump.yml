@@ -12,11 +12,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # 러너에 이미 JDK 가 있지만 버전을 고정해 둔다 — 부동소수 결과가 JDK 버전에
       # 좌우되지는 않지만, 재현할 때 무엇으로 돌렸는지는 남아야 한다.
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
           distribution: temurin
           java-version: "21"
@@ -35,7 +35,7 @@ jobs:
             echo "Color.kt 주석: Clay.tone(76) = #DAB673 · Clay.tone(42) = #7B5E22"
           } >> $GITHUB_STEP_SUMMARY
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: tokens-golden
           path: tokens.golden.json

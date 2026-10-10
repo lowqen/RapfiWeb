@@ -31,14 +31,14 @@ jobs:
     env:
       WORK: ${{ github.workspace }}/../rapfi-wasm-work
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "26"
       - name: 시스템 도구
         run: sudo apt-get update -qq && sudo apt-get install -y ninja-build ccache
       - name: rapfi 소스 캐시 복원
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ${{ env.WORK }}/rapfi
           key: rapfi-3c94c2a9-v1
@@ -54,7 +54,7 @@ jobs:
             --max-gap "${{ inputs.max_gap }}" --keep "${{ inputs.keep }}" \
             --out bench/sprt/openings-balanced.json | tee openings.log
           { echo '```'; sed -n '/^\[4\]/,$p' openings.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: openings-balanced
           retention-days: 14

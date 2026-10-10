@@ -54,14 +54,14 @@ env:
 
 jobs:
   build:
-    # 저장소 변수 CI_RUNNER(예: self-hosted)가 있으면 그 러너로 — GitHub 호스트 러너가 결제 · 지출 한도로 막혔을 때.
-    # 변수를 지우면 ubuntu-latest 로 돌아간다.
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    # GitHub 호스트 러너(보안 강화 계획 Phase 2) — 배포 토큰을 쥐는 잡이라 남과 나눠 쓰는 기계에 두지 않는다.
+    # 예전의 저장소 변수 CI_RUNNER(self-hosted 우회)는 없앴다.
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "26"
           cache: pnpm
@@ -107,7 +107,7 @@ jobs:
           find dist -name '*.map' -delete
           echo "소스맵 $(find sourcemaps -name '*.map' | wc -l)개를 배포본에서 뺐습니다."
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         continue-on-error: true
         with:
           name: sourcemaps-${{ github.sha }}
@@ -137,7 +137,7 @@ jobs:
           echo "깨끗합니다."
 
       # 기록용일 뿐 뒤 단계가 받아 쓰지 않는다 — 저장 한도가 차도 배포를 막지 않는다.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         continue-on-error: true
         with:
           name: dist

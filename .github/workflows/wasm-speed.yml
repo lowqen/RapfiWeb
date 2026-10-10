@@ -55,8 +55,8 @@ jobs:
       WORK: ${{ github.workspace }}/../rapfi-wasm-work
       ENABLE_LTO: "ON"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "26"
       - name: 시스템 도구
@@ -71,12 +71,12 @@ jobs:
         run: |
           echo "nproc $(nproc) · $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2)"
       - name: emsdk 캐시 복원
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ${{ env.WORK }}/emsdk
           key: emsdk-latest-v1
       - name: rapfi 소스 캐시 복원
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ${{ env.WORK }}/rapfi
           key: rapfi-3c94c2a9-v1
@@ -128,7 +128,7 @@ jobs:
       - name: 결과
         if: always()
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: wasm-speed
           retention-days: 14

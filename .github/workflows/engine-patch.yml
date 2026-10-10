@@ -51,23 +51,23 @@ jobs:
       # 「패치 없음 ↔ 패치」 대조에는 이 태그를 그대로 둔다(지우지 말 것).
       ENGINE_TAG: ${{ inputs.base_tag }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "26"
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
 
       - name: 시스템 도구
         run: sudo apt-get update -qq && sudo apt-get install -y ninja-build ccache file
 
       - name: emsdk 캐시 복원
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ${{ env.WORK }}/emsdk
           key: emsdk-latest-v1
 
       - name: rapfi 소스 캐시 복원
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ${{ env.WORK }}/rapfi
           key: rapfi-3c94c2a9-v1
@@ -117,7 +117,7 @@ jobs:
           STRICT="$GATE" node bench/gomocalc/thread-reload-probe.mjs patched multi-simd128
 
       - name: 산출물
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: engine-patched
           retention-days: 3

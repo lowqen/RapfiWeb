@@ -71,8 +71,8 @@ on:
         default: "300"
         type: string
       runner_label:
-        description: "self-hosted 러너의 고유 라벨(c4 = Intel Xeon 8581C) · self-hosted(아무 러너) · ubuntu-latest(GitHub 호스트)"
-        default: "c4"
+        description: "ubuntu-latest(기본, GitHub 호스트) · self-hosted(아무 러너) · self-hosted 러너의 고유 라벨(c4 = Intel Xeon 8581C)"
+        default: "ubuntu-latest"
         type: string
       expect_cpu:
         description: "러너 CPU 이름에 이 글자가 없으면 곧바로 멈춘다(예: 8581C) — 비우면 검사 안 함"
@@ -87,8 +87,8 @@ jobs:
     runs-on: ${{ inputs.runner_label == 'ubuntu-latest' && 'ubuntu-latest' || fromJSON(format('["self-hosted","{0}"]', inputs.runner_label)) }}
     timeout-minutes: ${{ inputs.runner_label == 'ubuntu-latest' && 360 || 1440 }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "26"
 
@@ -189,7 +189,7 @@ jobs:
       - name: 기보 · 요약
         if: always()
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: match-${{ inputs.test_variant }}-${{ inputs.opponent }}-t${{ inputs.threads }}
           retention-days: 14

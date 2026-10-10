@@ -24,19 +24,18 @@ env:
 
 jobs:
   build:
-    # 저장소 변수 CI_RUNNER(예: self-hosted)가 있으면 그 러너로 — GitHub 호스트 러너가 결제 · 지출 한도로 막혔을 때.
-    # 변수를 지우면 ubuntu-latest 로 돌아간다.
-    # **pull_request 는 언제나 GitHub 호스트 러너다** — 포크 PR 의 코드가 self-hosted 기계에서
-    # 돌면 그 기계가 남의 손에 넘어간다(공개 저장소의 self-hosted 러너 경고).
-    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || vars.CI_RUNNER || 'ubuntu-latest' }}
+    # **언제나 GitHub 호스트 러너다**(보안 강화 계획 Phase 2). 공개 저장소라 호스트 러너가 무료이고,
+    # 포크 PR 의 코드가 self-hosted 기계에서 돌면 그 기계가 남의 손에 넘어간다. 예전의 저장소 변수
+    # CI_RUNNER(결제 한도로 호스트 러너가 막혔을 때의 우회)는 없앴다.
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # 버전은 package.json 의 packageManager 필드에서 온다 — 여기 또 적으면 충돌한다.
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "26"
           cache: pnpm
@@ -44,6 +43,17 @@ jobs:
       # 잠금 파일 그대로만 설치한다(보안 강화 계획 F3). `^` 범위 안에서 새로 나온 판이 검토 없이
       # 들어오지 않게 — 의존성을 바꿀 때는 로컬에서 `pnpm install` 로 잠금 파일을 함께 고쳐 커밋한다.
       - run: pnpm install --frozen-lockfile
+
+      # 공급망 감사(보안 강화 계획 Phase 2) — 배포 번들에 들어가는 의존성(--prod)에 high 이상 권고가 있는가.
+      # 처음에는 경고 주석만 남기고 잡을 막지 않는다. 개발 도구(vitest · eslint …)의 권고와 업데이트는
+      # Dependabot(.github/dependabot.yml)이 주 1회 PR 로 다룬다.
+      - name: 의존성 감사 (prod · high 이상 — 경고만)
+        run: |
+          if pnpm audit --prod --audit-level high; then
+            echo "배포 의존성에 high 이상 권고 없음."
+          else
+            echo "::warning title=pnpm audit::배포 의존성에 high 이상 보안 권고가 있습니다(또는 감사 서버 응답 실패). pnpm audit --prod 결과를 확인하세요."
+          fi
 
       - name: 타입
         run: pnpm typecheck
@@ -141,7 +151,7 @@ jobs:
 
       - name: dist 업로드
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: dist
           path: dist/
@@ -177,7 +187,7 @@ jobs:
       - name: 서식 패치 업로드
         if: always() && steps.fmt.outcome == 'failure'
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: prettier-patch
           path: prettier.patch
