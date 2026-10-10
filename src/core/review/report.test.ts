@@ -112,7 +112,38 @@ describe("HTML", () => {
     const nasty = { ...report, title: 'a<b>&"c"' };
     const out = html(nasty, { head: "", body: "", tail: "" }, "2026-07-28 21:00");
     expect(out).toContain("a&lt;b&gt;&amp;&quot;c&quot;");
-    expect(out).toContain('"title":"a<b>&\\"c\\""');
+    expect(out).toContain('"title":"a\\u003cb>&\\"c\\""');
+  });
+
+  it("제목 · 코멘트 · 로그의 </script> 가 GAME 스크립트를 끝내지 못한다 (F1)", () => {
+    const attack = "x</script><script>alert(1)</script><!--";
+    const nasty: GameReport = {
+      ...report,
+      title: attack,
+      moves: report.moves.map((m) => ({ ...m, comment: attack })),
+    };
+    const read = (f: string) =>
+      readFileSync(new URL(`./report-shell/${f}`, import.meta.url), "utf8");
+    const shell = { head: read("head.html"), body: read("body.html"), tail: read("tail.html") };
+    const out = html(nasty, shell, "x", attack);
+    const data = gameJson(nasty, "x", attack);
+    // GAME 이 든 <script> 는 GAME 객체가 다 끝난 뒤에야(틀의 닫는 태그에서) 닫힌다.
+    const gameAt = out.indexOf(data);
+    expect(gameAt).toBeGreaterThan(0);
+    expect(out.indexOf("</script>", out.lastIndexOf("<script>", gameAt))).toBeGreaterThan(
+      gameAt + data.length,
+    );
+    // 공격 문자열은 데이터로만 남는다 — 페이지 어디에도 실행 가능한 «<script>alert» 가 없다.
+    expect(out).not.toContain("<script>alert");
+    // 그리고 GAME 을 읽으면 원문 그대로다.
+    const game = JSON.parse(data) as {
+      title: string;
+      log: string;
+      moves: { cmt: string }[];
+    };
+    expect(game.title).toBe(attack);
+    expect(game.log).toBe(attack);
+    expect(game.moves[0]!.cmt).toBe(attack);
   });
 
   it("실린 틀 셋을 이으면 한 페이지가 된다", () => {
@@ -142,6 +173,14 @@ describe("도움", () => {
   it("JSON 은 제어 문자를 이스케이프한다", () => {
     expect(json("a\nb\\c")).toBe('"a\\nb\\\\c"');
     expect(JSON.parse(json("x\u0001y"))).toBe("x\u0001y");
+  });
+
+  it("JSON 은 < 와 U+2028 · U+2029 를 이스케이프하고 값은 그대로다", () => {
+    const raw = "</script>\u2028\u2029<!--";
+    const lit = json(raw);
+    expect(lit).not.toMatch(/[<\u2028\u2029]/);
+    expect(lit).toBe('"\\u003c/script>\\u2028\\u2029\\u003c!--"');
+    expect(JSON.parse(lit)).toBe(raw);
   });
 
   it("예산 표기 · 감시견 · 범위", () => {

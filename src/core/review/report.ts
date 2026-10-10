@@ -112,6 +112,14 @@ export function fixed(value: number, digits: number): string {
   return digits === 0 ? `${sign}${whole}` : `${sign}${whole}.${String(frac).padStart(digits, "0")}`;
 }
 
+/**
+ * JSON 문자열 리터럴 — HTML 리포트의 `<script>const GAME = {…}` 안에 그대로 들어간다.
+ *
+ * 그래서 JSON 규칙만으로는 모자란다. `<` 를 `<` 로 바꿔 제목 · 코멘트 · 엔진 로그에 든
+ * `</script>` · `<!--` 가 스크립트 블록을 끝내지 못하게 하고(보안 강화 계획 F1), U+2028 · U+2029 는
+ * 옛 JS 엔진에서 문자열 안의 줄바꿈으로 읽혀 구문 오류가 나므로 이스케이프한다. 둘 다 JSON 으로도
+ * 유효해서 `JSON.parse` 결과는 원문과 같다.
+ */
 export function json(text: string): string {
   let out = '"';
   for (const c of text) {
@@ -120,6 +128,9 @@ export function json(text: string): string {
     else if (c === "\n") out += "\\n";
     else if (c === "\r") out += "\\r";
     else if (c === "\t") out += "\\t";
+    else if (c === "<") out += "\\u003c";
+    else if (c === " ") out += "\\u2028";
+    else if (c === " ") out += "\\u2029";
     else if (c < " ") out += `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`;
     else out += c;
   }
