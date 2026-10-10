@@ -7,13 +7,17 @@ export interface AutosaveState {
   size: number;
   moves: readonly Move[];
   future: readonly Move[];
+  /** 분석 판(`"analysis"` 자리)만 — 갈라져 나온 대국 수순. */
+  base?: readonly Move[];
 }
 
 /** 자리 하나를 읽는다. 없으면 `null`. */
 export async function readSlot(d: RapfiDb, slot: GameSlot): Promise<AutosaveState | null> {
   const r = await d.games.where("slot").equals(slot).first();
   if (!r) return null;
-  return { name: r.name, size: r.size, moves: r.moves, future: r.future };
+  const s: AutosaveState = { name: r.name, size: r.size, moves: r.moves, future: r.future };
+  if (r.base) s.base = r.base;
+  return s;
 }
 
 /**
@@ -32,6 +36,7 @@ export async function writeSlot(d: RapfiDb, slot: GameSlot, s: AutosaveState): P
       savedAt: Date.now(),
       slot,
     };
+    if (s.base) rec.base = s.base.map(({ x, y }) => ({ x, y }));
     if (prev?.id !== undefined) rec.id = prev.id;
     await d.games.put(rec);
   });

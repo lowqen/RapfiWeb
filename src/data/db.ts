@@ -29,13 +29,16 @@ export interface GameRecord {
   /**
    * 특별한 자리 — 자리마다 한 줄이고 늘 같은 줄을 덮어쓴다. 사용자가 저장한 기보에는
    * 없다(색인에 걸리지 않는다).
-   *   `"autosave"`   지금 판
+   *   `"autosave"`   보드 [대국] 탭의 판(대국 기보)
+   *   `"analysis"`   보드 [분석] 탭의 판 — `base` 는 이 판이 갈라져 나온 대국 수순
    *   `"beforeLink"` 국면 딥링크를 열기 직전에 두던 판 — 되돌리거나 버릴 때까지 남는다
    */
   slot?: GameSlot;
+  /** `"analysis"` 자리만 — 분석 판이 갈라져 나온 대국 수순. 색인하지 않는다(판본 그대로). */
+  base?: Move[];
 }
 
-export type GameSlot = "autosave" | "beforeLink";
+export type GameSlot = "autosave" | "analysis" | "beforeLink";
 
 /** 리뷰 작업 하나의 상태. `paused` 는 중단(취소 · 엔진 소실 · 새로고침) — 체크포인트에서 잇는다. */
 export type JobStatus = "pending" | "running" | "paused" | "done" | "failed";

@@ -141,11 +141,48 @@ const LOG_LIMIT = 30;
 const SWAP_FIRST_OPENING = move(7, 1);
 const SWAP_FIRST_REPLY = move(5, 4);
 
+/**
+ * 쉬고 있는 탭의 판 — **탭마다 판이 따로다.** 지금 탭의 판은 `boardStore` 에 있고, 다른 탭의
+ * 판은 여기 접혀 있다가 탭을 바꿀 때 서로 자리를 바꾼다(`setMode`).
+ *
+ *   - 대국 → 분석: 분석 판이 **대국 수순에서 갈라진다** — 대국의 모든 수가 분석 판에 있다. 다만
+ *     대국이 그 뒤로 바뀌지 않았으면(갈라진 자리 `analysisBase` 와 같으면) 하던 분석(탐색한 갈래)을
+ *     그대로 이어 보인다.
+ *   - 분석 → 대국: 접어 둔 대국 판을 그대로 펼친다 — 분석에서 둔 수가 대국 기보에 새어 들지 않는다.
+ *     결과(기권 · 무승부 포함)와 떠 있던 물음도 함께 돌아온다.
+ *
+ * 두 판 모두 자동 저장된다(`autosave.ts` — 대국은 `"autosave"`, 분석은 `"analysis"` 자리).
+ */
+export interface ParkedBoard {
+  stones: readonly Move[];
+  future: readonly Move[];
+  result: GameResult | null;
+  name: string | null;
+  prompt?: GamePrompt | null;
+}
+
+/** 두 탭의 판 — 자동 저장이 쓰고 읽는다. `base` 는 분석 판이 갈라져 나온 대국 수순. */
+export interface BoardSessions {
+  game: ParkedBoard;
+  analysis: ParkedBoard | null;
+  base: readonly Move[] | null;
+}
+
 interface GameState {
   /** 보드의 탭(`BoardMode`). 고른 탭은 이 브라우저에 남는다. */
   mode: BoardMode;
-  /** 탭을 바꾼다 — 엔진의 쓰임을 격리한다(`BoardMode` 주석). */
+  /** 탭을 바꾼다 — 엔진의 쓰임을 격리하고 판을 갈아 끼운다(`ParkedBoard`). */
   setMode: (m: BoardMode) => void;
+  /** 지금 [분석] 탭이면 접혀 있는 대국 판(없으면 빈 판). */
+  parkedGame: ParkedBoard | null;
+  /** 지금 [대국] 탭이면 접혀 있는 분석 판. */
+  parkedAnalysis: ParkedBoard | null;
+  /** 분석 판이 갈라져 나온 대국 수순 — 대국이 이것과 다르면 다음에 분석으로 갈 때 다시 갈라진다. */
+  analysisBase: readonly Move[] | null;
+  /** 두 탭의 판을 한꺼번에(지금 탭의 판은 보드에서) — 자동 저장이 쓴다. */
+  sessions: () => BoardSessions;
+  /** 자동 저장에서 두 탭의 판을 되살린다 — 지금 탭의 판은 보드에, 다른 탭의 판은 접어 둔다. */
+  restoreSessions: (s: BoardSessions, what?: string) => void;
   /** 대국 레벨 1..5(`LEVELS`). 5 = 최강. */
   level: number;
   setLevel: (n: number) => void;
@@ -227,6 +264,11 @@ interface GameState {
 
 const board = () => useBoardStore.getState();
 const engine = () => useEngineStore.getState();
+
+const EMPTY_PARKED: ParkedBoard = { stones: [], future: [], result: null, name: null };
+
+const sameMoves = (a: readonly Move[], b: readonly Move[]): boolean =>
+  a.length === b.length && a.every((m, i) => sameMove(m, b[i]!));
 
 /** 지금 둘 색. 돌 수가 짝수면 흑이다. */
 const sideToMove = (moves: readonly Move[]): StoneColor => colorAt(moves.length);
@@ -462,9 +504,68 @@ export const useGameStore = create<GameState>((set, get) => {
     return { kind: "placed" };
   };
 
+  /** 지금 보드의 판을 접는다. */
+  const fold = (): ParkedBoard => {
+    const s = get();
+    return {
+      stones: board().render.stones,
+      future: board().future,
+      result: s.result,
+      name: s.gameName,
+      prompt: s.prompt,
+    };
+  };
+
+  /**
+   * 접어 둔 판을 보드에 펼친다. 대국 판은 접을 때의 결과(기권 · 무승부 포함)와 물음을 그대로,
+   * 분석 판은 판에서 승패를 다시 본다(분석에는 기권이 없다).
+   */
+  const unfold = (p: ParkedBoard, keepState: boolean) => {
+    board().setStones(p.stones, p.future);
+    board().setForbidden([]);
+    set({
+      result: keepState ? p.result : null,
+      prompt: keepState ? (p.prompt ?? null) : null,
+      gameName: p.name,
+    });
+    if (!keepState) judge();
+  };
+
   return {
     mode: loadMode(),
     level: MAX_LEVEL,
+    parkedGame: null,
+    parkedAnalysis: null,
+    // 처음에는 분석 판이 빈 대국에서 갈라진 것으로 친다 — 대국을 두지 않았으면 분석을 오가도 이어진다.
+    analysisBase: [],
+
+    sessions: () => {
+      const s = get();
+      const live = fold();
+      return s.mode === "game"
+        ? { game: live, analysis: s.parkedAnalysis, base: s.analysisBase }
+        : { game: s.parkedGame ?? EMPTY_PARKED, analysis: live, base: s.analysisBase };
+    },
+
+    restoreSessions: ({ game, analysis, base }, what) => {
+      const s = get();
+      // 대국 판의 승패는 판에서 다시 본다(기권 · 무승부는 저장하지 않는다 — 새로고침 전과 같다).
+      const gameResult = refereeResult(game.stones, board().render.size, ALLOW_OVERLINE);
+      if (s.mode === "game") {
+        get().loadMoves(game.stones, {
+          future: game.future,
+          name: game.name,
+          ...(what ? { what } : {}),
+        });
+        set({ parkedAnalysis: analysis, analysisBase: base });
+        return;
+      }
+      set({ parkedGame: { ...game, result: gameResult, prompt: null } });
+      const keep = analysis !== null && base !== null && sameMoves(base, game.stones);
+      const a = keep ? analysis : { ...game, result: null };
+      set({ analysisBase: keep ? base : game.stones });
+      get().loadMoves(a.stones, { future: a.future, name: a.name, ...(what ? { what } : {}) });
+    },
 
     setMode: (mode) => {
       const s = get();
@@ -479,7 +580,23 @@ export const useGameStore = create<GameState>((set, get) => {
         // 분석 → 대국: 멈추기만 한다. 최선수를 두지 않는다 — 대국의 판에 새어 들지 않게.
         engine().stop();
       }
-      set({ mode });
+      // 판을 갈아 끼운다(`ParkedBoard`).
+      const live = fold();
+      if (mode === "analysis") {
+        const base = s.analysisBase;
+        const resume = s.parkedAnalysis !== null && base !== null && sameMoves(base, live.stones);
+        const next = resume ? s.parkedAnalysis! : { ...live, result: null, prompt: null };
+        set({
+          parkedGame: live,
+          parkedAnalysis: null,
+          analysisBase: resume ? base : live.stones,
+          mode,
+        });
+        unfold(next, false);
+      } else {
+        set({ parkedAnalysis: live, parkedGame: null, mode });
+        unfold(s.parkedGame ?? EMPTY_PARKED, true);
+      }
       saveMode(mode);
       log(mode === "game" ? "대국 탭" : "분석 탭");
       refreshForbidden();

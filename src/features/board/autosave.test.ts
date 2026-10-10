@@ -24,7 +24,17 @@ beforeEach(() => {
   useLinkBackup.setState({ backup: null });
   useEngineStore.setState({ status: "idle", send: () => {} });
   board().clear();
-  useGameStore.setState({ result: null, thinking: false, prompt: null, gameName: null });
+  // 아래 시험의 대부분은 [대국] 판(`"autosave"` 자리)의 것이다 — 분석 판은 «두 탭의 판» 묶음이 본다.
+  useGameStore.setState({
+    result: null,
+    thinking: false,
+    prompt: null,
+    gameName: null,
+    mode: "game",
+    parkedGame: null,
+    parkedAnalysis: null,
+    analysisBase: [],
+  });
 });
 
 afterEach(async () => {
@@ -72,6 +82,89 @@ describe("되살리기", () => {
     a = startAutosave(d, 0);
     await a.ready;
     expect(board().render.stones).toEqual([]);
+  });
+});
+
+describe("두 탭의 판", () => {
+  it("대국 판과 분석 판을 따로 저장한다", async () => {
+    a = startAutosave(d, 0);
+    await a.ready;
+    game().tap(move(7, 7));
+    game().setMode("analysis");
+    game().tap(move(8, 8));
+    await a.flush();
+    expect((await readAutosave(d))?.moves).toEqual([move(7, 7)]);
+    const an = await readSlot(d, "analysis");
+    expect(an?.moves).toEqual([move(7, 7), move(8, 8)]);
+    expect(an?.base).toEqual([move(7, 7)]);
+  });
+
+  it("탭 전환은 쉼을 기다리지 않고 곧바로 쓴다 — 두 판이 제 자리에", async () => {
+    // 쉼(debounce)을 길게 — 탭 전환의 즉시 쓰기만 남게. 예전에는 모드가 바뀌는 순간(보드를 갈아
+    // 끼우기 전) 쓰여 분석 판이 대국 기보 자리에 들어갔다.
+    a = startAutosave(d, 60_000);
+    await a.ready;
+    for (const m of [move(7, 7), move(8, 8), move(6, 8)]) game().tap(m);
+    game().setMode("analysis");
+    game().tap(move(5, 5));
+    game().tap(move(9, 9));
+    game().setMode("game");
+    await new Promise((r) => setTimeout(r, 50));
+    expect((await readAutosave(d))?.moves).toEqual([move(7, 7), move(8, 8), move(6, 8)]);
+    expect((await readSlot(d, "analysis"))?.moves).toHaveLength(5);
+  });
+
+  it("분석 탭으로 열면 저장된 분석 판이 보이고 대국 판은 접혀 있다", async () => {
+    await writeAutosave(d, { name: "", size: 15, moves: [move(7, 7)], future: [] });
+    await writeSlot(d, "analysis", {
+      name: "",
+      size: 15,
+      moves: [move(7, 7), move(8, 8), move(9, 9)],
+      future: [],
+      base: [move(7, 7)],
+    });
+    useGameStore.setState({ mode: "analysis" });
+    a = startAutosave(d, 0);
+    await a.ready;
+    expect(board().render.stones).toHaveLength(3);
+    game().setMode("game");
+    expect(board().render.stones).toEqual([move(7, 7)]);
+  });
+
+  it("분석 판이 다른 대국에서 갈라졌으면 지금 대국에서 다시 갈라진다", async () => {
+    await writeAutosave(d, { name: "", size: 15, moves: [move(7, 7), move(6, 6)], future: [] });
+    await writeSlot(d, "analysis", {
+      name: "",
+      size: 15,
+      moves: [move(1, 1)],
+      future: [],
+      base: [move(3, 3)],
+    });
+    useGameStore.setState({ mode: "analysis" });
+    a = startAutosave(d, 0);
+    await a.ready;
+    expect(board().render.stones).toEqual([move(7, 7), move(6, 6)]);
+  });
+
+  it("예전 판본의 자동 저장(대국 판 하나)만 있으면 분석 판은 거기서 갈라진다", async () => {
+    await writeAutosave(d, { name: "", size: 15, moves: [move(7, 7)], future: [move(8, 8)] });
+    useGameStore.setState({ mode: "analysis" });
+    a = startAutosave(d, 0);
+    await a.ready;
+    expect(board().render.stones).toEqual([move(7, 7)]);
+    expect(board().future).toEqual([move(8, 8)]);
+  });
+
+  it("분석 탭에서 링크로 열면 링크는 분석 판에, 대국 판은 저장된 그대로", async () => {
+    await writeAutosave(d, { name: "", size: 15, moves: [move(1, 1)], future: [] });
+    useGameStore.setState({ mode: "analysis" });
+    a = startAutosave(d, 10_000, [move(7, 7)]);
+    await a.ready;
+    expect(board().render.stones).toEqual([move(7, 7)]);
+    await a.flush();
+    expect((await readAutosave(d))?.moves).toEqual([move(1, 1)]);
+    game().setMode("game");
+    expect(board().render.stones).toEqual([move(1, 1)]);
   });
 });
 

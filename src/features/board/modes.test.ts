@@ -48,6 +48,9 @@ function fresh(opts: { mode?: "game" | "analysis"; computerSide?: ComputerSide }
     showForbidden: false,
     moveTimeMs: 0,
     level: 5,
+    parkedGame: null,
+    parkedAnalysis: null,
+    analysisBase: [],
   });
   g().newGame();
   if (opts.mode) useGameStore.setState({ mode: opts.mode });
@@ -112,7 +115,9 @@ describe("탭 전환 — 엔진 상태를 격리한다", () => {
     g().setMode("game");
     expect(stops).toBe(1);
     expect(useEngineStore.getState().analyzing).toBe(false);
-    expect(stones()).toHaveLength(1);
+    // 대국 판은 대국 기보(빈 판)이고, 분석 판은 최선수 없이 한 수 그대로 접혀 있다.
+    expect(stones()).toHaveLength(0);
+    expect(g().parkedAnalysis?.stones).toEqual([move(7, 7)]);
   });
 
   it("탭을 오가도 기보·앞으로 갈 수·결과가 그대로다", () => {
@@ -123,6 +128,63 @@ describe("탭 전환 — 엔진 상태를 격리한다", () => {
     g().setMode("analysis");
     expect(stones()).toHaveLength(2);
     expect(useBoardStore.getState().future).toEqual([move(9, 9)]);
+  });
+
+  it("대국 → 분석: 대국의 모든 수가 분석 판에 있다", () => {
+    for (const m of [move(7, 7), move(8, 8), move(6, 8)]) g().tap(m);
+    g().setMode("analysis");
+    expect(stones()).toEqual([move(7, 7), move(8, 8), move(6, 8)]);
+  });
+
+  it("분석에서 탐색한 수는 대국 기보에 새어 들지 않고, 대국으로 돌아오면 그대로다", () => {
+    for (const m of [move(7, 7), move(8, 8), move(6, 8)]) g().tap(m);
+    g().setMode("analysis");
+    g().tap(move(5, 5));
+    g().tap(move(9, 9));
+    expect(stones()).toHaveLength(5);
+    g().setMode("game");
+    expect(stones()).toEqual([move(7, 7), move(8, 8), move(6, 8)]);
+  });
+
+  it("대국이 그대로면 분석으로 다시 가도 하던 탐색이 이어진다", () => {
+    g().tap(move(7, 7));
+    g().setMode("analysis");
+    g().tap(move(8, 8));
+    g().setMode("game");
+    g().setMode("analysis");
+    expect(stones()).toEqual([move(7, 7), move(8, 8)]);
+  });
+
+  it("대국이 바뀌었으면 분석 판은 새 대국 수순에서 다시 갈라진다", () => {
+    g().tap(move(7, 7));
+    g().setMode("analysis");
+    g().tap(move(1, 1));
+    g().setMode("game");
+    g().tap(move(8, 8));
+    g().setMode("analysis");
+    expect(stones()).toEqual([move(7, 7), move(8, 8)]);
+  });
+
+  it("대국의 기권 결과는 대국 판에 남고, 분석 판에서는 계속 둘 수 있다", () => {
+    g().tap(move(7, 7));
+    g().resign();
+    expect(g().result).not.toBeNull();
+    g().setMode("analysis");
+    expect(g().result).toBeNull();
+    expect(g().tap(move(8, 8)).kind).toBe("placed");
+    g().setMode("game");
+    expect(g().result).not.toBeNull();
+    expect(stones()).toEqual([move(7, 7)]);
+  });
+
+  it("두 탭의 판을 sessions() 로 한꺼번에 읽는다", () => {
+    g().tap(move(7, 7));
+    g().setMode("analysis");
+    g().tap(move(8, 8));
+    const s = g().sessions();
+    expect(s.game.stones).toEqual([move(7, 7)]);
+    expect(s.analysis?.stones).toEqual([move(7, 7), move(8, 8)]);
+    expect(s.base).toEqual([move(7, 7)]);
   });
 
   it("엔진을 내리면(종료 · 엔진 전환) 생각하던 대국의 수를 버리고 판을 푼다", () => {
