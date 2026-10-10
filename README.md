@@ -68,6 +68,9 @@ inside one browser tab.
 - Games autosave on every move, undo included. Reload and keep going.
 - The engine's own position **database** (yixindb) is round-tripped between Emscripten's
   in-memory FS and IndexedDB. Annotate, label, import and export `.db` and CSV.
+- **Official opening curriculum**: maintainer-curated joseki you study read-only. Explore every
+  branch with commentary, bad moves, traps and refutations, or switch to Learn and guess each move
+  (hints, scoring, progress saved in the browser). Published as a static file, no server.
 - **Joseki editor**: variation trees, Markdown notes with clickable coordinates, auto
   classification, and lookup by board position (symmetry-aware).
 - Open and save `.psq`, `.sav` and `.pos`; share any position as a `?p=h8i9j10` deep link;
