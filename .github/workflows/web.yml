@@ -3,7 +3,10 @@ name: web
 # W1 스캐폴딩부터 이 워크플로가 «빌드된다»를 지킨다.
 # 엔진(WASM) 빌드 · 검증 게이트는 engine-release.yml 이 릴리스를 낼 때 본다.
 on:
+  # push 는 main 만 — 다른 브랜치(Dependabot 등)는 pull_request 로 한 번만 돈다. 예전에는 PR 브랜치마다
+  # push 와 pull_request 로 같은 커밋을 두 번 돌렸다.
   push:
+    branches: [main]
     paths-ignore:
       - "docs/**"
       - "spike/**"
@@ -44,16 +47,13 @@ jobs:
       # 들어오지 않게 — 의존성을 바꿀 때는 로컬에서 `pnpm install` 로 잠금 파일을 함께 고쳐 커밋한다.
       - run: pnpm install --frozen-lockfile
 
-      # 공급망 감사(보안 강화 계획 Phase 2) — 배포 번들에 들어가는 의존성(--prod)에 high 이상 권고가 있는가.
-      # 처음에는 경고 주석만 남기고 잡을 막지 않는다. 개발 도구(vitest · eslint …)의 권고와 업데이트는
-      # Dependabot(.github/dependabot.yml)이 주 1회 PR 로 다룬다.
-      - name: 의존성 감사 (prod · high 이상 — 경고만)
+      # 공급망 감사(보안 강화 계획 Phase 2) — 배포 번들에 들어가는 의존성(--prod)에 high 이상 권고가 있으면
+      # **잡을 막는다.** 경고 단계로 시작했고, react-router 7 이전으로 배포 의존성의 권고가 0건이 된 뒤
+      # 차단으로 올렸다. 감사 서버의 일시 실패는 한 번 다시 묻는다(권고가 있으면 두 번째도 실패한다).
+      # 개발 도구(vitest · eslint …)의 권고와 업데이트는 Dependabot(.github/dependabot.yml)이 다룬다.
+      - name: 의존성 감사 (prod · high 이상)
         run: |
-          if pnpm audit --prod --audit-level high; then
-            echo "배포 의존성에 high 이상 권고 없음."
-          else
-            echo "::warning title=pnpm audit::배포 의존성에 high 이상 보안 권고가 있습니다(또는 감사 서버 응답 실패). pnpm audit --prod 결과를 확인하세요."
-          fi
+          pnpm audit --prod --audit-level high || { sleep 15; pnpm audit --prod --audit-level high; }
 
       - name: 타입
         run: pnpm typecheck
