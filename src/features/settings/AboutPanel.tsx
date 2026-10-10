@@ -11,6 +11,9 @@ import { msg, t } from "../../i18n/i18n";
  * 가리킨다. 자세한 표와 BSD 고지 전문은 저장소의 `THIRD_PARTY_NOTICES.md` 가 정본이다.
  *
  * 구성요소 이름 · 라이선스 식별자는 번역하지 않는다(고유 명사 · SPDX).
+ *
+ * 설정 묶음(`.sgroup`)이 아니다 — 머리 모양만 빌려 쓰고 카드 클래스는 따로 둔다(스모크가
+ * `.sgroup` 수로 설정 카드를 센다).
  */
 
 const REPO = "https://github.com/lowqen/RapfiWeb";
@@ -73,7 +76,7 @@ function Ext({ href, children }: { href: string; children: ReactNode }) {
 
 export function AboutPanel() {
   return (
-    <section className="panel sgroup about" aria-labelledby="sg-about">
+    <section className="panel about" aria-labelledby="sg-about">
       <header className="sgroup__head">
         <h2 id="sg-about" className="sgroup__title">
           {t("정보")}

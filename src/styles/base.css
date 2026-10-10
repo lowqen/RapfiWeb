@@ -1260,7 +1260,11 @@ a:focus-visible {
   }
 }
 
-/* 설정 ▸ 정보 — 라이선스 고지(GPLv3) · 구성요소 · 엔진 소스. */
+/* 설정 ▸ 정보 — 라이선스 고지(GPLv3) · 구성요소 · 엔진 소스. 카드 틀은 .sgroup 과 같다. */
+.about {
+  padding: 0;
+  overflow: hidden;
+}
 .about__body {
   display: grid;
   gap: var(--space-s);
