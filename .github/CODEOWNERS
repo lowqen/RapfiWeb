@@ -1,0 +1,11 @@
+# 보안에 민감한 파일 — 바꾸는 PR 은 저장소 관리자의 검토가 있어야 합쳐진다(보안 강화 계획 Phase 2).
+# 강제는 main 의 규칙 집합(Settings ▸ Rules ▸ «main 보호 — 코드 소유자 검토»)이 맡는다.
+#
+#   워크플로      배포 토큰 · 러너 · 권한을 쥔다
+#   _headers      CSP · 교차 출처 격리 — 앱 전체의 실행 정책
+#   dependabot    무엇을 언제 올릴지
+#   CODEOWNERS    이 목록 자체
+/.github/workflows/     @lowqen
+/.github/dependabot.yml @lowqen
+/.github/CODEOWNERS     @lowqen
+/public/_headers        @lowqen

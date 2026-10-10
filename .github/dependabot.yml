@@ -1,0 +1,32 @@
+# 의존성 업데이트(보안 강화 계획 Phase 2). 주 1회 월요일 아침(KST)에 PR 을 연다.
+#
+# - 패치 · 마이너는 생태계마다 **묶음 PR 하나**로 — 리뷰 · CI 횟수를 줄인다.
+# - 메이저는 묶지 않고 하나씩 — 깨질 수 있는 변경이라 따로 본다(예: react-router 6 → 7).
+# - 워크플로의 액션은 커밋 SHA 로 고정되어 있다(`@<sha> # vX.Y.Z`). Dependabot 이 SHA 와 버전 주석을
+#   함께 올린다.
+# - CI 는 `pnpm install --frozen-lockfile` 이므로, 의존성은 이 PR 들(잠금 파일 포함)로만 바뀐다.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Asia/Seoul
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Asia/Seoul
+    open-pull-requests-limit: 5
+    groups:
+      actions-minor-patch:
+        update-types: [minor, patch]
