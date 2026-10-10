@@ -1,4 +1,5 @@
 import { DEFAULT_SIZE, fromLabel, label, moveKey, type Move } from "../model/move";
+import { t } from "../../i18n/i18n";
 
 /**
  * 손으로 적은 수순 — `h8 i9 j10`, `h8,i9`, `H8I9J10`, `1. h8 2. i9`, 줄바꿈 섞기(계획서 §7).
@@ -23,7 +24,7 @@ export function parseMoveText(text: string, size = DEFAULT_SIZE): ParseResult {
     while (at < tok.length) {
       COORD.lastIndex = at;
       const m = COORD.exec(tok);
-      if (!m) return { ok: false, error: `«${raw}» 를 좌표로 읽지 못했습니다` };
+      if (!m) return { ok: false, error: t("«{raw}» 를 좌표로 읽지 못했습니다", { raw }) };
       // 두 자리 수가 판 밖이면 한 자리만 — `h1i9` 가 아니라 `a15b1` 같은 경우를 위해.
       let digits = m[2]!;
       let mv = fromLabel(m[1]! + digits, size);
@@ -31,12 +32,12 @@ export function parseMoveText(text: string, size = DEFAULT_SIZE): ParseResult {
         digits = digits[0]!;
         mv = fromLabel(m[1]! + digits, size);
       }
-      if (!mv) return { ok: false, error: `«${m[1]}${m[2]}» 는 판 밖입니다` };
+      if (!mv) return { ok: false, error: t("«{c}» 는 판 밖입니다", { c: `${m[1]}${m[2]}` }) };
       const k = moveKey(mv, size);
       if (seen.has(k))
         return {
           ok: false,
-          error: `${moves.length + 1}수 ${label(mv, size)} 는 이미 둔 자리입니다`,
+          error: t("{n}수 {m} 는 이미 둔 자리입니다", { n: moves.length + 1, m: label(mv, size) }),
         };
       seen.add(k);
       moves.push(mv);

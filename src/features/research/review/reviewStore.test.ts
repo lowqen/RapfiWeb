@@ -70,7 +70,7 @@ describe("지금 판 리뷰", () => {
     expect(searched).toEqual([0, 1, 2, 3, 4]);
     const [job] = await listJobs(d);
     expect(job!.status).toBe("done");
-    expect(job!.result).toMatch(/^완료 — 정확도 흑 [\d.]+% \/ 백 [\d.]+%, 4수$/);
+    expect(job!.result).toMatch(/^완료: 정확도 흑 [\d.]+% \/ 백 [\d.]+%, 4수$/);
     const reviews = await listReviews(d);
     expect(reviews).toHaveLength(1);
     expect(reviews[0]!.moves).toEqual(line(4));

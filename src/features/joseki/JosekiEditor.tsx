@@ -22,6 +22,7 @@ import { useBoardStore } from "../board/boardStore";
 import { JosekiComment } from "./JosekiComment";
 import { useJosekiStore } from "./josekiStore";
 import { TreeView } from "./TreeView";
+import { langOf, t } from "../../i18n/i18n";
 
 /**
  * 정석 편집 · 재생(W9) — 왼쪽 트리, 오른쪽 판과 메모.
@@ -35,7 +36,7 @@ const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 /** 메모 도구: 고른 글을 감싸거나, 줄 앞에 붙인다. */
 function wrap(el: HTMLTextAreaElement, before: string, after = before): string {
   const { selectionStart: a, selectionEnd: b, value } = el;
-  const mid = value.slice(a, b) || "글";
+  const mid = value.slice(a, b) || t("글");
   return value.slice(0, a) + before + mid + after + value.slice(b);
 }
 function prefixLines(el: HTMLTextAreaElement, mark: string): string {
@@ -51,7 +52,7 @@ function prefixLines(el: HTMLTextAreaElement, mark: string): string {
 
 export function JosekiEditor() {
   const s = useJosekiStore();
-  const t = s.current!;
+  const jk = s.current!;
   const tables = useOpeningTables((x) => x.tables);
   const board = useBoardStore((b) => b.render);
   const navigate = useNavigate();
@@ -59,27 +60,27 @@ export function JosekiEditor() {
   const [draft, setDraft] = useState("");
   const [preview, setPreview] = useState(true);
   const [asking, setAsking] = useState(false);
-  const [tagText, setTagText] = useState(t.tags.join(", "));
+  const [tagText, setTagText] = useState(jk.tags.join(", "));
   const area = useRef<HTMLTextAreaElement>(null);
 
-  const node = nodeAt(t.root, s.path) ?? t.root;
-  const moves = useMemo(() => movesTo(t.root, s.path), [t.root, s.path]);
-  const total = countNodes(t.root);
-  const cls = useMemo(() => classifyTree(t, tables), [t, tables]);
+  const node = nodeAt(jk.root, s.path) ?? jk.root;
+  const moves = useMemo(() => movesTo(jk.root, s.path), [jk.root, s.path]);
+  const total = countNodes(jk.root);
+  const cls = useMemo(() => classifyTree(jk, tables), [jk, tables]);
   const here = useMemo(
-    () => classifyMoves(moves, tables, "", t.boardSize),
-    [moves, tables, t.boardSize],
+    () => classifyMoves(moves, tables, "", jk.boardSize),
+    [moves, tables, jk.boardSize],
   );
 
   // 마디가 바뀌면 메모 초안을 그 마디의 것으로.
-  const nodeKey = `${t.id}:${s.path.join(".")}`;
+  const nodeKey = `${jk.id}:${s.path.join(".")}`;
   useEffect(() => {
     setDraft(node.comment);
     setPreview(node.comment.length > 0);
     setAsking(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodeKey]);
-  useEffect(() => setTagText(t.tags.join(", ")), [t.id, t.tags]);
+  useEffect(() => setTagText(jk.tags.join(", ")), [jk.id, jk.tags]);
 
   // 메모는 쉬면 저장(글자마다 문서를 쓰지 않게).
   useEffect(() => {
@@ -93,14 +94,14 @@ export function JosekiEditor() {
     node.children.forEach((c, i) => {
       const bad = c.mark === "?" || c.mark === "??";
       const good = c.mark === "!" || c.mark === "!!";
-      tags.set(moveKey(c.move!, t.boardSize), {
+      tags.set(moveKey(c.move!, jk.boardSize), {
         label: c.mark ?? LETTERS[i] ?? "+",
         kind: good ? "win" : bad ? "lose" : "rate",
         winRatePct: i === 0 ? 70 : 50,
       });
     });
     return {
-      ...emptyRender(t.boardSize),
+      ...emptyRender(jk.boardSize),
       palette: board.palette,
       textScale: board.textScale,
       showNumbers: board.showNumbers,
@@ -108,11 +109,13 @@ export function JosekiEditor() {
       lastMove: moves.at(-1) ?? null,
       tags,
     };
-  }, [node, moves, t.boardSize, board.palette, board.textScale, board.showNumbers]);
+  }, [node, moves, jk.boardSize, board.palette, board.textScale, board.showNumbers]);
 
   // 키보드: ← → 처음/끝(Home/End) — 메모 · 입력칸에서는 글자 이동이 먼저다.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // 보드에 초점이 있으면 방향키는 보드 커서의 것이다(`defaultPrevented`).
+      if (e.defaultPrevented) return;
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       if (e.key === "ArrowLeft") s.back();
@@ -136,37 +139,37 @@ export function JosekiEditor() {
 
   return (
     <div className="joseki-editor">
-      <section className="panel jhead" aria-label="정석 정보">
+      <section className="panel jhead" aria-label={t("정석 정보")}>
         <div className="panel__actions">
           <button type="button" onClick={go(() => void s.close())}>
-            ← 목록
+            ← {t("목록")}
           </button>
           <span className="panel__status tnum" data-k="joseki-save">
-            {s.saving ? "저장 중…" : "저장됨"} · {total}수
+            {s.saving ? t("저장 중…") : t("저장됨")} · {t("{n}수", { n: total })}
           </span>
         </div>
         <label className="jfield">
-          <span>제목</span>
+          <span>{t("제목")}</span>
           <input
-            value={t.title}
+            value={jk.title}
             onChange={(e) => s.setInfo({ title: e.target.value })}
-            aria-label="정석 제목"
+            aria-label={t("정석 제목")}
           />
         </label>
         <label className="jfield">
-          <span>분류</span>
+          <span>{t("분류")}</span>
           <input
-            value={t.category}
-            placeholder={cls.chain.at(-1) ?? "분류 없음"}
+            value={jk.category}
+            placeholder={cls.chain.at(-1) ?? t("분류 없음")}
             onChange={(e) => s.setInfo({ category: e.target.value })}
-            aria-label="분류(비우면 주형 이름)"
+            aria-label={t("분류(비우면 주형 이름)")}
           />
         </label>
         <label className="jfield">
-          <span>태그</span>
+          <span>{t("태그")}</span>
           <input
             value={tagText}
-            placeholder="쉼표로 나눔"
+            placeholder={t("쉼표로 나눔")}
             onChange={(e) => setTagText(e.target.value)}
             onBlur={() =>
               s.setInfo({
@@ -180,55 +183,61 @@ export function JosekiEditor() {
                 ],
               })
             }
-            aria-label="태그"
+            aria-label={t("태그")}
           />
         </label>
-        <p className="panel__hint">
+        <p className="panel__hint" lang={langOf(cls.chain.join(" "))}>
           {cls.group ? `${cls.group} · ` : ""}
-          {cls.chain.length ? cls.chain.join(" › ") : "주형 이름 없음"}
+          {cls.chain.length ? cls.chain.join(" › ") : t("주형 이름 없음")}
           {cls.grade && (
             <>
               {" "}
-              · 5수 <GradeBadge grade={cls.grade} />
+              · {t("5수")} <GradeBadge grade={cls.grade} />
             </>
           )}
-          {total >= NODE_WARN && ` · 수가 ${NODE_WARN}개를 넘었습니다 — 나누면 저장이 가볍습니다`}
+          {total >= NODE_WARN &&
+            ` · ${t("수가 {n}개를 넘었습니다. 나누면 저장이 가볍습니다", { n: NODE_WARN })}`}
         </p>
         {s.notice && (
           <p className="panel__hint jnotice" role="status" data-k="joseki-notice">
             {s.notice}{" "}
             <button type="button" className="linkish" onClick={s.clearNotice}>
-              닫기
+              {t("닫기")}
             </button>
           </p>
         )}
       </section>
 
       <div className="jbody">
-        <section className="panel jtreebox" aria-label="트리">
+        <section className="panel jtreebox" aria-label={t("트리")}>
           <TreeView
-            root={t.root}
+            root={jk.root}
             path={s.path}
-            size={t.boardSize}
+            size={jk.boardSize}
             onGo={(p) => go(() => s.go(p))()}
           />
         </section>
 
-        <section className="panel jboardbox" aria-label="판">
+        <section className="panel jboardbox" aria-label={t("판")}>
           <p className="panel__hint tnum" data-k="joseki-where">
             {moves.length === 0
-              ? "빈 판"
-              : `${moves.length}수 ${label(moves.at(-1)!, t.boardSize)}`}
+              ? t("빈 판")
+              : `${t("{n}수", { n: moves.length })} ${label(moves.at(-1)!, jk.boardSize)}`}
             {here.chain.length ? ` · ${here.chain.at(-1)}` : ""}
-            {node.children.length > 1 ? ` · 갈래 ${node.children.length}` : ""}
+            {node.children.length > 1 ? ` · ${t("갈래 {n}", { n: node.children.length })}` : ""}
           </p>
           <div className="prove__board">
-            <BoardCanvas render={render} zoomable={false} onTap={(m) => go(() => s.play(m))()} />
+            <BoardCanvas
+              render={render}
+              zoomable={false}
+              keyboard
+              onTap={(m) => go(() => s.play(m))()}
+            />
           </div>
           <div className="panel__actions jnav">
             <button
               type="button"
-              aria-label="처음"
+              aria-label={t("처음")}
               onClick={go(s.first)}
               disabled={s.path.length === 0}
             >
@@ -236,7 +245,7 @@ export function JosekiEditor() {
             </button>
             <button
               type="button"
-              aria-label="뒤로"
+              aria-label={t("뒤로")}
               onClick={go(s.back)}
               disabled={s.path.length === 0}
             >
@@ -244,7 +253,7 @@ export function JosekiEditor() {
             </button>
             <button
               type="button"
-              aria-label="앞으로"
+              aria-label={t("앞으로")}
               onClick={go(s.forward)}
               disabled={node.children.length === 0}
             >
@@ -252,7 +261,7 @@ export function JosekiEditor() {
             </button>
             <button
               type="button"
-              aria-label="끝"
+              aria-label={t("끝")}
               onClick={go(s.last)}
               disabled={node.children.length === 0}
             >
@@ -260,24 +269,24 @@ export function JosekiEditor() {
             </button>
             {node.children.length > 1 && (
               <select
-                aria-label="갈래 고르기"
+                aria-label={t("갈래 고르기")}
                 value=""
                 onChange={(e) => go(() => s.go([...s.path, Number(e.target.value)]))()}
               >
                 <option value="" disabled>
-                  갈래 ({node.children.length})
+                  {t("갈래 ({n})", { n: node.children.length })}
                 </option>
                 {node.children.map((c, i) => (
                   <option key={i} value={i}>
-                    {LETTERS[i]}. {label(c.move!, t.boardSize)}
+                    {LETTERS[i]}. {label(c.move!, jk.boardSize)}
                     {c.mark ?? ""}
-                    {i === 0 ? " (주 변화)" : ""}
+                    {i === 0 ? ` (${t("주 변화")})` : ""}
                   </option>
                 ))}
               </select>
             )}
             <button type="button" onClick={go(s.undoEdit)} disabled={s.undo.length === 0}>
-              되돌리기
+              {t("되돌리기")}
             </button>
           </div>
 
@@ -292,17 +301,17 @@ export function JosekiEditor() {
             <input
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder="수순 넣기: h8 i9 j10 (지금 마디부터)"
-              aria-label="수순 글"
+              placeholder={t("수순 넣기: h8 i9 j10 (지금 마디부터)")}
+              aria-label={t("수순 글")}
             />
             <button type="submit" disabled={!text.trim()}>
-              넣기
+              {t("넣기")}
             </button>
           </form>
 
           {s.path.length > 0 && (
             <>
-              <div className="jmarks" role="radiogroup" aria-label="평가 기호">
+              <div className="jmarks" role="radiogroup" aria-label={t("평가 기호")}>
                 {MARKS.map((mk: JosekiMark) => (
                   <button
                     key={mk}
@@ -310,6 +319,7 @@ export function JosekiEditor() {
                     role="radio"
                     aria-checked={node.mark === mk}
                     title={MARK_LABEL[mk]}
+                    aria-label={`${mk} ${MARK_LABEL[mk]}`}
                     className={`chip${node.mark === mk ? " is-on" : ""}`}
                     onClick={() => s.setNodeMark(node.mark === mk ? null : mk)}
                   >
@@ -323,37 +333,37 @@ export function JosekiEditor() {
                   onClick={go(s.promote)}
                   disabled={s.path.every((i) => i === 0)}
                 >
-                  주 변화로
+                  {t("주 변화로")}
                 </button>
                 <button
                   type="button"
                   onClick={go(() => s.shift(-1))}
                   disabled={s.path.at(-1) === 0}
                 >
-                  갈래 앞으로
+                  {t("갈래 앞으로")}
                 </button>
                 <button
                   type="button"
                   onClick={go(() => s.shift(1))}
                   disabled={
-                    (nodeAt(t.root, s.path.slice(0, -1))?.children.length ?? 0) - 1 <=
+                    (nodeAt(jk.root, s.path.slice(0, -1))?.children.length ?? 0) - 1 <=
                     (s.path.at(-1) ?? 0)
                   }
                 >
-                  갈래 뒤로
+                  {t("갈래 뒤로")}
                 </button>
                 {asking ? (
                   <>
                     <button type="button" className="btn--danger" onClick={go(s.deleteNode)}>
-                      {countNodes(node) + 1}수 지우기
+                      {t("{n}수 지우기", { n: countNodes(node) + 1 })}
                     </button>
-                    <button type="button" onClick={() => setAsking(false)}>
-                      취소
+                    <button type="button" autoFocus onClick={() => setAsking(false)}>
+                      {t("취소")}
                     </button>
                   </>
                 ) : (
                   <button type="button" className="btn--danger" onClick={() => setAsking(true)}>
-                    이 수부터 지우기
+                    {t("이 수부터 지우기")}
                   </button>
                 )}
               </div>
@@ -361,37 +371,39 @@ export function JosekiEditor() {
           )}
 
           <div className="jcomment">
-            <div className="jcomment__bar" role="toolbar" aria-label="메모 서식">
+            <div className="jcomment__bar" role="toolbar" aria-label={t("메모 서식")}>
               <button
                 type="button"
-                title="굵게"
+                title={t("굵게")}
+                aria-label={t("굵게")}
                 onClick={() => area.current && setDraft(wrap(area.current, "**"))}
               >
                 <b>B</b>
               </button>
               <button
                 type="button"
-                title="기울임"
+                title={t("기울임")}
+                aria-label={t("기울임")}
                 onClick={() => area.current && setDraft(wrap(area.current, "*"))}
               >
                 <i>I</i>
               </button>
               <button
                 type="button"
-                title="목록"
+                title={t("목록")}
                 onClick={() => area.current && setDraft(prefixLines(area.current, "- "))}
               >
-                • 목록
+                • {t("목록")}
               </button>
               <button
                 type="button"
-                title="링크"
+                title={t("링크")}
                 onClick={() => area.current && setDraft(wrap(area.current, "[", "](https://)"))}
               >
-                링크
+                {t("링크")}
               </button>
               <button type="button" aria-pressed={preview} onClick={() => setPreview((p) => !p)}>
-                {preview ? "고치기" : "미리 보기"}
+                {preview ? t("고치기") : t("미리 보기")}
               </button>
             </div>
             {preview && draft ? (
@@ -403,8 +415,12 @@ export function JosekiEditor() {
                 ref={area}
                 rows={5}
                 value={draft}
-                placeholder={`${s.path.length ? "이 수" : "이 정석"}의 메모 — **굵게** *기울임* - 목록, 좌표(h8)는 누르면 그 수로`}
-                aria-label="메모"
+                placeholder={
+                  s.path.length
+                    ? t("이 수의 메모: **굵게** *기울임* 목록, 좌표(h8)는 누르면 그 수로")
+                    : t("이 정석의 메모: **굵게** *기울임* 목록, 좌표(h8)는 누르면 그 수로")
+                }
+                aria-label={t("메모")}
                 onChange={(e) => setDraft(e.target.value)}
                 onBlur={flushDraft}
               />
@@ -413,7 +429,7 @@ export function JosekiEditor() {
 
           <div className="panel__actions">
             <button type="button" onClick={go(s.toBoard)}>
-              보드로 보내기
+              {t("보드로 보내기")}
             </button>
             <button
               type="button"
@@ -422,9 +438,9 @@ export function JosekiEditor() {
                 s.toBoard();
                 navigate("/research/sequence");
               })}
-              title="같은 돌에 이르는 다른 수순(연구 ▸ 수순)"
+              title={t("같은 돌에 이르는 다른 수순(연구 ▸ 수순)")}
             >
-              다른 수순 보기
+              {t("다른 수순 보기")}
             </button>
             <button
               type="button"
@@ -433,13 +449,13 @@ export function JosekiEditor() {
                 const b = s.exportLine();
                 if (b)
                   downloadBlob(
-                    `${t.title.replace(/[\s/\\:*?"<>|]+/g, "_") || "joseki"}.psq`,
+                    `${jk.title.replace(/[\s/\\:*?"<>|]+/g, "_") || "joseki"}.psq`,
                     b,
                     "text/plain",
                   );
               }}
             >
-              이 변화 .psq
+              {t("이 변화 .psq")}
             </button>
             <button
               type="button"
@@ -447,13 +463,13 @@ export function JosekiEditor() {
                 const j = s.exportCurrent();
                 if (j)
                   downloadBlob(
-                    `${t.title.replace(/[\s/\\:*?"<>|]+/g, "_") || "joseki"}.json`,
+                    `${jk.title.replace(/[\s/\\:*?"<>|]+/g, "_") || "joseki"}.json`,
                     j,
                     "application/json",
                   );
               }}
             >
-              이 정석 JSON
+              {t("이 정석 JSON")}
             </button>
           </div>
           <p className="panel__hint tnum">{moves.length ? movesText(moves) : ""}</p>

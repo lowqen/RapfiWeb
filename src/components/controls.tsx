@@ -1,6 +1,7 @@
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { Icon, ICON } from "./icons";
 import { durationText, parseDuration, type DurationSpec } from "../core/settings/duration";
+import { t } from "../i18n/i18n";
 
 /**
  * 입력 부품 — 앱의 `FilterChip`·`Switch`·스테퍼를 옮긴 것. 설정 · 보드 옆 칸 · 연구가 함께 쓴다.
@@ -63,7 +64,14 @@ export function Segmented<T extends string | number>({
 }: {
   label: string;
   value: T;
-  options: readonly { value: T; label: string; title?: string; disabled?: boolean }[];
+  /** `lang` — 지금 화면 언어와 다른 말로 적은 항목(언어 고르기의 «English» · «한국어»). */
+  options: readonly {
+    value: T;
+    label: string;
+    title?: string;
+    disabled?: boolean;
+    lang?: string;
+  }[];
   onChange: (v: T) => void;
   disabled?: boolean;
 }) {
@@ -77,6 +85,7 @@ export function Segmented<T extends string | number>({
           className="seg__opt"
           aria-checked={o.value === value}
           title={o.title}
+          lang={o.lang}
           disabled={disabled || o.disabled}
           onClick={() => onChange(o.value)}
         >
@@ -137,7 +146,7 @@ export function Stepper({
         className="stepper__btn"
         onClick={() => onChange(value - 1)}
         disabled={value <= min}
-        aria-label={`${label} 줄이기`}
+        aria-label={t("{name} 줄이기", { name: label })}
       >
         <Icon d={ICON.minus} />
       </button>
@@ -149,7 +158,7 @@ export function Stepper({
         className="stepper__btn"
         onClick={() => onChange(value + 1)}
         disabled={value >= max}
-        aria-label={`${label} 늘리기`}
+        aria-label={t("{name} 늘리기", { name: label })}
       >
         <Icon d={ICON.plus} />
       </button>
@@ -286,9 +295,9 @@ export function DurationField({
           inputMode="decimal"
           autoComplete="off"
           spellCheck={false}
-          placeholder="직접"
-          aria-label={`${label} 직접 입력`}
-          title={`${label} — 2.5 · 1500ms · 1분 · 무제한처럼 적고 Enter`}
+          placeholder={t("직접")}
+          aria-label={t("{name} 직접 입력", { name: label })}
+          title={t("{name}: 2.5 · 1500ms · 1분 · 무제한처럼 적고 Enter", { name: label })}
           value={text}
           disabled={disabled}
           aria-invalid={note !== null || undefined}
@@ -299,7 +308,7 @@ export function DurationField({
             if (e.key === "Escape") setText(shown);
           }}
         />
-        <span className="field__unit">{spec.unit === "s" ? "초" : "ms"}</span>
+        <span className="field__unit">{spec.unit === "s" ? t("초") : "ms"}</span>
       </span>
       {note && (
         <span className="field__note" role="status">

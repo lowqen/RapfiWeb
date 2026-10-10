@@ -1,6 +1,7 @@
 import { writePsq } from "../model/game-file";
 import { DEFAULT_SIZE, inBoard, moveKey, type Move } from "../model/move";
 import { keyOf as posKeyOf } from "../model/pos-key";
+import { t } from "../../i18n/i18n";
 import {
   MARKS,
   emptyNode,
@@ -101,12 +102,12 @@ export function cleanTree(
     dropped: drop.n,
     tree: {
       id: typeof r.id === "string" && r.id ? r.id.slice(0, 64) : newId(),
-      title: str(r.title, MAX_TITLE) || "가져온 정석",
+      title: str(r.title, MAX_TITLE) || t("가져온 정석"),
       category: str(r.category, MAX_TITLE),
       tags: Array.isArray(r.tags)
         ? r.tags
-            .filter((t): t is string => typeof t === "string")
-            .map((t) => t.slice(0, 40))
+            .filter((x): x is string => typeof x === "string")
+            .map((x) => x.slice(0, 40))
             .slice(0, 32)
         : [],
       boardSize: size,
@@ -125,7 +126,7 @@ export function importJson(text: string, now = Date.now()): ImportResult {
   try {
     data = JSON.parse(text);
   } catch {
-    return { ok: false, error: "JSON 이 아닙니다" };
+    return { ok: false, error: t("JSON 이 아닙니다") };
   }
   const list: unknown[] = Array.isArray(data)
     ? data
@@ -140,7 +141,7 @@ export function importJson(text: string, now = Date.now()): ImportResult {
     trees.push(c.tree);
     dropped += c.dropped;
   }
-  if (trees.length === 0) return { ok: false, error: "정석이 들어 있지 않습니다" };
+  if (trees.length === 0) return { ok: false, error: t("정석이 들어 있지 않습니다") };
   return { ok: true, trees, dropped };
 }
 

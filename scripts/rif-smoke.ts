@@ -144,7 +144,7 @@ const packView = (page: Page) => page.evaluate("window.__rapfiPack()") as Promis
 
 await new Promise<void>((r) => server.listen(PORT, r));
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 1280, height: 1000 } });
+const page = await browser.newPage({ viewport: { width: 1280, height: 1000 }, locale: "ko-KR" });
 const pageErrors: string[] = [];
 page.on("pageerror", (e) => pageErrors.push(String(e)));
 

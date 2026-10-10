@@ -17,6 +17,7 @@ import { useGameStore } from "../board/gameStore";
 import { PackSourceBar, RifImportCard, WdlBar } from "./rif/RifParts";
 import { fmtInt } from "./rif/format";
 import { activePack, useRifStore } from "./rif/rifStore";
+import { langOf, localized, msg, pick, t } from "../../i18n/i18n";
 
 /**
  * 연구 ▸ 오프닝 — 앱 `OpeningExplorerSection` 의 이식. 이름 사슬 · 환원 · 이론 다음 수(W6a, 팩 없이)
@@ -48,11 +49,11 @@ interface NextRow {
   readonly w: number;
 }
 
-const RESULT_TEXT: Record<number, string> = {
-  [RES_BLACK]: "흑 승",
-  [RES_WHITE]: "백 승",
-  [RES_DRAW]: "무",
-};
+const RESULT_TEXT: Readonly<Record<number, string>> = localized({
+  [RES_BLACK]: msg("흑 승"),
+  [RES_WHITE]: msg("백 승"),
+  [RES_DRAW]: msg("무"),
+});
 
 const GAMES_SHOWN = 50;
 
@@ -149,7 +150,7 @@ export function OpeningExplorer() {
         // 무른 수와 같은 수면 앞날을 지킨다 — 보드의 「앞으로」와 같은 규칙.
         future: head && sameMove(head, m) ? future.slice(1) : [],
         name: g.gameName,
-        what: `오프닝 탐색 — ${label(m, size)}`,
+        what: `오프닝 탐색: ${label(m, size)}`,
       });
     },
     [stones, future, size],
@@ -193,7 +194,7 @@ export function OpeningExplorer() {
         pack.source === "renjunet"
           ? `${black} - ${white}`
           : (pack.tournaments[pack.games.tour[g]!] ?? null),
-      what: `오프닝 탐색 — 대국 열기`,
+      what: `오프닝 탐색: 대국 열기`,
     });
     navigate("/board");
   };
@@ -201,17 +202,17 @@ export function OpeningExplorer() {
   return (
     <div className="explorer">
       <div className="explorer__board">
-        <BoardCanvas render={view} onTap={onTap} zoomable={false} />
+        <BoardCanvas render={view} onTap={onTap} zoomable={false} keyboard />
       </div>
       <div className="panel__actions explorer__nav">
         <button type="button" onClick={undoAll} disabled={stones.length === 0}>
-          처음으로
+          {t("처음으로")}
         </button>
         <button type="button" onClick={undo} disabled={stones.length === 0}>
-          한 수 무르기
+          {t("한 수 무르기")}
         </button>
         <Link className="btn" to="/board">
-          보드에서 보기
+          {t("보드에서 보기")}
         </Link>
       </div>
 
@@ -219,17 +220,19 @@ export function OpeningExplorer() {
       <PackSourceBar />
 
       <section className="panel">
-        <h2 className="panel__title">국면</h2>
+        <h2 className="panel__title">{t("국면")}</h2>
         <dl className="kv">
-          <dt>수순</dt>
+          <dt>{t("수순")}</dt>
           <dd className="tnum" data-k="explorer-line">
-            {stones.length ? fmtLine(stones, size) : "시작 국면"}
+            {stones.length ? fmtLine(stones, size) : t("시작 국면")}
           </dd>
-          <dt>이름</dt>
-          <dd data-k="explorer-chain">{names.length ? names.join(" › ") : "—"}</dd>
+          <dt>{t("이름")}</dt>
+          <dd data-k="explorer-chain" lang={langOf(names.join(" "))}>
+            {names.length ? names.join(" › ") : t("없음")}
+          </dd>
           {grade && (
             <>
-              <dt>유불리</dt>
+              <dt>{t("유불리")}</dt>
               <dd>
                 <GradeBadge grade={grade} />
               </dd>
@@ -237,17 +240,17 @@ export function OpeningExplorer() {
           )}
           {pack && (
             <>
-              <dt>{pack.source === "renjunet" ? "대국" : "내 기보"}</dt>
+              <dt>{pack.source === "renjunet" ? t("대국") : t("내 기보")}</dt>
               <dd data-k="explorer-games" className="explorer__stat">
                 {stat ? (
                   <>
-                    <span className="tnum">{fmtInt(stat.n)}판</span>
+                    <span className="tnum">{t("{n}판", { n: fmtInt(stat.n) })}</span>
                     <WdlBar b={stat.b} d={stat.d} w={stat.w} />
                   </>
                 ) : stones.length > pack.maxPlies ? (
-                  `${pack.maxPlies}수까지 셉니다`
+                  t("{n}수까지 셉니다", { n: pack.maxPlies })
                 ) : (
-                  "이 국면을 지난 판이 없습니다"
+                  t("이 국면을 지난 판이 없습니다")
                 )}
               </dd>
             </>
@@ -257,20 +260,25 @@ export function OpeningExplorer() {
 
       <section className="panel">
         <h2 className="panel__title">
-          다음 수 <span className="panel__status">{rows.length ? `${rows.length}곳` : ""}</span>
+          {t("다음 수")}{" "}
+          <span className="panel__status">{rows.length ? t("{n}곳", { n: rows.length }) : ""}</span>
         </h2>
         {rows.length === 0 ? (
           <p className="panel__hint">
             {stat
-              ? "이 국면에서 더 둔 판이 없습니다."
+              ? t("이 국면에서 더 둔 판이 없습니다.")
               : stones.length >= 5
-                ? "이름과 흑 5수 유불리는 5수까지입니다. 그 뒤로는 기록(통계)이나 엔진이 읽습니다(보드 ▸ 분석)."
+                ? t(
+                    "이름과 흑 5수 유불리는 5수까지입니다. 그 뒤로는 기록(통계)이나 엔진이 읽습니다(보드 ▸ 분석).",
+                  )
                 : offFrame
-                  ? "이 수순은 표준 개시 틀(1수 천원 · 3수까지 가운데 5×5)을 벗어났습니다."
-                  : "표에 이 국면의 다음 수가 없습니다 — 대부분의 4수에는 이름이 없고, 그것이 정상입니다."}
+                  ? t("이 수순은 표준 개시 틀(1수 천원 · 3수까지 가운데 5×5)을 벗어났습니다.")
+                  : t(
+                      "표에 이 국면의 다음 수가 없습니다. 대부분의 4수에는 이름이 없고, 그것이 정상입니다.",
+                    )}
           </p>
         ) : (
-          <ul className="theory" aria-label="다음 수">
+          <ul className="theory" aria-label={t("다음 수")}>
             {rows.map((r) => (
               <li key={moveKey(r.move, size)}>
                 <button
@@ -279,7 +287,7 @@ export function OpeningExplorer() {
                   onClick={() => play(r.move)}
                 >
                   <span className="theory__move tnum">{label(r.move, size)}</span>
-                  <span className="theory__name">
+                  <span className="theory__name" lang={langOf(r.name ?? "")}>
                     {r.name ?? ""}
                     {r.grade && (
                       <>
@@ -290,7 +298,9 @@ export function OpeningExplorer() {
                   </span>
                   {pack && (
                     <>
-                      <span className="theory__games tnum">{r.n ? `${fmtInt(r.n)}판` : ""}</span>
+                      <span className="theory__games tnum">
+                        {r.n ? t("{n}판", { n: fmtInt(r.n) }) : ""}
+                      </span>
                       {r.n ? <WdlBar b={r.b} d={r.d} w={r.w} compact /> : <span />}
                     </>
                   )}
@@ -302,19 +312,21 @@ export function OpeningExplorer() {
       </section>
 
       {pack && stat && (
-        <section className="panel" aria-label="이 국면을 지난 대국">
+        <section className="panel" aria-label={t("이 국면을 지난 대국")}>
           <h2 className="panel__title">
-            대국{" "}
+            {t("대국")}{" "}
             <span className="panel__status tnum">
               {games
-                ? `${fmtInt(games.matched)}판${games.matched > GAMES_SHOWN ? ` 중 ${GAMES_SHOWN}판` : ""}`
-                : `${fmtInt(stat.n)}판`}
+                ? games.matched > GAMES_SHOWN
+                  ? t("{n}판 중 {shown}판", { n: fmtInt(games.matched), shown: GAMES_SHOWN })
+                  : t("{n}판", { n: fmtInt(games.matched) })
+                : t("{n}판", { n: fmtInt(stat.n) })}
             </span>
           </h2>
           {!showGames ? (
             <div className="panel__actions">
               <button type="button" onClick={() => setShowGames(true)}>
-                대국 목록 보기
+                {t("대국 목록 보기")}
               </button>
             </div>
           ) : (
@@ -323,8 +335,8 @@ export function OpeningExplorer() {
                 <input
                   className="ranking__input explorer__needle"
                   type="search"
-                  placeholder="선수 이름으로 거르기"
-                  aria-label="선수 이름으로 거르기"
+                  placeholder={t("선수 이름으로 거르기")}
+                  aria-label={t("선수 이름으로 거르기")}
                   value={needle}
                   onChange={(e) => setNeedle(e.target.value)}
                 />
@@ -334,7 +346,7 @@ export function OpeningExplorer() {
                   <li key={g}>
                     <button type="button" className="gamelist__row" onClick={() => openGame(g)}>
                       <span className="gamelist__year tnum">
-                        {pack.tourYear[pack.games.tour[g]!] || "—"}
+                        {pack.tourYear[pack.games.tour[g]!] || ""}
                       </span>
                       <span className="gamelist__players">
                         {pack.players[pack.games.black[g]!]}{" "}
@@ -342,7 +354,7 @@ export function OpeningExplorer() {
                         {pack.players[pack.games.white[g]!]}
                       </span>
                       <span className="gamelist__res" data-res={pack.games.res[g]}>
-                        {RESULT_TEXT[pack.games.res[g]!] ?? "—"}
+                        {RESULT_TEXT[pack.games.res[g]!] ?? t("결과 모름")}
                       </span>
                       <span className="gamelist__tour">
                         {pack.tournaments[pack.games.tour[g]!]}
@@ -352,7 +364,7 @@ export function OpeningExplorer() {
                 ))}
               </ol>
               {games && games.matched === 0 && (
-                <p className="panel__hint">그 이름의 선수가 둔 판이 없습니다.</p>
+                <p className="panel__hint">{t("그 이름의 선수가 둔 판이 없습니다.")}</p>
               )}
             </>
           )}
@@ -361,16 +373,19 @@ export function OpeningExplorer() {
 
       {alts.length > 0 && (
         <section className="panel">
-          <h2 className="panel__title">환원 — 같은 돌, 다른 수순</h2>
+          <h2 className="panel__title">{t("환원: 같은 돌, 다른 수순")}</h2>
           <p className="panel__hint">
-            돌과 색이 같으니 한 판이고 유불리와 통계도 하나지만, 수순이 달라 이름은 다를 수
-            있습니다.
+            {t(
+              "돌과 색이 같으니 한 판이고 유불리와 통계도 하나지만, 수순이 달라 이름은 다를 수 있습니다.",
+            )}
           </p>
           <ul className="theory">
             {alts.map((a) => (
               <li key={fmtLine(a.line, size)} className="theory__row theory__row--static">
                 <span className="theory__move tnum">{fmtLine(a.line, size)}</span>
-                <span className="theory__name">{a.chain.join(" › ")}</span>
+                <span className="theory__name" lang={langOf(a.chain.join(" "))}>
+                  {a.chain.join(" › ")}
+                </span>
               </li>
             ))}
           </ul>
@@ -378,10 +393,14 @@ export function OpeningExplorer() {
       )}
 
       <p className="explorer__note">
-        1~3수 이름은 계산하고, 4수 이름 249개와 흑 5수 유불리 1,889모양은 내장 표에서
-        읽습니다(유불리 출처: Renju Atlas, CC0 1.0).
-        {!loaded && " 표를 받는 중입니다…"} 빈도 통계는 RenjuNet `.rif` 를 넣으면(이 브라우저
-        안에서만 만들고 보관) 세계 대국으로, 없으면 내 기보로 셉니다.
+        {t(
+          "1~3수 이름은 계산하고, 4수 이름 249개와 흑 5수 유불리 1,889모양은 내장 표에서 읽습니다(유불리 출처: Renju Atlas, CC0 1.0).",
+        )}
+        {!loaded && ` ${t("표를 받는 중입니다…")}`}{" "}
+        {t(
+          "빈도 통계는 RenjuNet .rif 를 넣으면(이 브라우저 안에서만 만들고 보관) 세계 대국으로, 없으면 내 기보로 셉니다.",
+        )}
+        {pick("", ` ${t("4수 이름은 한국어 원표 그대로입니다.")}`)}
       </p>
     </div>
   );

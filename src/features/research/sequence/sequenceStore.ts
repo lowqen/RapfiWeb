@@ -10,6 +10,7 @@ import { useBoardStore } from "../../board/boardStore";
 import { useGameStore } from "../../board/gameStore";
 import { useEngineStore } from "../../../engine/engine-state";
 import { createMoveOrderService, type MoveOrderService } from "./moveOrderService";
+import { t } from "../../../i18n/i18n";
 
 /**
  * 수순 탐색기의 상태 — 앱 `MoveOrderViewModel` 의 이식.
@@ -136,12 +137,12 @@ export const useSequenceStore = create<SequenceState>((set, get) => {
       const prompt = get().applyPrompt;
       // 리뷰가 엔진을 쥐고 있으면 판을 바꾸지 않는다(main.c:6225 — reviewactive).
       if (useEngineStore.getState().owner) {
-        set({ notice: "게임 리뷰나 국면 증명이 진행 중입니다 — 먼저 멈추세요" });
+        set({ notice: t("게임 리뷰나 국면 증명이 진행 중입니다. 먼저 멈추세요") });
         return;
       }
       const done = confirmed && prompt ? prompt : await svc().call({ op: "complete" });
       if (!done) {
-        set({ notice: "여기서 완성할 수 있는 수순이 없습니다" });
+        set({ notice: t("여기서 완성할 수 있는 수순이 없습니다") });
         return;
       }
       if (done.transform !== 0 && !confirmed) {
@@ -149,9 +150,10 @@ export const useSequenceStore = create<SequenceState>((set, get) => {
           applyPrompt: {
             transform: done.transform,
             order: done.order,
-            text:
-              `이 수순은 ${xformName(done.transform)} 배치에 있습니다 — 돌 위치가 지금 보드와 ` +
-              "달라집니다. 그래도 놓을까요?",
+            text: t(
+              "이 수순은 {x} 배치에 있습니다. 돌 위치가 지금 보드와 달라집니다. 그래도 놓을까요?",
+              { x: xformName(done.transform) },
+            ),
           },
         });
         return;
@@ -159,9 +161,9 @@ export const useSequenceStore = create<SequenceState>((set, get) => {
       const size = get().size;
       useGameStore.getState().loadMoves(
         done.order.map((c) => cellMove(c, size)),
-        { name: useGameStore.getState().gameName, what: "수순 탐색기 — 이 수순으로 다시 놓기" },
+        { name: useGameStore.getState().gameName, what: t("수순 탐색기: 이 수순으로 다시 놓기") },
       );
-      set({ applyPrompt: null, notice: "보드를 이 수순으로 다시 놓았습니다" });
+      set({ applyPrompt: null, notice: t("보드를 이 수순으로 다시 놓았습니다") });
     },
 
     dismissPrompt: () => set({ applyPrompt: null }),

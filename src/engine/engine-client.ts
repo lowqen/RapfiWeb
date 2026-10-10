@@ -14,6 +14,7 @@ import {
   type WeightsSpec,
 } from "./engine-types";
 import engineManifest from "./engine-manifest.json";
+import { t } from "../i18n/i18n";
 
 /**
  * 메인 스레드에서 엔진을 다루는 유일한 창구.
@@ -124,14 +125,14 @@ export function planOrder(
         ? { order: [...multis, ...singles], note: null }
         : {
             order: singles,
-            note: "이 환경에서는 멀티스레드를 쓸 수 없어 단일 스레드로 띄웠습니다",
+            note: t("이 환경에서는 멀티스레드를 쓸 수 없어 단일 스레드로 띄웠습니다"),
           };
     case "relaxed":
       return singles.includes("single-simd128-relaxed")
         ? { order: singles, note: null }
         : {
             order: singles,
-            note: "이 브라우저에서는 relaxed SIMD 를 쓸 수 없어 Standard SIMD 로 띄웠습니다",
+            note: t("이 브라우저에서는 relaxed SIMD 를 쓸 수 없어 Standard SIMD 로 띄웠습니다"),
           };
     case "simd":
       return { order: singles.filter((v) => v === "single-simd128"), note: null };
@@ -150,8 +151,8 @@ export function preferenceBlocker(caps: Capabilities, pref: EnginePreference): s
     case "relaxed":
       if (caps.variants.includes("single-simd128-relaxed")) return null;
       return caps.relaxedSimd
-        ? "주소의 ?relaxed=0 으로 relaxed SIMD 를 꺼 두었습니다"
-        : "이 브라우저는 WebAssembly relaxed SIMD 를 지원하지 않습니다";
+        ? t("주소의 ?relaxed=0 으로 relaxed SIMD 를 꺼 두었습니다")
+        : t("이 브라우저는 WebAssembly relaxed SIMD 를 지원하지 않습니다");
   }
 }
 
@@ -207,13 +208,14 @@ export function detectCapabilities(): Capabilities {
   const forced = forcedVariant();
 
   let threadsNote: string | null = null;
-  if (!simd) threadsNote = "WebAssembly SIMD 가 없습니다";
-  else if (forced === "single") threadsNote = "주소의 ?engine=single 로 단일 스레드를 골랐습니다";
+  if (!simd) threadsNote = t("WebAssembly SIMD 가 없습니다");
+  else if (forced === "single")
+    threadsNote = t("주소의 ?engine=single 로 단일 스레드를 골랐습니다");
   else if (!isolated) {
-    threadsNote =
-      "교차 출처 격리(COOP/COEP 헤더)가 꺼져 있어 멀티스레드를 쓸 수 없습니다 — " +
-      "헤더를 붙일 수 없는 호스팅(GitHub Pages 등)이거나 개발 서버 설정이 빠졌습니다";
-  } else if (!sab) threadsNote = "이 브라우저는 SharedArrayBuffer 를 허용하지 않습니다";
+    threadsNote = t(
+      "교차 출처 격리(COOP/COEP 헤더)가 꺼져 있어 멀티스레드를 쓸 수 없습니다. 헤더를 붙일 수 없는 호스팅(GitHub Pages 등)이거나 개발 서버 설정이 빠졌습니다",
+    );
+  } else if (!sab) threadsNote = t("이 브라우저는 SharedArrayBuffer 를 허용하지 않습니다");
   const threads = threadsNote === null || (simd && forced === "multi");
   const variants = planVariants({ simd, relaxed: relaxedSimd && !relaxedOff, threads });
 
@@ -230,8 +232,9 @@ export function detectCapabilities(): Capabilities {
     threadsNote: threads ? null : threadsNote,
     note: simd
       ? null
-      : "이 브라우저는 WebAssembly SIMD 를 지원하지 않아 엔진을 실행할 수 없습니다. " +
-        "Chrome/Edge 91+, Firefox 89+, Safari 16.4+ 가 필요합니다.",
+      : t(
+          "이 브라우저는 WebAssembly SIMD 를 지원하지 않아 엔진을 실행할 수 없습니다. Chrome/Edge 91+, Firefox 89+, Safari 16.4+ 가 필요합니다.",
+        ),
   };
 }
 
@@ -344,7 +347,7 @@ const env = import.meta.env;
 
 /** 기동 중에 엔진을 내려(`terminate`) 그 기동이 버려졌다. 오류가 아니다. */
 export class BootAbortedError extends Error {
-  constructor(why = "엔진 기동을 취소했습니다") {
+  constructor(why = t("엔진 기동을 취소했습니다")) {
     super(why);
     this.name = "BootAbortedError";
   }
@@ -421,7 +424,7 @@ export class EngineClient {
    */
   async start(preference: EnginePreference = "auto"): Promise<void> {
     const best = this.capabilities.variant;
-    if (!best) throw new Error(this.capabilities.note ?? "엔진을 실행할 수 없습니다");
+    if (!best) throw new Error(this.capabilities.note ?? t("엔진을 실행할 수 없습니다"));
     if (this.booting) return this.booting;
     if (this.worker) return this.whenReady();
 
@@ -464,8 +467,10 @@ export class EngineClient {
           }
           // 다음 변형으로 — 이 사실은 콘솔과 화면에 남긴다(조용히 느려지면 원인을 모른다).
           const next = order[order.indexOf(variant) + 1];
-          fallbackReason = `${variant} 기동 실패 — ${why}`;
-          this.events.onConsole?.([`! ${variant} 기동 실패 — ${next} 로 물러섭니다: ${why}`]);
+          fallbackReason = t("{v} 기동 실패: {why}", { v: variant, why });
+          this.events.onConsole?.([
+            `! ${t("{v} 기동 실패, {next} 로 물러섭니다: {why}", { v: variant, next: next ?? "", why })}`,
+          ]);
         }
       }
     })().finally(() => {
@@ -495,10 +500,12 @@ export class EngineClient {
     this.worker?.terminate();
     this.worker = null;
     this.variant = null;
-    for (const p of this.fsPending.values()) p({ ok: false, error: "엔진을 내렸습니다" });
+    for (const p of this.fsPending.values()) p({ ok: false, error: t("엔진을 내렸습니다") });
     this.fsPending.clear();
     this.snapshot = EMPTY_SNAPSHOT;
-    this.events.onConsole?.([`! 멀티스레드 엔진이 멈춰 단일 스레드로 다시 띄웁니다: ${reason}`]);
+    this.events.onConsole?.([
+      `! ${t("멀티스레드 엔진이 멈춰 단일 스레드로 다시 띄웁니다: {why}", { why: reason })}`,
+    ]);
     this.setStatus("starting");
     // 단일 변형도 relaxed 부터 — 실패하면 일반 단일로.
     const singles = this.capabilities.variants.filter((v) => !isMultiVariant(v));
@@ -515,7 +522,7 @@ export class EngineClient {
           variant,
           threaded: booted.threaded,
           maxThreads: booted.maxThreads,
-          fallbackReason: `멀티스레드 엔진이 동작 중 멈췄습니다 — ${reason}`,
+          fallbackReason: t("멀티스레드 엔진이 동작 중 멈췄습니다: {why}", { why: reason }),
           recovered: true,
           weights: booted.weights,
           warmupMs: booted.warmupMs,
@@ -570,7 +577,8 @@ export class EngineClient {
     // 가중치(~20MB) 내려받기가 기동에 들어간다 — 느린 회선을 위해 넉넉히. 멀티가 조용히
     // 멈추는 경우는 워커의 핸드셰이크 한도(15초, 내려받기 **뒤**부터)가 먼저 잡는다.
     const timer = setTimeout(
-      () => settle?.reject(new Error(`${variant} 엔진이 120초 안에 기동하지 않았습니다`)),
+      () =>
+        settle?.reject(new Error(t("{v} 엔진이 120초 안에 기동하지 않았습니다", { v: variant }))),
       120_000,
     );
     const failBoot = (why: string): boolean => {
@@ -642,7 +650,10 @@ export class EngineClient {
           this.events.onSearchDone?.(m.mode, m.reason);
           break;
         case "exit":
-          if (failBoot(`${variant} 엔진이 기동 중에 종료했습니다 (${m.code})`)) break;
+          if (
+            failBoot(t("{v} 엔진이 기동 중에 종료했습니다 ({code})", { v: variant, code: m.code }))
+          )
+            break;
           this.setStatus("idle");
           break;
         case "fatal":
@@ -662,14 +673,16 @@ export class EngineClient {
     // 한 런을 통째로 헤맸다. 워커 오류 이벤트가 들고 있는 것을 전부 풀어 적는다.
     worker.onerror = (e) => {
       const where = e.filename ? ` (${e.filename}:${e.lineno}:${e.colno})` : "";
-      const what = e.message || e.type || "알 수 없는 워커 오류";
-      if (failBoot(`워커 오류: ${what}${where}`)) return;
-      this.events.onError?.(`워커 오류: ${what}${where}`);
+      const what = e.message || e.type || t("알 수 없는 워커 오류");
+      const text = t("워커 오류: {what}", { what: `${what}${where}` });
+      if (failBoot(text)) return;
+      this.events.onError?.(text);
       this.setStatus("error");
     };
     worker.onmessageerror = () => {
-      if (failBoot("워커 메시지를 복제하지 못했습니다(구조화 복제 실패)")) return;
-      this.events.onError?.("워커 메시지를 복제하지 못했습니다(구조화 복제 실패)");
+      const text = t("워커 메시지를 복제하지 못했습니다(구조화 복제 실패)");
+      if (failBoot(text)) return;
+      this.events.onError?.(text);
       this.setStatus("error");
     };
 
@@ -696,7 +709,7 @@ export class EngineClient {
     if (this.booting) return this.booting;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(
-        () => reject(new Error(`엔진이 ${timeoutMs}ms 안에 기동하지 않았습니다`)),
+        () => reject(new Error(t("엔진이 {ms}ms 안에 기동하지 않았습니다", { ms: timeoutMs }))),
         timeoutMs,
       );
       this.readyResolvers.push(() => {
@@ -799,7 +812,7 @@ export class EngineClient {
     path: string,
     bytes?: Uint8Array,
   ): Promise<FsResult> {
-    if (!this.worker) return Promise.resolve({ ok: false, error: "엔진이 떠 있지 않습니다" });
+    if (!this.worker) return Promise.resolve({ ok: false, error: t("엔진이 떠 있지 않습니다") });
     const id = ++this.fsSeq;
     return new Promise((resolve) => {
       this.fsPending.set(id, resolve);

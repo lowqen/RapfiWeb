@@ -1,4 +1,5 @@
 import { useLinkBackup } from "./linkBackup";
+import { t } from "../../i18n/i18n";
 
 /**
  * 「링크를 열기 전 판」 안내 — 보관한 판이 있는 동안만 보인다(`linkBackup.ts`). 두 탭
@@ -11,19 +12,22 @@ export function LinkBackupBanner() {
   if (!backup) return null;
   const n = backup.moves.length;
   return (
-    <section className="panel panel--notice" aria-label="링크를 열기 전 판">
-      <h2 className="panel__title">링크의 국면을 열었습니다</h2>
+    <section className="panel panel--notice" aria-label={t("링크를 열기 전 판")}>
+      <h2 className="panel__title">{t("링크의 국면을 열었습니다")}</h2>
       <p className="panel__hint">
-        두던 판({backup.name ? `${backup.name} · ` : ""}
-        {n}수{backup.future.length ? ` + 무른 수 ${backup.future.length}` : ""})은 따로 보관해
-        두었습니다.
+        {t("두던 판({what})은 따로 보관해 두었습니다.", {
+          what:
+            (backup.name ? `${backup.name} · ` : "") +
+            t("{n}수", { n }) +
+            (backup.future.length ? ` + ${t("무른 수 {n}", { n: backup.future.length })}` : ""),
+        })}
       </p>
       <div className="panel__actions">
         <button type="button" className="button--primary" onClick={() => void restore()}>
-          두던 판으로 돌아가기
+          {t("두던 판으로 돌아가기")}
         </button>
         <button type="button" onClick={() => void discard()}>
-          버리기
+          {t("버리기")}
         </button>
       </div>
     </section>

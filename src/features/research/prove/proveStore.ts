@@ -9,6 +9,7 @@ import {
 import {
   IDLE_PROGRESS,
   outcomeMessage,
+  outcomeTitle,
   type ProveOutcome,
   type ProveProgress,
 } from "../../../core/prove/prove-models";
@@ -17,6 +18,7 @@ import { proveDb } from "../../database/dbStore";
 import { useBoardStore } from "../../board/boardStore";
 import { useGameStore } from "../../board/gameStore";
 import { proveRefusal, runProve, type ProvePort } from "./proveRunner";
+import { t } from "../../../i18n/i18n";
 
 /**
  * 국면 증명의 화면 쪽 — 앱 `ProveRepositoryImpl` 의 상태(진행 · 덧그림 · 결과 · 기록).
@@ -91,16 +93,19 @@ export const useProveStore = create<ProveStoreState>((set, get) => {
     log: [],
 
     start: async () => {
-      if (get().running) return "이미 증명이 진행 중입니다";
-      if (useGameStore.getState().thinking) return "증명: 진행 중인 계산을 먼저 중지하세요";
+      if (get().running) return t("이미 증명이 진행 중입니다");
+      if (useGameStore.getState().thinking) return t("증명: 진행 중인 계산을 먼저 중지하세요");
       const { stones, size } = useBoardStore.getState().render;
       const why = proveRefusal(stones, size);
       if (why) return why;
+      const owner = useEngineStore.getState().owner;
       const lock = useEngineStore.getState().acquire("prove");
       if (lock)
-        return lock === "이미 진행 중입니다"
-          ? "이미 증명이 진행 중입니다"
-          : "게임 리뷰가 진행 중입니다 — 먼저 멈추세요";
+        return owner === "prove"
+          ? t("이미 증명이 진행 중입니다")
+          : owner === "review"
+            ? t("게임 리뷰가 진행 중입니다. 먼저 멈추세요")
+            : lock;
       cancelFlag = false;
       set({
         running: true,
@@ -118,9 +123,7 @@ export const useProveStore = create<ProveStoreState>((set, get) => {
         });
         if (failed) note(failed);
         set({ outcome });
-        note(
-          `증명 ${outcome.cancelled ? "취소" : "완료"}: ${outcomeMessage(outcome).replace(/\n/g, " ")}`,
-        );
+        note(`${outcomeTitle(outcome)}: ${outcomeMessage(outcome).replace(/\n/g, " ")}`);
       } finally {
         useEngineStore.getState().release("prove");
         set({ running: false, progress: IDLE_PROGRESS, overlay: null });

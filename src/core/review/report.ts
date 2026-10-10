@@ -9,6 +9,7 @@ import {
   recordAt,
   tally,
   winRateAt,
+  qualityName,
   winRateCell,
   worst,
   type GradedMove,
@@ -16,6 +17,7 @@ import {
   type ReviewData,
   type ReviewTally,
 } from "./move-quality";
+import { pick, t } from "../../i18n/i18n";
 
 /**
  * 끝난 리뷰와 그 내보내기 — 앱 `ReviewModels.kt` 의 `ReviewBudget` · `GameReport` 와
@@ -23,7 +25,7 @@ import {
  * `queue_write_report` · `report_export_html`).
  *
  *  - CSV  — 일부러 영어(데스크톱과 같다)
- *  - MD   — 한국어(데스크톱 한국어 화면의 것)
+ *  - MD   — 지금 언어(한국어는 데스크톱 한국어 화면의 것)
  *  - HTML — 데스크톱과 같은 한 파일 페이지(`report-shell/`)에 같은 `GAME` 객체를 넣는다
  */
 
@@ -148,29 +150,36 @@ export function csv(r: GameReport): string {
 // ── Markdown ─────────────────────────────────────────────────────────
 
 const gradeCell = (m: GradedMove) =>
-  m.quality === "none"
-    ? " "
-    : `${QUALITY_INFO[m.quality].symbol} ${QUALITY_INFO[m.quality].korean}`;
+  m.quality === "none" ? " " : `${QUALITY_INFO[m.quality].symbol} ${qualityName(m.quality)}`;
 const deltaCell = (m: GradedMove) =>
   m.quality === "none" || m.quality === "forced" ? "-" : `-${fixed(m.delta * 100, 1)}%p`;
 const gapCell = (m: GradedMove) => (m.gap !== null ? `${Math.round(m.gap * 100)}%p` : "-");
 
 export function markdown(r: GameReport): string {
-  let out = `# 게임 리뷰: ${r.title}\n\n`;
-  out += `- 수: ${r.moves.length}, 수당 ${budgetLabel(r.budget)}\n`;
-  out += `- 정확도: 흑 **${pct1(r.tally.blackAccuracy)}%** / 백 **${pct1(r.tally.whiteAccuracy)}%**\n\n`;
-  out += "| 등급 | 흑 | 백 |\n|---|---|---|\n";
+  let out = `# ${t("게임 리뷰: {title}", { title: r.title })}\n\n`;
+  out += `- ${t("수: {n}, 수당 {b}", { n: r.moves.length, b: budgetLabel(r.budget) })}\n`;
+  out += `- ${t("정확도: 흑 {b} / 백 {w}", { b: `**${pct1(r.tally.blackAccuracy)}%**`, w: `**${pct1(r.tally.whiteAccuracy)}%**` })}\n\n`;
+  out += `| ${t("등급")} | ${t("흑")} | ${t("백")} |\n|---|---|---|\n`;
   for (const q of GRADED) {
     const [b, w] = r.tally.counts.get(q) ?? [0, 0];
-    out += `| ${QUALITY_INFO[q].symbol} ${QUALITY_INFO[q].korean} | ${b} | ${w} |\n`;
+    out += `| ${QUALITY_INFO[q].symbol} ${qualityName(q)} | ${b} | ${w} |\n`;
   }
-  out += "\n## 최악의 수\n\n";
+  out += `\n## ${t("최악의 수")}\n\n`;
   for (const m of r.worst) {
     out +=
-      `- #${m.index} ${coord(m.move, r.size)} (${m.black ? "흑" : "백"}) — ` +
-      `${QUALITY_INFO[m.quality].korean}, -${fixed(m.delta * 100, 1)}%p, 최선은 ${coord(m.best, r.size)}\n`;
+      `- #${m.index} ${coord(m.move, r.size)} (${m.black ? t("흑") : t("백")}): ` +
+      `${qualityName(m.quality)}, -${fixed(m.delta * 100, 1)}%p, ${t("최선은 {best}", { best: coord(m.best, r.size) })}\n`;
   }
-  out += "\n## 수순\n\n| # | 수 | 등급 | dWR | 흑 승률 | 최선 | 격차 | 코멘트 |\n";
+  const heads = [
+    pick("수", "Move"),
+    t("등급"),
+    "dWR",
+    t("흑 승률"),
+    t("최선"),
+    t("격차"),
+    t("코멘트"),
+  ];
+  out += `\n## ${t("수순")}\n\n| # | ${heads.join(" | ")} |\n`;
   out += "|---|---|---|---|---|---|---|---|\n";
   for (const m of r.moves) {
     out +=
@@ -187,10 +196,10 @@ export function queueSummary(
   failed: number,
 ): string {
   let out =
-    `# 분석 큐 요약\n\n총 ${entries.length}개: 리뷰 ${reviewed}, 실패 ${failed}, ` +
-    `미실행 ${entries.length - reviewed - failed}\n\n`;
+    `# ${t("분석 큐 요약")}\n\n` +
+    `${t("총 {n}개: 리뷰 {r}, 실패 {f}, 미실행 {u}", { n: entries.length, r: reviewed, f: failed, u: entries.length - reviewed - failed })}\n\n`;
   entries.forEach((e, i) => {
-    out += `- [${String(i + 1).padStart(2, "0")}] ${e.name} — ${e.result || "미실행"}\n`;
+    out += `- [${String(i + 1).padStart(2, "0")}] ${e.name}: ${e.result || t("미실행")}\n`;
   });
   return out;
 }
@@ -204,17 +213,47 @@ export interface ReportShell {
   readonly tail: string;
 }
 
-/** 페이지가 키마다 기대는 화면 문구 — 데스크톱의 한국어 묶음. */
-const KOREAN_LABELS =
-  '{"black":"흑","white":"백",' +
-  '"h":["#","수","등급","ΔWR","승률","최선","격차","코멘트"],' +
-  '"worst":"최악의 수","clean":"없음 — 깔끔한 대국.",' +
-  '"movesw":"수","acclab":" 정확도","gen":"생성:",' +
-  '"startpos":"시작 국면입니다.","best":"최선","gap":"격차",' +
-  '"empty":"(비어 있음)","t_wr":"승률","t_gr":"등급",' +
-  '"t_mv":"수순","t_log":"엔진 로그","t_raw":"원본 데이터",' +
-  '"hint":"← → 키 · 돌/점/행 클릭으로 이동",' +
-  '"spm":"초/수","dpm":"깊이","permove":"/수"}';
+/** 페이지가 키마다 기대는 화면 문구 — 데스크톱의 한국어 묶음(지금 언어로). */
+function labels(): string {
+  const h = [
+    "#",
+    pick("수", "Move"),
+    t("등급"),
+    "ΔWR",
+    t("승률"),
+    t("최선"),
+    t("격차"),
+    t("코멘트"),
+  ];
+  const kv: [string, string][] = [
+    ["black", t("흑")],
+    ["white", t("백")],
+  ];
+  const rest: [string, string][] = [
+    ["worst", t("최악의 수")],
+    ["clean", t("없음. 깔끔한 대국입니다.")],
+    ["movesw", t("수")],
+    ["acclab", ` ${t("정확도")}`],
+    ["gen", t("생성:")],
+    ["startpos", t("시작 국면입니다.")],
+    ["best", t("최선")],
+    ["gap", t("격차")],
+    ["empty", t("(비어 있음)")],
+    ["t_wr", t("승률")],
+    ["t_gr", t("등급")],
+    ["t_mv", t("수순")],
+    ["t_log", t("엔진 로그")],
+    ["t_raw", t("원본 데이터")],
+    ["hint", t("← → 키 · 돌/점/행 클릭으로 이동")],
+    ["spm", t("초/수")],
+    ["dpm", t("깊이")],
+    ["permove", t("/수")],
+  ];
+  const pair = ([k, v]: [string, string]) => `${json(k)}:${json(v)}`;
+  return (
+    `{${kv.map(pair).join(",")},"h":[${h.map(json).join(",")}],` + `${rest.map(pair).join(",")}}`
+  );
+}
 
 /** `GAME = {...}` 객체 — main.c:8447 이 쓰는 그대로, 칸마다. */
 export function gameJson(r: GameReport, dateStamp: string, log: string, ver = "web"): string {
@@ -238,10 +277,10 @@ export function gameJson(r: GameReport, dateStamp: string, log: string, ver = "w
     `,"best":${ordinalOf("best")},"inacc":${ordinalOf("inaccuracy")}` +
     `,"blunder":${ordinalOf("blunder")},"missed":${ordinalOf("missedWin")}` +
     `,"forced":${ordinalOf("forced")}}`;
-  out += `,"L":${KOREAN_LABELS}`;
+  out += `,"L":${labels()}`;
   out += `,"mq":[${QUALITIES.map(
     (q) =>
-      `{"n":${json(QUALITY_INFO[q].korean)},"s":${json(QUALITY_INFO[q].symbol)},"c":${json(QUALITY_INFO[q].color)}}`,
+      `{"n":${json(qualityName(q))},"s":${json(QUALITY_INFO[q].symbol)},"c":${json(QUALITY_INFO[q].color)}}`,
   ).join(",")}]`;
   out += `,"cnt":[[${counts(0)}],[${counts(1)}]]`;
   out += `,"moves":[${r.moves
@@ -262,7 +301,7 @@ export function gameJson(r: GameReport, dateStamp: string, log: string, ver = "w
 export function html(r: GameReport, shell: ReportShell, dateStamp: string, log = ""): string {
   return (
     shell.head +
-    `${escapeHtml(r.title)} - RapfiWeb 게임 리포트` +
+    `${escapeHtml(r.title)} · ${t("RapfiWeb 게임 리포트")}` +
     shell.body +
     gameJson(r, dateStamp, log) +
     shell.tail

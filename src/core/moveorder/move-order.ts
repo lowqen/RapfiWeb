@@ -1,5 +1,6 @@
 import { DEFAULT_SIZE, move } from "../model/move";
 import { NONSTD, classify } from "../opening/opening26";
+import { msg, t } from "../../i18n/i18n";
 
 /**
  * 수순 열거(환원) — 앱 `core/model/MoveOrder.kt` 의 이식(원본은 데스크톱
@@ -304,18 +305,18 @@ export function xform(t: number, size: number, cell: number): number {
 }
 
 const XFORM_NAME = [
-  "원래 방향",
-  "90° 회전",
-  "180° 회전",
-  "270° 회전",
-  "좌우 반전",
-  "상하 반전",
-  "\\ 대각 반전",
-  "/ 대각 반전",
+  msg("원래 방향"),
+  msg("90° 회전"),
+  msg("180° 회전"),
+  msg("270° 회전"),
+  msg("좌우 반전"),
+  msg("상하 반전"),
+  msg("\\ 대각 반전"),
+  msg("/ 대각 반전"),
 ];
 
-/** 방향 이름(`mo_xform_name`). */
-export const xformName = (t: number): string => XFORM_NAME[t] ?? XFORM_NAME[7]!;
+/** 방향 이름(`mo_xform_name`) — 지금 언어로. */
+export const xformName = (k: number): string => t(XFORM_NAME[k] ?? XFORM_NAME[7]!);
 
 /** 정규 2수 두 칸(H9 / I9), 천원이 없는 짝수 판이면 `null`(`mo_rule2_cells`). */
 export function rule2Cells(size: number): [number, number] | null {

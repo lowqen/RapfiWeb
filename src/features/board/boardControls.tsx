@@ -1,11 +1,12 @@
 import type { ReactNode } from "react";
 import { MOVE_TIME_CHOICES, LEVELS, useGameStore } from "./gameStore";
+import { t } from "../../i18n/i18n";
 import { MULTI_PV } from "../../engine/engine-state";
 import {
   COMPUTER_SIDE_LABEL,
   OPENING_HINT,
   OPENING_LABEL,
-  OPENING_NOTICE,
+  openingNotice,
   type ComputerSide,
   type OpeningProtocol,
 } from "../../core/model/game";
@@ -42,10 +43,10 @@ export function RulesetControl() {
   return (
     <div className="stack">
       <div className="ruleset">
-        <span className="pill" title="INFO RULE 4 — 웹 버전은 렌주 가중치만 싣습니다">
+        <span className="pill" title={`INFO RULE 4. ${t("웹 버전은 렌주 가중치만 싣습니다")}`}>
           {RULE_LABEL.renju}
         </span>
-        <ChipGroup label="오프닝">
+        <ChipGroup label={t("오프닝")}>
           {OPENINGS.map((o) => (
             <Chip key={o} on={opening === o} title={OPENING_HINT[o]} onClick={() => setOpening(o)}>
               {OPENING_LABEL[o]}
@@ -57,8 +58,8 @@ export function RulesetControl() {
       <span
         className="infodot"
         data-k="opening-notice"
-        title={OPENING_NOTICE}
-        aria-label={OPENING_NOTICE}
+        title={openingNotice()}
+        aria-label={openingNotice()}
       >
         i
       </span>
@@ -71,7 +72,7 @@ export function ComputerControl() {
   const side = useGameStore((s) => s.computerSide);
   const setSide = useGameStore((s) => s.setComputerSide);
   return (
-    <ChipGroup label="컴퓨터">
+    <ChipGroup label={t("컴퓨터")}>
       {SIDES.map((s) => (
         <Chip key={s} on={side === s} onClick={() => setSide(s)}>
           {COMPUTER_SIDE_LABEL[s]}
@@ -81,7 +82,7 @@ export function ComputerControl() {
   );
 }
 
-const moveTimeLabel = (ms: number) => (ms === 0 ? "무제한" : `${ms / 1000}초`);
+const moveTimeLabel = (ms: number) => (ms === 0 ? t("무제한") : t("{n}초", { n: ms / 1000 }));
 
 /**
  * 시간 제어 — 엔진 한 수의 시간. 대국 시계 없이 `timeout_turn` 하나만 정한다. 칩에 없는
@@ -92,7 +93,7 @@ export function MoveTimeControl() {
   const set = useGameStore((s) => s.setMoveTime);
   return (
     <div className="timepick">
-      <ChipGroup label="엔진 착수 시간">
+      <ChipGroup label={t("엔진 착수 시간")}>
         {MOVE_TIME_CHOICES.map((ms) => (
           <Chip key={ms} on={v === ms} onClick={() => set(ms)}>
             {moveTimeLabel(ms)}
@@ -100,7 +101,7 @@ export function MoveTimeControl() {
         ))}
       </ChipGroup>
       <DurationField
-        label="엔진 착수 시간"
+        label={t("엔진 착수 시간")}
         valueMs={v}
         spec={MOVE_TIME_SPEC}
         presetsMs={MOVE_TIME_CHOICES}
@@ -118,21 +119,21 @@ export function LevelControl() {
   const set = useGameStore((s) => s.setLevel);
   return (
     <Segmented
-      label="레벨"
+      label={t("레벨")}
       value={v}
       options={LEVELS.map((l) => ({
         value: l.level,
-        label: l.label,
+        label: t(l.label),
         title: l.maxNode
-          ? `한 수에 ${nodes(l.maxNode)} 노드까지`
-          : "노드 제한 없음(설정의 최대 노드)",
+          ? t("한 수에 {n} 노드까지", { n: nodes(l.maxNode) })
+          : t("노드 제한 없음(설정의 최대 노드)"),
       }))}
       onChange={set}
     />
   );
 }
 
-const secLabel = (s: number) => (s === 0 ? "무제한" : `${s}초`);
+const secLabel = (s: number) => (s === 0 ? t("무제한") : t("{n}초", { n: s }));
 
 const ANALYSIS_PRESETS_MS = ANALYSIS_SEC_CHOICES.map((s) => s * 1000);
 
@@ -143,13 +144,13 @@ export function AnalysisTimeControl() {
   return (
     <div className="timepick">
       <Segmented
-        label="분석 시간"
+        label={t("분석 시간")}
         value={v}
         options={ANALYSIS_SEC_CHOICES.map((s) => ({ value: s, label: secLabel(s) }))}
         onChange={(analysisSec) => update({ analysisSec })}
       />
       <DurationField
-        label="분석 시간"
+        label={t("분석 시간")}
         valueMs={v * 1000}
         spec={ANALYSIS_TIME_SPEC}
         presetsMs={ANALYSIS_PRESETS_MS}
@@ -164,7 +165,7 @@ export function MultiPvControl() {
   const update = useSettingsStore((s) => s.update);
   return (
     <Stepper
-      label="후보 수"
+      label={t("후보 수")}
       value={v}
       min={MULTI_PV.min}
       max={MULTI_PV.max}
@@ -178,7 +179,7 @@ export function PlayBestOnStopControl() {
   const update = useSettingsStore((s) => s.update);
   return (
     <Switch
-      label="정지하면 최선수 두기"
+      label={t("정지하면 최선수 두기")}
       on={on}
       onChange={(playBestOnStop) => update({ playBestOnStop })}
     />

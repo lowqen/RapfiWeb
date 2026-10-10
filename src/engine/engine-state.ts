@@ -20,6 +20,7 @@ import {
   type Placement,
 } from "./engine-types";
 import { toEvalView, type EvalView } from "./eval-view";
+import { t } from "../i18n/i18n";
 
 /**
  * 엔진의 화면쪽 그림자.
@@ -179,7 +180,7 @@ export function engineFs(
   bytes?: Uint8Array,
 ): Promise<FsResult> {
   if (!client || client.currentStatus === "idle" || client.currentStatus === "error") {
-    return Promise.resolve({ ok: false, error: "엔진이 떠 있지 않습니다" });
+    return Promise.resolve({ ok: false, error: t("엔진이 떠 있지 않습니다") });
   }
   return client.fs(op, path, bytes);
 }
@@ -624,7 +625,7 @@ export const useEngineStore = create<EngineState>((set, get) => {
     acquire: (owner) => {
       const s = get();
       if (s.owner)
-        return s.owner === owner ? "이미 진행 중입니다" : "엔진을 다른 작업이 쓰고 있습니다";
+        return s.owner === owner ? t("이미 진행 중입니다") : t("엔진을 다른 작업이 쓰고 있습니다");
       set({ owner });
       // 켜 둔 분석은 끈다. 도는 탐색은 다음 독점 탐색 요청이 비켜 세운다(워커가 줄 뒤의
       // 요청을 보면 앞 탐색을 멈춘다) — 그 탐색의 끝과 스냅샷은 클라이언트가 버린다.

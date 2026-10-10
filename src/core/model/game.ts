@@ -1,4 +1,5 @@
 import type { Move } from "./move";
+import { localized, msg, t } from "../../i18n/i18n";
 
 /**
  * 대국 자체가 아닌 모든 것 — `core/model/GameModels.kt` 의 이식본.
@@ -30,12 +31,12 @@ export const COMPUTER_SIDE = {
 
 export type ComputerSide = keyof typeof COMPUTER_SIDE;
 
-export const COMPUTER_SIDE_LABEL: Record<ComputerSide, string> = {
-  none: "사람 대 사람",
-  black: "컴퓨터 흑",
-  white: "컴퓨터 백",
-  both: "컴퓨터 양쪽",
-};
+export const COMPUTER_SIDE_LABEL: Readonly<Record<ComputerSide, string>> = localized({
+  none: msg("사람 대 사람"),
+  black: msg("컴퓨터 흑"),
+  white: msg("컴퓨터 백"),
+  both: msg("컴퓨터 양쪽"),
+});
 
 export function enginePlays(side: ComputerSide, color: StoneColor): boolean {
   const bits = COMPUTER_SIDE[side];
@@ -76,25 +77,26 @@ export function swappedSide(side: ComputerSide): ComputerSide {
  */
 export type OpeningProtocol = "none" | "rif" | "swapFirst";
 
-export const OPENING_LABEL: Record<OpeningProtocol, string> = {
-  none: "자유 렌주",
-  rif: "RIF 오프닝",
-  swapFirst: "첫 수 이후 교환",
-};
+export const OPENING_LABEL: Readonly<Record<OpeningProtocol, string>> = localized({
+  none: msg("자유 렌주"),
+  rif: msg("RIF 오프닝"),
+  swapFirst: msg("첫 수 이후 교환"),
+});
 
-export const OPENING_HINT: Record<OpeningProtocol, string> = {
-  none: "협상 없이 흑부터 둡니다.",
-  rif: "첫 세 수를 천원 둘레에 손으로 놓고 시작합니다.",
-  swapFirst: "흑이 한 수를 놓으면 상대가 그 색을 가져갈지 정합니다.",
-};
+export const OPENING_HINT: Readonly<Record<OpeningProtocol, string>> = localized({
+  none: msg("협상 없이 흑부터 둡니다."),
+  rif: msg("첫 세 수를 천원 둘레에 손으로 놓고 시작합니다."),
+  swapFirst: msg("흑이 한 수를 놓으면 상대가 그 색을 가져갈지 정합니다."),
+});
 
 /**
  * 왜 셋뿐인지 화면에 적는 문장. 「없습니다」로 끝내지 않고 **어디에 원인이
  * 있는지**까지 말한다 — `unsupportedRuleNotice` 와 같은 규칙이다.
  */
-export const OPENING_NOTICE =
-  "웹 버전은 Rapfi 엔진이 지원하는 렌주 규칙만 제공합니다. " +
-  "스왑2와 Soosorv-8은 현재 Rapfi에서 지원하지 않습니다.";
+export const openingNotice = (): string =>
+  t(
+    "웹 버전은 Rapfi 엔진이 지원하는 렌주 규칙만 제공합니다. 스왑2와 Soosorv-8은 현재 Rapfi에서 지원하지 않습니다.",
+  );
 
 /** 첫 세 수를 손으로 놓는 개시 — 그 안에서는 엔진에게 두라고 하지 않는다. */
 export const handEnteredOpening = (o: OpeningProtocol): boolean => o === "rif";
@@ -107,12 +109,12 @@ export const negotiates = (o: OpeningProtocol): boolean => o !== "none";
 /** 대국이 끝나는 길. 시간 초과는 대국 시계와 함께 빠졌다(시계가 없다). */
 export type GameEnd = "five" | "boardFull" | "resigned" | "drawAgreed";
 
-export const GAME_END_LABEL: Record<GameEnd, string> = {
-  five: "5목 완성",
-  boardFull: "판이 다 찼습니다",
-  resigned: "기권",
-  drawAgreed: "무승부 합의",
-};
+export const GAME_END_LABEL: Readonly<Record<GameEnd, string>> = localized({
+  five: msg("5목 완성"),
+  boardFull: msg("판이 다 찼습니다"),
+  resigned: msg("기권"),
+  drawAgreed: msg("무승부 합의"),
+});
 
 export interface GameResult {
   end: GameEnd;
@@ -122,7 +124,7 @@ export interface GameResult {
 
 export function describeResult(r: GameResult): string {
   if (r.winner === null) return GAME_END_LABEL[r.end];
-  const who = r.winner === "black" ? "흑 승" : "백 승";
+  const who = r.winner === "black" ? t("흑 승") : t("백 승");
   return `${who} · ${GAME_END_LABEL[r.end]}`;
 }
 

@@ -3,15 +3,16 @@ import { useBoardStore } from "./boardStore";
 import { useEngineStore } from "../../engine/engine-state";
 import { useSettingsStore } from "../settings/settingsStore";
 import { useBoardNotice } from "./boardNotice";
+import { localized, msg, t } from "../../i18n/i18n";
 
 /** 엔진 상태의 짧은 이름 — 분석 카드와 대국 카드가 함께 쓴다. */
-export const STATUS_TEXT: Record<string, string> = {
-  idle: "꺼짐",
-  starting: "기동 중",
-  ready: "대기",
-  searching: "탐색 중",
-  error: "오류",
-};
+export const STATUS_TEXT: Readonly<Record<string, string>> = localized({
+  idle: msg("꺼짐"),
+  starting: msg("기동 중"),
+  ready: msg("대기"),
+  searching: msg("탐색 중"),
+  error: msg("오류"),
+});
 
 /**
  * 분석 시작 — 카드의 「분석」과 이동 바의 ▶ 가 같은 길을 걷는다. 게임 리뷰가 엔진을 쥐고
@@ -23,7 +24,7 @@ export function useStartAnalysis(): () => void {
   const show = useBoardNotice((s) => s.show);
   return () => {
     if (useEngineStore.getState().owner) {
-      show(REVIEW_BUSY);
+      show(t(REVIEW_BUSY));
       return;
     }
     void analyze(placements());
@@ -40,6 +41,6 @@ export function useStopAnalysis(): () => void {
   const show = useBoardNotice((s) => s.show);
   return () => {
     const r = stopAnalysis({ playBest });
-    show(r.kind === "rejected" ? `정지했습니다 — ${r.reason}` : null);
+    show(r.kind === "rejected" ? t("정지했습니다: {why}", { why: r.reason }) : null);
   };
 }

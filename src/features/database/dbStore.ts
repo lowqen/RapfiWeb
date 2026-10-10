@@ -20,6 +20,7 @@ import { CoordMapper } from "../../engine/engine-protocol";
 import { engineFs, onDbLine, onEngineBooted, useEngineStore } from "../../engine/engine-state";
 import type { EngineCommand } from "../../engine/engine-types";
 import { useGameStore } from "../board/gameStore";
+import { t } from "../../i18n/i18n";
 import {
   DbChannel,
   replyError,
@@ -167,8 +168,8 @@ const info = (key: string, value: number): EngineCommand => ({ kind: "info", key
 /** 고치기 · 저장이 지금 엔진을 써도 되나. 분석 중이면 멈춘다. 못 쓰면 까닭. */
 function claimForWrite(): string | null {
   const e = useEngineStore.getState();
-  if (e.owner) return "리뷰나 증명이 엔진을 쓰는 중입니다 — 끝나거나 멈춘 뒤에 하세요";
-  if (useGameStore.getState().thinking) return "엔진이 착수를 생각하는 중입니다";
+  if (e.owner) return t("리뷰나 증명이 엔진을 쓰는 중입니다. 끝나거나 멈춘 뒤에 하세요");
+  if (useGameStore.getState().thinking) return t("엔진이 착수를 생각하는 중입니다");
   if (e.analyzing) e.stop();
   return null;
 }
@@ -181,14 +182,14 @@ async function storedRow() {
 export const useDbStore = create<DbState>((set, get) => {
   const note = (t: string) => set((s) => ({ log: [...s.log, t].slice(-LOG_LIMIT) }));
   lineHook = (l) => {
-    if (l.kind === "saved") note(`저장: ${l.ms}ms`);
-    else if (l.kind === "deleted") note(`지움: 기록 ${l.count}개`);
-    else if (l.kind === "error") note(`엔진 오류: ${l.text}`);
+    if (l.kind === "saved") note(t("저장: {ms}ms", { ms: l.ms }));
+    else if (l.kind === "deleted") note(t("지움: 기록 {n}개", { n: l.count }));
+    else if (l.kind === "error") note(t("엔진 오류: {text}", { text: l.text }));
   };
 
   const writable = (): string | null => {
-    if (get().status !== "on") return "DB 가 붙어 있지 않습니다";
-    if (get().settings.readonly) return "읽기 전용 DB 입니다";
+    if (get().status !== "on") return t("DB 가 붙어 있지 않습니다");
+    if (get().settings.readonly) return t("읽기 전용 DB 입니다");
     return claimForWrite();
   };
 
@@ -251,16 +252,16 @@ export const useDbStore = create<DbState>((set, get) => {
     },
 
     attach: async () => {
-      if (get().status === "attaching") return "이미 붙이는 중입니다";
+      if (get().status === "attaching") return t("이미 붙이는 중입니다");
       const e = useEngineStore.getState();
       if (e.status === "idle" || e.status === "error")
-        return "엔진이 떠 있지 않습니다 — 엔진을 먼저 시작하세요";
+        return t("엔진이 떠 있지 않습니다. 엔진을 먼저 시작하세요");
       set({ status: "attaching", message: null });
       try {
         const row = await storedRow();
         if (row) {
           const w = await engineFs("write", DB_FILE, row.bytes.slice());
-          if (!w.ok) throw new Error(w.error ?? "DB 파일을 엔진에 넣지 못했습니다");
+          if (!w.ok) throw new Error(w.error ?? t("DB 파일을 엔진에 넣지 못했습니다"));
         } else {
           await engineFs("remove", DB_FILE);
         }
@@ -278,14 +279,14 @@ export const useDbStore = create<DbState>((set, get) => {
         });
         note(
           row
-            ? `붙임: 저장된 DB ${(row.bytes.byteLength / 1024).toFixed(1)}KB`
-            : "붙임: 새 DB(비어 있음)",
+            ? t("붙임: 저장된 DB {kb}KB", { kb: (row.bytes.byteLength / 1024).toFixed(1) })
+            : t("붙임: 새 DB(비어 있음)"),
         );
         return null;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         set({ status: "error", message: msg });
-        note(`붙이기 실패: ${msg}`);
+        note(t("붙이기 실패: {msg}", { msg }));
         return msg;
       }
     },
@@ -298,30 +299,30 @@ export const useDbStore = create<DbState>((set, get) => {
       const why = claimForWrite();
       if (why) return why;
       if (!get().settings.readonly) {
-        const err = await get().save("떼기 전");
+        const err = await get().save(t("떼기 전"));
         if (err) return err;
       }
       useEngineStore.getState().send(info("usedatabase", 0));
       set({ status: "off", view: null });
-      note("뗌");
+      note(t("뗌"));
       return null;
     },
 
-    save: async (why = "저장") => {
-      if (get().status !== "on") return "DB 가 붙어 있지 않습니다";
-      if (get().settings.readonly) return "읽기 전용 DB 는 저장하지 않습니다";
+    save: async (why = t("저장")) => {
+      if (get().status !== "on") return t("DB 가 붙어 있지 않습니다");
+      if (get().settings.readonly) return t("읽기 전용 DB 는 저장하지 않습니다");
       const claim = claimForWrite();
       if (claim) return claim;
       set({ busy: true });
       try {
         const r = await engineFs("save", DB_FILE);
-        if (!r.ok || !r.bytes) return r.error ?? "엔진이 DB 파일을 돌려주지 않았습니다";
+        if (!r.ok || !r.bytes) return r.error ?? t("엔진이 DB 파일을 돌려주지 않았습니다");
         const d = db();
         const savedAt = Date.now();
         if (d) await d.dbfiles.put({ name: DB_FILE, bytes: r.bytes, savedAt });
         set({ stored: { size: r.bytes.byteLength, savedAt }, dirty: false });
         note(
-          `${why}: ${(r.bytes.byteLength / 1024).toFixed(1)}KB${d ? "" : " (이 브라우저는 저장소가 없어 이번 세션만)"}`,
+          `${why}: ${(r.bytes.byteLength / 1024).toFixed(1)}KB${d ? "" : ` ${t("(이 브라우저는 저장소가 없어 이번 세션만)")}`}`,
         );
         return null;
       } finally {
@@ -330,7 +331,7 @@ export const useDbStore = create<DbState>((set, get) => {
     },
 
     refresh: async (moves) => {
-      if (get().status !== "on") return "DB 가 붙어 있지 않습니다";
+      if (get().status !== "on") return t("DB 가 붙어 있지 않습니다");
       return readPosition(moves);
     },
 
@@ -369,7 +370,7 @@ export const useDbStore = create<DbState>((set, get) => {
       if (why) return why;
       await ch().request(deleteOne(moves), null);
       set({ dirty: true });
-      note(`이 국면의 기록을 지움(${moves.length}수)`);
+      note(t("이 국면의 기록을 지움({n}수)", { n: moves.length }));
       await reread(moves);
       return null;
     },
@@ -379,7 +380,9 @@ export const useDbStore = create<DbState>((set, get) => {
       if (why) return why;
       set({ busy: true });
       try {
-        note(`일괄 삭제: ${deleteScopeTitle(scope)} (${moves.length}수 아래)`);
+        note(
+          t("일괄 삭제: {scope} ({n}수 아래)", { scope: deleteScopeTitle(scope), n: moves.length }),
+        );
         const r = await ch().request(deleteAllCmd(scope, moves), untilDeleted, 120_000);
         set({ dirty: true });
         const err = replyError(r);
@@ -391,7 +394,7 @@ export const useDbStore = create<DbState>((set, get) => {
     },
 
     exportCsv: async () => {
-      if (get().status !== "on") return { error: "DB 가 붙어 있지 않습니다" };
+      if (get().status !== "on") return { error: t("DB 가 붙어 있지 않습니다") };
       const claim = claimForWrite();
       if (claim) return { error: claim };
       set({ busy: true });
@@ -410,12 +413,12 @@ export const useDbStore = create<DbState>((set, get) => {
         // 차례로 처리하므로 다음 명령의 답이 오면 앞 명령은 소멸자까지 끝났다. 가장 싼 질의 하나를
         // 왕복시키고 나서 읽는다(DB 저장은 `flush()` 가 파일을 닫은 뒤 알리므로 이것이 필요 없다).
         const barrier = await ch().request(queryOne([]), untilOne, 30_000);
-        if (!barrier) return { error: "엔진이 CSV 쓰기를 마쳤는지 답하지 않았습니다" };
+        if (!barrier) return { error: t("엔진이 CSV 쓰기를 마쳤는지 답하지 않았습니다") };
         const f = await engineFs("read", CSV_FILE);
         await engineFs("remove", CSV_FILE);
-        if (!f.ok || !f.bytes) return { error: f.error ?? "CSV 를 읽지 못했습니다" };
+        if (!f.ok || !f.bytes) return { error: f.error ?? t("CSV 를 읽지 못했습니다") };
         // 머리줄(`index,key,…`)은 늘 있다 — 비었으면 다 쓰기 전에 읽은 것이다.
-        if (f.bytes.byteLength === 0) return { error: "엔진이 빈 CSV 를 남겼습니다" };
+        if (f.bytes.byteLength === 0) return { error: t("엔진이 빈 CSV 를 남겼습니다") };
         return { bytes: f.bytes };
       } finally {
         set({ busy: false });
@@ -425,16 +428,16 @@ export const useDbStore = create<DbState>((set, get) => {
     exportFile: async () => {
       // 붙어 있으면 지금 것을 먼저 저장 — 내려받는 파일이 엔진의 최신이어야 한다.
       if (get().status === "on" && !get().settings.readonly) {
-        const err = await get().save("내보내기 전 저장");
+        const err = await get().save(t("내보내기 전 저장"));
         if (err) return { error: err };
       }
       const row = await storedRow();
-      return row ? { bytes: row.bytes } : { error: "저장된 DB 파일이 없습니다" };
+      return row ? { bytes: row.bytes } : { error: t("저장된 DB 파일이 없습니다") };
     },
 
     importFile: async (bytes) => {
       const d = db();
-      if (!d) return "이 브라우저는 저장소(IndexedDB)를 쓸 수 없습니다";
+      if (!d) return t("이 브라우저는 저장소(IndexedDB)를 쓸 수 없습니다");
       const wasOn = get().status === "on";
       if (wasOn) {
         const claim = claimForWrite();
@@ -445,7 +448,7 @@ export const useDbStore = create<DbState>((set, get) => {
       }
       await d.dbfiles.put({ name: DB_FILE, bytes, savedAt: Date.now() });
       set({ stored: { size: bytes.byteLength, savedAt: Date.now() } });
-      note(`가져옴: ${(bytes.byteLength / 1024).toFixed(1)}KB`);
+      note(t("가져옴: {kb}KB", { kb: (bytes.byteLength / 1024).toFixed(1) }));
       if (wasOn || (get().settings.enabled && useEngineStore.getState().status !== "idle"))
         return get().attach();
       return null;
@@ -461,7 +464,7 @@ export const useDbStore = create<DbState>((set, get) => {
       }
       await db()?.dbfiles.delete(DB_FILE);
       set({ stored: null });
-      note("저장된 DB 를 지움");
+      note(t("저장된 DB 를 지움"));
       return wasOn ? get().attach() : null;
     },
   };
@@ -532,13 +535,13 @@ export function wireDatabase(): void {
     const last = s.stored?.savedAt ?? 0;
     if (Date.now() - last < s.settings.autoSaveMinutes * 60_000) return;
     if (!idle()) return;
-    void s.save("자동 저장");
+    void s.save(t("자동 저장"));
   }, 60_000);
   document.addEventListener("visibilitychange", () => {
     const s = useDbStore.getState();
     if (document.visibilityState !== "hidden") return;
     if (s.status !== "on" || s.settings.readonly || !s.dirty || s.busy || !idle()) return;
-    void s.save("탭을 숨길 때 저장");
+    void s.save(t("탭을 숨길 때 저장"));
   });
 }
 

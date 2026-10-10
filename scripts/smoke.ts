@@ -62,7 +62,8 @@ await new Promise<void>((r) => server.listen(PORT, r));
 const browser = await chromium.launch();
 
 try {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  // 한국어 화면으로 고정한다 — 앱은 브라우저 언어가 한국어가 아니면 영어로 뜬다(W10).
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, locale: "ko-KR" });
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   page.on("console", (m) => {

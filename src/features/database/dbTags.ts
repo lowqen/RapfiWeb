@@ -1,6 +1,7 @@
 import type { TagKind } from "../../core/board/ladder";
 import { kindOf, winRatePct, type DbCell, type DbPositionValue } from "../../core/database/yixindb";
 import type { EvalView } from "../../engine/eval-view";
+import { t } from "../../i18n/i18n";
 
 /**
  * DB 의 모습을 판 · 평가 바가 그리는 모양으로 — DB 화면과 보드 화면이 함께 쓴다.
@@ -35,6 +36,7 @@ export function dbEvalView(v: DbPositionValue): EvalView {
 
 /** 국면 값 한 줄 — 「승 5」 · 「패 *」 · 「63%」 (둘 차례 관점). DB 화면과 국면 카드가 쓴다. */
 export function dbValueText(v: DbPositionValue): string {
-  if (v.stmMate !== null) return `${v.stmMate > 0 ? "승" : "패"} ${Math.abs(v.stmMate) || "*"}`;
+  if (v.stmMate !== null)
+    return `${v.stmMate > 0 ? t("승") : t("패")} ${Math.abs(v.stmMate) || "*"}`;
   return `${Math.round(v.stmWinRate * 100)}%`;
 }

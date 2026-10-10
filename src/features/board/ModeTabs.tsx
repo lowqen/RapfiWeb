@@ -1,9 +1,10 @@
 import type { KeyboardEvent } from "react";
 import { useGameStore, type BoardMode } from "./gameStore";
+import { msg, t } from "../../i18n/i18n";
 
 const TABS: readonly { mode: BoardMode; label: string; hint: string }[] = [
-  { mode: "game", label: "대국", hint: "사람 대 컴퓨터 — 엔진이 제 차례에 둡니다" },
-  { mode: "analysis", label: "분석", hint: "엔진이 국면을 읽습니다 — 판은 자유롭게 둡니다" },
+  { mode: "game", label: msg("대국"), hint: msg("사람 대 컴퓨터. 엔진이 제 차례에 둡니다") },
+  { mode: "analysis", label: msg("분석"), hint: msg("엔진이 국면을 읽고, 판은 자유롭게 둡니다") },
 ];
 
 /** 옆 칸 패널의 id — 탭이 `aria-controls` 로 가리킨다. */
@@ -24,28 +25,28 @@ export function ModeTabs() {
     // 이동 바의 ← → (기보 이동)와 겹치지 않게 여기서 멈춘다.
     e.preventDefault();
     e.stopPropagation();
-    const i = TABS.findIndex((t) => t.mode === mode);
+    const i = TABS.findIndex((tab) => tab.mode === mode);
     const next = TABS[(i + (e.key === "ArrowRight" ? 1 : TABS.length - 1)) % TABS.length]!;
     setMode(next.mode);
     e.currentTarget.querySelector<HTMLButtonElement>(`[data-mode="${next.mode}"]`)?.focus();
   };
 
   return (
-    <div className="modetabs" role="tablist" aria-label="보드 모드" onKeyDown={onKey}>
-      {TABS.map((t) => (
+    <div className="modetabs" role="tablist" aria-label={t("보드 모드")} onKeyDown={onKey}>
+      {TABS.map((tab) => (
         <button
-          key={t.mode}
+          key={tab.mode}
           type="button"
           role="tab"
           className="modetabs__tab"
-          data-mode={t.mode}
-          aria-selected={mode === t.mode}
+          data-mode={tab.mode}
+          aria-selected={mode === tab.mode}
           aria-controls={MODE_PANEL_ID}
-          tabIndex={mode === t.mode ? 0 : -1}
-          title={t.hint}
-          onClick={() => setMode(t.mode)}
+          tabIndex={mode === tab.mode ? 0 : -1}
+          title={t(tab.hint)}
+          onClick={() => setMode(tab.mode)}
         >
-          {t.label}
+          {t(tab.label)}
         </button>
       ))}
     </div>

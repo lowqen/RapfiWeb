@@ -10,7 +10,14 @@ import {
 } from "../../../core/rif/rif-parse";
 import { result } from "../../../core/model/referee";
 import { DEFAULT_SIZE } from "../../../core/model/move";
-import type { FromRifWorker, LocalGame, RifPhase, ToRifWorker } from "./protocol";
+import {
+  NO_GAMES,
+  type FromRifWorker,
+  type LocalGame,
+  type RifPhase,
+  type ToRifWorker,
+} from "./protocol";
+import { t, useLang } from "../../../i18n/i18n";
 
 /**
  * W7 팩의 화면 쪽 — 변환(워커) · 저장(IndexedDB) · 불러오기 · 내 기보 폴백.
@@ -103,7 +110,7 @@ function run(
     w.onerror = (e) => {
       w.terminate();
       if (worker === w) worker = null;
-      reject(new Error(e.message || "변환 워커가 멈췄습니다"));
+      reject(new Error(e.message || t("변환 워커가 멈췄습니다")));
     };
     w.postMessage(msg);
   });
@@ -127,11 +134,11 @@ export function buildLocalPack(games: readonly LocalGame[]): RenjuPack {
     {
       source: "local",
       date: new Date().toISOString().slice(0, 10),
-      fileName: "내 기보",
+      fileName: t("내 기보"),
       fileSize: 0,
       games: cols,
-      playerName: (id) => ({ name: id === 0 ? "흑" : "백", country: "" }),
-      ruleName: () => "내 기보",
+      playerName: (id) => ({ name: id === 0 ? t("흑") : t("백"), country: "" }),
+      ruleName: () => t("내 기보"),
       tournament: (id) => ({
         name: games[id]?.name ?? "",
         year: new Date(games[id]?.savedAt ?? 0).getFullYear(),
@@ -155,7 +162,7 @@ async function localGames(): Promise<LocalGame[]> {
     seen.add(key);
     const res = result(r.moves, r.size, true);
     out.push({
-      name: r.slot === "autosave" ? "지금 판" : r.name,
+      name: r.slot === "autosave" ? t("지금 판") : r.name,
       cells: Uint8Array.from(r.moves.map((m) => m.y * r.size + m.x)),
       res: !res
         ? RES_UNKNOWN
@@ -234,10 +241,12 @@ export const useRifStore = create<RifState>((set, get) => ({
       let saveError: string | null = null;
       try {
         const d = db();
-        if (!d) saveError = "이 브라우저는 저장소(IndexedDB)를 쓸 수 없어 이번 세션만 씁니다";
+        if (!d) saveError = t("이 브라우저는 저장소(IndexedDB)를 쓸 수 없어 이번 세션만 씁니다");
         else await d.packs.put({ name: "renjunet", pack, savedAt: Date.now() });
       } catch (e) {
-        saveError = `저장 공간이 모자라 이번 세션만 씁니다 (${e instanceof Error ? e.name : String(e)})`;
+        saveError = t("저장 공간이 모자라 이번 세션만 씁니다 ({why})", {
+          why: e instanceof Error ? e.name : String(e),
+        });
       }
       set({
         pack,
@@ -256,7 +265,16 @@ export const useRifStore = create<RifState>((set, get) => ({
       });
     } catch (e) {
       if (!get().job) return; // 취소했다
-      set({ job: null, error: e instanceof Error ? e.message : String(e) });
+      const why = e instanceof Error ? e.message : String(e);
+      set({
+        job: null,
+        error:
+          why === NO_GAMES
+            ? t(
+                "이 파일에서 대국을 찾지 못했습니다. renju.net 기보 화면의 [XML] 로 받은 파일(.rif)인지 확인해 주세요.",
+              )
+            : why,
+      });
     }
   },
 
@@ -279,6 +297,11 @@ export const useRifStore = create<RifState>((set, get) => ({
   setSource: (source) => set({ source }),
   dismiss: () => set({ done: null, error: null }),
 }));
+
+// 내 기보 팩의 이름(흑 · 백 · 내 기보)은 만들 때의 언어로 굳는다 — 언어가 바뀌면 다시 만든다(몇 판이라 수 ms).
+useLang.subscribe(() => {
+  if (useRifStore.getState().local) void useRifStore.getState().refreshLocal();
+});
 
 /** 스모크 · 실측이 변환 상태를 꺼내 보는 손잡이(`__rapfiPack()`). */
 if (typeof window !== "undefined") {

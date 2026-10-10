@@ -1,10 +1,11 @@
 import { useThemeStore, type ThemeMode } from "./theme";
+import { msg, t } from "../i18n/i18n";
 
 const ORDER: readonly ThemeMode[] = ["system", "light", "dark"];
 const LABEL: Record<ThemeMode, string> = {
-  system: "시스템",
-  light: "밝게",
-  dark: "어둡게",
+  system: msg("시스템"),
+  light: msg("밝게"),
+  dark: msg("어둡게"),
 };
 
 /** 3상태 순환. 설정 화면이 생기면(W5) 그쪽이 정식 자리고 여기는 지름길로 남는다. */
@@ -18,9 +19,9 @@ export function ThemeToggle() {
       type="button"
       className="themetoggle"
       onClick={() => set(next)}
-      title={`테마: ${LABEL[mode]} → ${LABEL[next]}`}
+      title={t("테마: {now} → {next}", { now: t(LABEL[mode]), next: t(LABEL[next]) })}
     >
-      {LABEL[mode]}
+      {t(LABEL[mode])}
     </button>
   );
 }

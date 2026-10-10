@@ -16,6 +16,7 @@ import { useDbStore } from "../database/dbStore";
 import { useProveStore } from "../research/prove/proveStore";
 import { useReviewStore } from "../research/review/reviewStore";
 import { deviceCores, resolveThreads, useSettingsStore } from "./settingsStore";
+import { t } from "../../i18n/i18n";
 
 /**
  * 데스크톱 `settings.txt` · `settings_dev.txt` 가져오기 · 내보내기(W5b) — 앱 `SettingsCodec` 의 웹판.
@@ -110,7 +111,7 @@ export async function applyWeb(w: WebSettings): Promise<string[]> {
   if (g.opening !== w.opening) {
     // 개시를 바꾸면 새 대국이다 — 둔 판을 지우지 않게 빈 판에서만.
     if (useBoardStore.getState().render.stones.length === 0) g.setOpening(w.opening);
-    else notes.push("판에 돌이 있어 개시는 그대로 둡니다(새 판에서 바꾸세요)");
+    else notes.push(t("판에 돌이 있어 개시는 그대로 둡니다(새 판에서 바꾸세요)"));
   }
   if (useBoardStore.getState().render.showNumbers !== w.showNumbers)
     useBoardStore.getState().toggleNumbers();
@@ -124,7 +125,7 @@ export async function applyWeb(w: WebSettings): Promise<string[]> {
 
   useProveStore.getState().setOptions(w.prove);
   const dbNote = await useDbStore.getState().setSettings(w.db);
-  if (dbNote) notes.push(`데이터베이스: ${dbNote}`);
+  if (dbNote) notes.push(t("데이터베이스: {note}", { note: dbNote }));
   return notes;
 }
 
@@ -143,7 +144,7 @@ export async function importDesktopFiles(files: readonly File[]): Promise<Import
     seen.push({ name: f.name, file: which });
     if (which) values = parse(text, which, values);
   }
-  if (!seen.some((s) => s.file)) return { files: seen, notes: ["settings.txt 형식이 아닙니다"] };
+  if (!seen.some((s) => s.file)) return { files: seen, notes: [t("settings.txt 형식이 아닙니다")] };
   saveBase(values);
   const { web, notes } = webFromDesktop(values, readWeb());
   notes.push(...(await applyWeb(web)));

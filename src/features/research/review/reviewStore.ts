@@ -26,6 +26,7 @@ import { useEngineStore } from "../../../engine/engine-state";
 import { useBoardStore } from "../../board/boardStore";
 import { useGameStore } from "../../board/gameStore";
 import { runReview, type ReviewPort } from "./runner";
+import { t } from "../../../i18n/i18n";
 
 /**
  * 게임 리뷰의 화면 쪽 — 앱 `ReviewRepositoryImpl` 의 큐 · 실행 · 리포트 상태.
@@ -187,8 +188,8 @@ export const useReviewStore = create<ReviewState>((set, get) => {
 
   /** 리뷰를 시작할 수 없는 까닭(main.c:7189 · 7195 · 7440 의 거절). */
   const refusal = (): string | null => {
-    if (get().running) return "이미 리뷰가 진행 중입니다";
-    if (useGameStore.getState().thinking) return "엔진이 대국 수를 계산 중입니다 — 먼저 멈추세요";
+    if (get().running) return t("이미 리뷰가 진행 중입니다");
+    if (useGameStore.getState().thinking) return t("엔진이 대국 수를 계산 중입니다. 먼저 멈추세요");
     return null;
   };
 
@@ -232,7 +233,7 @@ export const useReviewStore = create<ReviewState>((set, get) => {
       if (why) return why;
       const { render, future } = useBoardStore.getState();
       const moves = [...render.stones, ...future];
-      if (moves.length === 0) return "리뷰할 수가 없습니다";
+      if (moves.length === 0) return t("리뷰할 수가 없습니다");
       const order = Math.min(0, ...get().jobs.map((j) => j.order)) - 1;
       const name =
         useGameStore.getState().gameName ??
@@ -244,7 +245,7 @@ export const useReviewStore = create<ReviewState>((set, get) => {
       const draft = newJob(name, render.size, moves, order);
       const job = db ? await addJob(db, draft) : { ...draft, id: -Date.now() };
       set((s) => ({ jobs: [job, ...s.jobs].sort((a, b) => a.order - b.order) }));
-      note(`지금 판을 큐 맨 앞에: ${name} (${moves.length}수)`);
+      note(t("지금 판을 큐 맨 앞에: {name} ({n}수)", { name, n: moves.length }));
       return get().start();
     },
 
@@ -265,11 +266,11 @@ export const useReviewStore = create<ReviewState>((set, get) => {
         if (!moves || moves.length === 0) {
           draft.status = "failed";
           draft.result = !format
-            ? "실패: 모르는 형식(.psq · .sav · .pos)"
+            ? t("실패: 모르는 형식(.psq · .sav · .pos)")
             : moves === null
-              ? "실패: 파일을 읽을 수 없음"
-              : "실패: 수가 없음";
-          note(`큐: ${file.name} 을(를) 읽을 수 없어 건너뜁니다`);
+              ? t("실패: 파일을 읽을 수 없음")
+              : t("실패: 수가 없음");
+          note(t("큐: {name} 을(를) 읽을 수 없어 건너뜁니다", { name: file.name }));
         }
         const job = db ? await addJob(db, draft) : { ...draft, id: -Date.now() - order };
         set((s) => ({ jobs: [...s.jobs, job] }));
@@ -292,11 +293,11 @@ export const useReviewStore = create<ReviewState>((set, get) => {
       if (why) return why;
       const runnable = () =>
         get().jobs.filter((j) => j.status === "pending" || j.status === "paused");
-      if (runnable().length === 0) return "리뷰할 작업이 없습니다";
+      if (runnable().length === 0) return t("리뷰할 작업이 없습니다");
       const lock = useEngineStore.getState().acquire("review");
       if (lock) {
         return useEngineStore.getState().owner === "prove"
-          ? "국면 증명이 진행 중입니다 — 먼저 멈추세요"
+          ? t("국면 증명이 진행 중입니다. 먼저 멈추세요")
           : lock;
       }
       cancelFlag = false;
@@ -353,9 +354,11 @@ export const useReviewStore = create<ReviewState>((set, get) => {
               records: outcome.records,
               index: job.moves.length + 1,
               reviewId: row.id!,
-              result:
-                `완료 — 정확도 흑 ${percent(r.tally.blackAccuracy)} / ` +
-                `백 ${percent(r.tally.whiteAccuracy)}, ${r.moves.length}수`,
+              result: t("완료: 정확도 흑 {b} / 백 {w}, {n}수", {
+                b: percent(r.tally.blackAccuracy),
+                w: percent(r.tally.whiteAccuracy),
+                n: r.moves.length,
+              }),
             });
             set((s) => ({ reviews: [row, ...s.reviews], selectedId: row.id! }));
             publishSelection();
@@ -369,16 +372,16 @@ export const useReviewStore = create<ReviewState>((set, get) => {
               records: outcome.records,
               index: outcome.index,
               log: outcome.log,
-              result: `중단 — ${at}에서 이어서`,
+              result: t("중단: {at}에서 이어서", { at }),
             });
-            note(`게임 리뷰 취소 (${at})`);
+            note(t("게임 리뷰 취소 ({at})", { at }));
           } else {
             patchJob(id, {
               status: "paused",
               records: outcome.records,
               index: outcome.index,
               log: outcome.log,
-              result: `${outcome.reason} — ${at}에서 이어서`,
+              result: `${outcome.reason}: ${t("{at}에서 이어서", { at })}`,
             });
             note(outcome.reason);
             failed++;
@@ -390,7 +393,17 @@ export const useReviewStore = create<ReviewState>((set, get) => {
         set({ running: false, progress: null });
         if (queueTotal > 1) {
           note(
-            `분석 큐 ${cancelFlag ? "취소" : "끝"}: 리뷰 ${reviewed}, 중단 ${failed} / 총 ${queueTotal}`,
+            cancelFlag
+              ? t("분석 큐 취소: 리뷰 {r}, 중단 {f} / 총 {n}", {
+                  r: reviewed,
+                  f: failed,
+                  n: queueTotal,
+                })
+              : t("분석 큐 끝: 리뷰 {r}, 중단 {f} / 총 {n}", {
+                  r: reviewed,
+                  f: failed,
+                  n: queueTotal,
+                }),
           );
         }
       }
@@ -424,7 +437,7 @@ export const useReviewStore = create<ReviewState>((set, get) => {
       useGameStore.getState().loadMoves(row.moves.slice(0, n), {
         future: row.moves.slice(n),
         name: row.title,
-        what: `리뷰에서 ${n}수 국면으로`,
+        what: t("리뷰에서 {n}수 국면으로", { n }),
       });
     },
   };

@@ -80,7 +80,7 @@ describe("Markdown", () => {
       0,
     );
     expect(s).toContain("총 2개: 리뷰 1, 실패 0, 미실행 1");
-    expect(s).toContain("- [02] b.psq — 미실행");
+    expect(s).toContain("- [02] b.psq: 미실행");
   });
 });
 
@@ -92,7 +92,7 @@ describe("HTML", () => {
       "2026-07-28 21:00",
     );
     expect(
-      out.startsWith("<head><title>test game - RapfiWeb 게임 리포트</title>const GAME = {"),
+      out.startsWith("<head><title>test game · RapfiWeb 게임 리포트</title>const GAME = {"),
     ).toBe(true);
     expect(out.endsWith(";</html>")).toBe(true);
     expect(out).toContain('"size":15');
@@ -124,7 +124,7 @@ describe("HTML", () => {
       "x",
     );
     expect(out.startsWith("<!DOCTYPE html>")).toBe(true);
-    expect(out).toContain("<title>test game - RapfiWeb 게임 리포트</title>");
+    expect(out).toContain("<title>test game · RapfiWeb 게임 리포트</title>");
     expect(out).toMatch(/const GAME = \s*\{"title":"test game"/);
     expect(out).not.toContain("Yixin [DevBuild]");
   });

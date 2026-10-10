@@ -1,6 +1,7 @@
 import type { ComputerSide, OpeningProtocol } from "../model/game";
 import type { GradingPreset } from "../review/move-quality";
 import { DESKTOP_DEFAULTS, type DesktopValues } from "./desktop-settings";
+import { msg, t } from "../../i18n/i18n";
 
 /**
  * settings.txt 67행 ↔ 웹 설정 — 무엇이 웹의 어느 값이 되고, 무엇이 안 되는가(W5b).
@@ -69,10 +70,10 @@ export const WEB_LIMITS = {
 const RULE_TO_OPENING: Record<number, OpeningProtocol> = { 2: "none", 3: "swapFirst", 4: "rif" };
 const OPENING_TO_RULE: Record<OpeningProtocol, number> = { none: 2, swapFirst: 3, rif: 4 };
 const RULE_NAME: Record<number, string> = {
-  0: "프리스타일",
-  1: "스탠다드",
-  5: "Soosorv-8",
-  6: "스왑2",
+  0: msg("프리스타일"),
+  1: msg("스탠다드"),
+  5: "Soosorv 8",
+  6: msg("스왑2"),
 };
 const PRESETS: readonly GradingPreset[] = ["strict", "default", "lenient"];
 
@@ -154,16 +155,25 @@ export function webFromDesktop(v: DesktopValues, current: WebSettings): WebPatch
   let opening = current.opening;
   const rule = n("rule");
   if (RULE_TO_OPENING[rule]) opening = RULE_TO_OPENING[rule];
-  else notes.push(`규칙 ${rule}(${RULE_NAME[rule] ?? "?"})은 웹에 없어 개시를 그대로 둡니다`);
+  else
+    notes.push(
+      t("규칙 {rule}({name})은 웹에 없어 개시를 그대로 둡니다", {
+        rule,
+        name: t(RULE_NAME[rule] ?? "?"),
+      }),
+    );
 
   const hashMb = hashChoice(n("hashSizeMb"));
-  if (hashMb !== n("hashSizeMb")) notes.push(`해시 ${n("hashSizeMb")}MB → ${hashMb}MB(웹 선택지)`);
+  if (hashMb !== n("hashSizeMb"))
+    notes.push(t("해시 {a}MB → {b}MB(웹 선택지)", { a: n("hashSizeMb"), b: hashMb }));
   const maxDepth = Math.max(2, Math.min(WEB_LIMITS.maxDepth, n("maxDepth")));
-  if (maxDepth !== n("maxDepth")) notes.push(`최대 깊이 ${n("maxDepth")} → ${maxDepth}`);
+  if (maxDepth !== n("maxDepth"))
+    notes.push(t("최대 깊이 {a} → {b}", { a: n("maxDepth"), b: maxDepth }));
   const threads = Math.max(1, Math.min(WEB_LIMITS.threads, n("threadNum")));
-  if (threads !== n("threadNum")) notes.push(`스레드 ${n("threadNum")} → ${threads}`);
+  if (threads !== n("threadNum"))
+    notes.push(t("스레드 {a} → {b}", { a: n("threadNum"), b: threads }));
   const multiPv = Math.max(1, Math.min(WEB_LIMITS.multiPv, n("multiPv")));
-  if (multiPv !== n("multiPv")) notes.push(`멀티 PV ${n("multiPv")} → ${multiPv}`);
+  if (multiPv !== n("multiPv")) notes.push(t("멀티 PV {a} → {b}", { a: n("multiPv"), b: multiPv }));
   const nodes = n("maxNode");
 
   return {

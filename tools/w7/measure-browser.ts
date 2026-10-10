@@ -62,6 +62,7 @@ const browser = await chromium.launch();
 
 for (const c of configs) {
   const context = await browser.newContext({
+    locale: "ko-KR",
     viewport: c.viewport,
     isMobile: c.mobile,
     hasTouch: c.mobile,

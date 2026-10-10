@@ -1,5 +1,6 @@
 import type { Move } from "../model/move";
 import { moveKey } from "../model/move";
+import { msg, t } from "../../i18n/i18n";
 
 /**
  * yixindb(엔진 쪽 정석 데이터베이스)의 전선 — 앱 `DatabaseCommand.kt` · `DatabaseAggregator.kt` ·
@@ -95,14 +96,15 @@ export const deleteOne = (moves: readonly Move[]) => pos("yxdeletedatabaseone", 
 /** 일괄 삭제의 대상 — `yxdeletedatabaseall <filter>`(dbcommand.cpp `deleteDatabaseAll`). */
 export type DbDeleteFilter = "all" | "nonwl" | "wl" | "w" | "l" | "wlnostep" | "wlinstep";
 
+/** `title` 은 사전 열쇠 — 화면에는 `t(title)`. */
 export const DELETE_FILTERS: readonly { id: DbDeleteFilter; title: string }[] = [
-  { id: "all", title: "모든 분기" },
-  { id: "nonwl", title: "승/패가 아닌 기록" },
-  { id: "wl", title: "승/패 기록" },
-  { id: "w", title: "승 기록" },
-  { id: "l", title: "패 기록" },
-  { id: "wlnostep", title: "수순 없는 승/패" },
-  { id: "wlinstep", title: "N수 이내 승/패" },
+  { id: "all", title: msg("모든 분기") },
+  { id: "nonwl", title: msg("승/패가 아닌 기록") },
+  { id: "wl", title: msg("승/패 기록") },
+  { id: "w", title: msg("승 기록") },
+  { id: "l", title: msg("패 기록") },
+  { id: "wlnostep", title: msg("수순 없는 승/패") },
+  { id: "wlinstep", title: msg("N수 이내 승/패") },
 ];
 
 export interface DbDeleteScope {
@@ -120,11 +122,11 @@ export function deleteScopeWire(s: DbDeleteScope): string {
 }
 
 export function deleteScopeTitle(s: DbDeleteScope): string {
-  const t =
+  const title =
     s.filter === "wlinstep"
-      ? `${Math.max(1, Math.round(s.step))}수 이내 승/패`
-      : DELETE_FILTERS.find((f) => f.id === s.filter)!.title;
-  return s.recursive && s.filter !== "all" ? `${t} (하위 분기까지)` : t;
+      ? t("{n}수 이내 승/패", { n: Math.max(1, Math.round(s.step)) })
+      : t(DELETE_FILTERS.find((f) => f.id === s.filter)!.title);
+  return s.recursive && s.filter !== "all" ? t("{title} (하위 분기까지)", { title }) : title;
 }
 
 /** 이 국면 아래 자식 분기를 거른 대로 지운다. 엔진은 지운 뒤 `queryAll` 처럼 다시 알린다. */
@@ -293,7 +295,13 @@ export interface DbEntry {
 }
 
 export const entrySummary = (e: DbEntry): string =>
-  `${e.display ? `${e.display}: ` : ""}라벨=${e.label ?? "(없음)"}  값=${e.value}  깊이=${e.depth}  범위=${e.bound}`;
+  `${e.display ? `${e.display}: ` : ""}` +
+  t("라벨={l}  값={v}  깊이={d}  범위={b}", {
+    l: e.label ?? t("(없음)"),
+    v: e.value,
+    d: e.depth,
+    b: e.bound,
+  });
 
 export interface DbSnapshot {
   /** `moveKey` → 칸. */

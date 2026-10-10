@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { t } from "../../i18n/i18n";
 import { useEngineStore } from "../../engine/engine-state";
 import type { SearchStats } from "../../engine/engine-types";
 import { useBoardStore } from "./boardStore";
@@ -59,7 +60,7 @@ export function AnalysisPanel() {
   if (!caps.variant) {
     return (
       <section className="panel">
-        <h2 className="panel__title">엔진</h2>
+        <h2 className="panel__title">{t("엔진")}</h2>
         <p className="panel__hint">{caps.note}</p>
       </section>
     );
@@ -68,14 +69,14 @@ export function AnalysisPanel() {
   return (
     <section className="panel panel--engine">
       <h2 className="panel__title">
-        엔진 <span className="panel__badge" data-status={status} />
+        {t("엔진")} <span className="panel__badge" data-status={status} />
         <span className="panel__status">{STATUS_TEXT[status]}</span>
       </h2>
 
       <div className="panel__actions">
         {status === "idle" || status === "error" ? (
           <button type="button" onClick={() => void start()}>
-            엔진 시작
+            {t("엔진 시작")}
           </button>
         ) : null}
         <button
@@ -84,18 +85,18 @@ export function AnalysisPanel() {
           onClick={startAnalysis}
           disabled={searching || status === "starting"}
         >
-          분석
+          {t("분석")}
         </button>
         <button
           type="button"
           onClick={stopAnalysis}
           disabled={!searching}
-          title={playBest ? "정지하고 최선수를 둡니다" : "정지"}
+          title={playBest ? t("정지하고 최선수를 둡니다") : t("정지")}
         >
-          정지
+          {t("정지")}
         </button>
         <button type="button" onClick={terminate} disabled={status === "idle"}>
-          종료
+          {t("종료")}
         </button>
       </div>
 
@@ -103,23 +104,24 @@ export function AnalysisPanel() {
 
       <p className="engine-mode" data-on={analyzing || undefined}>
         <span className="engine-mode__dot" aria-hidden="true" />
-        {analyzing ? "분석 중" : "분석 꺼짐"} ·{" "}
-        {Number.isFinite(analysisMs) ? `${analysisMs / 1000}초` : "무제한"} · 후보 {multiPv}수
-        {playBest ? " · 정지하면 최선수" : ""}
+        {analyzing ? t("분석 중") : t("분석 꺼짐")} ·{" "}
+        {Number.isFinite(analysisMs) ? t("{n}초", { n: analysisMs / 1000 }) : t("무제한")} ·{" "}
+        {t("후보 {n}수", { n: multiPv })}
+        {playBest ? ` · ${t("정지하면 최선수")}` : ""}
       </p>
 
       <dl className="kv stats">
         <Stat k="DEPTH">
-          {stats.depth || "—"}
-          {stats.depth && stats.selDepth ? `-${stats.selDepth}` : ""}
+          {stats.depth || NONE()}
+          {stats.depth && stats.selDepth ? `/${stats.selDepth}` : ""}
         </Stat>
         <Stat k="EVAL">{formatEval(stats)}</Stat>
-        <Stat k="WINRATE">{stats.winRatePct === null ? "—" : `${stats.winRatePct}%`}</Stat>
+        <Stat k="WINRATE">{stats.winRatePct === null ? NONE() : `${stats.winRatePct}%`}</Stat>
         <Stat k="TIME">{formatTime(timeMs)}</Stat>
         <Stat k="NODE">{compact(stats.nodes)}</Stat>
-        <Stat k="NPS">{stats.speed === null ? "—" : `${compact(stats.speed)}/s`}</Stat>
+        <Stat k="NPS">{stats.speed === null ? NONE() : `${compact(stats.speed)}/s`}</Stat>
         <Stat k="BEST" wide>
-          {bestMove ? label(bestMove, size) : "—"}
+          {bestMove ? label(bestMove, size) : NONE()}
         </Stat>
       </dl>
 
@@ -127,14 +129,14 @@ export function AnalysisPanel() {
         <p
           className="panel__hint"
           data-instant
-          title="빈 판의 천원이나 막아야만 하는 수처럼 정해진 자리 — 깊이·평가가 없습니다"
+          title={t("빈 판의 천원이나 막아야만 하는 수처럼 정해진 자리라 깊이와 평가가 없습니다")}
         >
-          즉답 — 탐색 없이 정해진 수
+          {t("즉답: 탐색 없이 정해진 수")}
         </p>
       )}
 
       {pvs.length > 0 && (
-        <ol className="pvlist" aria-label="후보 수순(PV)">
+        <ol className="pvlist" aria-label={t("후보 수순(PV)")}>
           {pvs.map((pv) => {
             const c = colorsForTag(
               DEFAULT_PALETTE,
@@ -166,19 +168,19 @@ export function AnalysisOptions() {
   return (
     <section className="panel" aria-labelledby="analysis-options-title">
       <h2 id="analysis-options-title" className="panel__title">
-        분석 설정
+        {t("분석 설정")}
       </h2>
       <div className="panel__rows">
-        <Row id="analysisTime" label="분석 시간" note="무제한 = 정지할 때까지" wide>
+        <Row id="analysisTime" label={t("분석 시간")} note={t("무제한 = 정지할 때까지")} wide>
           <AnalysisTimeControl />
         </Row>
-        <Row id="multiPv" label="후보 수" note="YXNBEST — 1 이면 최선 수 하나만 깊게">
+        <Row id="multiPv" label={t("후보 수")} note={t("YXNBEST: 1 이면 최선 수 하나만 깊게")}>
           <MultiPvControl />
         </Row>
         <Row
           id="playBestOnStop"
-          label="정지하면 최선수 두기"
-          note="정지하는 순간의 BEST 를 둡니다(빈 판은 H8)"
+          label={t("정지하면 최선수 두기")}
+          note={t("정지하는 순간의 BEST 를 둡니다(빈 판은 H8)")}
         >
           <PlayBestOnStopControl />
         </Row>
@@ -206,6 +208,9 @@ function useSearchClock(searching: boolean): number | null {
   return searching ? ms : null;
 }
 
+/** 값이 아직 없는 칸 — 대시 대신 말로(W10). */
+const NONE = () => t("없음");
+
 function Stat({ k, wide, children }: { k: string; wide?: boolean; children: ReactNode }) {
   return (
     <div className={"stat" + (wide ? " stat--wide" : "")}>
@@ -219,12 +224,12 @@ function formatEval(stats: Pick<SearchStats, "evalCp" | "mate">): string {
   if (stats.mate !== null && stats.mate !== 0) {
     return stats.mate > 0 ? `+M${stats.mate}` : `-M${-stats.mate}`;
   }
-  return stats.evalCp === null ? "—" : String(stats.evalCp);
+  return stats.evalCp === null ? NONE() : String(stats.evalCp);
 }
 
 /** 노드·속도는 자릿수만 읽히면 된다 — 1,234,567 보다 1.23M 이 흘깃 읽힌다. */
 function compact(n: number | null): string {
-  if (n === null) return "—";
+  if (n === null) return NONE();
   if (n < 1e3) return String(n);
   if (n < 1e6) return `${(n / 1e3).toFixed(n < 1e4 ? 1 : 0)}K`;
   if (n < 1e9) return `${(n / 1e6).toFixed(n < 1e7 ? 2 : 1)}M`;
@@ -232,14 +237,14 @@ function compact(n: number | null): string {
 }
 
 function formatTime(ms: number | null): string {
-  if (ms === null) return "—";
+  if (ms === null) return NONE();
   if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
   const s = Math.floor(ms / 1000);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
 const pvRate = (winRate: number | null): string => {
-  if (winRate === null) return "—";
+  if (winRate === null) return NONE();
   const v = winRate > 1 ? winRate : winRate * 100;
   return `${Math.round(v)}%`;
 };

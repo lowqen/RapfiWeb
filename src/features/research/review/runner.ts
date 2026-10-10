@@ -13,6 +13,7 @@ import type {
   Placement,
 } from "../../../engine/engine-types";
 import { winRateFromEval } from "../../../engine/eval-view";
+import { t } from "../../../i18n/i18n";
 
 /**
  * 리뷰 파이프라인 — 앱 `ReviewRepositoryImpl` 의 루프(원본은 main.c:6964-7260
@@ -154,20 +155,21 @@ export function engineLogLine(
   size: number,
 ): string {
   const st = snap.stats;
-  const parts = [`#${index} ${index % 2 === 0 ? "흑" : "백"} 차례`];
-  if (snap.instant && snap.pvs.length === 0) parts.push("즉답");
+  const parts = [`#${index} ${index % 2 === 0 ? t("흑 차례") : t("백 차례")}`];
+  if (snap.instant && snap.pvs.length === 0) parts.push(t("즉답"));
   else {
-    parts.push(`깊이 ${st.depth}${st.selDepth !== null ? `-${st.selDepth}` : ""}`);
-    if (st.nodes !== null) parts.push(`${compact(st.nodes)} 노드`);
+    parts.push(t("깊이 {d}", { d: `${st.depth}${st.selDepth !== null ? `-${st.selDepth}` : ""}` }));
+    if (st.nodes !== null) parts.push(t("{n} 노드", { n: compact(st.nodes) }));
     if (st.timeMs !== null) parts.push(`${Math.round(st.timeMs)}ms`);
     if (st.speed !== null) parts.push(`${compact(st.speed)}/s`);
   }
   const best = rec.best ? `${String.fromCharCode(97 + rec.best.x)}${size - rec.best.y}` : "-";
-  parts.push(`최선 ${best}`);
+  parts.push(t("최선 {best}", { best }));
   if (rec.blackMate !== 0)
-    parts.push(`${rec.blackMate > 0 ? "흑" : "백"} M${Math.abs(rec.blackMate)}`);
-  else if (rec.blackWinRate !== null) parts.push(`흑 ${(rec.blackWinRate * 100).toFixed(1)}%`);
-  if (rec.gap !== null) parts.push(`차 ${Math.round(rec.gap * 100)}%p`);
+    parts.push(`${rec.blackMate > 0 ? t("흑") : t("백")} M${Math.abs(rec.blackMate)}`);
+  else if (rec.blackWinRate !== null)
+    parts.push(t("흑 {p}%", { p: (rec.blackWinRate * 100).toFixed(1) }));
+  if (rec.gap !== null) parts.push(t("차 {p}%p", { p: Math.round(rec.gap * 100) }));
   return parts.join(" · ");
 }
 
@@ -193,8 +195,16 @@ export async function runReview(
   let index = Math.max(0, Math.min(state.index, total + 1));
   const log: string[] = [...(state.log ?? [])];
 
-  if (index === 0) hooks.log(`게임 리뷰 시작: ${total + 1}개 국면, 수당 ${budgetLabel(budget)}`);
-  else hooks.log(`게임 리뷰 이어서: ${index}/${total + 1}부터, 수당 ${budgetLabel(budget)}`);
+  if (index === 0)
+    hooks.log(t("게임 리뷰 시작: {n}개 국면, 수당 {b}", { n: total + 1, b: budgetLabel(budget) }));
+  else
+    hooks.log(
+      t("게임 리뷰 이어서: {i}/{n}부터, 수당 {b}", {
+        i: index,
+        n: total + 1,
+        b: budgetLabel(budget),
+      }),
+    );
 
   while (index <= total) {
     if (hooks.isCancelled()) return { kind: "cancelled", records, index, log };
@@ -213,7 +223,9 @@ export async function runReview(
         best: null,
         gap: null,
       };
-      log.push(`#${index} 종국 — ${index % 2 === 1 ? "흑" : "백"} 승(탐색 없음)`);
+      log.push(
+        `#${index} ${index % 2 === 1 ? t("종국: 흑 승(탐색 없음)") : t("종국: 백 승(탐색 없음)")}`,
+      );
       index++;
       await hooks.onCheckpoint(records, index, log);
       continue;
@@ -228,7 +240,9 @@ export async function runReview(
     // 감시견: 엔진이 답하지 않으면 그때까지 읽은 것으로 넘어간다.
     const watchdog = setTimeout(
       () => {
-        hooks.log(`리뷰: 엔진 응답이 없어 ${index}번 국면을 그때까지의 값으로 넘깁니다`);
+        hooks.log(
+          t("리뷰: 엔진 응답이 없어 {i}번 국면을 그때까지의 값으로 넘깁니다", { i: index }),
+        );
         stopOnce();
       },
       watchdogSeconds(budget) * 1000,
@@ -246,7 +260,7 @@ export async function runReview(
     clearTimeout(watchdog);
     if (hooks.isCancelled()) return { kind: "cancelled", records, index, log };
     if (!snap) {
-      return { kind: "failed", records, index, reason: "엔진이 내려가 리뷰를 멈췄습니다", log };
+      return { kind: "failed", records, index, reason: t("엔진이 내려가 리뷰를 멈췄습니다"), log };
     }
     records[index] = recordFromSnapshot(snap, index);
     log.push(engineLogLine(index, snap, records[index]!, size));
@@ -254,6 +268,6 @@ export async function runReview(
     await hooks.onCheckpoint(records, index, log);
   }
   hooks.onProgress(total + 1, total);
-  hooks.log(`게임 리뷰 완료: ${total + 1}개 국면`);
+  hooks.log(t("게임 리뷰 완료: {n}개 국면", { n: total + 1 }));
   return { kind: "done", records, log };
 }

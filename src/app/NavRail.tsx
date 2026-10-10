@@ -1,6 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { RAIL, RESEARCH_TABS } from "./destinations";
 import { useEngineStore } from "../engine/engine-state";
+import { msg, t } from "../i18n/i18n";
 
 /**
  * 좌측 아이콘 레일 여섯 항목.
@@ -15,7 +16,7 @@ export function NavRail() {
   const status = useEngineStore((s) => s.status);
 
   return (
-    <nav className="rail" aria-label="주 메뉴">
+    <nav className="rail" aria-label={t("주 메뉴")}>
       <ul className="rail__list">
         {RAIL.map((d) => {
           const isResearch = d.path === "/research";
@@ -29,27 +30,27 @@ export function NavRail() {
                 <svg className="rail__icon" viewBox="0 0 24 24" aria-hidden="true">
                   <path d={d.icon} />
                 </svg>
-                <span className="rail__label">{d.label}</span>
+                <span className="rail__label">{t(d.label)}</span>
                 {d.path === "/engine" && (
                   <span
                     className="rail__dot"
                     data-status={status}
-                    title={`엔진: ${ENGINE_STATUS_TEXT[status]}`}
+                    title={t("엔진: {s}", { s: t(ENGINE_STATUS_TEXT[status]) })}
                   />
                 )}
               </NavLink>
 
               {isResearch && (
-                <ul className="rail__submenu" aria-label="연구 하위 항목">
-                  {RESEARCH_TABS.map((t) => (
-                    <li key={t.path}>
+                <ul className="rail__submenu" aria-label={t("연구 하위 항목")}>
+                  {RESEARCH_TABS.map((tab) => (
+                    <li key={tab.path}>
                       <NavLink
-                        to={t.path}
+                        to={tab.path}
                         className={({ isActive }) =>
                           "rail__sublink" + (isActive ? " is-active" : "")
                         }
                       >
-                        {t.label}
+                        {t(tab.label)}
                       </NavLink>
                     </li>
                   ))}
@@ -64,9 +65,9 @@ export function NavRail() {
 }
 
 const ENGINE_STATUS_TEXT = {
-  idle: "꺼짐",
-  starting: "기동 중",
-  ready: "대기",
-  searching: "탐색 중",
-  error: "오류",
+  idle: msg("꺼짐"),
+  starting: msg("기동 중"),
+  ready: msg("대기"),
+  searching: msg("탐색 중"),
+  error: msg("오류"),
 } as const;

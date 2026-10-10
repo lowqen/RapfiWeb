@@ -1,7 +1,13 @@
 /// <reference lib="webworker" />
 import { RifStreamParser } from "../../../core/rif/rif-parse";
 import { buildPack, rifInput, type RenjuPack } from "../../../core/rif/pack";
-import { overallFraction, type FromRifWorker, type RifPhase, type ToRifWorker } from "./protocol";
+import {
+  NO_GAMES,
+  overallFraction,
+  type FromRifWorker,
+  type RifPhase,
+  type ToRifWorker,
+} from "./protocol";
 
 /**
  * W7 변환 워커 — 사용자가 고른 `.rif` 를 **스트림으로** 읽어(1MB 남짓씩) 팩을 만든다. 파일 전체를
@@ -59,9 +65,8 @@ async function convertRif(file: File, partitions?: number): Promise<void> {
   }
   const parsed = parser.finish();
   if (parsed.games.count === 0) {
-    throw new Error(
-      "이 파일에서 대국을 찾지 못했습니다 — renju.net 의 «games database (XML)» 파일(.rif)인지 확인해 주세요.",
-    );
+    // 워커는 화면의 언어를 모른다 — 까닭은 부호로 넘기고 화면이 번역한다(`rifStore`).
+    throw new Error(NO_GAMES);
   }
   const games = parsed.games.count;
   const pack = buildPack(rifInput(parsed, file, performance.now() - t0), {

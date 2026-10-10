@@ -1,4 +1,5 @@
 import { move, sameMove, type Move } from "../model/move";
+import { pick, t } from "../../i18n/i18n";
 
 /**
  * 26주형 — 앱 `core/model/Opening26.kt` 의 이식(원본은 데스크톱 `mo_opening26` 분류기와
@@ -63,12 +64,14 @@ export function representative(index: number): Move[] {
 
 export const isDirect = (index: number): boolean => index < 13;
 
-/** 사람이 읽는 이름 — 웹은 한국어 화면이라 한글이다. */
-export const nameOf = (index: number): string => KOREAN[index] ?? "";
+/** 사람이 읽는 이름 — 한국어 화면은 한글, 영어 화면은 로마자(W10). */
+export const nameOf = (index: number): string => pick(KOREAN[index], ROMAJI[index]) ?? "";
 
 /** 예 "D1 한성 (Kansei)". */
 export const labelOf = (index: number): string =>
-  index === NONSTD ? "기타 (규칙외)" : `${ABBR[index]} ${KOREAN[index]} (${ROMAJI[index]})`;
+  index === NONSTD
+    ? t("기타 (규칙외)")
+    : pick(`${ABBR[index]} ${KOREAN[index]} (${ROMAJI[index]})`, `${ABBR[index]} ${ROMAJI[index]}`);
 
 /** "D1".."I13" → 0..25, 모르면 `NONSTD`. */
 export function indexOfAbbr(a: string): number {

@@ -2,6 +2,8 @@ import { useRef, useState } from "react";
 import { Segmented } from "../../../components/controls";
 import { useRifStore } from "./rifStore";
 import { RENJUNET_DOWNLOADS, fmtInt, pct } from "./format";
+import { t } from "../../../i18n/i18n";
+import { rich } from "../../../i18n/rich";
 
 /**
  * W7 의 작은 부품들 — 승·무·패 막대, `.rif` 가져오기 안내, 자료 출처 줄. 랭킹 · 오프닝 화면이
@@ -25,8 +27,15 @@ export function WdlBar({
 }) {
   const n = b + d + w;
   const title = n
-    ? `흑 승 ${fmtInt(b)} (${pct(b, n)}%) · 무 ${fmtInt(d)} (${pct(d, n)}%) · 백 승 ${fmtInt(w)} (${pct(w, n)}%)`
-    : "결과가 난 판이 없습니다";
+    ? t("흑 승 {b} ({bp}%) · 무 {d} ({dp}%) · 백 승 {w} ({wp}%)", {
+        b: fmtInt(b),
+        bp: pct(b, n),
+        d: fmtInt(d),
+        dp: pct(d, n),
+        w: fmtInt(w),
+        wp: pct(w, n),
+      })
+    : t("결과가 난 판이 없습니다");
   const score = n ? Math.round(((b + d / 2) / n) * 100) : null;
   return (
     <span className={"wdl" + (compact ? " wdl--compact" : "")} title={title} aria-label={title}>
@@ -41,19 +50,15 @@ export function WdlBar({
           <span className="wdl__none" />
         )}
       </span>
-      <span className="wdl__score tnum">{score === null ? "—" : `흑 ${score}%`}</span>
+      <span className="wdl__score tnum">
+        {score === null ? t("없음") : t("흑 {b}%", { b: score })}
+      </span>
     </span>
   );
 }
 
 /** 파일 고르기 버튼 — 숨은 `<input type=file>` 을 대신 누른다. */
-export function PickRifButton({
-  label = "파일 고르기",
-  tonal,
-}: {
-  label?: string;
-  tonal?: boolean;
-}) {
+export function PickRifButton({ label, tonal }: { label?: string; tonal?: boolean }) {
   const input = useRef<HTMLInputElement>(null);
   const importFile = useRifStore((s) => s.importFile);
   const busy = useRifStore((s) => s.job !== null);
@@ -65,7 +70,7 @@ export function PickRifButton({
         disabled={busy}
         onClick={() => input.current?.click()}
       >
-        {label}
+        {label ?? t("파일 고르기")}
       </button>
       <input
         ref={input}
@@ -94,12 +99,13 @@ export function RifImportCard({ compact }: { compact?: boolean }) {
       aria-labelledby="rifcard-title"
     >
       <h2 id="rifcard-title" className="panel__title">
-        RenjuNet 기보로 통계 만들기
+        {t("RenjuNet 기보로 통계 만들기")}
       </h2>
       {!compact && (
         <p className="rifcard__lead">
-          세계 렌주 대국 약 12만 판으로 오프닝마다 몇 판이 두어졌고 흑이 얼마나 이겼는지, 어떤
-          개시가 많이 쓰이는지를 봅니다. 파일은 한 번만 넣으면 됩니다.
+          {t(
+            "세계 렌주 대국 약 12만 판으로 오프닝마다 몇 판이 두어졌고 흑이 얼마나 이겼는지, 어떤 개시가 많이 쓰이는지를 봅니다. 파일은 한 번만 넣으면 됩니다.",
+          )}
         </p>
       )}
       <ol className="rifsteps">
@@ -108,11 +114,19 @@ export function RifImportCard({ compact }: { compact?: boolean }) {
             1
           </span>
           <span>
-            <a href={RENJUNET_DOWNLOADS} target="_blank" rel="noreferrer noopener">
-              renju.net 기보 화면
-            </a>
-            에서 <b>[XML]</b> 버튼을 눌러 기보 파일(약 43MB)을 받습니다. 옆의 [XML.GZ] 는 압축본이라
-            읽지 못합니다.
+            {rich(
+              t(
+                "{link}에서 {xml} 버튼을 눌러 기보 파일(약 43MB)을 받습니다. 옆의 [XML.GZ] 는 압축본이라 읽지 못합니다.",
+              ),
+              {
+                link: (
+                  <a href={RENJUNET_DOWNLOADS} target="_blank" rel="noreferrer noopener">
+                    {t("renju.net 기보 화면")}
+                  </a>
+                ),
+                xml: <b>[XML]</b>,
+              },
+            )}
           </span>
         </li>
         <li>
@@ -120,26 +134,31 @@ export function RifImportCard({ compact }: { compact?: boolean }) {
             2
           </span>
           <span>
-            받은 파일을 <b>이 앱의 아무 화면에나 끌어다 놓거나</b> 아래에서 고릅니다.
+            {rich(t("받은 파일을 {drop} 아래에서 고릅니다."), {
+              drop: <b>{t("이 앱의 아무 화면에나 끌어다 놓거나")}</b>,
+            })}
           </span>
         </li>
         <li>
           <span className="rifsteps__n" aria-hidden="true">
             3
           </span>
-          <span>몇 초 뒤 랭킹과 오프닝 통계가 열립니다. 다음부터는 바로 뜹니다.</span>
+          <span>{t("몇 초 뒤 랭킹과 오프닝 통계가 열립니다. 다음부터는 바로 뜹니다.")}</span>
         </li>
       </ol>
       <div className="panel__actions">
         <PickRifButton tonal />
         <a className="btn" href={RENJUNET_DOWNLOADS} target="_blank" rel="noreferrer noopener">
-          renju.net 열기
+          {t("renju.net 열기")}
         </a>
       </div>
       <p className="panel__hint rifcard__legal">
-        파일과 만든 통계는 <b>이 브라우저 안에만</b> 남고 어디로도 보내지 않습니다. RenjuNet 자료는
-        비상업 · 오프라인 사용만 허락되어 있어, 앱이 대신 받아 오거나 통계를 미리 실어 둘 수
-        없습니다.
+        {rich(
+          t(
+            "파일과 만든 통계는 {here} 남고 어디로도 보내지 않습니다. RenjuNet 자료는 비상업 · 오프라인 사용만 허락되어 있어, 앱이 대신 받아 오거나 통계를 미리 실어 둘 수 없습니다.",
+          ),
+          { here: <b>{t("이 브라우저 안에만")}</b> },
+        )}
       </p>
     </section>
   );
@@ -163,28 +182,31 @@ export function PackSourceBar() {
     <div className="packbar" data-k="pack-source">
       {pack && local ? (
         <Segmented
-          label="자료"
+          label={t("자료")}
           value={showing}
           options={[
             { value: "renjunet", label: "RenjuNet" },
-            { value: "local", label: "내 기보" },
+            { value: "local", label: t("내 기보") },
           ]}
           onChange={setSource}
         />
       ) : (
-        <span className="pill">{showing === "renjunet" ? "RenjuNet" : "내 기보"}</span>
+        <span className="pill">{showing === "renjunet" ? "RenjuNet" : t("내 기보")}</span>
       )}
       <span className="packbar__meta tnum">
         {showing === "renjunet" && pack
-          ? `${fmtInt(pack.games.id.length)}판 · ${pack.date || "날짜 모름"} 판`
+          ? t("{n}판 · {date} 판", {
+              n: fmtInt(pack.games.id.length),
+              date: pack.date || t("날짜 모름"),
+            })
           : local
-            ? `${fmtInt(local.games.id.length)}판 — 저장한 기보와 지금 판`
+            ? t("{n}판: 저장한 기보와 지금 판", { n: fmtInt(local.games.id.length) })
             : ""}
       </span>
       <span className="packbar__actions">
         {pack && asking ? (
           <span className="packbar__confirm" role="alert">
-            RenjuNet 통계를 지울까요? 다시 보려면 파일을 다시 넣어야 합니다.
+            {t("RenjuNet 통계를 지울까요? 다시 보려면 파일을 다시 넣어야 합니다.")}
             <button
               type="button"
               className="btn btn--danger"
@@ -193,21 +215,21 @@ export function PackSourceBar() {
                 void remove();
               }}
             >
-              지우기
+              {t("지우기")}
             </button>
-            <button type="button" className="btn" onClick={() => setAsking(false)}>
-              그대로 두기
+            <button type="button" className="btn" autoFocus onClick={() => setAsking(false)}>
+              {t("그대로 두기")}
             </button>
           </span>
         ) : pack ? (
           <>
-            <PickRifButton label="새 파일로 다시" />
+            <PickRifButton label={t("새 파일로 다시")} />
             <button type="button" className="btn" onClick={() => setAsking(true)}>
-              지우기
+              {t("지우기")}
             </button>
           </>
         ) : (
-          <PickRifButton label="RenjuNet 파일 넣기" tonal />
+          <PickRifButton label={t("RenjuNet 파일 넣기")} tonal />
         )}
       </span>
     </div>

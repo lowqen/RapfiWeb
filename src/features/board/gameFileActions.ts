@@ -9,6 +9,7 @@ import {
   type GameFileFormat,
 } from "../../core/model/game-file";
 import { downloadBlob } from "../../app/download";
+import { t } from "../../i18n/i18n";
 
 /**
  * 기보 파일 열기 · 저장 — 계획서 §4 「기보 파일 I/O」.
@@ -23,7 +24,11 @@ export type OpenResult = { ok: true; text: string } | { ok: false; text: string 
 
 export async function openGameFile(file: File): Promise<OpenResult> {
   const format = formatOf(file.name);
-  if (!format) return { ok: false, text: `모르는 형식입니다 (${file.name}) — .psq · .sav · .pos` };
+  if (!format)
+    return {
+      ok: false,
+      text: t("모르는 형식입니다 ({name}). 읽는 형식: .psq · .sav · .pos", { name: file.name }),
+    };
   const size = useBoardStore.getState().render.size;
   let moves;
   try {
@@ -31,12 +36,13 @@ export async function openGameFile(file: File): Promise<OpenResult> {
   } catch {
     moves = null;
   }
-  if (!moves) return { ok: false, text: `읽을 수 없는 파일입니다 (${file.name})` };
+  if (!moves)
+    return { ok: false, text: t("읽을 수 없는 파일입니다 ({name})", { name: file.name }) };
   useGameStore.getState().loadMoves(moves, {
     name: baseName(file.name),
-    what: `기보 열기 — ${file.name} (${moves.length}수)`,
+    what: `기보 열기: ${file.name} (${moves.length}수)`,
   });
-  return { ok: true, text: `${file.name} — ${moves.length}수를 올렸습니다` };
+  return { ok: true, text: t("{name}: {n}수를 올렸습니다", { name: file.name, n: moves.length }) };
 }
 
 /** 쓰는 형식 — 데스크톱이 쓰는 둘(.pos 는 읽기만). */
@@ -70,7 +76,12 @@ export async function saveGameFile(format: SaveFormat): Promise<string | null> {
     try {
       const handle = await picker({
         suggestedName: name,
-        types: [{ description: `.${format} 기보`, accept: { [MIME[format]]: [`.${format}`] } }],
+        types: [
+          {
+            description: t(".{fmt} 기보", { fmt: format }),
+            accept: { [MIME[format]]: [`.${format}`] },
+          },
+        ],
       });
       const w = await handle.createWritable();
       await w.write(blob);

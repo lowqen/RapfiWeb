@@ -1,6 +1,5 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { RouterProvider } from "react-router-dom";
 import { router } from "./app/routes";
 import "./styles/tokens.css";
 import "./styles/base.css";
@@ -13,6 +12,8 @@ import { useBoardNotice } from "./features/board/boardNotice";
 import { DEFAULT_SIZE } from "./core/model/move";
 import { loadOpeningTables } from "./data/opening-tables";
 import { wireDatabase } from "./features/database/dbStore";
+import { t } from "./i18n/i18n";
+import { Root } from "./app/Root";
 
 // 오프닝 표(4수 이름 · 흑 5수 유불리, 50KB)는 따로 떨어진 조각으로 뒤에서 받는다.
 void loadOpeningTables();
@@ -26,16 +27,16 @@ wireDatabase();
 const link = readPositionLink(location.search, DEFAULT_SIZE);
 startAutosave(undefined, undefined, link.kind === "ok" ? link.moves : null);
 if (link.kind !== "none") {
-  if (link.kind === "invalid") useBoardNotice.getState().show("링크의 국면을 읽지 못했습니다");
+  if (link.kind === "invalid") useBoardNotice.getState().show(t("링크의 국면을 읽지 못했습니다"));
   const { pathname, search, hash } = router.state.location;
   void router.navigate({ pathname, search: withoutPositionParam(search), hash }, { replace: true });
 }
 
 const root = document.getElementById("root");
-if (!root) throw new Error("#root 가 없습니다 — index.html 이 바뀌었나요?");
+if (!root) throw new Error("#root 가 없습니다: index.html 이 바뀌었나요?");
 
 createRoot(root).render(
   <StrictMode>
-    <RouterProvider router={router} />
+    <Root />
   </StrictMode>,
 );

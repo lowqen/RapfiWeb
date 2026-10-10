@@ -1,3 +1,5 @@
+import { msg, t } from "../i18n/i18n";
+
 /**
  * 레일 여섯 항목과 연구 네 탭 — 앱의 `Destinations.kt` 구조를 보존한 것.
  *
@@ -13,7 +15,7 @@
 export interface Dest {
   /** 라우트 경로. 활성 판정은 이 접두사로 한다. */
   path: string;
-  /** 레일·탭 라벨. 앱의 한국어 문구를 그대로 쓴다. */
+  /** 레일·탭 라벨 — 번역 열쇠(`msg`). 그릴 때 `t()` 한다. */
   label: string;
   /** 상단 바 부제 — 앱의 화면 설명과 같은 자리. */
   subtitle: string;
@@ -36,15 +38,20 @@ const ICON = {
 } as const;
 
 export const RAIL: readonly Dest[] = [
-  { path: "/board", label: "보드", subtitle: "대국과 분석", icon: ICON.board },
-  { path: "/research", label: "연구", subtitle: "국면을 보드 밖에서 읽는다", icon: ICON.research },
-  { path: "/database", label: "DB", subtitle: "yixindb 국면 저장소", icon: ICON.database },
-  { path: "/engine", label: "엔진", subtitle: "엔진 상태와 도구", icon: ICON.engine },
-  { path: "/joseki", label: "정석", subtitle: "오프닝 정석 노트", icon: ICON.joseki },
+  { path: "/board", label: msg("보드"), subtitle: msg("대국과 분석"), icon: ICON.board },
+  {
+    path: "/research",
+    label: msg("연구"),
+    subtitle: msg("국면을 보드 밖에서 읽는다"),
+    icon: ICON.research,
+  },
+  { path: "/database", label: "DB", subtitle: msg("yixindb 국면 저장소"), icon: ICON.database },
+  { path: "/engine", label: msg("엔진"), subtitle: msg("엔진 상태와 도구"), icon: ICON.engine },
+  { path: "/joseki", label: msg("정석"), subtitle: msg("오프닝 정석 노트"), icon: ICON.joseki },
   {
     path: "/settings",
-    label: "설정",
-    subtitle: "엔진 · 표시 · 고급",
+    label: msg("설정"),
+    subtitle: msg("엔진 · 표시 · 고급"),
     icon: ICON.settings,
   },
 ];
@@ -56,13 +63,18 @@ export const RAIL: readonly Dest[] = [
 export const RESEARCH_TABS: readonly Dest[] = [
   {
     path: "/research/review",
-    label: "리뷰·증명",
-    subtitle: "대국을 되짚고 수를 증명한다",
+    label: msg("리뷰·증명"),
+    subtitle: msg("대국을 되짚고 수를 증명한다"),
     icon: "",
   },
-  { path: "/research/explorer", label: "오프닝", subtitle: "주형과 빈도", icon: "" },
-  { path: "/research/sequence", label: "수순", subtitle: "같은 국면에 이르는 다른 길", icon: "" },
-  { path: "/research/ranking", label: "랭킹", subtitle: "기록과 순위", icon: "" },
+  { path: "/research/explorer", label: msg("오프닝"), subtitle: msg("주형과 빈도"), icon: "" },
+  {
+    path: "/research/sequence",
+    label: msg("수순"),
+    subtitle: msg("같은 국면에 이르는 다른 길"),
+    icon: "",
+  },
+  { path: "/research/ranking", label: msg("랭킹"), subtitle: msg("기록과 순위"), icon: "" },
 ];
 
 /** 지금 위치에 해당하는 레일 항목. 접두사 일치 — `/research/review` 는 «연구». */
@@ -72,10 +84,10 @@ export function activeDest(pathname: string): Dest | undefined {
 
 /** 상단 바가 쓸 제목·부제. 연구 안에서는 탭 쪽이 더 구체적이므로 그것을 쓴다. */
 export function titleFor(pathname: string): { title: string; subtitle: string } {
-  const tab = RESEARCH_TABS.find((t) => pathname.startsWith(t.path));
-  if (tab) return { title: `연구 · ${tab.label}`, subtitle: tab.subtitle };
+  const tab = RESEARCH_TABS.find((r) => pathname.startsWith(r.path));
+  if (tab) return { title: `${t("연구")} · ${t(tab.label)}`, subtitle: t(tab.subtitle) };
   const dest = activeDest(pathname);
   return dest
-    ? { title: dest.label, subtitle: dest.subtitle }
+    ? { title: t(dest.label), subtitle: t(dest.subtitle) }
     : { title: "RapfiWeb", subtitle: "" };
 }

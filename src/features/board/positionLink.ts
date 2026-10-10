@@ -2,6 +2,7 @@ import { useBoardStore } from "./boardStore";
 import { useBoardNotice } from "./boardNotice";
 import { POSITION_PARAM, encodePosition, parsePosition } from "../../core/model/position-link";
 import type { Move } from "../../core/model/move";
+import { t } from "../../i18n/i18n";
 
 /**
  * 국면 딥링크 `?p=…` 의 화면 쪽 — 계획서 §6. **전 화면 공통 쿼리**라 어느 주소에 붙어
@@ -47,8 +48,8 @@ export async function copyPositionLink(): Promise<void> {
   const notice = useBoardNotice.getState().show;
   try {
     await navigator.clipboard.writeText(url);
-    notice("이 국면의 링크를 복사했습니다");
+    notice(t("이 국면의 링크를 복사했습니다"));
   } catch {
-    window.prompt("이 국면의 링크 — 복사해 쓰세요", url);
+    window.prompt(t("이 국면의 링크입니다. 복사해 쓰세요"), url);
   }
 }

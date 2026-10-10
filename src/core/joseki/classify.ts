@@ -3,6 +3,7 @@ import { chain, gradeAt } from "../opening/opening-name";
 import { NONSTD, classify as classify26, labelOf } from "../opening/opening26";
 import type { Grade, OpeningTables } from "../opening/tables";
 import { mainLineFrom, movesTo, type JosekiTree } from "./tree";
+import { msg } from "../../i18n/i18n";
 
 /**
  * 정석의 분류 — 사람이 채우는 칸이 아니라 **국면에서 유도되는 값**(계획서 §7 «카테고리»).
@@ -25,7 +26,8 @@ export interface JosekiClass {
   grade: Grade | null;
 }
 
-export const UNCLASSIFIED = "분류 없음";
+/** 사전 열쇠 — 화면에는 `t(category)`(사용자 분류는 사전에 없으니 그대로 나온다). */
+export const UNCLASSIFIED = msg("분류 없음");
 
 /** 주 변화 수순. */
 export const mainLine = (t: JosekiTree): Move[] => movesTo(t.root, mainLineFrom(t.root));

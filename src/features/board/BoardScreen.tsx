@@ -22,6 +22,7 @@ import { useEngineStore } from "../../engine/engine-state";
 import { EMPTY_SNAPSHOT } from "../../engine/engine-types";
 import { useSettingsStore } from "../settings/settingsStore";
 import type { Move } from "../../core/model/move";
+import { t } from "../../i18n/i18n";
 
 /**
  * 보드 화면 — [대국] | [분석] 두 탭.
@@ -139,7 +140,7 @@ export function BoardScreen() {
               높이다(CSS 의 컨테이너 단위). 둘을 묶어 가운데 둔다. */}
           <div className="boardrow">
             {showEvalBar && <EvalBar empty={render.stones.length === 0} />}
-            <BoardCanvas render={render} onTap={onTap} onLongPress={markBlocked} />
+            <BoardCanvas render={render} onTap={onTap} onLongPress={markBlocked} keyboard />
           </div>
           {notice && (
             <p className="board-notice" role="status">
@@ -154,7 +155,7 @@ export function BoardScreen() {
         id={MODE_PANEL_ID}
         className="boardscreen__side"
         role="tabpanel"
-        aria-label={mode === "game" ? "대국" : "분석"}
+        aria-label={mode === "game" ? t("대국") : t("분석")}
       >
         {/* 물음은 맨 위 — 답하기 전까지 판이 잠기므로 가장 먼저 보여야 한다. 두 탭 모두. */}
         <PromptPanel />

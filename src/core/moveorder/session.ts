@@ -1,5 +1,6 @@
 import { DEFAULT_SIZE, type Move } from "../model/move";
 import { nameOf } from "../opening/opening26";
+import { t } from "../../i18n/i18n";
 import {
   MO_GUI_NODES,
   MO_MAX_STONES,
@@ -124,15 +125,16 @@ export class MoveOrderSession {
 // ── 문구 ─────────────────────────────────────────────────────────────
 
 export function headline(v: MoveOrderView): string {
-  const stones = `흑 ${v.blackCount} · 백 ${v.whiteCount}`;
-  if (v.overflow) return `${stones} — 경우의 수가 너무 많아 정확한 집계 생략`;
-  if (v.total <= 0) return `${stones} — 이 규칙에서는 만들 수 없는 배치`;
+  const stones = t("흑 {b} · 백 {w}", { b: v.blackCount, w: v.whiteCount });
+  if (v.overflow) return `${stones} · ${t("경우의 수가 너무 많아 정확한 집계 생략")}`;
+  if (v.total <= 0) return `${stones} · ${t("이 규칙에서는 만들 수 없는 배치")}`;
   if (v.variantCount > 1)
-    return `${stones} — 수순 ${formatCount(v.total)}가지 (배치 ${v.variantCount}종)`;
-  return `${stones} — 수순 ${formatCount(v.total)}가지`;
+    return `${stones} · ${t("수순 {n}가지 (배치 {k}종)", { n: formatCount(v.total), k: v.variantCount })}`;
+  return `${stones} · ${t("수순 {n}가지", { n: formatCount(v.total) })}`;
 }
 
-export const TOO_BIG = `국면이 너무 큽니다 — 색깔당 최대 ${MO_MAX_STONES}개까지.`;
+export const tooBig = (): string =>
+  t("국면이 너무 큽니다. 색깔당 최대 {n}개까지.", { n: MO_MAX_STONES });
 
 /** 만들 수 없을 때 **어느 규칙이 물었는지**가 흥미로운 부분이다(main.c:6074-6110). */
 export function note(
@@ -142,14 +144,14 @@ export function note(
   rules: MoveOrderRules,
 ): string {
   if (v.total > 0 && rules.symmetry && v.variantCount > 1) {
-    return `(회전·반전 ${v.variantCount}종을 같은 모양으로 합산)`;
+    return t("(회전·반전 {k}종을 같은 모양으로 합산)", { k: v.variantCount });
   }
   if (v.total > 0 || v.overflow || !rules.openingRule) return "";
-  if (size % 2 === 0) return "(오프닝 규칙은 홀수 판에서만 적용됩니다)";
+  if (size % 2 === 0) return t("(오프닝 규칙은 홀수 판에서만 적용됩니다)");
   const ctr = Math.floor(size / 2);
   const tengen = ctr * size + ctr;
   if (!line.some((m) => m.y * size + m.x === tengen)) {
-    return "(천원에 흑돌이 없습니다: 1수는 반드시 중앙이어야 합니다)";
+    return t("(천원에 흑돌이 없습니다: 1수는 반드시 중앙이어야 합니다)");
   }
   const r2 = rule2Cells(size);
   if (rules.move2Fix && r2) {
@@ -161,11 +163,11 @@ export function note(
     );
     if (!hasR2) {
       return rules.symmetry
-        ? "(어떤 배치에서도 2수가 H9/I9에 오지 않습니다)"
-        : "(H9/I9에 백돌이 없습니다 — 환원을 켜 보세요)";
+        ? t("(어떤 배치에서도 2수가 H9/I9에 오지 않습니다)")
+        : t("(H9/I9에 백돌이 없습니다. 환원을 켜 보세요)");
     }
   }
-  return "(3×3 / 5×5 / 7×7 상자를 만족하는 수순이 없습니다)";
+  return t("(3×3 / 5×5 / 7×7 상자를 만족하는 수순이 없습니다)");
 }
 
 /**
@@ -184,15 +186,19 @@ export function openingLabel(
   const id = opening26Of(src[0]!, src[1]!, src[2]!, size);
   if (id === null) return null;
   const tag = id < 13 ? `D${id + 1}` : `I${id - 12}`;
-  return `주형: ${nameOf(id)} (${tag})`;
+  return t("주형: {name} ({tag})", { name: nameOf(id), tag });
 }
 
 export const breadcrumb = (v: MoveOrderView, size = DEFAULT_SIZE): string =>
-  v.prefix.length === 0 ? "처음부터" : `수순: ${v.prefix.map((c) => cellName(c, size)).join(" ")}`;
+  v.prefix.length === 0
+    ? t("처음부터")
+    : t("수순: {line}", { line: v.prefix.map((c) => cellName(c, size)).join(" ") });
 
 export function orientation(v: MoveOrderView, rules: MoveOrderRules): string | null {
   if (!rules.symmetry || v.variantCount <= 1) return null;
-  return v.aliveCount === 1 ? xformName(v.soleAlive ?? 0) : `배치 ${v.aliveCount}종 진행 중`;
+  return v.aliveCount === 1
+    ? xformName(v.soleAlive ?? 0)
+    : t("배치 {k}종 진행 중", { k: v.aliveCount });
 }
 
 /**

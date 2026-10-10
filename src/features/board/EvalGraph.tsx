@@ -2,6 +2,7 @@ import { useMemo, useState, type KeyboardEvent } from "react";
 import { moveKey, label, type Move } from "../../core/model/move";
 import type { EvalView } from "../../engine/eval-view";
 import { useBoardStore } from "./boardStore";
+import { t } from "../../i18n/i18n";
 import { useGameStore } from "./gameStore";
 import { useEvalHistory } from "./currentAnalysis";
 import { buildSeries, evalAtOrBefore, showMarkers, type SeriesPoint } from "./evalSeries";
@@ -88,14 +89,14 @@ export function EvalGraph() {
   };
 
   const readout = shownEval
-    ? `${describe(shownEval.view)}${shownEval.ply === shown ? "" : ` (${shownEval.ply}수)`}`
-    : "—";
+    ? `${describe(shownEval.view)}${shownEval.ply === shown ? "" : ` (${t("{n}수째", { n: shownEval.ply })})`}`
+    : t("평가 없음");
   const markers = showMarkers(series);
 
   return (
     <section className="panel evalgraph" aria-labelledby="evalgraph-title">
       <h2 id="evalgraph-title" className="panel__title">
-        형세 그래프
+        {t("형세 그래프")}
         <span className="panel__status tnum">{plyLabel(shown, line, size)}</span>
       </h2>
       <p className="evalgraph__readout tnum" aria-live="polite">
@@ -106,7 +107,7 @@ export function EvalGraph() {
         viewBox={`0 0 ${W} ${H}`}
         role="slider"
         tabIndex={0}
-        aria-label="형세 그래프 — 수를 고르면 그 국면으로 갑니다"
+        aria-label={t("형세 그래프. 수를 고르면 그 국면으로 갑니다")}
         aria-valuemin={0}
         aria-valuemax={n}
         aria-valuenow={shown}
@@ -130,7 +131,7 @@ export function EvalGraph() {
               y2={y(v)}
             />
             <text className="evalgraph__tick" x={PAD.left - 6} y={y(v) + 3} textAnchor="end">
-              {v === 100 ? "흑" : v === 0 ? "백" : "50"}
+              {v === 100 ? t("흑") : v === 0 ? t("백") : "50"}
             </text>
           </g>
         ))}
@@ -139,7 +140,7 @@ export function EvalGraph() {
         </text>
         {n > 0 && (
           <text className="evalgraph__tick" x={W - PAD.right} y={H - 4} textAnchor="end">
-            {n}수
+            {t("{n}수", { n })}
           </text>
         )}
 
@@ -192,18 +193,21 @@ export function EvalGraph() {
           </>
         )}
       </svg>
-      {series.length === 0 && <p className="panel__hint">분석하면 수마다 쌓입니다</p>}
+      {series.length === 0 && <p className="panel__hint">{t("분석하면 수마다 쌓입니다")}</p>}
     </section>
   );
 }
 
 function describe(v: EvalView): string {
-  if (v.mate) return `${v.mate.winner === "black" ? "흑" : "백"} ${v.mate.plies}수 외통`;
-  return `흑 ${Math.round(v.blackPct)}%`;
+  if (v.mate)
+    return v.mate.winner === "black"
+      ? t("흑 {n}수 외통", { n: v.mate.plies })
+      : t("백 {n}수 외통", { n: v.mate.plies });
+  return t("흑 {b}%", { b: Math.round(v.blackPct) });
 }
 
 function plyLabel(ply: number, line: readonly Move[], size: number): string {
-  if (ply === 0) return "빈 판";
+  if (ply === 0) return t("빈 판");
   const m = line[ply - 1];
-  return m ? `${ply}수 ${label(m, size)}` : `${ply}수`;
+  return m ? `${t("{n}수째", { n: ply })} ${label(m, size)}` : t("{n}수째", { n: ply });
 }

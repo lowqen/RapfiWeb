@@ -1,4 +1,5 @@
 import { DEFAULT_SIZE, move, type Move } from "../model/move";
+import { pick } from "../../i18n/i18n";
 import { keyOf as posKeyOf } from "../model/pos-key";
 import { MAX_PLY, keyOf as frameKeyOf } from "./frame";
 
@@ -34,6 +35,9 @@ export interface Grade {
   /** 안쪽 점의 색, 없으면 `null`. */
   readonly dot: string | null;
 }
+
+/** 등급 이름 — 지금 언어로(표에 두 언어가 다 있다). */
+export const gradeName = (g: Grade): string => pick(g.ko, g.en);
 
 export const gradeLabel = (g: Grade): string => (g.code >= 0 ? `+${g.code}` : `${g.code}`);
 

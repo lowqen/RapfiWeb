@@ -158,7 +158,7 @@ function describe(e: unknown): string {
   if (e && typeof e === "object") {
     const o = e as Record<string, unknown>;
     if (o.name === "ExitStatus" || typeof o.status === "number") {
-      return `엔진이 종료했습니다 (ExitStatus ${String(o.status)}) — 분석 중 exit 가 불렸습니다`;
+      return `엔진이 종료했습니다 (ExitStatus ${String(o.status)}): 분석 중 exit 가 불렸습니다`;
     }
     try {
       return JSON.stringify(e) ?? String(e);
@@ -583,7 +583,7 @@ async function boot(msg: Extract<ToWorker, { type: "boot" }>) {
   if (msg.weights) post({ type: "phase", phase: "engine" });
   mod = await factory(opts);
   if (typeof mod.sendCommand !== "function") {
-    throw new Error("Module.sendCommand 가 없습니다 — preamble.js 가 빠진 빌드입니다");
+    throw new Error("Module.sendCommand 가 없습니다: preamble.js 가 빠진 빌드입니다");
   }
 
   // 답을 기다릴 자리를 **보내기 전에** 건다. 단일 변형은 답이 sendCommand 안에서
@@ -664,7 +664,7 @@ const WARMUP_GRACE_MS = 20_000;
 async function warmup(budgetMs: number): Promise<number> {
   const t = performance.now();
   const turn = Math.max(MIN_SLICE_MS, Math.round(budgetMs));
-  pushConsole(`· 예열 탐색 ${turn}ms — 가중치 풀기와 JIT 승격을 첫 요청 앞으로 당긴다`);
+  pushConsole(`· 예열 탐색 ${turn}ms: 가중치 풀기와 JIT 승격을 첫 요청 앞으로 당긴다`);
   warming = true;
   try {
     sendCommand(["INFO timeout_match 0"]);
@@ -699,7 +699,7 @@ async function warmup(budgetMs: number): Promise<number> {
     sliceMoves = null;
   }
   const ms = Math.round(performance.now() - t);
-  pushConsole(`· 예열 끝 — ${ms}ms`);
+  pushConsole(`· 예열 끝: ${ms}ms`);
   return ms;
 }
 

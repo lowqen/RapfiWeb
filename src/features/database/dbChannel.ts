@@ -1,6 +1,7 @@
 import { DbAggregator, type DbLine, type DbSnapshot } from "../../core/database/yixindb";
 import type { Move } from "../../core/model/move";
 import type { EngineCommand } from "../../engine/engine-types";
+import { t } from "../../i18n/i18n";
 
 /**
  * 엔진과 yixindb 가 말하는 길 하나 — 명령을 보내고, 그 명령의 끝을 알리는 줄을 기다린다.
@@ -104,5 +105,5 @@ export const untilWrote = (l: DbLine) => l.kind === "wrote";
 /** 답의 첫 오류 글, 없으면 null. */
 export const replyError = (r: DbReply | null): string | null =>
   r === null
-    ? "엔진이 답하지 않았습니다(DB 가 붙어 있지 않을 수 있습니다)"
+    ? t("엔진이 답하지 않았습니다(DB 가 붙어 있지 않을 수 있습니다)")
     : ((r.lines.find((l) => l.kind === "error") as { text: string } | undefined)?.text ?? null);

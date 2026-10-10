@@ -125,7 +125,7 @@ export async function loadWeights(
     notes.push(`받은 가중치가 맞지 않아(${bad}) HTTP 캐시를 건너뛰고 다시 받습니다`);
     buf = await download(spec, deps, { cache: "reload" });
     bad = await verify(buf, spec, deps);
-    if (bad) throw new Error(`가중치 무결성 검사 실패 — ${bad} (${spec.url})`);
+    if (bad) throw new Error(`가중치 무결성 검사 실패: ${bad} (${spec.url})`);
   }
 
   if (cache) {

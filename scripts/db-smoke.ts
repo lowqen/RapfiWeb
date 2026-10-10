@@ -155,6 +155,8 @@ async function tapDbBoard(page: Page, x: number, y: number) {
 await new Promise<void>((r) => server.listen(PORT, r));
 const browser = await chromium.launch();
 const context = await browser.newContext({
+  // 화면 문구를 한국어로 고정한다 — 앱은 브라우저 언어가 한국어가 아니면 영어로 뜬다(W10).
+  locale: "ko-KR",
   viewport: { width: 1280, height: 1400 },
   acceptDownloads: true,
 });

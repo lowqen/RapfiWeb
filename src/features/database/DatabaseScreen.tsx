@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NumberField, Segmented, Switch } from "../../components/controls";
+import { ConfirmBox } from "../../components/ConfirmBox";
 import { downloadBlob, stamp } from "../../app/download";
 import { BoardCanvas } from "../../core/board/BoardCanvas";
 import { emptyRender, type BoardRender } from "../../core/board/board-renderer";
@@ -20,6 +21,7 @@ import { useEngineStore } from "../../engine/engine-state";
 import { useBoardStore } from "../board/boardStore";
 import { DB_FILE, useDbStore } from "./dbStore";
 import { dbCellTag, dbValueText } from "./dbTags";
+import { msg, t } from "../../i18n/i18n";
 
 /**
  * 데이터베이스(W8) — 엔진의 yixindb. 앱 `DatabaseScreen` · 데스크톱 `show_database` 의 이식.
@@ -29,11 +31,11 @@ import { dbCellTag, dbValueText } from "./dbTags";
  */
 
 const TAGS = [
-  { value: "-", label: "없음" },
-  { value: "W", label: "W 승" },
-  { value: "L", label: "L 패" },
-  { value: "D", label: "D 무" },
-  { value: "X", label: "X 금지" },
+  { value: "-", label: msg("없음") },
+  { value: "W", label: msg("W 승") },
+  { value: "L", label: msg("L 패") },
+  { value: "D", label: msg("D 무") },
+  { value: "X", label: msg("X 금지") },
 ] as const;
 
 const fmtSize = (n: number) =>
@@ -113,31 +115,32 @@ export function DatabaseScreen() {
 
   const ask = (text: string, run: () => Promise<string | null>) => {
     if (s.settings.confirmDeleteAll) setConfirm({ text, run });
-    else void run().then((m) => tell(m, "지웠습니다"));
+    else void run().then((m) => tell(m, t("지웠습니다")));
   };
 
   return (
     <div className="review database">
-      <section className="panel" aria-label="데이터베이스">
+      <section className="panel" aria-label={t("데이터베이스")} aria-busy={s.busy}>
         <h2 className="panel__title">
-          데이터베이스 (yixindb){" "}
+          {t("데이터베이스")} (yixindb){" "}
           <span className="panel__status" data-k="db-status">
             {s.status === "on"
               ? ro
-                ? "붙음 · 읽기 전용"
-                : "붙음"
+                ? t("붙음 · 읽기 전용")
+                : t("붙음")
               : s.status === "attaching"
-                ? "붙이는 중…"
+                ? t("붙이는 중…")
                 : s.status === "error"
-                  ? "붙이지 못함"
-                  : "꺼짐"}
+                  ? t("붙이지 못함")
+                  : t("꺼짐")}
           </span>
         </h2>
         <p className="panel__hint">
-          엔진이 국면마다 증명된 승패 · 값 · 주석을 쌓는 데이터베이스입니다. 파일은 이
-          브라우저(IndexedDB)에 두고, 엔진이 뜰 때 엔진 메모리에 올립니다.{" "}
-          <b>저장하지 않은 변경은 엔진을 다시 띄우면 사라집니다</b>— 자동 저장을 켜 두거나 «지금
-          저장»을 누르세요.
+          {t(
+            "엔진이 국면마다 증명된 승패 · 값 · 주석을 쌓는 데이터베이스입니다. 파일은 이 브라우저(IndexedDB)에 두고, 엔진이 뜰 때 엔진 메모리에 올립니다.",
+          )}{" "}
+          <b>{t("저장하지 않은 변경은 엔진을 다시 띄우면 사라집니다.")}</b>{" "}
+          {t("자동 저장을 켜 두거나 «지금 저장»을 누르세요.")}
         </p>
         {s.message && (
           <p className="panel__hint" role="alert">
@@ -145,64 +148,64 @@ export function DatabaseScreen() {
           </p>
         )}
         <div className="review__row">
-          <span className="review__label">DB 사용</span>
+          <span className="review__label">{t("DB 사용")}</span>
           <Switch
-            label="DB 사용"
+            label={t("DB 사용")}
             on={s.settings.enabled}
             onChange={(enabled) => void s.setSettings({ enabled }).then((m) => tell(m))}
           />
         </div>
         <div className="review__row">
-          <span className="review__label">읽기 전용</span>
+          <span className="review__label">{t("읽기 전용")}</span>
           <Switch
-            label="읽기 전용"
+            label={t("읽기 전용")}
             on={ro}
             onChange={(readonly) => void s.setSettings({ readonly })}
           />
         </div>
         <div className="review__row">
-          <span className="review__label">자동 저장</span>
+          <span className="review__label">{t("자동 저장")}</span>
           <Switch
-            label="자동 저장"
+            label={t("자동 저장")}
             on={s.settings.autoSave}
             onChange={(autoSave) => void s.setSettings({ autoSave })}
           />
         </div>
         {s.settings.autoSave && (
           <div className="review__row">
-            <span className="review__label">저장 간격</span>
+            <span className="review__label">{t("저장 간격")}</span>
             <NumberField
-              label="자동 저장 간격(분)"
+              label={t("자동 저장 간격(분)")}
               value={s.settings.autoSaveMinutes}
               min={1}
               max={1440}
-              unit="분"
+              unit={t("분")}
               onCommit={(autoSaveMinutes) => void s.setSettings({ autoSaveMinutes })}
             />
           </div>
         )}
         <div className="review__row">
-          <span className="review__label">칸 글자를 태그보다 먼저</span>
+          <span className="review__label">{t("칸 글자를 태그보다 먼저")}</span>
           <Switch
-            label="칸 글자를 태그보다 먼저"
+            label={t("칸 글자를 태그보다 먼저")}
             on={s.settings.showBoardText}
             onChange={(showBoardText) => void s.setSettings({ showBoardText })}
           />
         </div>
         <div className="review__row">
-          <span className="review__label">일괄 삭제 전에 묻기</span>
+          <span className="review__label">{t("일괄 삭제 전에 묻기")}</span>
           <Switch
-            label="일괄 삭제 전에 묻기"
+            label={t("일괄 삭제 전에 묻기")}
             on={s.settings.confirmDeleteAll}
             onChange={(confirmDeleteAll) => void s.setSettings({ confirmDeleteAll })}
           />
         </div>
         <p className="panel__hint tnum" data-k="db-stored">
-          저장된 파일:{" "}
+          {t("저장된 파일:")}{" "}
           {s.stored
             ? `${DB_FILE} ${fmtSize(s.stored.size)} · ${new Date(s.stored.savedAt).toLocaleString()}`
-            : "없음(붙이면 빈 DB 로 시작)"}
-          {on && s.dirty && !ro ? " · 저장 안 된 변경 있음" : ""}
+            : t("없음(붙이면 빈 DB 로 시작)")}
+          {on && s.dirty && !ro ? ` · ${t("저장 안 된 변경 있음")}` : ""}
         </p>
         <div className="panel__actions">
           {engineStatus === "idle" || engineStatus === "error" ? (
@@ -211,16 +214,16 @@ export function DatabaseScreen() {
               className="button--primary"
               onClick={() => void useEngineStore.getState().start()}
             >
-              엔진 시작
+              {t("엔진 시작")}
             </button>
           ) : (
             s.settings.enabled &&
             !on && (
               <button
                 type="button"
-                onClick={() => void s.attach().then((m) => tell(m, "붙였습니다"))}
+                onClick={() => void s.attach().then((m) => tell(m, t("붙였습니다")))}
               >
-                다시 붙이기
+                {t("다시 붙이기")}
               </button>
             )
           )}
@@ -228,22 +231,23 @@ export function DatabaseScreen() {
             type="button"
             className="button--tonal"
             disabled={!on || ro || s.busy}
-            onClick={() => void s.save().then((m) => tell(m, "저장했습니다"))}
+            onClick={() => void s.save().then((m) => tell(m, t("저장했습니다")))}
           >
-            지금 저장
+            {t("지금 저장")}
           </button>
         </div>
       </section>
 
-      <section className="panel" aria-label="DB 파일">
-        <h2 className="panel__title">파일</h2>
+      <section className="panel" aria-label={t("DB 파일")}>
+        <h2 className="panel__title">{t("파일")}</h2>
         <p className="panel__hint">
-          데스크톱 · 앱의 <code>rapfi.db</code> 를 그대로 주고받습니다. CSV 는 엔진의{" "}
-          <code>dbtotxt all</code> 형식입니다.
+          {t(
+            "데스크톱 · 앱의 rapfi.db 를 그대로 주고받습니다. CSV 는 엔진의 dbtotxt all 형식입니다.",
+          )}
         </p>
         <div className="panel__actions">
           <button type="button" disabled={s.busy} onClick={() => fileInput.current?.click()}>
-            .db 올리기
+            {t(".db 올리기")}
           </button>
           <button
             type="button"
@@ -255,7 +259,7 @@ export function DatabaseScreen() {
               })
             }
           >
-            .db 내려받기
+            {t(".db 내려받기")}
           </button>
           <button
             type="button"
@@ -267,7 +271,7 @@ export function DatabaseScreen() {
               })
             }
           >
-            CSV 내보내기
+            {t("CSV 내보내기")}
           </button>
           <button
             type="button"
@@ -275,12 +279,14 @@ export function DatabaseScreen() {
             disabled={s.busy || (!s.stored && !on)}
             onClick={() =>
               setConfirm({
-                text: "저장된 DB 파일을 지우고 빈 DB 로 시작합니다. 되돌릴 수 없습니다 — 먼저 내려받아 두세요.",
+                text: t(
+                  "저장된 DB 파일을 지우고 빈 DB 로 시작합니다. 되돌릴 수 없습니다. 먼저 내려받아 두세요.",
+                ),
                 run: () => s.clearFile(),
               })
             }
           >
-            저장된 DB 지우기
+            {t("저장된 DB 지우기")}
           </button>
           <input
             ref={fileInput}
@@ -294,32 +300,33 @@ export function DatabaseScreen() {
               void f
                 .arrayBuffer()
                 .then((b) => s.importFile(new Uint8Array(b)))
-                .then((m) => tell(m, `${f.name} 을(를) 가져왔습니다`));
+                .then((m) => tell(m, t("{name} 을(를) 가져왔습니다", { name: f.name })));
             }}
           />
         </div>
       </section>
 
-      <section className="panel" aria-label="이 국면">
+      <section className="panel" aria-label={t("이 국면")}>
         <h2 className="panel__title">
-          이 국면{" "}
+          {t("이 국면")}{" "}
           <span className="panel__status tnum">
-            {stones.length}수 · {stones.length % 2 === 0 ? "흑" : "백"} 차례
+            {t("{n}수", { n: stones.length })} ·{" "}
+            {stones.length % 2 === 0 ? t("흑 차례") : t("백 차례")}
           </span>
         </h2>
         {!on ? (
-          <p className="panel__hint">DB 가 붙으면 이 판의 기록을 읽습니다.</p>
+          <p className="panel__hint">{t("DB 가 붙으면 이 판의 기록을 읽습니다.")}</p>
         ) : (
           <>
             <p className="panel__hint tnum" data-k="db-value">
               {snap
-                ? `기록된 자식 ${snap.cells.size}개` +
-                  (value ? ` · DB 값: ${dbValueText(value)} (둘 차례)` : "")
-                : "읽는 중…"}
+                ? t("기록된 자식 {n}개", { n: snap.cells.size }) +
+                  (value ? ` · ${t("DB 값: {v} (둘 차례)", { v: dbValueText(value) })}` : "")
+                : t("읽는 중…")}
             </p>
             {snap?.entry && (
               <p className="panel__hint tnum" data-k="db-entry">
-                이 국면의 기록 — {entrySummary(snap.entry)}
+                {t("이 국면의 기록: {e}", { e: entrySummary(snap.entry) })}
               </p>
             )}
           </>
@@ -328,6 +335,7 @@ export function DatabaseScreen() {
           <BoardCanvas
             render={render}
             zoomable={false}
+            keyboard
             onTap={(m) => {
               if (occupied.has(moveKey(m, board.size))) return;
               setPicked((p) => (p && sameMove(p, m) ? null : m));
@@ -337,10 +345,14 @@ export function DatabaseScreen() {
         {picked && (
           <div className="db__picked">
             <p className="panel__hint tnum">
-              고른 칸 {moveLabel(picked, board.size)}
+              {t("고른 칸 {m}", { m: moveLabel(picked, board.size) })}:{" "}
               {pickedCell
-                ? ` — 태그 ${pickedCell.tag || "없음"}, 값 ${pickedCell.value}, 깊이 ${pickedCell.depth}`
-                : " — 기록 없음"}
+                ? t("태그 {tag}, 값 {v}, 깊이 {d}", {
+                    tag: pickedCell.tag || t("없음"),
+                    v: pickedCell.value,
+                    d: pickedCell.depth,
+                  })
+                : t("기록 없음")}
             </p>
             <div className="panel__actions">
               <button
@@ -351,14 +363,14 @@ export function DatabaseScreen() {
                   setPicked(null);
                 }}
               >
-                이 수 두기
+                {t("이 수 두기")}
               </button>
               <input
                 className="db__label"
-                aria-label="칸 글자"
+                aria-label={t("칸 글자")}
                 maxLength={LABEL_MAX}
                 value={labelText}
-                placeholder="칸 글자"
+                placeholder={t("칸 글자")}
                 disabled={!on || ro}
                 onChange={(e) => setLabelText(e.currentTarget.value)}
               />
@@ -368,19 +380,21 @@ export function DatabaseScreen() {
                 onClick={() =>
                   void s
                     .setLabel(stones, picked, labelText)
-                    .then((m) => tell(m, "칸 글자를 적었습니다"))
+                    .then((m) => tell(m, t("칸 글자를 적었습니다")))
                 }
               >
-                칸 글자 적기
+                {t("칸 글자 적기")}
               </button>
               <button
                 type="button"
                 disabled={!on || ro || !pickedCell?.text}
                 onClick={() =>
-                  void s.setLabel(stones, picked, "").then((m) => tell(m, "칸 글자를 지웠습니다"))
+                  void s
+                    .setLabel(stones, picked, "")
+                    .then((m) => tell(m, t("칸 글자를 지웠습니다")))
                 }
               >
-                지우기
+                {t("지우기")}
               </button>
             </div>
           </div>
@@ -389,7 +403,7 @@ export function DatabaseScreen() {
         {on && (
           <>
             <label className="db__comment">
-              <span className="review__label">국면 주석</span>
+              <span className="review__label">{t("국면 주석")}</span>
               <textarea
                 rows={3}
                 value={comment}
@@ -402,32 +416,33 @@ export function DatabaseScreen() {
                 type="button"
                 disabled={ro || comment === (snap?.comment ?? "")}
                 onClick={() =>
-                  void s.setComment(stones, comment).then((m) => tell(m, "주석을 적었습니다"))
+                  void s.setComment(stones, comment).then((m) => tell(m, t("주석을 적었습니다")))
                 }
               >
-                주석 적기
+                {t("주석 적기")}
               </button>
             </div>
 
-            <h3 className="db__sub">이 국면의 기록 고치기</h3>
+            <h3 className="db__sub">{t("이 국면의 기록 고치기")}</h3>
             <p className="panel__hint">
-              라벨은 <b>이 국면으로 둔 쪽</b>의 관점입니다 — 둘 차례가 이기는 국면은 L
-              입니다(데스크톱과 같음).
+              {t(
+                "라벨은 이 국면으로 둔 쪽의 관점입니다. 둘 차례가 이기는 국면은 L 입니다(데스크톱과 같음).",
+              )}
             </p>
             <div className="review__row">
-              <span className="review__label">라벨</span>
+              <span className="review__label">{t("라벨")}</span>
               <Segmented
-                label="라벨"
+                label={t("라벨")}
                 value={rec.tag}
-                options={TAGS.map((t) => ({ value: t.value, label: t.label }))}
+                options={TAGS.map((g) => ({ value: g.value, label: t(g.label) }))}
                 onChange={(tag) => setRec((r) => ({ ...r, tag }))}
                 disabled={ro}
               />
             </div>
             <div className="review__row">
-              <span className="review__label">값</span>
+              <span className="review__label">{t("값")}</span>
               <NumberField
-                label="값"
+                label={t("값")}
                 value={rec.value}
                 min={-30000}
                 max={30000}
@@ -436,9 +451,9 @@ export function DatabaseScreen() {
               />
             </div>
             <div className="review__row">
-              <span className="review__label">깊이</span>
+              <span className="review__label">{t("깊이")}</span>
               <NumberField
-                label="깊이"
+                label={t("깊이")}
                 value={rec.depth}
                 min={0}
                 max={255}
@@ -457,10 +472,10 @@ export function DatabaseScreen() {
                       value: rec.value,
                       depth: rec.depth,
                     })
-                    .then((m) => tell(m, "기록을 적었습니다"))
+                    .then((m) => tell(m, t("기록을 적었습니다")))
                 }
               >
-                셋 다 적기
+                {t("셋 다 적기")}
               </button>
               <button
                 type="button"
@@ -468,10 +483,10 @@ export function DatabaseScreen() {
                 onClick={() =>
                   void s
                     .setRecord(stones, MASK_TAG, { tag: rec.tag === "-" ? null : rec.tag })
-                    .then((m) => tell(m, "라벨을 적었습니다"))
+                    .then((m) => tell(m, t("라벨을 적었습니다")))
                 }
               >
-                라벨만
+                {t("라벨만")}
               </button>
               <button
                 type="button"
@@ -479,20 +494,20 @@ export function DatabaseScreen() {
                 disabled={ro || stones.length === 0}
                 onClick={() =>
                   setConfirm({
-                    text: `이 국면(${stones.length}수)의 기록을 지웁니다.`,
+                    text: t("이 국면({n}수)의 기록을 지웁니다.", { n: stones.length }),
                     run: () => s.deleteHere(stones),
                   })
                 }
               >
-                이 국면 기록 지우기
+                {t("이 국면 기록 지우기")}
               </button>
             </div>
 
-            <h3 className="db__sub">아래 분기 일괄 삭제</h3>
+            <h3 className="db__sub">{t("아래 분기 일괄 삭제")}</h3>
             <div className="review__row">
-              <span className="review__label">대상</span>
+              <span className="review__label">{t("대상")}</span>
               <select
-                aria-label="일괄 삭제 대상"
+                aria-label={t("일괄 삭제 대상")}
                 value={scope.filter}
                 disabled={ro}
                 onChange={(e) => {
@@ -502,16 +517,16 @@ export function DatabaseScreen() {
               >
                 {DELETE_FILTERS.map((f) => (
                   <option key={f.id} value={f.id}>
-                    {f.title}
+                    {t(f.title)}
                   </option>
                 ))}
               </select>
             </div>
             {scope.filter !== "all" && (
               <div className="review__row">
-                <span className="review__label">하위 분기까지</span>
+                <span className="review__label">{t("하위 분기까지")}</span>
                 <Switch
-                  label="하위 분기까지"
+                  label={t("하위 분기까지")}
                   on={scope.recursive}
                   onChange={(recursive) => setScope((x) => ({ ...x, recursive }))}
                   disabled={ro}
@@ -520,9 +535,9 @@ export function DatabaseScreen() {
             )}
             {scope.filter === "wlinstep" && (
               <div className="review__row">
-                <span className="review__label">수</span>
+                <span className="review__label">{t("수")}</span>
                 <NumberField
-                  label="N수 이내"
+                  label={t("N수 이내")}
                   value={scope.step}
                   min={1}
                   max={225}
@@ -538,58 +553,54 @@ export function DatabaseScreen() {
                 disabled={ro || s.busy}
                 onClick={() =>
                   ask(
-                    `이 국면 아래의 «${deleteScopeTitle(scope)}»를 지웁니다. 되돌릴 수 없습니다.`,
+                    t("이 국면 아래의 «{scope}»를 지웁니다. 되돌릴 수 없습니다.", {
+                      scope: deleteScopeTitle(scope),
+                    }),
                     () => s.deleteAll(stones, scope),
                   )
                 }
               >
-                일괄 삭제
+                {t("일괄 삭제")}
               </button>
             </div>
           </>
         )}
         {owner && on && (
           <p className="panel__hint">
-            {owner === "prove" ? "증명" : "리뷰"}이 엔진을 쓰는 동안은 고칠 수 없습니다(읽기는
-            됩니다).
+            {owner === "prove"
+              ? t("증명이 엔진을 쓰는 동안은 고칠 수 없습니다(읽기는 됩니다).")
+              : t("리뷰가 엔진을 쓰는 동안은 고칠 수 없습니다(읽기는 됩니다).")}
           </p>
         )}
       </section>
 
       {confirm && (
-        <div className="sequence__prompt" role="alertdialog" aria-label="확인">
-          <p>{confirm.text}</p>
-          <div className="panel__actions">
-            <button
-              type="button"
-              className="btn--danger"
-              onClick={() => {
-                const c = confirm;
-                setConfirm(null);
-                void c.run().then((m) => tell(m, "끝났습니다"));
-              }}
-            >
-              진행
-            </button>
-            <button type="button" onClick={() => setConfirm(null)}>
-              취소
-            </button>
-          </div>
-        </div>
+        <ConfirmBox
+          text={confirm.text}
+          danger
+          confirmLabel={t("진행")}
+          cancelLabel={t("취소")}
+          onConfirm={() => {
+            const c = confirm;
+            setConfirm(null);
+            void c.run().then((m) => tell(m, t("끝났습니다")));
+          }}
+          onCancel={() => setConfirm(null)}
+        />
       )}
 
       {notice && (
         <p className="panel__hint" role="status" data-k="db-notice">
           {notice}{" "}
           <button type="button" className="linkish" onClick={() => setNotice(null)}>
-            닫기
+            {t("닫기")}
           </button>
         </p>
       )}
 
       {s.log.length > 0 && (
         <details className="review__log">
-          <summary>DB 기록 ({s.log.length})</summary>
+          <summary>{t("DB 기록 ({n})", { n: s.log.length })}</summary>
           <pre>{s.log.join("\n")}</pre>
         </details>
       )}

@@ -57,6 +57,7 @@ const where = (page: Page) => page.locator('[data-k="joseki-where"]').innerText(
 await new Promise<void>((r) => server.listen(PORT, r));
 const browser = await chromium.launch();
 const page = await browser.newPage({
+  locale: "ko-KR", // 한국어 화면으로 고정(W10 — 그 밖의 언어면 영어로 뜬다)
   viewport: { width: 1280, height: 1000 },
   acceptDownloads: true,
 });
@@ -97,7 +98,8 @@ try {
     "갈래가 트리에 들여 쓴 줄로",
     "갈래 줄이 없다",
   );
-  await page.getByRole("radio", { name: "?!", exact: true }).click();
+  // 이름은 «기호 + 뜻»(W10 접근성, 예: «?! 의문수») — 기호로 시작하는 단추를 집는다.
+  await page.getByRole("radio", { name: /^\?! / }).click();
   await page
     .getByRole("button", { name: "고치기" })
     .click()

@@ -18,6 +18,7 @@ import {
 } from "./settingsStore";
 import { Segmented } from "../../components/controls";
 import { PREFERENCE_LABEL, VARIANT_LABEL } from "./engineLabels";
+import { t } from "../../i18n/i18n";
 
 /**
  * 엔진 조작부 — 상단 바 · 설정 · 보드의 대국 탭이 함께 쓴다. 값은 모두 설정 스토어
@@ -40,22 +41,22 @@ export function EngineSelect({ compact = false }: { compact?: boolean }) {
   return (
     <span className={"select" + (compact ? " select--compact" : "")}>
       <label htmlFor={id} className="select__label">
-        엔진
+        {t("엔진")}
       </label>
       <select
         id={id}
         className="select__input"
-        aria-label="엔진 선택"
+        aria-label={t("엔진 선택")}
         value={pref}
         disabled={!caps.variant}
         onChange={(e) => update({ enginePreference: e.target.value as EnginePreference })}
       >
         {ENGINE_PREFERENCES.map((p) => {
           const why = preferenceBlocker(caps, p);
-          const name = compact ? PREFERENCE_LABEL[p].short : PREFERENCE_LABEL[p].long;
+          const name = t(compact ? PREFERENCE_LABEL[p].short : PREFERENCE_LABEL[p].long);
           return (
             <option key={p} value={p} disabled={why !== null && p !== pref} title={why ?? ""}>
-              {why ? `${name} — 사용 불가` : name}
+              {why ? t("{name} (사용 불가)", { name }) : name}
             </option>
           );
         })}
@@ -80,10 +81,14 @@ export function EngineChoiceControl() {
     <div className="stack">
       <EngineSelect />
       <p className="srow__hint tnum" data-k="engine-variant" title={why}>
-        {shown ?? "실행 불가"}
+        {shown ?? t("실행 불가")}
         {shown ? ` · ${VARIANT_LABEL[shown]}` : ""}
-        {engine.variant ? " · 실행 중" : status === "starting" ? " · 띄우는 중" : ""}
-        {engine.fallbackReason ? " · 물러섬" : ""}
+        {engine.variant
+          ? ` · ${t("실행 중")}`
+          : status === "starting"
+            ? ` · ${t("띄우는 중")}`
+            : ""}
+        {engine.fallbackReason ? ` · ${t("물러섬")}` : ""}
       </p>
     </div>
   );
@@ -130,21 +135,24 @@ export function ThreadControl() {
   const wantsMulti = pref === "auto" || pref === "multi";
   const usable = caps.threads && wantsMulti && !single;
   const wanted = resolveThreads(v, cores);
-  const options = [{ value: AUTO_THREADS, label: `자동 (${Math.min(cap, autoThreads(cores))})` }];
+  const options = [
+    { value: AUTO_THREADS, label: t("자동 ({n})", { n: Math.min(cap, autoThreads(cores)) }) },
+  ];
   for (let n = 1; n <= cap; n++) options.push({ value: n, label: String(n) });
 
   let line: string;
-  if (!caps.threads) line = "단일 스레드 환경";
-  else if (!wantsMulti) line = "단일 스레드 엔진";
-  else if (single) line = "단일 스레드로 실행 중";
-  else if (status === "idle" || status === "error" || applied === null) line = `기동 시 ${wanted}`;
-  else if (applied === wanted) line = `적용 ${applied}`;
-  else line = `다음 탐색부터 ${wanted} (지금 ${applied})`;
+  if (!caps.threads) line = t("단일 스레드 환경");
+  else if (!wantsMulti) line = t("단일 스레드 엔진");
+  else if (single) line = t("단일 스레드로 실행 중");
+  else if (status === "idle" || status === "error" || applied === null)
+    line = t("기동 시 {n}", { n: wanted });
+  else if (applied === wanted) line = t("적용 {n}", { n: applied });
+  else line = t("다음 탐색부터 {n} (지금 {now})", { n: wanted, now: applied });
 
   return (
     <div className="stack">
       <Segmented
-        label="스레드 수"
+        label={t("스레드 수")}
         value={Math.min(draft ?? v, cap)}
         options={options}
         disabled={!usable}
@@ -153,21 +161,24 @@ export function ThreadControl() {
       {draft !== null && (
         <div className="stack" data-k="threads-confirm">
           <p className="srow__hint tnum" role="status">
-            {resolveThreads(draft, cores)} 스레드 — 다음 탐색이 {THREAD_RELOAD_COST} 늦게 시작
+            {t("{n} 스레드: 다음 탐색이 {cost} 늦게 시작", {
+              n: resolveThreads(draft, cores),
+              cost: t(THREAD_RELOAD_COST),
+            })}
           </p>
           <div className="actions">
             <button type="button" className="btn btn--tonal" onClick={commit}>
-              적용
+              {t("적용")}
             </button>
             <button type="button" className="btn" onClick={() => setDraft(null)}>
-              취소
+              {t("취소")}
             </button>
           </div>
         </div>
       )}
       <p className="srow__hint tnum" data-k="threads-status">
         {line}
-        {cores ? ` · 코어 ${cores}` : ""}
+        {cores ? ` · ${t("코어 {n}", { n: cores })}` : ""}
       </p>
     </div>
   );

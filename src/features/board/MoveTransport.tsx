@@ -4,6 +4,7 @@ import { useGameStore } from "./gameStore";
 import { useEngineStore } from "../../engine/engine-state";
 import { Icon, ICON } from "../../components/icons";
 import { useStartAnalysis, useStopAnalysis } from "./analysisActions";
+import { t } from "../../i18n/i18n";
 
 /**
  * 보드 바로 아래의 이동 바 — `|<` `<` `▶` `>` `>|`. 앱의 재생 바 그대로다.
@@ -70,14 +71,14 @@ export function MoveTransport() {
   }, [undoMove, redoMove, undoAll, redoAll]);
 
   return (
-    <nav className="transport" aria-label="수 이동">
+    <nav className="transport" aria-label={t("수 이동")}>
       <button
         type="button"
         className="transport__btn"
         onClick={undoAll}
         disabled={!canBack}
-        aria-label="처음으로"
-        title="처음으로 (Home)"
+        aria-label={t("처음으로")}
+        title={`${t("처음으로")} (Home)`}
       >
         <Icon d={ICON.first} />
       </button>
@@ -86,8 +87,8 @@ export function MoveTransport() {
         className="transport__btn"
         onClick={undoMove}
         disabled={!canBack}
-        aria-label="한 수 뒤로"
-        title="한 수 뒤로 (←)"
+        aria-label={t("한 수 뒤로")}
+        title={`${t("한 수 뒤로")} (←)`}
       >
         <Icon d={ICON.prev} />
       </button>
@@ -98,8 +99,8 @@ export function MoveTransport() {
           onClick={toggleEngine}
           disabled={playDisabled}
           aria-pressed={analyzing}
-          aria-label={analyzing ? "엔진 멈춤" : "엔진 분석"}
-          title={analyzing ? "엔진 멈춤" : "엔진 분석"}
+          aria-label={analyzing ? t("엔진 멈춤") : t("엔진 분석")}
+          title={analyzing ? t("엔진 멈춤") : t("엔진 분석")}
           data-running={analyzing || undefined}
         >
           <Icon d={analyzing ? ICON.pause : ICON.play} />
@@ -110,8 +111,8 @@ export function MoveTransport() {
         className="transport__btn"
         onClick={redoMove}
         disabled={!canForward}
-        aria-label="한 수 앞으로"
-        title="한 수 앞으로 (→)"
+        aria-label={t("한 수 앞으로")}
+        title={`${t("한 수 앞으로")} (→)`}
       >
         <Icon d={ICON.next} />
       </button>
@@ -120,8 +121,8 @@ export function MoveTransport() {
         className="transport__btn"
         onClick={redoAll}
         disabled={!canForward}
-        aria-label="끝으로"
-        title="끝으로 (End)"
+        aria-label={t("끝으로")}
+        title={`${t("끝으로")} (End)`}
       >
         <Icon d={ICON.last} />
       </button>

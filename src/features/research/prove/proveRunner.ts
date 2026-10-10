@@ -5,6 +5,7 @@ import {
   ProveTree,
   depthLeashMs,
   maxBudget,
+  optionsLabel,
   type ProveOptions,
   type ProveOverlay,
   type ProvePv,
@@ -14,6 +15,7 @@ import type { ProveOutcome, ProveProgress } from "../../../core/prove/prove-mode
 import type { AnalysisSnapshot, EngineCommand, PvSnapshot } from "../../../engine/engine-types";
 import type { ProveDb } from "../../database/dbStore";
 import { placementsOf } from "../review/runner";
+import { t } from "../../../i18n/i18n";
 
 /**
  * 증명의 엔진 대화 — 앱 `ProveRepositoryImpl` 의 루프(원본은 main.c:9435-9598, 9756-9859).
@@ -125,9 +127,9 @@ export async function runProve(
   };
 
   hooks.log(
-    `증명: ${rootLen % 2 === 0 ? "흑" : "백"} 차례, 노드당 예산 ` +
-      `${options.byDepth ? `d${options.depth0}..${options.depthMax}` : `${options.budget0Sec}..${options.budgetMaxSec}초`}, ` +
-      `nbest ${options.nbest} · ${dbp ? "DB 붙음(질의 · 기록)" : "DB 없음(결론은 이 실행 안에서만)"}`,
+    `${t("증명:")} ${rootLen % 2 === 0 ? t("흑 차례") : t("백 차례")}, ` +
+      `${t("노드당 예산 {b}", { b: optionsLabel(options) })}, ` +
+      `nbest ${options.nbest} · ${dbp ? t("DB 붙음(질의 · 기록)") : t("DB 없음(결론은 이 실행 안에서만)")}`,
   );
   hooks.onOverlay(tree.overlay(null, rootLen));
 
@@ -196,7 +198,7 @@ export async function runProve(
     const watchdog = setTimeout(
       () => {
         timedOut = true;
-        hooks.log(`증명: 엔진 응답 없음 (${tree.path(next)}), 다시 시도`);
+        hooks.log(t("증명: 엔진 응답 없음 ({path}), 다시 시도", { path: tree.path(next) }));
         stopOnce();
       },
       (Math.floor(leash / 1000) * 2 + 60) * 1000,
@@ -228,7 +230,7 @@ export async function runProve(
     searches++;
     if (hooks.isCancelled()) break;
     if (!snap) {
-      failed = "엔진이 내려가 증명을 멈췄습니다";
+      failed = t("엔진이 내려가 증명을 멈췄습니다");
       break;
     }
     let step: ProveStep;
@@ -260,8 +262,8 @@ export async function runProve(
 
 /** 증명을 시작할 수 없는 국면인가 — 이미 승부가 났으면 까닭(main.c:9867-9882). */
 export function proveRefusal(rootMoves: readonly Move[], size: number): string | null {
-  if (rootMoves.length >= size * size) return "증명: 판이 가득 찼습니다";
+  if (rootMoves.length >= size * size) return t("증명: 판이 가득 찼습니다");
   if (refereeResult(rootMoves, size, ALLOW_OVERLINE) !== null)
-    return "증명: 이미 승부가 결정된 국면입니다";
+    return t("증명: 이미 승부가 결정된 국면입니다");
   return null;
 }

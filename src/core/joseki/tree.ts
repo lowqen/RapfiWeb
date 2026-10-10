@@ -1,4 +1,5 @@
 import { DEFAULT_SIZE, inBoard, moveKey, sameMove, type Move } from "../model/move";
+import { localized, msg, t } from "../../i18n/i18n";
 
 /**
  * 정석 한 벌 = 문서 하나(W9, 계획서 §7). 사람이 쓰는 **문서**라 증명 트리(`ProveTree`)와 섞지
@@ -11,14 +12,14 @@ import { DEFAULT_SIZE, inBoard, moveKey, sameMove, type Move } from "../model/mo
 /** 수 평가 기호 — 기보 주석의 관례. */
 export type JosekiMark = "!!" | "!" | "!?" | "?!" | "?" | "??";
 export const MARKS: readonly JosekiMark[] = ["!!", "!", "!?", "?!", "?", "??"];
-export const MARK_LABEL: Record<JosekiMark, string> = {
-  "!!": "최선",
-  "!": "좋은 수",
-  "!?": "흥미로운 수",
-  "?!": "의문수",
-  "?": "나쁜 수",
-  "??": "큰 실수",
-};
+export const MARK_LABEL: Readonly<Record<JosekiMark, string>> = localized({
+  "!!": msg("최선"),
+  "!": msg("좋은 수"),
+  "!?": msg("흥미로운 수"),
+  "?!": msg("의문수"),
+  "?": msg("나쁜 수"),
+  "??": msg("큰 실수"),
+});
 
 export interface JosekiNode {
   /** 뿌리만 null. */
@@ -61,7 +62,7 @@ export function newId(): string {
   return `j${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
 }
 
-export function newTree(title = "새 정석", now = Date.now()): JosekiTree {
+export function newTree(title = t("새 정석"), now = Date.now()): JosekiTree {
   return {
     id: newId(),
     title,
@@ -138,9 +139,10 @@ export function walk(
 
 /** 이 수를 이 경로 끝에 둘 수 있나 — 판 밖이나 이미 돌이 있으면 까닭. */
 export function illegal(root: JosekiNode, path: Path, m: Move, size = DEFAULT_SIZE): string | null {
-  if (!inBoard(m, size)) return "판 밖입니다";
+  if (!inBoard(m, size)) return t("판 밖입니다");
   const k = moveKey(m, size);
-  if (movesTo(root, path).some((x) => moveKey(x, size) === k)) return "이미 돌이 있는 자리입니다";
+  if (movesTo(root, path).some((x) => moveKey(x, size) === k))
+    return t("이미 돌이 있는 자리입니다");
   return null;
 }
 

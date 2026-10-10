@@ -1,4 +1,5 @@
 import { DEFAULT_SIZE, sameMove, type Move } from "../model/move";
+import { localized, msg, t } from "../../i18n/i18n";
 
 /**
  * 수 등급 — 앱 `core/model/MoveQuality.kt` 의 이식(원본은 데스크톱의 4단계 분류기,
@@ -29,23 +30,27 @@ export interface QualityInfo {
   label: string;
   symbol: string;
   color: string;
-  /** 데스크톱 한국어 표(main.c:397 `devko`). */
+  /** 데스크톱 한국어 표(main.c:397 `devko`) — 화면에는 `qualityName` 으로(사전 열쇠). */
   korean: string;
 }
 
 export const QUALITY_INFO: Record<MoveQuality, QualityInfo> = {
   none: { label: "", symbol: "", color: "#808080", korean: "" },
-  brilliant: { label: "Brilliant", symbol: "!!", color: "#26c2a3", korean: "명수" },
-  great: { label: "Great", symbol: "!", color: "#749bbf", korean: "훌륭한 수" },
-  best: { label: "Best", symbol: "★", color: "#81b64c", korean: "최선" },
-  excellent: { label: "Excellent", symbol: "👍", color: "#a0c15a", korean: "우수" },
-  good: { label: "Good", symbol: "✓", color: "#95b776", korean: "좋음" },
-  inaccuracy: { label: "Inaccuracy", symbol: "?!", color: "#f7c631", korean: "부정확" },
-  mistake: { label: "Mistake", symbol: "?", color: "#ffa459", korean: "실수" },
-  blunder: { label: "Blunder", symbol: "??", color: "#fa412d", korean: "대실수" },
-  missedWin: { label: "Missed Win", symbol: "✕", color: "#ff7769", korean: "놓친 승리" },
-  forced: { label: "Forced", symbol: "→", color: "#8c919a", korean: "강제" },
+  brilliant: { label: "Brilliant", symbol: "!!", color: "#26c2a3", korean: msg("명수") },
+  great: { label: "Great", symbol: "!", color: "#749bbf", korean: msg("훌륭한 수") },
+  best: { label: "Best", symbol: "★", color: "#81b64c", korean: msg("최선") },
+  excellent: { label: "Excellent", symbol: "👍", color: "#a0c15a", korean: msg("우수") },
+  good: { label: "Good", symbol: "✓", color: "#95b776", korean: msg("좋음") },
+  inaccuracy: { label: "Inaccuracy", symbol: "?!", color: "#f7c631", korean: msg("부정확") },
+  mistake: { label: "Mistake", symbol: "?", color: "#ffa459", korean: msg("실수") },
+  blunder: { label: "Blunder", symbol: "??", color: "#fa412d", korean: msg("대실수") },
+  missedWin: { label: "Missed Win", symbol: "✕", color: "#ff7769", korean: msg("놓친 승리") },
+  forced: { label: "Forced", symbol: "→", color: "#8c919a", korean: msg("강제") },
 };
+
+/** 등급의 화면 이름(지금 언어). */
+export const qualityName = (q: MoveQuality): string =>
+  q === "none" ? "" : t(QUALITY_INFO[q].korean);
 
 export const ordinalOf = (q: MoveQuality): number => QUALITIES.indexOf(q);
 
@@ -59,11 +64,11 @@ export const PRESET_SCALE: Record<GradingPreset, number> = {
   default: 1.0,
   lenient: 1.5,
 };
-export const PRESET_LABEL: Record<GradingPreset, string> = {
-  strict: "엄격",
-  default: "기본",
-  lenient: "관대",
-};
+export const PRESET_LABEL: Readonly<Record<GradingPreset, string>> = localized({
+  strict: msg("엄격"),
+  default: msg("기본"),
+  lenient: msg("관대"),
+});
 
 /**
  * 리뷰가 한 국면에 남긴 것 — 데스크톱의 `wrhistory`/`wrmate`/`wrvalid` 셋과
@@ -329,43 +334,43 @@ function comment(g: GradedMove, d: ReviewData, n: number): string {
   const best = coord(before.best, d.size);
   switch (g.quality) {
     case "brilliant":
-      return "찾기 어려운 결정타 — 승부를 결정지었습니다.";
+      return t("찾기 어려운 결정타. 승부를 결정지었습니다.");
     case "great":
-      return "국면을 지키는 유일한 수 — 다른 수는 모두 무너집니다.";
+      return t("국면을 지키는 유일한 수. 다른 수는 모두 무너집니다.");
     case "missedWin":
-      return `필승(M${mb})이 있었지만 이 수로 사라졌습니다.`;
+      return t("필승(M{m})이 있었지만 이 수로 사라졌습니다.", { m: mb });
     case "best":
-      if (resist) return "가장 끈질긴 방어 — 메이트를 최대한 늦춥니다.";
+      if (resist) return t("가장 끈질긴 방어. 메이트를 최대한 늦춥니다.");
       return before.best !== null && sameMove(before.best, g.move)
-        ? "엔진의 최선수입니다."
-        : "엔진 최선수에 못지않은 수입니다.";
+        ? t("엔진의 최선수입니다.")
+        : t("엔진 최선수에 못지않은 수입니다.");
     case "excellent":
-      return `거의 최선 (-${dp}%p) — ${best}이(가) 조금 더 정확했습니다.`;
+      return t("거의 최선({p}%p 손실). {best}이(가) 조금 더 정확했습니다.", { p: dp, best });
     case "good":
       return resist
-        ? `버틸 만한 방어지만 메이트를 필요 이상 ${shed}수 앞당깁니다.`
-        : `무난하지만 ${dp}%p 손해 — ${best}이(가) 더 유리했습니다.`;
+        ? t("버틸 만한 방어지만 메이트를 필요 이상 {n}수 앞당깁니다.", { n: shed })
+        : t("무난하지만 {p}%p 손해. {best}이(가) 더 유리했습니다.", { p: dp, best });
     case "inaccuracy":
       return resist
-        ? `방어가 느슨합니다 — 메이트가 필요 이상 ${shed}수 빨라집니다.`
-        : `${dp}%p 손실 — ${best}이(가) 더 정확했습니다.`;
+        ? t("방어가 느슨합니다. 메이트가 필요 이상 {n}수 빨라집니다.", { n: shed })
+        : t("{p}%p 손실. {best}이(가) 더 정확했습니다.", { p: dp, best });
     case "mistake":
       return resist
-        ? `약한 저항 — 패배까지의 수순을 ${shed}수 단축시킵니다.`
-        : `${dp}%p 손실 — ${best}이(가) 명백히 더 좋았습니다.`;
+        ? t("약한 저항. 패배까지의 수순을 {n}수 단축시킵니다.", { n: shed })
+        : t("{p}%p 손실. {best}이(가) 명백히 더 좋았습니다.", { p: dp, best });
     case "blunder":
       if (wb >= 0.65 && wa <= 0.35) {
-        return (
-          `승세를 날렸습니다 — 이기던 국면(${Math.round(wb * 100)}%)이 ` +
-          `지는 국면(${Math.round(wa * 100)}%)이 되었습니다.`
-        );
+        return t("승세를 날렸습니다. 이기던 국면({a}%)이 지는 국면({b}%)이 되었습니다.", {
+          a: Math.round(wb * 100),
+          b: Math.round(wa * 100),
+        });
       }
       if (mb >= 0 && ma < 0)
-        return `필패(M${-ma})에 걸려들었습니다 — ${best}을(를) 고려해야 했습니다.`;
-      if (resist) return `방어 붕괴 — 메이트가 ${shed}수 가까워졌습니다.`;
-      return `${dp}%p 손실 — 여기서는 ${best}이(가) 필요했습니다.`;
+        return t("필패(M{m})에 걸려들었습니다. {best}을(를) 고려해야 했습니다.", { m: -ma, best });
+      if (resist) return t("방어 붕괴. 메이트가 {n}수 가까워졌습니다.", { n: shed });
+      return t("{p}%p 손실. 여기서는 {best}이(가) 필요했습니다.", { p: dp, best });
     case "forced":
-      return "이미 패배가 확정된 국면 — 어떤 방어도 결과를 바꿀 수 없습니다.";
+      return t("이미 패배가 확정된 국면. 어떤 방어도 결과를 바꿀 수 없습니다.");
     case "none":
       return "";
   }

@@ -28,6 +28,7 @@ import { db } from "../../data/db";
 import { deleteJoseki, findByKey, listJoseki, putJoseki } from "../../data/joseki";
 import { useBoardStore } from "../board/boardStore";
 import { useGameStore } from "../board/gameStore";
+import { t } from "../../i18n/i18n";
 
 /**
  * 정석 화면의 상태(W9) — 목록, 열린 정석 하나, 그 안의 커서(`path`).
@@ -113,10 +114,11 @@ export const useJosekiStore = create<JosekiState>((set, get) => {
   };
   /** 열린 정석을 새 뿌리 · 정보로 바꾸고 목록에도 반영, 저장을 미룬다. */
   const commit = (patch: Partial<JosekiTree>, path?: number[], keepUndo = false) => {
-    const t = get().current;
-    if (!t) return;
-    const next: JosekiTree = { ...t, ...patch, updatedAt: Date.now() };
-    const undo = keepUndo || !patch.root ? get().undo : [...get().undo, t.root].slice(-UNDO_LIMIT);
+    const cur = get().current;
+    if (!cur) return;
+    const next: JosekiTree = { ...cur, ...patch, updatedAt: Date.now() };
+    const undo =
+      keepUndo || !patch.root ? get().undo : [...get().undo, cur.root].slice(-UNDO_LIMIT);
     set((s) => ({
       current: next,
       path: path ?? s.path,
@@ -125,7 +127,9 @@ export const useJosekiStore = create<JosekiState>((set, get) => {
     }));
     schedule();
     if (patch.root && countNodes(next.root) === NODE_WARN)
-      set({ notice: `수가 ${NODE_WARN}개가 넘었습니다 — 정석을 나누면 저장이 가벼워집니다` });
+      set({
+        notice: t("수가 {n}개가 넘었습니다. 정석을 나누면 저장이 가벼워집니다", { n: NODE_WARN }),
+      });
   };
   const tell = (notice: string) => set({ notice });
 
@@ -238,18 +242,21 @@ export const useJosekiStore = create<JosekiState>((set, get) => {
     },
 
     addText: (text) => {
-      const t = get().current;
-      if (!t) return false;
-      const p = parseMoveText(text, t.boardSize);
+      const jk = get().current;
+      if (!jk) return false;
+      const p = parseMoveText(text, jk.boardSize);
       if (!p.ok) {
         tell(p.error);
         return false;
       }
       if (p.moves.length === 0) return false;
-      const r = addLine(t.root, p.moves, get().path, t.boardSize);
+      const r = addLine(jk.root, p.moves, get().path, jk.boardSize);
       if (r.stoppedAt !== null) {
         tell(
-          `${r.stoppedAt + 1}번째 수 ${label(p.moves[r.stoppedAt]!, t.boardSize)} 는 이 줄에 둘 수 없습니다 — 그 앞까지 넣었습니다`,
+          t("{n}번째 수 {m} 는 이 줄에 둘 수 없습니다. 그 앞까지 넣었습니다", {
+            n: r.stoppedAt + 1,
+            m: label(p.moves[r.stoppedAt]!, jk.boardSize),
+          }),
         );
       }
       if (r.added > 0) commit({ root: r.root }, r.path);
@@ -311,14 +318,16 @@ export const useJosekiStore = create<JosekiState>((set, get) => {
           // 기보 → 정석 초안: 열린 정석이 있으면 그 뿌리에 한 줄로 잇는다, 없으면 새 정석.
           const moves = parseGameFile(new Uint8Array(await f.arrayBuffer()), fmt, 15);
           if (!moves) {
-            notes.push(`${f.name}: 기보를 읽지 못했습니다`);
+            notes.push(`${f.name}: ${t("기보를 읽지 못했습니다")}`);
             continue;
           }
           const cur = get().current;
           if (cur) {
             const r = addLine(cur.root, moves, [], cur.boardSize);
             commit({ root: r.root }, r.path);
-            notes.push(`${f.name}: ${moves.length}수를 이 정석에 이었습니다(새 마디 ${r.added}개)`);
+            notes.push(
+              `${f.name}: ${t("{n}수를 이 정석에 이었습니다(새 마디 {k}개)", { n: moves.length, k: r.added })}`,
+            );
           } else {
             const t = newTree(f.name.replace(/\.[^.]+$/, ""));
             t.root = addLine(t.root, moves, [], t.boardSize).root;
@@ -335,13 +344,15 @@ export const useJosekiStore = create<JosekiState>((set, get) => {
         const have = new Set(get().list.map((x) => x.id));
         for (const t of r.trees) added.push(have.has(t.id) ? { ...t, id: newTree().id } : t);
         if (r.dropped)
-          notes.push(`${f.name}: 둘 수 없는 수 ${r.dropped}개(와 그 아래)를 버렸습니다`);
+          notes.push(
+            `${f.name}: ${t("둘 수 없는 수 {n}개(와 그 아래)를 버렸습니다", { n: r.dropped })}`,
+          );
       }
       const d = db();
       if (d) for (const t of added) await putJoseki(d, t);
       if (added.length) {
         set((s) => ({ list: [...added, ...s.list] }));
-        notes.unshift(`정석 ${added.length}개를 가져왔습니다`);
+        notes.unshift(t("정석 {n}개를 가져왔습니다", { n: added.length }));
       }
       if (notes.length) tell(notes.join("\n"));
     },
@@ -357,26 +368,26 @@ export const useJosekiStore = create<JosekiState>((set, get) => {
     },
 
     toBoard: () => {
-      const t = get().current;
-      if (!t) return;
-      const moves = movesTo(t.root, get().path);
+      const jk = get().current;
+      if (!jk) return;
+      const moves = movesTo(jk.root, get().path);
       useGameStore
         .getState()
-        .loadMoves(moves, { name: t.title, what: `정석 «${t.title}» — ${moves.length}수` });
-      tell(`보드에 ${moves.length}수를 올렸습니다`);
+        .loadMoves(moves, { name: jk.title, what: `정석 «${jk.title}»: ${moves.length}` });
+      tell(t("보드에 {n}수를 올렸습니다", { n: moves.length }));
     },
 
     findBoard: async () => {
       const stones = useBoardStore.getState().render.stones;
       if (stones.length === 0) {
-        tell("보드가 비었습니다 — 돌을 놓고 찾으세요");
+        tell(t("보드가 비었습니다. 돌을 놓고 찾으세요"));
         return;
       }
       await flush();
       const d = db();
       const hits = d ? await findByKey(d, keyOf(stones)) : [];
       set({ hits });
-      if (hits.length === 0) tell(`이 국면(${stones.length}수)을 담은 정석이 없습니다`);
+      if (hits.length === 0) tell(t("이 국면({n}수)을 담은 정석이 없습니다", { n: stones.length }));
     },
 
     clearNotice: () => set({ notice: null }),

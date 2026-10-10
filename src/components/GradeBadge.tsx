@@ -1,4 +1,5 @@
-import { gradeLabel, type Grade } from "../core/opening/tables";
+import { gradeLabel, gradeName, type Grade } from "../core/opening/tables";
+import { t } from "../i18n/i18n";
 
 /**
  * 흑 5수 유불리 등급 표식 — 앱 `MiniBoard.drawGradeMark` 의 모양 다섯(원 · 오각 · 사각 ·
@@ -73,10 +74,10 @@ function polygon(n: number, r: number, start: number, cy = 8): string {
 /** 표식 + `+3 흑 매우 유리`. `compact` 면 이름을 빼고 부호 숫자만. */
 export function GradeBadge({ grade, compact = false }: { grade: Grade; compact?: boolean }) {
   return (
-    <span className="gradebadge" title={`흑 5수 유불리: ${grade.ko}`}>
+    <span className="gradebadge" title={t("흑 5수 유불리: {g}", { g: gradeName(grade) })}>
       <GradeMarkIcon grade={grade} />
       <span className="tnum">{gradeLabel(grade)}</span>
-      {!compact && <span className="gradebadge__name">{grade.ko}</span>}
+      {!compact && <span className="gradebadge__name">{gradeName(grade)}</span>}
     </span>
   );
 }

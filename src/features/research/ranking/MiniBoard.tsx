@@ -1,4 +1,5 @@
 import { DEFAULT_SIZE, type Move } from "../../../core/model/move";
+import { t } from "../../../i18n/i18n";
 
 /**
  * 개시 썸네일 — 천원 둘레 7×7 만 그린 작은 판(SVG). 3수 · 5수 개시는 늘 그 안에 있다(벗어난 돌은
@@ -27,7 +28,7 @@ export function MiniBoard({
       className={"miniboard" + (className ? ` ${className}` : "")}
       viewBox={`0 0 ${SIDE} ${SIDE}`}
       role="img"
-      aria-label={`${moves.length}수 개시`}
+      aria-label={t("{n}수 개시", { n: moves.length })}
     >
       <rect className="miniboard__wood" x="0" y="0" width={SIDE} height={SIDE} rx="3" />
       {lines.map((p) => (

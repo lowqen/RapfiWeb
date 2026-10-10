@@ -1,4 +1,5 @@
 import type { ProveKind, ProveOverlay } from "./prove-tree";
+import { t } from "../../i18n/i18n";
 
 /**
  * 증명의 진행 · 결과 문구 — 앱 `ProveModels.kt` 의 `ProveProgress` · `ProveOutcome` 이식.
@@ -55,14 +56,18 @@ export const IDLE_PROGRESS: ProveProgress = {
 
 /** `prove_badge_lines`(main.c:9223). 첫 줄은 실행 합계, 둘째는 도는 탐색 — 없으면 빈 줄. */
 export function badgeLines(p: ProveProgress): [string, string] {
-  const first = `증명: 해결 ${p.resolved} / 탐색 ${p.searches} / 미결 ${p.open}`;
+  const first = t("증명: 해결 {r} / 탐색 {s} / 미결 {o}", {
+    r: p.resolved,
+    s: p.searches,
+    o: p.open,
+  });
   if (p.phase !== "search") return [first, ""];
-  const side = p.attack ? "공격" : "방어";
+  const side = p.attack ? t("공격") : t("방어");
   const value = p.mate !== 0 ? `M${Math.abs(p.mate)}` : `${p.winRatePct}%`;
   let second = p.byDepth
     ? `${side}  d${p.depth}/${p.budget} ${value}  ${p.elapsedSec}s`
     : `${side}  d${p.depth} ${value}  ${p.elapsedSec}s/${Math.floor(p.budget / 1000)}s`;
-  if (p.candTotal > 0) second += `  후보 ${p.candIndex}/${p.candTotal}`;
+  if (p.candTotal > 0) second += `  ${t("후보 {i}/{n}", { i: p.candIndex, n: p.candTotal })}`;
   return [first, second];
 }
 
@@ -82,24 +87,24 @@ export interface ProveOutcome {
   readonly attackerWinRatePct: number;
 }
 
-export const outcomeTitle = (o: ProveOutcome) => (o.cancelled ? "증명 취소" : "증명 완료");
+export const outcomeTitle = (o: ProveOutcome) => (o.cancelled ? t("증명 취소") : t("증명 완료"));
 
 /** 결과 문구 — main.c 가 만드는 그대로, DB 가 없으면 그 부분만 다르게. */
 export function outcomeMessage(o: ProveOutcome): string {
   const tally =
-    `탐색 ${o.searches}회, 결론 ${o.conclusions}개` +
-    (o.dbWrites !== null ? `, DB 기록 ${o.dbWrites}개` : "");
+    t("탐색 {s}회, 결론 {c}개", { s: o.searches, c: o.conclusions }) +
+    (o.dbWrites !== null ? `, ${t("DB 기록 {n}개", { n: o.dbWrites })}` : "");
   if (o.resolved) {
-    const side = o.blackToMove ? "흑 (차례)" : "백 (차례)";
-    const verdict = o.win ? "승리 증명됨" : "승리 불가 (방어 성립/무승부)";
-    const by = o.kind === "mate" ? "메이트" : o.kind === "db" ? "데이터베이스" : "승률";
+    const side = o.blackToMove ? t("흑 (차례)") : t("백 (차례)");
+    const verdict = o.win ? t("승리 증명됨") : t("승리 불가 (방어 성립/무승부)");
+    const by = o.kind === "mate" ? t("메이트") : o.kind === "db" ? t("데이터베이스") : t("승률");
     return `${side}: ${verdict} (${by})\n${tally}`;
   }
   const again =
     o.dbWrites !== null
-      ? "다시 실행하면 이어서 계산합니다 (DB 유지)."
-      : "DB 가 없어 결론이 남지 않습니다 — 다시 실행하면 처음부터 셉니다.";
-  return `미결 (예산 소진), 공격측 승률 ~${o.attackerWinRatePct}%\n${tally}. ${again}`;
+      ? t("다시 실행하면 이어서 계산합니다 (DB 유지).")
+      : t("DB 가 없어 결론이 남지 않습니다. 다시 실행하면 처음부터 셉니다.");
+  return `${t("미결 (예산 소진), 공격측 승률 ~{p}%", { p: o.attackerWinRatePct })}\n${tally}. ${again}`;
 }
 
 // ── 덧그림 도움 ──

@@ -4,7 +4,7 @@ import { Chip, ChipGroup, Segmented } from "../../../components/controls";
 import { fromLabel, type Move } from "../../../core/model/move";
 import {
   ABBR,
-  KOREAN,
+  nameOf,
   NONSTD,
   ROMAJI,
   isDirect,
@@ -26,6 +26,7 @@ import { PackSourceBar, RifImportCard, WdlBar } from "../rif/RifParts";
 import { fmtInt } from "../rif/format";
 import { activePack, useRifStore } from "../rif/rifStore";
 import { MiniBoard } from "./MiniBoard";
+import { langOf, msg, pick, t } from "../../../i18n/i18n";
 
 /**
  * 연구 ▸ 랭킹(W7) — 앱 `RankingsScreen` 의 이식. «사람들이 실제로 어떤 개시를 두고, 어떻게 이기나».
@@ -44,9 +45,9 @@ type Tab = "three" | "five";
 type Sort = "number" | "games" | "rate";
 
 const SIDE_OPTIONS: { value: RankSide; label: string }[] = [
-  { value: "either", label: "어느 색이든" },
-  { value: "black", label: "흑으로" },
-  { value: "white", label: "백으로" },
+  { value: "either", label: msg("어느 색이든") },
+  { value: "black", label: msg("흑으로") },
+  { value: "white", label: msg("백으로") },
 ];
 
 const parseLine = (text: string): Move[] =>
@@ -115,7 +116,7 @@ export function RankingScreen() {
   );
 
   const open = (moves: Move[], what: string) => {
-    useGameStore.getState().loadMoves(moves, { what: `랭킹 — ${what}` });
+    useGameStore.getState().loadMoves(moves, { what: `랭킹: ${what}` });
     navigate("/research/explorer");
   };
 
@@ -144,25 +145,30 @@ export function RankingScreen() {
 
       {pack && three && (
         <>
-          <section className="panel" aria-label="랭킹 거르기">
+          <section className="panel" aria-label={t("랭킹 거르기")}>
             <div className="ranking__head">
               <Segmented<Tab>
-                label="랭킹 종류"
+                label={t("랭킹 종류")}
                 value={tab}
                 options={[
-                  { value: "three", label: "3수 · 26주형" },
-                  { value: "five", label: "5수 모양" },
+                  { value: "three", label: t("3수 · 26주형") },
+                  { value: "five", label: t("5수 모양") },
                 ]}
                 onChange={setTab}
               />
               <Segmented<Sort>
-                label="정렬"
+                label={t("정렬")}
                 value={effectiveSort}
                 options={[
-                  ...(tab === "three" ? [{ value: "number" as const, label: "번호" }] : []),
-                  { value: "games", label: "판 수" },
+                  ...(tab === "three" ? [{ value: "number" as const, label: t("번호") }] : []),
+                  { value: "games", label: t("판 수") },
                   ...(active
-                    ? [{ value: "rate" as const, label: side === "white" ? "백 승률" : "흑 승률" }]
+                    ? [
+                        {
+                          value: "rate" as const,
+                          label: side === "white" ? t("백 승률") : t("흑 승률"),
+                        },
+                      ]
                     : []),
                 ]}
                 onChange={setSort}
@@ -172,17 +178,17 @@ export function RankingScreen() {
             {!isLocal && (
               <div className="ranking__filters">
                 <label className="ranking__search">
-                  <span className="field__label">선수</span>
+                  <span className="field__label">{t("선수")}</span>
                   <input
                     className="ranking__input"
                     type="search"
-                    placeholder="이름이나 나라(예: KOR)"
+                    placeholder={t("이름이나 나라(예: KOR)")}
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    aria-label="선수 찾기"
+                    aria-label={t("선수 찾기")}
                   />
                   {suggestions.length > 0 && (
-                    <ul className="ranking__suggest" role="listbox" aria-label="선수 후보">
+                    <ul className="ranking__suggest" role="listbox" aria-label={t("선수 후보")}>
                       {suggestions.map((i) => (
                         <li key={i}>
                           <button
@@ -194,7 +200,7 @@ export function RankingScreen() {
                               setQuery("");
                             }}
                           >
-                            {pack.players[i]}
+                            <span lang={langOf(pack.players[i] ?? "")}>{pack.players[i]}</span>
                             <span className="ranking__country">{pack.playerCountry[i]}</span>
                           </button>
                         </li>
@@ -204,34 +210,34 @@ export function RankingScreen() {
                 </label>
                 {players.length > 0 && (
                   <>
-                    <ChipGroup label="고른 선수">
+                    <ChipGroup label={t("고른 선수")}>
                       {players.map((i) => (
                         <Chip
                           key={i}
                           on
                           onClick={() => setPlayers((p) => p.filter((x) => x !== i))}
                         >
-                          {pack.players[i]} ×
+                          {pack.players[i]} ×<span className="sr-only"> {t("빼기")}</span>
                         </Chip>
                       ))}
                     </ChipGroup>
                     <Segmented<RankSide>
-                      label="선수의 색"
+                      label={t("선수의 색")}
                       value={side}
-                      options={SIDE_OPTIONS}
+                      options={SIDE_OPTIONS.map((o) => ({ ...o, label: t(o.label) }))}
                       onChange={setSide}
                     />
                   </>
                 )}
                 {pack.rules.length > 1 && (
                   <div className="ranking__rules">
-                    <span className="field__label">규칙</span>
-                    <ChipGroup label="규칙">
+                    <span className="field__label">{t("규칙")}</span>
+                    <ChipGroup label={t("규칙")}>
                       {shownRules.map(({ i, count }) => (
                         <Chip
                           key={i}
                           on={rules.includes(i)}
-                          title={`${fmtInt(count)}판`}
+                          title={t("{n}판", { n: fmtInt(count) })}
                           onClick={() =>
                             setRules((r) => (r.includes(i) ? r.filter((x) => x !== i) : [...r, i]))
                           }
@@ -243,9 +249,12 @@ export function RankingScreen() {
                         <button
                           type="button"
                           className="linkish ranking__more"
+                          aria-expanded={allRules}
                           onClick={() => setAllRules((v) => !v)}
                         >
-                          {allRules ? "접기" : `더 보기 (${ruleOrder.length - RULES_SHOWN})`}
+                          {allRules
+                            ? t("접기")
+                            : t("더 보기 ({n})", { n: ruleOrder.length - RULES_SHOWN })}
                         </button>
                       )}
                     </ChipGroup>
@@ -254,14 +263,18 @@ export function RankingScreen() {
               </div>
             )}
             <p className="panel__hint tnum" data-k="ranking-total">
-              {active ? "고른 범위 " : ""}
-              {fmtInt(three.total)}판
+              {active
+                ? t("고른 범위 {n}판", { n: fmtInt(three.total) })
+                : t("{n}판", { n: fmtInt(three.total) })}
               {isLocal &&
-                " — 내 기보(저장한 기보와 지금 판)로 센 것입니다. RenjuNet 파일을 넣으면 세계 대국으로 바뀝니다."}
+                ` · ${t("내 기보(저장한 기보와 지금 판)로 센 것입니다. RenjuNet 파일을 넣으면 세계 대국으로 바뀝니다.")}`}
             </p>
           </section>
 
-          <section className="panel" aria-label={tab === "three" ? "26주형 랭킹" : "5수 모양 랭킹"}>
+          <section
+            className="panel"
+            aria-label={tab === "three" ? t("26주형 랭킹") : t("5수 모양 랭킹")}
+          >
             {tab === "three" ? (
               <ol className="ranklist" data-k="ranking-three">
                 {threeRows.map((r, k) => (
@@ -270,7 +283,7 @@ export function RankingScreen() {
                       type="button"
                       className="rankrow"
                       disabled={r.opening === NONSTD}
-                      onClick={() => open(representative(r.opening), KOREAN[r.opening] ?? "")}
+                      onClick={() => open(representative(r.opening), nameOf(r.opening))}
                     >
                       <span className="rankrow__rank tnum">
                         {effectiveSort === "number" ? "" : k + 1}
@@ -282,19 +295,20 @@ export function RankingScreen() {
                       )}
                       <span className="rankrow__name">
                         {r.opening === NONSTD ? (
-                          "규칙 밖 개시"
+                          t("규칙 밖 개시")
                         ) : (
                           <>
-                            <b>{KOREAN[r.opening]}</b>
+                            <b>{nameOf(r.opening)}</b>
                             <span className="rankrow__sub">
-                              {ABBR[r.opening]} · {isDirect(r.opening) ? "직접" : "간접"} ·{" "}
-                              {ROMAJI[r.opening]}
+                              {ABBR[r.opening]} ·{" "}
+                              {isDirect(r.opening) ? t("직접주형") : t("간접주형")}
+                              {pick(` · ${ROMAJI[r.opening]}`, "")}
                             </span>
                           </>
                         )}
                       </span>
                       <span className="rankrow__games tnum">
-                        {r.split.total ? `${fmtInt(r.split.total)}판` : "—"}
+                        {r.split.total ? t("{n}판", { n: fmtInt(r.split.total) }) : t("없음")}
                       </span>
                       <WdlBar b={r.split.black} d={r.split.draw} w={r.split.white} compact />
                     </button>
@@ -302,7 +316,7 @@ export function RankingScreen() {
                 ))}
               </ol>
             ) : fiveRows.length === 0 ? (
-              <p className="panel__hint">다섯 수를 넘긴 판이 없습니다.</p>
+              <p className="panel__hint">{t("다섯 수를 넘긴 판이 없습니다.")}</p>
             ) : (
               <ol className="ranklist" data-k="ranking-five">
                 {fiveRows.map((r, k) => {
@@ -317,10 +331,12 @@ export function RankingScreen() {
                         <span className="rankrow__rank tnum">{k + 1}</span>
                         <MiniBoard moves={moves} className="rankrow__thumb" />
                         <span className="rankrow__name">
-                          <b>{r.opening === NONSTD ? "규칙 밖" : KOREAN[r.opening]}</b>
+                          <b>{r.opening === NONSTD ? t("규칙 밖") : nameOf(r.opening)}</b>
                           <span className="rankrow__sub tnum">{r.moves.toUpperCase()}</span>
                         </span>
-                        <span className="rankrow__games tnum">{fmtInt(r.split.total)}판</span>
+                        <span className="rankrow__games tnum">
+                          {t("{n}판", { n: fmtInt(r.split.total) })}
+                        </span>
                         <WdlBar b={r.split.black} d={r.split.draw} w={r.split.white} compact />
                       </button>
                     </li>
@@ -334,8 +350,9 @@ export function RankingScreen() {
 
       {ready && !pack && (
         <p className="explorer__note">
-          아직 저장한 기보도 없습니다 — 보드에서 둔 판이나 연 기보가 쌓이면 여기서 내 기보로도
-          셉니다.
+          {t(
+            "아직 저장한 기보도 없습니다. 보드에서 둔 판이나 연 기보가 쌓이면 여기서 내 기보로도 셉니다.",
+          )}
         </p>
       )}
     </div>

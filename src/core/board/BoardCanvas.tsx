@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from "react";
-import type { Move } from "../model/move";
+import type {
+  KeyboardEvent as ReactKeyboardEvent,
+  PointerEvent as ReactPointerEvent,
+  WheelEvent as ReactWheelEvent,
+} from "react";
+import { label, sameMove, type Move } from "../model/move";
+import { t } from "../../i18n/i18n";
 import { boardGeometry } from "./board-geometry";
 import { drawStatic, drawDynamic, type BoardRender } from "./board-renderer";
 import { readBoardSkin, type BoardSkin } from "./board-skin";
@@ -30,6 +35,11 @@ export interface BoardCanvasProps {
   onLongPress?: (m: Move) => void;
   /** 확대를 허용할 것인가. 작은 미리보기 보드에서는 끈다. */
   zoomable?: boolean;
+  /**
+   * 키보드로 둘 수 있는가(W10) — 보드가 Tab 으로 초점을 받고, 방향키로 커서를 옮겨 Enter · Space 로
+   * `onTap` 한다. 누르면 두는 보드에만 켠다(보기 전용 보드에 초점이 멈추면 Tab 이 헛걸음한다).
+   */
+  keyboard?: boolean;
   className?: string;
 }
 
@@ -38,6 +48,7 @@ export function BoardCanvas({
   onTap,
   onLongPress,
   zoomable = true,
+  keyboard = false,
   className,
 }: BoardCanvasProps) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -238,6 +249,41 @@ export function BoardCanvas({
     onTap(moveAt(p.x, p.y, side, render.size, view));
   };
 
+  // ── 키보드(W10) ─────────────────────────────────────────────────────
+  // 커서는 초점을 받을 때 마지막 수(없으면 천원)에서 시작한다. 방향키는 판 안에서 멈춘다.
+  const [cursor, setCursor] = useState<Move | null>(null);
+  const [focused, setFocused] = useState(false);
+  const centre = (): Move => ({ x: render.size >> 1, y: render.size >> 1 });
+  const onKeyDown = (e: ReactKeyboardEvent) => {
+    if (!keyboard || e.altKey || e.ctrlKey || e.metaKey) return;
+    const cur = cursor ?? render.stones.at(-1) ?? centre();
+    const step: Record<string, [number, number]> = {
+      ArrowLeft: [-1, 0],
+      ArrowRight: [1, 0],
+      ArrowUp: [0, -1],
+      ArrowDown: [0, 1],
+    };
+    const d = step[e.key];
+    if (d) {
+      const n = render.size - 1;
+      setCursor({
+        x: Math.min(n, Math.max(0, cur.x + d[0])),
+        y: Math.min(n, Math.max(0, cur.y + d[1])),
+      });
+    } else if (e.key === "Enter" || e.key === " ") {
+      onTap?.(cur);
+    } else return;
+    // 보드 위의 방향키는 커서의 것이다 — 기보 넘기기(MoveTransport)는 `defaultPrevented` 를 보고 비켜선다.
+    e.preventDefault();
+  };
+  const stoneAt = (m: Move) => render.stones.findIndex((s) => sameMove(s, m));
+  const cursorText = (m: Move) => {
+    const i = stoneAt(m);
+    const what = i < 0 ? t("빈 칸") : i % 2 === 0 ? t("흑 돌") : t("백 돌");
+    return `${label(m, render.size)} ${what}`;
+  };
+  const shownCursor = keyboard && focused ? (cursor ?? render.stones.at(-1) ?? centre()) : null;
+
   const onWheel = (e: ReactWheelEvent) => {
     if (!zoomable) return;
     const p = localPoint(e);
@@ -257,6 +303,15 @@ export function BoardCanvas({
       onPointerCancel={onPointerUp}
       onWheel={onWheel}
       style={{ touchAction }}
+      {...(keyboard && {
+        tabIndex: 0,
+        role: "application",
+        "aria-roledescription": t("오목판"),
+        "aria-label": t("오목판: 방향키로 칸을 고르고 Enter 로 둡니다"),
+        onKeyDown,
+        onFocus: () => setFocused(true),
+        onBlur: () => setFocused(false),
+      })}
     >
       <div
         className="board__view"
@@ -271,17 +326,37 @@ export function BoardCanvas({
           ref={dynamicRef}
           className="board__layer"
           role="img"
-          aria-label={`${render.size}×${render.size} 오목판, 돌 ${render.stones.length}개`}
+          aria-label={t("{size}×{size} 오목판, 돌 {n}개", {
+            size: render.size,
+            n: render.stones.length,
+          })}
         />
+        {shownCursor && geometry && (
+          <span
+            className="board__cursor"
+            aria-hidden="true"
+            style={{
+              left: geometry.cx(shownCursor.x),
+              top: geometry.cy(shownCursor.y),
+              width: geometry.step,
+              height: geometry.step,
+            }}
+          />
+        )}
       </div>
+      {keyboard && (
+        <span className="sr-only" aria-live="polite">
+          {shownCursor ? cursorText(shownCursor) : ""}
+        </span>
+      )}
       {view.scale > 1 && (
         <button
           type="button"
           className="board__reset"
           onClick={() => setView(IDENTITY)}
-          title="확대 해제"
+          title={t("확대 해제")}
         >
-          {view.scale.toFixed(1)}× 해제
+          {t("{n}× 해제", { n: view.scale.toFixed(1) })}
         </button>
       )}
     </div>

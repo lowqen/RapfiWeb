@@ -1,6 +1,7 @@
 import { useGameStore } from "./gameStore";
 import { COMPUTER_SIDE_LABEL, swappedSide } from "../../core/model/game";
 import { Icon, ICON } from "../../components/icons";
+import { t } from "../../i18n/i18n";
 
 /**
  * 보드 위의 퀵 액션 바 — **새 판 · 진영 전환**. 진영 전환과 컴퓨터 색 표시는 [대국] 탭에만
@@ -23,33 +24,36 @@ export function QuickActions() {
 
   const canSwap = (side === "white" || side === "black") && !thinking && prompt === null;
   const swapTitle = canSwap
-    ? `진영 전환 — ${COMPUTER_SIDE_LABEL[side]} → ${COMPUTER_SIDE_LABEL[swappedSide(side)]}`
-    : "진영 전환 — 컴퓨터가 한쪽을 맡은 대국에서만(대국 탭 ▸ 흑 / 백)";
+    ? t("진영 전환: {from} → {to}", {
+        from: COMPUTER_SIDE_LABEL[side],
+        to: COMPUTER_SIDE_LABEL[swappedSide(side)],
+      })
+    : t("진영 전환은 컴퓨터가 한쪽을 맡은 대국에서만 됩니다(대국 탭 ▸ 흑 / 백)");
 
   return (
-    <nav className="quickbar" aria-label="퀵 액션">
+    <nav className="quickbar" aria-label={t("퀵 액션")}>
       <button
         type="button"
         className="quickbar__btn"
-        aria-label="새 판"
-        title="새 판 — 판·물음을 비우고 새로 시작합니다(개시·컴퓨터 색은 그대로)"
+        aria-label={t("새 판")}
+        title={t("새 판: 판과 물음을 비우고 새로 시작합니다(개시와 컴퓨터 색은 그대로)")}
         onClick={newGame}
       >
         <Icon d={ICON.restart} />
-        <span className="quickbar__label">새 판</span>
+        <span className="quickbar__label">{t("새 판")}</span>
       </button>
       {game && (
         <>
           <button
             type="button"
             className="quickbar__btn"
-            aria-label="진영 전환"
+            aria-label={t("진영 전환")}
             title={swapTitle}
             disabled={!canSwap}
             onClick={swapSides}
           >
             <Icon d={ICON.swap} />
-            <span className="quickbar__label">진영 전환</span>
+            <span className="quickbar__label">{t("진영 전환")}</span>
           </button>
           <span className="quickbar__sep" aria-hidden="true" />
           {/* 지금 누가 무엇을 맡았는지 — 바꾸기 전에 보여야 누를지 정한다. */}

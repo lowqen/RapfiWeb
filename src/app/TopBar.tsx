@@ -1,5 +1,6 @@
 import { ThemeToggle } from "./ThemeToggle";
 import { EngineIndicator } from "./EngineIndicator";
+import { LangToggle } from "./LangToggle";
 
 /**
  * 제목과 부제 — 현재 위치를 말로 확인해 주는 자리.
@@ -20,6 +21,7 @@ export function TopBar({ title, subtitle }: { title: string; subtitle: string })
       <div className="topbar__end">
         <EngineIndicator />
         <ThemeToggle />
+        <LangToggle />
       </div>
     </header>
   );

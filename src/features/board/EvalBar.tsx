@@ -4,6 +4,7 @@ import { useCurrentEval } from "./currentAnalysis";
 import { useBoardDb } from "./boardDb";
 import { useGameStore } from "./gameStore";
 import { dbEvalView } from "../database/dbTags";
+import { t } from "../../i18n/i18n";
 
 /**
  * 평가 바 — 체스닷컴의 세로 게이지를 오목에 옮긴 것.
@@ -43,7 +44,7 @@ export function EvalBar({ empty }: { empty: boolean }) {
     <div
       className="evalbar"
       role="meter"
-      aria-label="평가 바"
+      aria-label={t("평가 바")}
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={Math.round(black)}
@@ -64,7 +65,7 @@ export function EvalBar({ empty }: { empty: boolean }) {
 }
 
 function labels(v: EvalView | null, fromDb: boolean): { main: string; sub: string | null } {
-  if (!v) return { main: "—", sub: null };
+  if (!v) return { main: "", sub: null };
   if (v.mate) return { main: `M${v.mate.plies}`, sub: fromDb ? "DB" : null };
   if (fromDb) return { main: `${Math.round(Math.max(v.blackPct, 100 - v.blackPct))}%`, sub: "DB" };
   const leadPct = Math.round(Math.max(v.blackPct, 100 - v.blackPct));
@@ -74,9 +75,19 @@ function labels(v: EvalView | null, fromDb: boolean): { main: string; sub: strin
 }
 
 function describe(v: EvalView | null, fromDb: boolean): string {
-  if (!v) return "평가 없음";
-  const src = fromDb ? " · DB 기록" : "";
-  if (v.mate) return `${v.mate.winner === "black" ? "흑" : "백"} ${v.mate.plies}수 외통${src}`;
-  const e = v.blackEval === null ? "" : ` · 평가 ${v.blackEval > 0 ? "+" : ""}${v.blackEval}`;
-  return `흑 ${Math.round(v.blackPct)}% · 백 ${Math.round(100 - v.blackPct)}%${e}${src}`;
+  if (!v) return t("평가 없음");
+  const src = fromDb ? ` · ${t("DB 기록")}` : "";
+  if (v.mate)
+    return (
+      (v.mate.winner === "black"
+        ? t("흑 {n}수 외통", { n: v.mate.plies })
+        : t("백 {n}수 외통", { n: v.mate.plies })) + src
+    );
+  const e =
+    v.blackEval === null
+      ? ""
+      : ` · ${t("평가 {v}", { v: `${v.blackEval > 0 ? "+" : ""}${v.blackEval}` })}`;
+  return (
+    t("흑 {b}% · 백 {w}%", { b: Math.round(v.blackPct), w: Math.round(100 - v.blackPct) }) + e + src
+  );
 }

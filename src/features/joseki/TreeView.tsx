@@ -1,5 +1,6 @@
 import { label } from "../../core/model/move";
 import type { JosekiNode } from "../../core/joseki/tree";
+import { t } from "../../i18n/i18n";
 
 /**
  * 정석 트리 — 기보 편집기의 줄글 모양. 주 변화는 한 줄로 이어 쓰고, 갈래가 있는 수 뒤에 다른 변화를
@@ -26,9 +27,9 @@ export function TreeView({
   for (const i of scope) start = start.children[i] ?? start;
   const here = path.join(".");
   if (start.children.length === 0)
-    return <p className="jtree__empty">아직 수가 없습니다 — 판을 눌러 첫 수를 두세요.</p>;
+    return <p className="jtree__empty">{t("아직 수가 없습니다. 판을 눌러 첫 수를 두세요.")}</p>;
   return (
-    <div className="jtree" role="tree" aria-label="정석 트리">
+    <div className="jtree" role="tree" aria-label={t("정석 트리")}>
       <Line
         node={start}
         prefix={[...scope]}

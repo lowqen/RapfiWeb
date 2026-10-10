@@ -28,6 +28,7 @@ import {
 import { useBoardStore } from "./boardStore";
 import { setGameHandlers, useEngineStore } from "../../engine/engine-state";
 import type { EngineCommand } from "../../engine/engine-types";
+import { msg, t } from "../../i18n/i18n";
 
 /**
  * 대국 상태 기계 — `data/game/GameRepositoryImpl.kt` 의 대국·개시·시계 부분.
@@ -72,11 +73,11 @@ export type BoardMode = "game" | "analysis";
  * 최대 노드로 읽는다. 「최강」은 덧씌우지 않는다(설정의 최대 노드 · 착수 시간 그대로).
  */
 export const LEVELS = [
-  { level: 1, label: "입문", maxNode: 20_000 },
-  { level: 2, label: "초급", maxNode: 100_000 },
-  { level: 3, label: "중급", maxNode: 500_000 },
-  { level: 4, label: "상급", maxNode: 2_000_000 },
-  { level: 5, label: "최강", maxNode: null },
+  { level: 1, label: msg("입문"), maxNode: 20_000 },
+  { level: 2, label: msg("초급"), maxNode: 100_000 },
+  { level: 3, label: msg("중급"), maxNode: 500_000 },
+  { level: 4, label: msg("상급"), maxNode: 2_000_000 },
+  { level: 5, label: msg("최강"), maxNode: null },
 ] as const;
 export const MAX_LEVEL = 5;
 
@@ -120,8 +121,9 @@ function saveMode(m: BoardMode) {
 }
 
 /** 리뷰가 엔진을 쥐고 있을 때의 안내 — 분석 · 정지 · 엔진 착수가 함께 쓴다. */
-export const REVIEW_BUSY =
-  "게임 리뷰나 국면 증명이 엔진을 쓰는 중입니다 — 끝나거나 멈춘 뒤에 하세요";
+export const REVIEW_BUSY = msg(
+  "게임 리뷰나 국면 증명이 엔진을 쓰는 중입니다. 끝나거나 멈춘 뒤에 하세요",
+);
 
 /** 렌주에서는 장목이 흑의 **금수**라 승리 판정에서는 장목을 인정한다. */
 const ALLOW_OVERLINE = true;
@@ -246,7 +248,7 @@ export const useGameStore = create<GameState>((set, get) => {
     const s = get();
     if (r && !s.result) {
       set({ result: r, thinking: false });
-      log(`대국 종료 — ${r.winner ?? "무승부"} / ${r.end}`);
+      log(`대국 종료: ${r.winner ?? "무승부"} / ${r.end}`);
     } else if (!r && s.result) {
       set({ result: null });
     }
@@ -332,8 +334,8 @@ export const useGameStore = create<GameState>((set, get) => {
         if (!get().thinking || get().result) return;
         send({ kind: "stop" });
         set({ thinking: false });
-        prompt({ kind: "info", text: "엔진이 답하지 않습니다 — 손으로 이어서 두세요." });
-        log("엔진 무응답 — 기다림을 풀었습니다");
+        prompt({ kind: "info", text: t("엔진이 답하지 않습니다. 손으로 이어서 두세요.") });
+        log("엔진 무응답: 기다림을 풀었습니다");
       },
       Math.max(WATCHDOG_FLOOR_MS, budgetMs + WATCHDOG_SLACK_MS),
     );
@@ -353,7 +355,7 @@ export const useGameStore = create<GameState>((set, get) => {
     if (s.result || s.mode !== "game") return;
     // 리뷰가 엔진을 쥐고 있다 — 착수를 걸면 리뷰의 국면이 엇갈린다. 기다리게 한다.
     if (engine().owner) {
-      prompt({ kind: "info", text: REVIEW_BUSY });
+      prompt({ kind: "info", text: t(REVIEW_BUSY) });
       return;
     }
     const moves = board().render.stones;
@@ -363,7 +365,7 @@ export const useGameStore = create<GameState>((set, get) => {
     if (moves.length === 0) {
       const first = center(board().render.size);
       place(first);
-      log(`빈 판 — 첫 수 천원 ${label(first, board().render.size)} 바로 착수`);
+      log(`빈 판: 첫 수 천원 ${label(first, board().render.size)} 바로 착수`);
       const next = get();
       if (!next.result && enginePlays(next.computerSide, sideToMove(board().render.stones))) {
         engineTurn();
@@ -422,7 +424,7 @@ export const useGameStore = create<GameState>((set, get) => {
       if (!get().thinking) return;
       disarmWatchdog();
       set({ thinking: false });
-      log("엔진 복구 — 생각하던 수를 새 엔진에게 다시 묻습니다");
+      log("엔진 복구: 생각하던 수를 새 엔진에게 다시 묻습니다");
       engineTurn();
     },
     onEngineReset: () => {
@@ -443,14 +445,14 @@ export const useGameStore = create<GameState>((set, get) => {
     const size = board().render.size;
     if (!inBoard(cell, size)) return { kind: "ignored" };
     if (s.result) {
-      return { kind: "rejected", reason: "대국이 끝났습니다 — 무르거나 새 판을 시작하세요" };
+      return { kind: "rejected", reason: t("대국이 끝났습니다. 무르거나 새 판을 시작하세요") };
     }
-    if (s.prompt) return { kind: "rejected", reason: "먼저 위 물음에 답해 주세요" };
+    if (s.prompt) return { kind: "rejected", reason: t("먼저 위 물음에 답해 주세요") };
     const moves = board().render.stones;
     if (moves.some((m) => sameMove(m, cell))) return { kind: "ignored" };
     if (sideToMove(moves) === "black" && board().forbidden.some((m) => sameMove(m, cell))) {
       prompt({ kind: "forbidden", cell });
-      return { kind: "rejected", reason: `금수입니다 (${label(cell, size)})` };
+      return { kind: "rejected", reason: t("금수입니다 ({cell})", { cell: label(cell, size) }) };
     }
     place(cell);
     return { kind: "placed" };
@@ -468,7 +470,7 @@ export const useGameStore = create<GameState>((set, get) => {
         disarmWatchdog();
         set({ thinking: false });
         engine().stop();
-        log("탭 전환 — 엔진이 생각하던 수를 버렸습니다");
+        log("탭 전환: 엔진이 생각하던 수를 버렸습니다");
       } else if (engine().analyzing) {
         // 분석 → 대국: 멈추기만 한다. 최선수를 두지 않는다 — 대국의 판에 새어 들지 않게.
         engine().stop();
@@ -482,7 +484,7 @@ export const useGameStore = create<GameState>((set, get) => {
     setLevel: (n) => {
       const level = Math.min(MAX_LEVEL, Math.max(1, Math.round(n)));
       set({ level });
-      log(`대국 레벨: ${LEVELS.find((l) => l.level === level)?.label ?? level}`);
+      log(`대국 레벨: ${level}`);
     },
 
     computerSide: "none",
@@ -561,7 +563,7 @@ export const useGameStore = create<GameState>((set, get) => {
       board().setForbidden([]);
       set({ result: null, thinking: false, prompt: null, gameName: opts.name ?? null });
       judge();
-      log(opts.what ?? `불러오기 — ${moves.length}수`);
+      log(opts.what ?? `불러오기: ${moves.length}수`);
       // 엔진에 따로 알리지 않는다 — 다음 요청이 `BOARD`/`YXBOARD` 로 판을 통째로 준다.
       refreshForbidden();
     },
@@ -575,17 +577,17 @@ export const useGameStore = create<GameState>((set, get) => {
       if (s.thinking) {
         const reason =
           s.moveTimeMs > 0
-            ? "엔진이 생각 중입니다"
-            : "엔진이 생각 중입니다 — 「지금 두기」를 누르면 둡니다";
+            ? t("엔진이 생각 중입니다")
+            : t("엔진이 생각 중입니다. 「지금 두기」를 누르면 둡니다");
         return { kind: "rejected", reason };
       }
       if (s.result) {
         return {
           kind: "rejected",
-          reason: "대국이 끝났습니다 — 무르거나 새 대국을 시작하세요",
+          reason: t("대국이 끝났습니다. 무르거나 새 판을 시작하세요"),
         };
       }
-      if (s.prompt) return { kind: "rejected", reason: "먼저 위 물음에 답해 주세요" };
+      if (s.prompt) return { kind: "rejected", reason: t("먼저 위 물음에 답해 주세요") };
 
       const moves = board().render.stones;
       if (moves.some((m) => sameMove(m, cell))) return { kind: "ignored" };
@@ -608,7 +610,7 @@ export const useGameStore = create<GameState>((set, get) => {
       // 렌주 금수 — 데스크톱의 대화상자와 같이 거절한다.
       if (sideToMove(moves) === "black" && board().forbidden.some((m) => sameMove(m, cell))) {
         prompt({ kind: "forbidden", cell });
-        return { kind: "rejected", reason: `금수입니다 (${label(cell, size)})` };
+        return { kind: "rejected", reason: t("금수입니다 ({cell})", { cell: label(cell, size) }) };
       }
 
       place(cell);
@@ -664,7 +666,7 @@ export const useGameStore = create<GameState>((set, get) => {
     stopAnalysis: ({ playBest }) => {
       const e = engine();
       // 지금 도는 탐색은 리뷰의 것이다 — 분석 정지가 그것을 끊으면 리뷰가 덜 읽은 값을 적는다.
-      if (e.owner) return { kind: "rejected", reason: REVIEW_BUSY };
+      if (e.owner) return { kind: "rejected", reason: t(REVIEW_BUSY) };
       // 「분석 중」이었는가 — 의도가 켜져 있거나, 대국이 아닌 탐색이 돌고 있다.
       const running = e.analyzing || (e.status === "searching" && !get().thinking);
       const stones = board().render.stones;
@@ -678,16 +680,16 @@ export const useGameStore = create<GameState>((set, get) => {
       e.stop();
       if (!playBest || !running || get().mode !== "analysis") return { kind: "stopped" };
       if (!best) {
-        return { kind: "rejected", reason: "엔진이 아직 이 국면의 최선수를 찾지 못했습니다" };
+        return { kind: "rejected", reason: t("엔진이 아직 이 국면의 최선수를 찾지 못했습니다") };
       }
       const r = placeForAnalysis(best);
       if (r.kind === "placed") {
-        log(`정지 — 최선수 ${label(best, board().render.size)} 착수`);
+        log(`정지: 최선수 ${label(best, board().render.size)} 착수`);
         return { kind: "placed", cell: best };
       }
       return {
         kind: "rejected",
-        reason: r.kind === "rejected" ? r.reason : "최선수 자리에 둘 수 없습니다",
+        reason: r.kind === "rejected" ? r.reason : t("최선수 자리에 둘 수 없습니다"),
       };
     },
 

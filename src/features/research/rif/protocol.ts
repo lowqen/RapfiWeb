@@ -1,4 +1,5 @@
 import type { RenjuPack } from "../../../core/rif/pack";
+import { msg } from "../../../i18n/i18n";
 
 /**
  * W7 변환 워커와 주고받는 말. 변환은 몇 초지만 그동안 화면이 멈추면 안 되고(진행 막대가 흘러야
@@ -12,6 +13,9 @@ export interface LocalGame {
   readonly res: number;
   readonly savedAt: number;
 }
+
+/** 워커가 «대국이 없다»를 알리는 부호 — 문구는 화면이 그 언어로 만든다. */
+export const NO_GAMES = "NO_GAMES";
 
 export type ToRifWorker = { type: "rif"; file: File; partitions?: number };
 
@@ -51,9 +55,10 @@ export function overallFraction(phase: RifPhase, f: number, part = 0, parts = 1)
   return READ_SPAN + (1 - READ_SPAN) * ((part + a + (b - a) * x) / parts);
 }
 
+/** 단계 이름 — 번역 열쇠(그릴 때 `t()`). 워커와 함께 쓰는 파일이라 번역은 화면에서 한다. */
 export const RIF_PHASE_TEXT: Readonly<Record<RifPhase, string>> = {
-  read: "파일 읽는 중",
-  index: "국면 세는 중",
-  sort: "정리하는 중",
-  count: "통계 만드는 중",
+  read: msg("파일 읽는 중"),
+  index: msg("국면 세는 중"),
+  sort: msg("정리하는 중"),
+  count: msg("통계 만드는 중"),
 };

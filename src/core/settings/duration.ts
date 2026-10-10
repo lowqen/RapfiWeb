@@ -1,3 +1,5 @@
+import { t } from "../../i18n/i18n";
+
 /**
  * 시간 직접 입력 — 착수 시간 · 분석 시간 · 리뷰 예산 · 증명 예산 칸이 함께 쓰는 해석기.
  *
@@ -56,11 +58,11 @@ const UNLIMITED_WORDS = new Set(["무제한", "∞", "unlimited", "inf", "infini
 
 /** 사람이 읽는 시간 — 「무제한」 · 「800ms」 · 「2.5초」 · 「90초」 · 「10분」. */
 export function formatDuration(ms: number): string {
-  if (ms <= 0) return "무제한";
+  if (ms <= 0) return t("무제한");
   if (ms < 1000) return `${Math.round(ms)}ms`;
-  if (ms >= 600_000 && ms % 60_000 === 0) return `${ms / 60_000}분`;
+  if (ms >= 600_000 && ms % 60_000 === 0) return t("{n}분", { n: ms / 60_000 });
   const s = ms / 1000;
-  return `${Number.isInteger(s) ? s : Number(s.toFixed(2))}초`;
+  return t("{n}초", { n: Number.isInteger(s) ? s : Number(s.toFixed(2)) });
 }
 
 /** 입력 칸에 다시 채울 글 — 그 칸의 기본 단위로, 단위 글자 없이. 무제한은 빈칸. */
@@ -74,27 +76,27 @@ export function parseDuration(text: string, spec: DurationSpec): DurationResult 
   const fallback = (why: string): DurationResult => ({
     kind: "fallback",
     ms: spec.defaultMs,
-    note: `${why} — 기본값(${formatDuration(spec.defaultMs)})으로 돌렸습니다`,
+    note: t("{why}. 기본값({def})으로 돌렸습니다", { why, def: formatDuration(spec.defaultMs) }),
   });
 
   const raw = text.trim().toLowerCase().replace(/\s+/g, "");
-  if (raw === "") return fallback("시간이 비었습니다");
+  if (raw === "") return fallback(t("시간이 비었습니다"));
   if (UNLIMITED_WORDS.has(raw)) {
-    return spec.unlimited ? { kind: "ok", ms: 0 } : fallback("이 칸은 무제한을 받지 않습니다");
+    return spec.unlimited ? { kind: "ok", ms: 0 } : fallback(t("이 칸은 무제한을 받지 않습니다"));
   }
 
   const m = /^([+-]?\d+(?:[.,]\d*)?|[+-]?[.,]\d+)([a-z가-힣]*)$/.exec(raw);
-  if (!m) return fallback(`«${text.trim()}» 는 시간이 아닙니다`);
+  if (!m) return fallback(t("«{text}» 는 시간이 아닙니다", { text: text.trim() }));
   const num = Number(m[1]!.replace(",", "."));
   const unitWord = m[2]!;
   const factor = unitWord === "" ? UNIT_MS[spec.unit]! : UNIT_MS[unitWord];
-  if (factor === undefined) return fallback(`«${unitWord}» 는 모르는 단위입니다`);
-  if (!Number.isFinite(num)) return fallback("수가 아닙니다");
-  if (num < 0) return fallback("음수는 시간이 될 수 없습니다");
+  if (factor === undefined) return fallback(t("«{unit}» 는 모르는 단위입니다", { unit: unitWord }));
+  if (!Number.isFinite(num)) return fallback(t("수가 아닙니다"));
+  if (num < 0) return fallback(t("음수는 시간이 될 수 없습니다"));
 
   let ms = num * factor;
   if (ms === 0) {
-    return spec.unlimited ? { kind: "ok", ms: 0 } : fallback("0 은 이 칸에서 쓸 수 없습니다");
+    return spec.unlimited ? { kind: "ok", ms: 0 } : fallback(t("0 은 이 칸에서 쓸 수 없습니다"));
   }
 
   const step = spec.stepMs && spec.stepMs > 0 ? spec.stepMs : 1;
@@ -103,14 +105,14 @@ export function parseDuration(text: string, spec: DurationSpec): DurationResult 
     return {
       kind: "clamped",
       ms: spec.minMs,
-      note: `가장 짧은 ${formatDuration(spec.minMs)}로 맞췄습니다`,
+      note: t("가장 짧은 {v}로 맞췄습니다", { v: formatDuration(spec.minMs) }),
     };
   }
   if (ms > spec.maxMs) {
     return {
       kind: "clamped",
       ms: spec.maxMs,
-      note: `가장 긴 ${formatDuration(spec.maxMs)}로 맞췄습니다`,
+      note: t("가장 긴 {v}로 맞췄습니다", { v: formatDuration(spec.maxMs) }),
     };
   }
   return { kind: "ok", ms };

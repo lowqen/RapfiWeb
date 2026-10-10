@@ -10,6 +10,7 @@ import {
   RulesetControl,
 } from "./boardControls";
 import { STATUS_TEXT } from "./analysisActions";
+import { t } from "../../i18n/i18n";
 
 /**
  * [대국] 탭의 카드 — 사람 대 컴퓨터 한 판에 필요한 것만.
@@ -34,24 +35,25 @@ export function GamePanel() {
   const side = useGameStore((s) => s.computerSide);
   const level = useGameStore((s) => s.level);
 
-  const levelLabel = LEVELS.find((l) => l.level === level)?.label ?? String(level);
-  const statusText = thinking ? "엔진이 생각 중" : STATUS_TEXT[status];
+  const found = LEVELS.find((l) => l.level === level);
+  const levelLabel = found ? t(found.label) : String(level);
+  const statusText = thinking ? t("엔진이 생각 중") : STATUS_TEXT[status];
 
   return (
     <section className="panel panel--engine panel--game" aria-labelledby="game-panel-title">
       <h2 id="game-panel-title" className="panel__title">
-        대국 <span className="panel__badge" data-status={thinking ? "searching" : status} />
+        {t("대국")} <span className="panel__badge" data-status={thinking ? "searching" : status} />
         <span className="panel__status">{statusText}</span>
       </h2>
       <p className="engine-mode" data-on={thinking || undefined}>
         <span className="engine-mode__dot" aria-hidden="true" />
-        {COMPUTER_SIDE_LABEL[side]} · 레벨 {levelLabel}
+        {COMPUTER_SIDE_LABEL[side]} · {t("레벨 {level}", { level: levelLabel })}
       </p>
 
       {(status === "idle" || status === "error") && caps.variant && (
         <div className="panel__actions">
           <button type="button" onClick={() => void start()}>
-            엔진 시작
+            {t("엔진 시작")}
           </button>
         </div>
       )}
@@ -61,7 +63,7 @@ export function GamePanel() {
       {thinking && unlimited && (
         <div className="panel__actions">
           <button type="button" className="button--primary" onClick={moveNow}>
-            지금 두기
+            {t("지금 두기")}
           </button>
         </div>
       )}
@@ -69,24 +71,34 @@ export function GamePanel() {
       {error && <p className="panel__error">{error}</p>}
 
       <div className="panel__rows">
-        <Row id="computer" label="흑 / 백" note="엔진 차례에 판을 누르면 엔진이 둡니다" wide>
+        <Row
+          id="computer"
+          label={t("흑 / 백")}
+          note={t("엔진 차례에 판을 누르면 엔진이 둡니다")}
+          wide
+        >
           <ComputerControl />
         </Row>
         <Row
           id="moveTime"
-          label="시간 제어"
-          note="무제한 + 최강이면 「지금 두기」까지 읽습니다"
+          label={t("시간 제어")}
+          note={t("무제한 + 최강이면 「지금 두기」까지 읽습니다")}
           wide
         >
           <MoveTimeControl />
         </Row>
-        <Row id="level" label="레벨" note="한 수에 읽을 노드 수 — 분석에는 적용되지 않습니다" wide>
+        <Row
+          id="level"
+          label={t("레벨")}
+          note={t("한 수에 읽을 노드 수입니다. 분석에는 적용되지 않습니다")}
+          wide
+        >
           <LevelControl />
         </Row>
-        <Row id="threads" label="스레드" wide>
+        <Row id="threads" label={t("스레드")} wide>
           <ThreadControl />
         </Row>
-        <Row id="ruleset" label="룰셋" note="바꾸면 새 대국" wide>
+        <Row id="ruleset" label={t("룰셋")} note={t("바꾸면 새 대국")} wide>
           <RulesetControl />
         </Row>
       </div>

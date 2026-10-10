@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useEngineStore } from "../../engine/engine-state";
 import { useSettingsStore } from "../settings/settingsStore";
+import { localized, msg, t } from "../../i18n/i18n";
 
 /**
  * 엔진 화면 — 엔진 상태와 piskvork 콘솔.
@@ -14,19 +15,19 @@ import { useSettingsStore } from "../settings/settingsStore";
 const VISIBLE_LINES = 400;
 
 /** 가중치를 어디서 얻었나 — 캐시면 이번 기동에 20MB 를 받지 않았다. */
-const WEIGHTS_SOURCE: Record<"cache" | "network" | "glue", string> = {
-  cache: "캐시(해시 확인)",
-  network: "내려받음(해시 확인)",
-  glue: "글루가 받음",
-};
+const WEIGHTS_SOURCE: Readonly<Record<"cache" | "network" | "glue", string>> = localized({
+  cache: msg("캐시(해시 확인)"),
+  network: msg("내려받음(해시 확인)"),
+  glue: msg("글루가 받음"),
+});
 
-const STATUS_TEXT: Record<string, string> = {
-  idle: "꺼짐",
-  starting: "기동 중",
-  ready: "대기",
-  searching: "탐색 중",
-  error: "오류",
-};
+const STATUS_TEXT: Readonly<Record<string, string>> = localized({
+  idle: msg("꺼짐"),
+  starting: msg("기동 중"),
+  ready: msg("대기"),
+  searching: msg("탐색 중"),
+  error: msg("오류"),
+});
 
 export function EngineScreen() {
   const status = useEngineStore((s) => s.status);
@@ -45,40 +46,43 @@ export function EngineScreen() {
 
   return (
     <div className="enginescreen">
-      <section className="panel">
+      <section className="panel" aria-busy={status === "starting"}>
         <h2 className="panel__title">
-          엔진 <span className="panel__badge" data-status={status} />
+          {t("엔진")} <span className="panel__badge" data-status={status} />
           <span className="panel__status">{STATUS_TEXT[status]}</span>
         </h2>
         <dl className="kv">
-          <dt>변형</dt>
+          <dt>{t("변형")}</dt>
           <dd className="tnum" data-k="variant">
-            {engine.variant ?? (caps.variant ? `${caps.variant} (뜨기 전)` : "실행 불가")}
+            {engine.variant ??
+              (caps.variant ? t("{v} (뜨기 전)", { v: caps.variant }) : t("실행 불가"))}
           </dd>
-          <dt>스레드</dt>
+          <dt>{t("스레드")}</dt>
           <dd className="tnum" data-k="threads">
-            {applied ?? "—"}
-            {engine.variant ? (engine.threaded ? " · 멀티스레드" : " · 단일 스레드") : ""}
+            {applied ?? t("없음")}
+            {engine.variant ? ` · ${engine.threaded ? t("멀티스레드") : t("단일 스레드")}` : ""}
           </dd>
-          <dt>가중치</dt>
+          <dt>{t("가중치")}</dt>
           <dd className="tnum" data-k="weights">
             {engine.weightsSource === null
-              ? "—"
+              ? t("없음")
               : `${WEIGHTS_SOURCE[engine.weightsSource]} · ${engine.weightsMs ?? 0}ms`}
           </dd>
-          <dt>예열</dt>
+          <dt>{t("예열")}</dt>
           <dd className="tnum" data-k="warmup">
-            {engine.warmupMs === null ? "—" : `${engine.warmupMs}ms`}
+            {engine.warmupMs === null ? t("없음") : `${engine.warmupMs}ms`}
           </dd>
-          <dt>해시</dt>
+          <dt>{t("해시")}</dt>
           <dd className="tnum">{hashMb} MB</dd>
-          <dt>스타일</dt>
+          <dt>{t("스타일")}</dt>
           <dd className="tnum">{style}</dd>
-          <dt>분석</dt>
-          <dd>{analyzing ? "켜짐 — 국면을 따라 읽는 중" : "꺼짐"}</dd>
+          <dt>{t("분석")}</dt>
+          <dd>{analyzing ? t("켜짐: 국면을 따라 읽는 중") : t("꺼짐")}</dd>
         </dl>
         {!caps.variant && caps.note && <p className="panel__hint">{caps.note}</p>}
-        {engine.fallbackReason && <p className="panel__hint">물러섬 — {engine.fallbackReason}</p>}
+        {engine.fallbackReason && (
+          <p className="panel__hint">{t("물러섬: {why}", { why: engine.fallbackReason })}</p>
+        )}
         {!engine.variant && caps.threadsNote && caps.variant && (
           <p className="panel__hint">{caps.threadsNote}</p>
         )}
@@ -86,11 +90,11 @@ export function EngineScreen() {
         <div className="panel__actions">
           {status === "idle" || status === "error" ? (
             <button type="button" onClick={() => void start()} disabled={!caps.variant}>
-              엔진 시작
+              {t("엔진 시작")}
             </button>
           ) : null}
           <button type="button" onClick={terminate} disabled={status === "idle"}>
-            종료
+            {t("종료")}
           </button>
           {/* 한 번 쓰는 동작이라 설정 목록이 아니라 엔진 곁에 둔다. 탐색 중에 보내면
               읽던 표를 발밑에서 비우게 되므로 대기 중일 때만. */}
@@ -98,24 +102,26 @@ export function EngineScreen() {
             type="button"
             onClick={() => send({ kind: "raw", line: "YXHASHCLEAR" })}
             disabled={status !== "ready"}
-            title="YXHASHCLEAR — 치환표를 지금 한 번 비웁니다"
+            title={t("YXHASHCLEAR: 치환표를 지금 한 번 비웁니다")}
           >
-            해시 비우기
+            {t("해시 비우기")}
           </button>
         </div>
       </section>
 
       <section className="panel enginescreen__console">
         <h2 className="panel__title">
-          콘솔
-          <span className="panel__status tnum">{lines.length.toLocaleString()}줄</span>
+          {t("콘솔")}
+          <span className="panel__status tnum">
+            {t("{n}줄", { n: lines.length.toLocaleString() })}
+          </span>
           <button
             type="button"
             className="panel__link"
             onClick={clearConsole}
             disabled={lines.length === 0}
           >
-            지우기
+            {t("지우기")}
           </button>
         </h2>
         <ConsoleView lines={lines} />
@@ -139,7 +145,7 @@ function ConsoleView({ lines }: { lines: readonly string[] }) {
   }, [lines, follow]);
 
   if (lines.length === 0) {
-    return <p className="panel__hint">엔진이 아직 아무 말도 하지 않았습니다.</p>;
+    return <p className="panel__hint">{t("엔진이 아직 아무 말도 하지 않았습니다.")}</p>;
   }
   return (
     <pre

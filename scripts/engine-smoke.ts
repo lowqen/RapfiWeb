@@ -132,7 +132,7 @@ async function dumpState(why: string, err?: unknown) {
 }
 
 try {
-  page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  page = await browser.newPage({ viewport: { width: 1440, height: 900 }, locale: "ko-KR" });
   const errors = pageErrors;
   page.on("pageerror", (e) => errors.push("[pageerror] " + (e.stack ?? String(e))));
   page.on("console", (m) => {
@@ -277,7 +277,7 @@ try {
     .locator(".panel")
     .filter({ has: page.locator(".panel__badge") })
     .locator(".kv dd.tnum")
-    .filter({ hasNotText: "—" })
+    .filter({ hasNotText: "없음" })
     .first()
     .waitFor({ timeout: 30_000 });
   await page.waitForTimeout(2000);
@@ -296,7 +296,7 @@ try {
   // 분석 패널은 상태 점(.panel__badge)을 가진 패널이다.
   const analysisPanel = page.locator(".panel").filter({ has: page.locator(".panel__badge") });
   const bestCell = (await analysisPanel.locator(".kv dd").last().innerText()).trim();
-  if (bestCell === "—") fail("최선수가 비어 있습니다 — INFO 스트림이 오지 않았습니다");
+  if (bestCell === "없음") fail("최선수가 비어 있습니다 — INFO 스트림이 오지 않았습니다");
   else console.log(`최선수 ${bestCell}`);
 
   const pvRows = await page.locator(".pvlist__row").count();
@@ -373,7 +373,7 @@ try {
   else console.log(`정지 → 최선수 ${stoppedOn} 착수`);
   // 둔 직후 옛 국면(1수)의 BEST·PV 가 새 국면(2수)에 남지 않는다.
   const afterPlace = (await analysisPanel.locator(".kv dd").last().innerText()).trim();
-  if (afterPlace !== "—") fail(`착수 뒤에 옛 국면의 BEST(${afterPlace}) 가 남아 있습니다`);
+  if (afterPlace !== "없음") fail(`착수 뒤에 옛 국면의 BEST(${afterPlace}) 가 남아 있습니다`);
   if ((await page.locator(".pvlist__row").count()) !== 0)
     fail("착수 뒤에 옛 국면의 PV 가 남아 있습니다");
 
@@ -385,7 +385,7 @@ try {
     .waitForFunction(
       `(() => { const dds = [...document.querySelectorAll(".kv.stats dd")];
                 return document.querySelectorAll(".pvlist__row").length > 0 &&
-                       dds.length > 0 && dds[dds.length - 1].textContent.trim() !== "—"; })()`,
+                       dds.length > 0 && dds[dds.length - 1].textContent.trim() !== "없음"; })()`,
       undefined,
       { timeout: 30_000 },
     )
@@ -405,7 +405,7 @@ try {
     };
   })()`)) as { best: string; pv: number; bar: string; stones: string };
   if (!undone.stones.includes("돌 1개")) fail(`무르기가 돌지 않았습니다: ${undone.stones}`);
-  else if (undone.best !== "—" || undone.pv !== 0 || undone.bar !== "평가 없음") {
+  else if (undone.best !== "없음" || undone.pv !== 0 || undone.bar !== "평가 없음") {
     fail(
       `무른 판에 뒤 국면의 분석이 남았습니다 — BEST ${undone.best} · PV ${undone.pv}줄 · 평가 바 «${undone.bar}»`,
     );
@@ -414,7 +414,7 @@ try {
   await page
     .waitForFunction(
       `(() => { const dds = [...document.querySelectorAll(".kv.stats dd")];
-                return dds[dds.length - 1].textContent.trim() !== "—"; })()`,
+                return dds[dds.length - 1].textContent.trim() !== "없음"; })()`,
       undefined,
       { timeout: 30_000 },
     )

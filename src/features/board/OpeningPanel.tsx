@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
+import { msg, t } from "../../i18n/i18n";
 import { useBoardStore } from "./boardStore";
 import { useGameStore } from "./gameStore";
 import { OPENING_LABEL, negotiates, type OpeningProtocol } from "../../core/model/game";
@@ -16,7 +17,11 @@ export function OpeningProgress() {
   if (!negotiates(opening)) return null;
 
   return (
-    <div className="opening-progress" role="group" aria-label={`${OPENING_LABEL[opening]} 진행`}>
+    <div
+      className="opening-progress"
+      role="group"
+      aria-label={t("{name} 진행", { name: OPENING_LABEL[opening] })}
+    >
       <Timeline opening={opening} stones={stones} />
     </div>
   );
@@ -52,7 +57,7 @@ function Timeline({ opening, stones }: { opening: OpeningProtocol; stones: numbe
           className="timeline__step"
           data-state={i < at ? "done" : i === at ? "now" : "todo"}
         >
-          {s}
+          {t(s)}
         </li>
       ))}
     </ol>
@@ -62,9 +67,9 @@ function Timeline({ opening, stones }: { opening: OpeningProtocol; stones: numbe
 function stepsFor(o: OpeningProtocol): string[] {
   switch (o) {
     case "swapFirst":
-      return ["흑 1수", "색 결정", "대국"];
+      return [msg("흑 1수"), msg("색 결정"), msg("대국")];
     case "rif":
-      return ["첫 3수", "대국"];
+      return [msg("첫 3수"), msg("대국")];
     case "none":
       return [];
   }
@@ -82,9 +87,9 @@ function currentStep(o: OpeningProtocol, n: number): number {
 }
 
 /** 개시 영역을 어긴 안내. `Referee.openingAreaOk` 가 보는 조건 그대로다. */
-const ILLEGAL_OPENING =
-  "개시 영역을 벗어났습니다 — 판을 되돌렸습니다. " +
-  "1수는 천원, 2수는 그 한 점 이내, 3수는 두 점 이내여야 합니다.";
+const ILLEGAL_OPENING = msg(
+  "개시 영역을 벗어나 판을 되돌렸습니다. 1수는 천원, 2수는 그 한 점 이내, 3수는 두 점 이내여야 합니다.",
+);
 
 /** 지금 물어보고 있는 것. 데스크톱의 대화상자 하나에 대응한다. */
 function Prompt() {
@@ -95,39 +100,39 @@ function Prompt() {
   switch (p.kind) {
     case "swap":
       return (
-        <Ask kind={p.kind} text="색을 교환하시겠습니까?">
+        <Ask kind={p.kind} text={t("색을 교환하시겠습니까?")}>
           <button type="button" onClick={() => g.answerSwap(true)}>
-            교환
+            {t("교환")}
           </button>
           <button type="button" onClick={() => g.answerSwap(false)}>
-            그대로
+            {t("그대로")}
           </button>
         </Ask>
       );
 
     case "swapInfo":
       return (
-        <Ask kind={p.kind} text="상대가 색을 가져갔습니다.">
+        <Ask kind={p.kind} text={t("상대가 색을 가져갔습니다.")}>
           <button type="button" onClick={g.dismissPrompt}>
-            확인
+            {t("확인")}
           </button>
         </Ask>
       );
 
     case "illegalOpening":
       return (
-        <Ask kind={p.kind} text={ILLEGAL_OPENING}>
+        <Ask kind={p.kind} text={t(ILLEGAL_OPENING)}>
           <button type="button" onClick={g.dismissPrompt}>
-            확인
+            {t("확인")}
           </button>
         </Ask>
       );
 
     case "forbidden":
       return (
-        <Ask kind={p.kind} text={`${label(p.cell)} 은 흑의 금수입니다.`}>
+        <Ask kind={p.kind} text={t("{cell} 은 흑의 금수입니다.", { cell: label(p.cell) })}>
           <button type="button" onClick={g.dismissPrompt}>
-            확인
+            {t("확인")}
           </button>
         </Ask>
       );
@@ -136,19 +141,36 @@ function Prompt() {
       return (
         <Ask kind={p.kind} text={p.text}>
           <button type="button" onClick={g.dismissPrompt}>
-            확인
+            {t("확인")}
           </button>
         </Ask>
       );
   }
 }
 
+/**
+ * 물음 하나 — 답하기 전까지 판이 잠기는 대화상자다(`role="alertdialog"`). 뜨는 순간 첫 버튼으로 초점을
+ * 옮겨 키보드로 곧바로 답하게 하고(Enter · Space), 스크린 리더는 물음 글을 읽는다(W10 접근성).
+ */
 function Ask({ kind, text, children }: { kind: string; text: string; children: ReactNode }) {
+  const id = useId();
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    box.current?.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
+  }, [kind, text]);
   return (
     // `data-prompt` 는 스모크가 «지금 무엇을 묻고 있나»를 문구가 아니라
     // 종류로 집게 한다 — 문구는 다듬을 수 있고 종류는 프로토콜의 것이다.
-    <div className="ask panel-enter" data-prompt={kind}>
-      <p className="ask__text">{text}</p>
+    <div
+      ref={box}
+      className="ask panel-enter"
+      data-prompt={kind}
+      role="alertdialog"
+      aria-labelledby={id}
+    >
+      <p className="ask__text" id={id}>
+        {text}
+      </p>
       <div className="ask__actions">{children}</div>
     </div>
   );

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_RULES,
   MoveOrderSession,
-  TOO_BIG,
+  tooBig,
   actualNext,
   breadcrumb,
   headline,
@@ -31,7 +31,7 @@ describe("세션", () => {
     expect(s.build([], size, DEFAULT_RULES).kind).toBe("empty");
     const many = Array.from({ length: 2 * MO_MAX_STONES + 2 }, (_, i) => i);
     expect(s.build(many, size, DEFAULT_RULES).kind).toBe("tooBig");
-    expect(TOO_BIG).toContain(String(MO_MAX_STONES));
+    expect(tooBig()).toContain(String(MO_MAX_STONES));
   });
 
   it("파고들기 · 되짚기 · 처음이 스냅샷으로 답한다", () => {
@@ -68,10 +68,10 @@ describe("문구", () => {
   it("머리줄 — 수 · 배치 · 넘침 · 불가", () => {
     expect(
       headline(build(line("h8", "i9", "j10", "k11"), { ...DEFAULT_RULES, symmetry: false }).v),
-    ).toBe("흑 2 · 백 2 — 수순 1가지");
+    ).toBe("흑 2 · 백 2 · 수순 1가지");
     expect(
       headline(build(line("h8", "i9", "j10", "k11"), { ...DEFAULT_RULES, move2Fix: false }).v),
-    ).toBe("흑 2 · 백 2 — 수순 4가지 (배치 4종)");
+    ).toBe("흑 2 · 백 2 · 수순 4가지 (배치 4종)");
     expect(
       headline(build(line("h8", "i9", "k11"), { ...DEFAULT_RULES, symmetry: false }).v),
     ).toMatch(/만들 수 없는 배치$/);

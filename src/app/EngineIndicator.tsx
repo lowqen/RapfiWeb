@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { msg, t } from "../i18n/i18n";
 import { useEngineStore } from "../engine/engine-state";
 import type { BootPhase, EngineStatus } from "../engine/engine-types";
 import { isMultiVariant, isRelaxedVariant } from "../engine/engine-client";
@@ -26,17 +27,17 @@ import { EngineSelect } from "../features/settings/engineControls";
  * 칩의 글자 칸은 폭을 고정해 단계 글자가 바뀌어도 옆의 드롭다운이 들썩이지 않는다.
  */
 const PHASE_TEXT: Record<BootPhase, string> = {
-  weights: "가중치 받는 중",
-  engine: "엔진 올리는 중",
-  warmup: "예열 중",
+  weights: msg("가중치 받는 중"),
+  engine: msg("엔진 올리는 중"),
+  warmup: msg("예열 중"),
 };
 
 const STATUS_TEXT: Record<EngineStatus, string> = {
-  idle: "엔진 꺼짐",
-  starting: "엔진 준비 중",
-  ready: "엔진 준비",
-  searching: "탐색 중",
-  error: "엔진 오류",
+  idle: msg("엔진 꺼짐"),
+  starting: msg("엔진 준비 중"),
+  ready: msg("엔진 준비"),
+  searching: msg("탐색 중"),
+  error: msg("엔진 오류"),
 };
 
 /** 이보다 빨리 끝나는 기동에는 진행 줄을 보이지 않는다. */
@@ -88,20 +89,20 @@ export function EngineIndicator() {
   const bar = useBootBar(status === "starting");
 
   const variant = engine.variant
-    ? `${isMultiVariant(engine.variant) ? "멀티" : "단일"}${isRelaxedVariant(engine.variant) ? " · relaxed" : ""}`
+    ? `${isMultiVariant(engine.variant) ? t("멀티") : t("단일")}${isRelaxedVariant(engine.variant) ? " · relaxed" : ""}`
     : null;
   const detail =
     status === "starting"
       ? phase
-        ? PHASE_TEXT[phase]
+        ? t(PHASE_TEXT[phase])
         : null
       : status === "ready" || status === "searching"
         ? variant
         : null;
   const title =
     status === "error"
-      ? (error ?? "엔진 오류")
-      : `${STATUS_TEXT[status]}${detail ? ` · ${detail}` : ""}${engine.variant ? ` (${engine.variant})` : ""}`;
+      ? (error ?? t("엔진 오류"))
+      : `${t(STATUS_TEXT[status])}${detail ? ` · ${detail}` : ""}${engine.variant ? ` (${engine.variant})` : ""}`;
 
   return (
     <div className="enginechip-wrap">
@@ -115,17 +116,17 @@ export function EngineIndicator() {
       >
         <span className="enginechip__dot" aria-hidden="true" />
         <span className="enginechip__text">
-          {STATUS_TEXT[status]}
+          {t(STATUS_TEXT[status])}
           {detail && <span className="enginechip__detail"> · {detail}</span>}
         </span>
         {(status === "idle" || status === "error") && caps.variant && (
           <button
             type="button"
             className="enginechip__action"
-            aria-label="엔진 기동"
+            aria-label={t("엔진 기동")}
             onClick={() => void start()}
           >
-            {status === "error" ? "다시 시도" : "켜기"}
+            {status === "error" ? t("다시 시도") : t("켜기")}
           </button>
         )}
       </span>

@@ -159,7 +159,11 @@ const STOP_AND_READ_BEST = `(() => {
 
 if (!REMOTE) await new Promise<void>((r) => server.listen(PORT, r));
 const browser = await chromium.launch();
-const page: Page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+// 화면 문구를 한국어로 고정한다 — 앱은 브라우저 언어가 한국어가 아니면 영어로 뜬다(W10).
+const page: Page = await browser.newPage({
+  viewport: { width: 1440, height: 1000 },
+  locale: "ko-KR",
+});
 const pageErrors: string[] = [];
 page.on("pageerror", (e) => pageErrors.push("[pageerror] " + (e.stack ?? String(e))));
 page.on("console", (m) => {

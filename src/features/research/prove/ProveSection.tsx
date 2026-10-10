@@ -10,6 +10,7 @@ import { badgeLines, outcomeMessage, outcomeTitle } from "../../../core/prove/pr
 import { useBoardStore } from "../../board/boardStore";
 import { useDbStore } from "../../database/dbStore";
 import { useProveStore } from "./proveStore";
+import { t } from "../../../i18n/i18n";
 
 /**
  * 연구 ▸ 리뷰·증명 의 **증명**(W6d) — 앱 `ProveScreen` 의 이식.
@@ -52,11 +53,11 @@ export function ProveSection() {
       for (const { move, mark, budget } of ov.marks.values()) {
         const k = moveKey(move, board.size);
         if (onLine.has(k)) continue;
-        if (mark === "win") tags.set(k, { label: "승", kind: "win" });
-        else if (mark === "loss") tags.set(k, { label: "패", kind: "lose" });
+        if (mark === "win") tags.set(k, { label: t("승"), kind: "win" });
+        else if (mark === "loss") tags.set(k, { label: t("패"), kind: "lose" });
         else if (mark === "open")
           tags.set(k, { label: budgetText(budget, ov.byDepth), kind: "rate", winRatePct: 50 });
-        else if (mark === "exh") tags.set(k, { label: "소진", kind: "rate", winRatePct: 50 });
+        else if (mark === "exh") tags.set(k, { label: t("소진"), kind: "rate", winRatePct: 50 });
         else if (mark === "latent") candidates.set(k, "done");
       }
     }
@@ -73,32 +74,35 @@ export function ProveSection() {
   }, [s.running, s.root, s.overlay, board]);
 
   return (
-    <section className="panel" aria-label="국면 증명">
+    <section className="panel" aria-label={t("국면 증명")} aria-busy={s.running}>
       <h2 className="panel__title">
-        국면 증명{" "}
+        {t("국면 증명")}{" "}
         <span className="panel__status">
-          {s.running ? "증명 중 — 엔진을 증명이 쓰고 있습니다" : ""}
+          {s.running ? t("증명 중: 엔진을 증명이 쓰고 있습니다") : ""}
         </span>
       </h2>
       <p className="panel__hint">
-        지금 판에서 둘 차례({board.stones.length % 2 === 0 ? "흑" : "백"})의 승리를 엔진이 모는
-        AND/OR 탐색으로 증명하거나 반증합니다. 메이트만 결론으로 칩니다 — 높은 승률은 증거일
-        뿐입니다.{" "}
+        {t(
+          "지금 판에서 둘 차례({side})의 승리를 엔진이 모는 AND/OR 탐색으로 증명하거나 반증합니다. 메이트만 결론으로 칩니다. 높은 승률은 증거일 뿐입니다.",
+          { side: board.stones.length % 2 === 0 ? t("흑") : t("백") },
+        )}{" "}
         {dbOn
           ? dbReadonly
-            ? "데이터베이스(읽기 전용)를 먼저 묻습니다 — 결론은 적지 않습니다."
-            : "데이터베이스를 먼저 묻고, 증명된 메이트를 데이터베이스에 적습니다."
-          : "데이터베이스가 붙어 있지 않아 결론은 이 실행 안에서만 쓰입니다(데이터베이스 화면에서 켤 수 있습니다)."}
+            ? t("데이터베이스(읽기 전용)를 먼저 묻습니다. 결론은 적지 않습니다.")
+            : t("데이터베이스를 먼저 묻고, 증명된 메이트를 데이터베이스에 적습니다.")
+          : t(
+              "데이터베이스가 붙어 있지 않아 결론은 이 실행 안에서만 쓰입니다(데이터베이스 화면에서 켤 수 있습니다).",
+            )}
       </p>
 
       <div className="review__row">
-        <span className="review__label">예산</span>
+        <span className="review__label">{t("예산")}</span>
         <Segmented
-          label="증명 예산의 종류"
+          label={t("증명 예산의 종류")}
           value={o.byDepth ? "depth" : "time"}
           options={[
-            { value: "time", label: "시간" },
-            { value: "depth", label: "깊이" },
+            { value: "time", label: t("시간") },
+            { value: "depth", label: t("깊이") },
           ]}
           onChange={(v) => s.setOptions({ byDepth: v === "depth" })}
           disabled={s.running}
@@ -107,9 +111,9 @@ export function ProveSection() {
       {o.byDepth ? (
         <>
           <div className="review__row">
-            <span className="review__label">시작 깊이</span>
+            <span className="review__label">{t("시작 깊이")}</span>
             <Segmented
-              label="시작 깊이"
+              label={t("시작 깊이")}
               value={o.depth0}
               options={DEPTH0.map((d) => ({ value: d, label: String(d) }))}
               onChange={(depth0) => s.setOptions({ depth0 })}
@@ -117,9 +121,9 @@ export function ProveSection() {
             />
           </div>
           <div className="review__row">
-            <span className="review__label">최대 깊이</span>
+            <span className="review__label">{t("최대 깊이")}</span>
             <Segmented
-              label="최대 깊이"
+              label={t("최대 깊이")}
               value={o.depthMax}
               options={DEPTH_MAX.map((d) => ({ value: d, label: String(d) }))}
               onChange={(depthMax) => s.setOptions({ depthMax })}
@@ -129,17 +133,17 @@ export function ProveSection() {
         </>
       ) : (
         <div className="review__row">
-          <span className="review__label">시작 예산</span>
+          <span className="review__label">{t("시작 예산")}</span>
           <div className="timepick">
             <Segmented
-              label="마디당 시작 예산(초)"
+              label={t("마디당 시작 예산(초)")}
               value={o.budget0Sec}
-              options={START_SEC.map((v) => ({ value: v, label: `${v}초` }))}
+              options={START_SEC.map((v) => ({ value: v, label: t("{n}초", { n: v }) }))}
               onChange={(budget0Sec) => s.setOptions({ budget0Sec })}
               disabled={s.running}
             />
             <DurationField
-              label="마디당 시작 예산"
+              label={t("마디당 시작 예산")}
               valueMs={o.budget0Sec * 1000}
               spec={PROVE_START_SPEC}
               presetsMs={START_MS}
@@ -150,17 +154,17 @@ export function ProveSection() {
         </div>
       )}
       <div className="review__row">
-        <span className="review__label">{o.byDepth ? "마디당 시간 끈" : "마디당 상한"}</span>
+        <span className="review__label">{o.byDepth ? t("마디당 시간 끈") : t("마디당 상한")}</span>
         <div className="timepick">
           <Segmented
-            label="마디당 상한(초)"
+            label={t("마디당 상한(초)")}
             value={o.budgetMaxSec}
-            options={MAX_SEC.map((v) => ({ value: v, label: `${v}초` }))}
+            options={MAX_SEC.map((v) => ({ value: v, label: t("{n}초", { n: v }) }))}
             onChange={(budgetMaxSec) => s.setOptions({ budgetMaxSec })}
             disabled={s.running}
           />
           <DurationField
-            label="마디당 상한"
+            label={t("마디당 상한")}
             valueMs={o.budgetMaxSec * 1000}
             spec={PROVE_MAX_SPEC}
             presetsMs={MAX_MS}
@@ -170,9 +174,9 @@ export function ProveSection() {
         </div>
       </div>
       <div className="review__row">
-        <span className="review__label">공격 후보 수</span>
+        <span className="review__label">{t("공격 후보 수")}</span>
         <Segmented
-          label="공격 후보 수(nbest)"
+          label={t("공격 후보 수(nbest)")}
           value={o.nbest}
           options={NBEST.map((v) => ({ value: v, label: String(v) }))}
           onChange={(nbest) => s.setOptions({ nbest })}
@@ -180,18 +184,18 @@ export function ProveSection() {
         />
       </div>
       <div className="review__row">
-        <span className="review__label">가장 좋은 공격부터</span>
+        <span className="review__label">{t("가장 좋은 공격부터")}</span>
         <Switch
-          label="가장 좋은 공격부터"
+          label={t("가장 좋은 공격부터")}
           on={o.bestFirst}
           onChange={(bestFirst) => s.setOptions({ bestFirst })}
           disabled={s.running}
         />
       </div>
       <div className="review__row">
-        <span className="review__label">버틸 것 같은 방어 먼저 탐침</span>
+        <span className="review__label">{t("버틸 것 같은 방어 먼저 탐침")}</span>
         <Switch
-          label="버틸 것 같은 방어 먼저 탐침"
+          label={t("버틸 것 같은 방어 먼저 탐침")}
           on={o.probe}
           onChange={(probe) => s.setOptions({ probe })}
           disabled={s.running}
@@ -208,12 +212,12 @@ export function ProveSection() {
               void s.start().then(setNotice);
             }}
           >
-            지금 판 증명
+            {t("지금 판 증명")}
           </button>
         )}
         {s.running && (
           <button type="button" className="btn--danger" onClick={s.cancel}>
-            멈추기
+            {t("멈추기")}
           </button>
         )}
       </div>
@@ -228,7 +232,7 @@ export function ProveSection() {
           <p>{first}</p>
           {second && <p>{second}</p>}
           <p className="prove__path">
-            {p.path} · 트리 {p.nodes}마디 · 예산 {optionsLabel(o)}
+            {p.path} · {t("트리 {n}마디", { n: p.nodes })} · {t("예산 {b}", { b: optionsLabel(o) })}
           </p>
         </div>
       )}
@@ -243,7 +247,7 @@ export function ProveSection() {
           <p>{outcomeMessage(s.outcome)}</p>
           <div className="panel__actions">
             <button type="button" onClick={s.clearOutcome}>
-              닫기
+              {t("닫기")}
             </button>
           </div>
         </div>
@@ -251,7 +255,7 @@ export function ProveSection() {
 
       {s.log.length > 0 && (
         <details className="review__log">
-          <summary>증명 기록 ({s.log.length})</summary>
+          <summary>{t("증명 기록 ({n})", { n: s.log.length })}</summary>
           <pre>{s.log.join("\n")}</pre>
         </details>
       )}

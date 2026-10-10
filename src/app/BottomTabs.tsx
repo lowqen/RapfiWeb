@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { RAIL } from "./destinations";
+import { t } from "../i18n/i18n";
 
 /**
  * 좁은 폭(<640px)의 하단 탭 — 앱 모습 그대로.
@@ -9,7 +10,7 @@ import { RAIL } from "./destinations";
  */
 export function BottomTabs() {
   return (
-    <nav className="tabs" aria-label="주 메뉴">
+    <nav className="tabs" aria-label={t("주 메뉴")}>
       {RAIL.map((d) => (
         <NavLink
           key={d.path}
@@ -19,7 +20,7 @@ export function BottomTabs() {
           <svg className="tabs__icon" viewBox="0 0 24 24" aria-hidden="true">
             <path d={d.icon} />
           </svg>
-          <span className="tabs__label">{d.label}</span>
+          <span className="tabs__label">{t(d.label)}</span>
         </NavLink>
       ))}
     </nav>

@@ -1,3 +1,5 @@
+import { localized, msg, t } from "../../i18n/i18n";
+
 /**
  * 규칙 — **이 웹 버전은 렌주 전용이다.**
  *
@@ -25,13 +27,13 @@ export type RuleName = keyof typeof RULE_ID;
 /** 이 빌드가 실제로 둘 수 있는 규칙. */
 export const SUPPORTED_RULES: readonly RuleName[] = ["renju"];
 
-export const RULE_LABEL: Record<RuleName, string> = {
-  freestyle: "프리스타일",
-  standard: "스탠다드",
-  renju: "렌주",
-  swap1: "스왑1",
-  swap2: "스왑2",
-};
+export const RULE_LABEL: Readonly<Record<RuleName, string>> = localized({
+  freestyle: msg("프리스타일"),
+  standard: msg("스탠다드"),
+  renju: msg("렌주"),
+  swap1: msg("스왑1"),
+  swap2: msg("스왑2"),
+});
 
 export const isSupported = (rule: RuleName): boolean => SUPPORTED_RULES.includes(rule);
 
@@ -42,9 +44,8 @@ export const isSupported = (rule: RuleName): boolean => SUPPORTED_RULES.includes
  * 사용자가 다음에 무엇을 할 수 있는지 모르는 안내는 안내가 아니다.
  */
 export function unsupportedRuleNotice(rule: RuleName): string {
-  return (
-    `웹 버전은 렌주만 지원합니다 (${RULE_LABEL[rule]}은 없습니다). ` +
-    `엔진 가중치를 규칙마다 10MB씩 받아야 해서, 웹에서는 렌주 것만 싣습니다. ` +
-    `다른 규칙은 안드로이드 앱이나 데스크톱 Yixin 을 쓰세요.`
+  return t(
+    "웹 버전은 렌주만 지원합니다({rule}은 없습니다). 엔진 가중치를 규칙마다 10MB씩 받아야 해서, 웹에서는 렌주 것만 싣습니다. 다른 규칙은 안드로이드 앱이나 데스크톱 Yixin 을 쓰세요.",
+    { rule: RULE_LABEL[rule] },
   );
 }

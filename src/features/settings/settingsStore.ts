@@ -3,6 +3,7 @@ import { useEngineStore, MULTI_PV, threadCap, type EngineConfig } from "../../en
 import { isEnginePreference, type EnginePreference } from "../../engine/engine-client";
 import type { EngineCommand } from "../../engine/engine-types";
 import { DEFAULT_SIZE } from "../../core/model/move";
+import { msg } from "../../i18n/i18n";
 
 /**
  * 설정 화면이 **소유하는** 값들 — 엔진 파라미터·분석·표시.
@@ -70,7 +71,8 @@ export function resolveThreads(setting: number, cores: number | null): number {
  * 세우며 평가기를 버리고(`SearchEngine::setNumThreads`), 다음 탐색이 가중치를 다시 푼다
  * — T1 실측 0.73~0.85초(docs/최적화-마스터플랜.md 1부 §3.2-①).
  */
-export const THREAD_RELOAD_COST = "약 0.8초";
+/** 사전 열쇠 — 그릴 때 `t()`. */
+export const THREAD_RELOAD_COST = msg("약 0.8초");
 
 /**
  * 스레드 수 선택을 언제 엔진에 보낼지(P1-2).

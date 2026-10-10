@@ -1,5 +1,6 @@
 import type { MoveOrderChild, MoveOrderGhost } from "../../../core/moveorder/move-order";
 import { formatPlies } from "../../../core/moveorder/move-order";
+import { t } from "../../../i18n/i18n";
 
 /**
  * 수순 탐색기의 판(`mo_board_draw`) — 파고든 길은 번호 단 단단한 돌, 남은 돌은 «몇 수째가 될 수
@@ -51,7 +52,10 @@ export function MoveOrderBoard({
       className="moboard"
       viewBox={`0 0 ${W} ${W}`}
       role="img"
-      aria-label={`수순 탐색 판 — 파고든 ${prefix.length}수, 다음 후보 ${rows.length}곳`}
+      aria-label={t("수순 탐색 판: 파고든 {n}수, 다음 후보 {k}곳", {
+        n: prefix.length,
+        k: rows.length,
+      })}
       onClick={(e) => {
         const box = e.currentTarget.getBoundingClientRect();
         const x = Math.round((((e.clientX - box.left) / box.width) * W - PAD) / STEP);

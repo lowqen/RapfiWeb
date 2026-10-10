@@ -5,6 +5,7 @@ import type {
   MoveOrderRequest,
   ToMoveOrderWorker,
 } from "./protocol";
+import { t } from "../../../i18n/i18n";
 
 /**
  * 수순 계산 창구 — 브라우저에서는 워커(`moveOrder.worker.ts`), 워커가 없는 곳(시험의 node)에서는
@@ -66,7 +67,7 @@ export function workerService(): MoveOrderService {
       }),
     dispose: () => {
       worker.terminate();
-      for (const p of pending.values()) p.reject(new Error("수순 워커를 내렸습니다"));
+      for (const p of pending.values()) p.reject(new Error(t("수순 워커를 내렸습니다")));
       pending.clear();
     },
   };

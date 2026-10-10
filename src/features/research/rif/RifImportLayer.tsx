@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { RIF_PHASE_TEXT } from "./protocol";
 import { fmtInt, fmtMB, fmtSec, rifFrom } from "./format";
 import { useRifStore } from "./rifStore";
+import { t } from "../../../i18n/i18n";
+import { rich } from "../../../i18n/rich";
 
 /**
  * 셸에 한 번 거는 W7 층 — **어느 화면에 `.rif` 를 떨어뜨려도** 변환을 시작하고, 진행 · 결과를 한 장의
@@ -66,7 +68,9 @@ export function RifImportLayer() {
     <>
       {dragging && (
         <div className="riftip" role="status">
-          <b>RenjuNet .rif</b> 는 어디에 놓아도 오프닝 통계를 만듭니다 · 기보 파일은 판 위에
+          {rich(t("{rif} 는 어디에 놓아도 오프닝 통계를 만듭니다 · 기보 파일은 판 위에"), {
+            rif: <b>RenjuNet .rif</b>,
+          })}
         </div>
       )}
       <RifProgressCard />
@@ -96,9 +100,14 @@ function RifProgressCard() {
     // 시계 상태는 작업보다 먼저 잡혔을 수 있다 — 음수로 보이지 않게.
     const elapsed = Math.max(0, now - job.startedAt);
     return (
-      <section className="rifjob" aria-live="polite" aria-label="RenjuNet 통계 만드는 중">
+      <section
+        className="rifjob"
+        aria-live="polite"
+        aria-busy="true"
+        aria-label={t("RenjuNet 통계 만드는 중")}
+      >
         <div className="rifjob__head">
-          <span className="rifjob__title">RenjuNet 통계 만드는 중</span>
+          <span className="rifjob__title">{t("RenjuNet 통계 만드는 중")}</span>
           <span className="rifjob__pct tnum">{pct}%</span>
         </div>
         <div
@@ -107,14 +116,14 @@ function RifProgressCard() {
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={pct}
-          aria-label="변환 진행"
+          aria-label={t("변환 진행")}
         >
           <span style={{ width: `${pct}%` }} />
         </div>
         <p className="rifjob__meta tnum">
           {job.phase === "read"
-            ? `${RIF_PHASE_TEXT.read} — ${fmtMB(job.loaded)} / ${fmtMB(job.fileSize)} · ${fmtInt(job.games)}판`
-            : `${RIF_PHASE_TEXT[job.phase]} — ${fmtInt(job.games)}판`}
+            ? `${t(RIF_PHASE_TEXT.read)}: ${fmtMB(job.loaded)} / ${fmtMB(job.fileSize)} · ${t("{n}판", { n: fmtInt(job.games) })}`
+            : `${t(RIF_PHASE_TEXT[job.phase])}: ${t("{n}판", { n: fmtInt(job.games) })}`}
           <span className="rifjob__time">{fmtSec(elapsed)}</span>
         </p>
         <div className="rifjob__actions">
@@ -122,7 +131,7 @@ function RifProgressCard() {
             {job.fileName}
           </span>
           <button type="button" className="btn" onClick={cancel}>
-            취소
+            {t("취소")}
           </button>
         </div>
       </section>
@@ -133,17 +142,21 @@ function RifProgressCard() {
       <section
         className="rifjob rifjob--done"
         role="status"
-        aria-label="RenjuNet 통계를 만들었습니다"
+        aria-label={t("RenjuNet 통계를 만들었습니다")}
       >
         <div className="rifjob__head">
-          <span className="rifjob__title">통계를 만들었습니다</span>
-          <button type="button" className="rifjob__close" aria-label="닫기" onClick={dismiss}>
+          <span className="rifjob__title">{t("통계를 만들었습니다")}</span>
+          <button type="button" className="rifjob__close" aria-label={t("닫기")} onClick={dismiss}>
             ×
           </button>
         </div>
         <p className="rifjob__meta tnum" data-k="rif-done">
-          {fmtInt(done.games)}판 · 국면 {fmtInt(done.positions)} · {fmtSec(done.ms)} · 저장{" "}
-          {fmtMB(done.packBytes)}
+          {t("{n}판 · 국면 {p} · {time} · 저장 {size}", {
+            n: fmtInt(done.games),
+            p: fmtInt(done.positions),
+            time: fmtSec(done.ms),
+            size: fmtMB(done.packBytes),
+          })}
         </p>
         {done.saveError && <p className="rifjob__warn">{done.saveError}</p>}
         <div className="rifjob__actions">
@@ -155,7 +168,7 @@ function RifProgressCard() {
               navigate("/research/ranking");
             }}
           >
-            랭킹 보기
+            {t("랭킹 보기")}
           </button>
           <button
             type="button"
@@ -165,7 +178,7 @@ function RifProgressCard() {
               navigate("/research/explorer");
             }}
           >
-            오프닝 보기
+            {t("오프닝 보기")}
           </button>
         </div>
       </section>
@@ -175,8 +188,8 @@ function RifProgressCard() {
     return (
       <section className="rifjob rifjob--error" role="alert">
         <div className="rifjob__head">
-          <span className="rifjob__title">통계를 만들지 못했습니다</span>
-          <button type="button" className="rifjob__close" aria-label="닫기" onClick={dismiss}>
+          <span className="rifjob__title">{t("통계를 만들지 못했습니다")}</span>
+          <button type="button" className="rifjob__close" aria-label={t("닫기")} onClick={dismiss}>
             ×
           </button>
         </div>

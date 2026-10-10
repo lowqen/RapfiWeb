@@ -10,12 +10,18 @@ import { useOpeningTables } from "../../data/opening-tables";
 import { chain, gradeAt } from "../../core/opening/opening-name";
 import { GradeBadge } from "../../components/GradeBadge";
 import { useCurrentReview } from "../../data/current-review";
-import { QUALITY_INFO, currentBadge, matchesPrefix } from "../../core/review/move-quality";
+import {
+  QUALITY_INFO,
+  currentBadge,
+  matchesPrefix,
+  qualityName,
+} from "../../core/review/move-quality";
 import { OpeningProgress } from "./OpeningPanel";
 import { label } from "../../core/model/move";
 import { RULE_LABEL } from "../../core/model/rules";
 import { OPENING_LABEL, describeResult } from "../../core/model/game";
 import { dbValueText } from "../database/dbTags";
+import { langOf, t } from "../../i18n/i18n";
 
 /**
  * 지금 국면을 말하는 값들 — 국면 카드와 국면 요약 줄이 같은 계산을 쓴다.
@@ -50,7 +56,8 @@ function usePosition() {
     badge,
     count: render.stones.length,
     last: render.lastMove ? label(render.lastMove, render.size) : null,
-    turn: render.stones.length % 2 === 0 ? "흑" : "백",
+    black: render.stones.length % 2 === 0,
+    turn: render.stones.length % 2 === 0 ? t("흑") : t("백"),
   };
 }
 
@@ -88,7 +95,7 @@ export function PositionCard({ game }: { game: boolean }) {
     <section className="panel panel--position" aria-labelledby="position-card-title">
       <div className="poscard__head">
         <h2 id="position-card-title" className="panel__title">
-          국면
+          {t("국면")}
         </h2>
         <span className="poscard__rule" data-k="ruleset">
           {RULE_LABEL.renju} · {OPENING_LABEL[opening]}
@@ -102,22 +109,22 @@ export function PositionCard({ game }: { game: boolean }) {
       {/* 늘 읽는 셋 — 차례 · 수 · 마지막 — 은 한 줄 타일로. */}
       <dl className="poscard__tiles">
         <div className="poscard__tile">
-          <dt>둘 차례</dt>
-          <dd className="tnum" data-k="turn" data-side={p.turn === "흑" ? "black" : "white"}>
+          <dt>{t("둘 차례")}</dt>
+          <dd className="tnum" data-k="turn" data-side={p.black ? "black" : "white"}>
             {p.turn}
           </dd>
         </div>
         <div className="poscard__tile">
-          <dt>수</dt>
+          <dt>{t("수")}</dt>
           <dd className="tnum">
             {p.count}
             {p.ahead > 0 && <span className="kv__aside"> / {p.count + p.ahead}</span>}
           </dd>
         </div>
         <div className="poscard__tile">
-          <dt>마지막</dt>
+          <dt>{t("마지막")}</dt>
           <dd className="tnum" data-k="last">
-            {p.last ?? "—"}
+            {p.last ?? t("없음")}
           </dd>
         </div>
       </dl>
@@ -125,8 +132,8 @@ export function PositionCard({ game }: { game: boolean }) {
         <dl className="kv poscard__rows">
           {p.names.length > 0 && (
             <>
-              <dt>주형</dt>
-              <dd data-k="opening-name">
+              <dt>{t("주형")}</dt>
+              <dd data-k="opening-name" lang={langOf(p.names.join(" "))}>
                 {p.names.join(" › ")}
                 {p.grade && (
                   <>
@@ -139,15 +146,15 @@ export function PositionCard({ game }: { game: boolean }) {
           )}
           {p.badge && (
             <>
-              <dt>평가</dt>
+              <dt>{t("평가")}</dt>
               <dd data-k="move-grade">
                 <span
                   className="qtag"
                   style={{ "--q": QUALITY_INFO[p.badge].color } as CSSProperties}
-                  title="연구 ▸ 리뷰에서 고른 리포트의 등급"
+                  title={t("연구 ▸ 리뷰에서 고른 리포트의 등급")}
                 >
                   <span className="qtag__sym">{QUALITY_INFO[p.badge].symbol}</span>{" "}
-                  {QUALITY_INFO[p.badge].korean}
+                  {qualityName(p.badge)}
                 </span>
               </dd>
             </>
@@ -159,54 +166,59 @@ export function PositionCard({ game }: { game: boolean }) {
               <dd
                 className="tnum"
                 data-k="db-value"
-                title="데이터베이스의 자식 값으로 읽은 국면 값"
+                title={t("데이터베이스의 자식 값으로 읽은 국면 값")}
               >
-                {db.value ? `${dbValueText(db.value)} (${p.turn})` : "값 없음"}
-                <span className="kv__aside"> · 기록 {db.snap.cells.size}</span>
+                {db.value ? `${dbValueText(db.value)} (${p.turn})` : t("값 없음")}
+                <span className="kv__aside">
+                  {" · "}
+                  {t("기록 {n}", { n: db.snap.cells.size })}
+                </span>
               </dd>
             </>
           )}
           {db && db.snap.comment && (
             <>
-              <dt>주석</dt>
-              <dd className="poscard__comment" data-k="db-comment">
+              <dt>{t("주석")}</dt>
+              <dd className="poscard__comment" data-k="db-comment" lang={langOf(db.snap.comment)}>
                 {db.snap.comment}
               </dd>
             </>
           )}
           {gameName && (
             <>
-              <dt>기보</dt>
-              <dd data-k="game-name">{gameName}</dd>
+              <dt>{t("기보")}</dt>
+              <dd data-k="game-name" lang={langOf(gameName)}>
+                {gameName}
+              </dd>
             </>
           )}
         </dl>
       )}
       <div className="panel__actions panel__actions--compact">
         <button type="button" onClick={() => fileInput.current?.click()}>
-          기보 열기
+          {t("기보 열기")}
         </button>
         <button
           type="button"
-          title="Piskvork 기보(.psq)로 저장"
+          title={t("Piskvork 기보(.psq)로 저장")}
           onClick={() => void saveGameFile("psq")}
         >
-          .psq 저장
+          {t(".psq 저장")}
         </button>
         <button
           type="button"
-          title="Yixin 저장 국면(.sav)으로 저장"
+          title={t("Yixin 저장 국면(.sav)으로 저장")}
           onClick={() => void saveGameFile("sav")}
         >
-          .sav 저장
+          {t(".sav 저장")}
         </button>
         <button
           type="button"
-          title="지금 판을 여는 주소(?p=…)를 복사합니다"
+          title={t("지금 판을 여는 주소(?p=…)를 복사합니다")}
           disabled={p.count === 0}
           onClick={() => void copyPositionLink()}
         >
-          링크 복사
+          {t("링크 복사")}
         </button>
         <input
           ref={fileInput}
@@ -225,10 +237,10 @@ export function PositionCard({ game }: { game: boolean }) {
           <OpeningProgress />
           <div className="panel__actions">
             <button type="button" onClick={resign} disabled={!playing}>
-              기권
+              {t("기권")}
             </button>
             <button type="button" onClick={offerDraw} disabled={!playing}>
-              무승부
+              {t("무승부")}
             </button>
           </div>
         </>
@@ -246,16 +258,17 @@ export function PositionStrip({ game }: { game: boolean }) {
   const p = usePosition();
   const db = useBoardDb();
   return (
-    <div className="possum" role="group" aria-label="국면 요약">
-      <span className="possum__turn" data-side={p.turn === "흑" ? "black" : "white"}>
+    <div className="possum" role="group" aria-label={t("국면 요약")}>
+      <span className="possum__turn" data-side={p.black ? "black" : "white"}>
         <span className="possum__stone" aria-hidden="true" />
-        {p.result ? describeResult(p.result) : `${p.turn} 차례`}
+        {p.result ? describeResult(p.result) : t("{side} 차례", { side: p.turn })}
       </span>
       <span className="possum__item tnum">
-        {p.count}수{p.last && ` · ${p.last}`}
+        {t("{n}수", { n: p.count })}
+        {p.last && ` · ${p.last}`}
       </span>
       {p.names.length > 0 && (
-        <span className="possum__name" title={p.names.join(" › ")}>
+        <span className="possum__name" title={p.names.join(" › ")} lang={langOf(p.names.join(" "))}>
           {p.names.at(-1)}
         </span>
       )}
@@ -264,13 +277,13 @@ export function PositionStrip({ game }: { game: boolean }) {
         <span
           className="qtag"
           style={{ "--q": QUALITY_INFO[p.badge].color } as CSSProperties}
-          title={QUALITY_INFO[p.badge].korean}
+          title={qualityName(p.badge)}
         >
           <span className="qtag__sym">{QUALITY_INFO[p.badge].symbol}</span>
         </span>
       )}
       {db?.value && !game && (
-        <span className="possum__item tnum" title="데이터베이스의 국면 값(둘 차례)">
+        <span className="possum__item tnum" title={t("데이터베이스의 국면 값(둘 차례)")}>
           DB {dbValueText(db.value)}
         </span>
       )}

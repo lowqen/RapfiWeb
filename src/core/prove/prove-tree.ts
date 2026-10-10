@@ -1,5 +1,6 @@
 import { DEFAULT_SIZE, sameMove, type Move } from "../model/move";
 import { coord } from "../review/move-quality";
+import { t } from "../../i18n/i18n";
 
 /**
  * 국면 증명 — 앱 `ProveModels.kt` · `ProveTree.kt` 의 이식(원본은 main.c:8918-9979).
@@ -81,7 +82,9 @@ export const verifyBudget = (o: ProveOptions) =>
   o.byDepth ? Math.min(o.depth0, VERIFY_DEPTH) : VERIFY_MS;
 /** 로그 줄의 예산 부분(main.c:9970 / 9974). */
 export const optionsLabel = (o: ProveOptions) =>
-  o.byDepth ? `d${o.depth0}..${o.depthMax}` : `${o.budget0Sec}..${o.budgetMaxSec}초`;
+  o.byDepth
+    ? `d${o.depth0}..${o.depthMax}`
+    : t("{a}..{b}초", { a: o.budget0Sec, b: o.budgetMaxSec });
 
 export type ProveState = "open" | "resolved" | "exhausted";
 /** 마디의 결과 — 언제나 **공격 쪽** 관점(`PR_*`). */
@@ -122,7 +125,7 @@ export interface ProveOverlay {
 export function budgetText(budget: number | null, byDepth: boolean): string {
   if (budget === null) return "";
   if (budget > 99) return "99+";
-  return byDepth ? `d${budget}` : `${budget}초`;
+  return byDepth ? `d${budget}` : t("{n}초", { n: budget });
 }
 
 // ── 트리 ─────────────────────────────────────────────────────────────
@@ -379,7 +382,10 @@ export class ProveTree {
     if (p.altNext < p.alt.length) {
       const a = p.alt[p.altNext++]!;
       const c = this.addChild(parent, a.move, a.winRate ?? UNKNOWN_WR, false, a.mate);
-      if (c >= 0) this.log(`증명: 공격 후보 ${p.altNext + 1}/${p.alt.length + 1} ${this.path(c)}`);
+      if (c >= 0)
+        this.log(
+          `${t("증명: 공격 후보 {i}/{n}", { i: p.altNext + 1, n: p.alt.length + 1 })} ${this.path(c)}`,
+        );
     }
   }
 
@@ -418,7 +424,7 @@ export class ProveTree {
           n.alt.push({ ...pv, mate });
         } else {
           // 대기로도 못 두는 공격 후보. OR 마디에는 이기는 수 하나면 되므로 불완전하지 않다.
-          this.log(`증명: 공격 후보 ${coord(pv.move, this.size)} 보관 한도 초과`);
+          this.log(t("증명: 공격 후보 {m} 보관 한도 초과", { m: coord(pv.move, this.size) }));
         }
       }
     } else {
@@ -444,7 +450,9 @@ export class ProveTree {
       }
       if (dropped > 0) {
         this.log(
-          `증명: 방어 ${dropped}개를 담지 못해 이 국면은 «모든 방어가 진다» 로 결론내지 않는다`,
+          t("증명: 방어 {n}개를 담지 못해 이 국면은 «모든 방어가 진다» 로 결론내지 않는다", {
+            n: dropped,
+          }),
         );
       }
       if (kept === 0 && n.pending.length > 0) {
@@ -452,7 +460,7 @@ export class ProveTree {
         const deferred = n.pending.splice(0);
         for (const m of deferred) this.addChild(i, m, 0.98, true, 0);
       } else if (n.pending.length > 0) {
-        this.log(`증명: 약한 방어 ${n.pending.length}개 보류 (나중에 검증)`);
+        this.log(t("증명: 약한 방어 {n}개 보류 (나중에 검증)", { n: n.pending.length }));
       }
     }
   }
@@ -480,7 +488,7 @@ export class ProveTree {
     // 판정 낱말은 main.c 철자(WIN/NOWIN, mate/db/wr) — 로그를 데스크톱과 줄마다 견줄 수 있게.
     const verdict = result === "win" ? "WIN" : "NOWIN";
     const by = kind === "mate" ? "mate" : kind === "db" ? "db" : "wr";
-    this.log(`증명: ${verdict} ${by}(${note}) ${this.path(i)}`);
+    this.log(`${t("증명:")} ${verdict} ${by}(${note}) ${this.path(i)}`);
     // DB 에서 읽은 기록은 다시 쓸 필요가 없다.
     if (kind !== "db") this.queueWrite(i);
     if (n.parent >= 0) this.propagate(n.parent);
@@ -543,12 +551,12 @@ export class ProveTree {
         // 낙관적 가지치기의 보답: 미룬 방어를 한꺼번에 검증한다.
         const deferred = p.pending.splice(0);
         for (const m of deferred) this.addChild(parent, m, 0.98, true, 0);
-        this.log(`증명: 보류한 방어 ${deferred.length}개 검증`);
+        this.log(t("증명: 보류한 방어 {n}개 검증", { n: deferred.length }));
         return;
       }
       if (p.incomplete) {
         // 아는 방어는 모두 지지만, 다 듣지 못했음을 안다 — «모든 방어가 진다»고 말할 수 없다.
-        this.log(`증명: 방어 목록이 불완전해 결론 보류 ${this.path(parent)}`);
+        this.log(`${t("증명: 방어 목록이 불완전해 결론 보류")} ${this.path(parent)}`);
         return;
       }
       this.resolve(parent, "win", weakest, bestValue, p.recDepth + 1, "all defenses lose");
@@ -603,7 +611,7 @@ export class ProveTree {
     const max = maxBudget(this.options);
     if (n.budget >= max) {
       n.state = "exhausted";
-      this.log(`증명: 예산 소진 EXHAUSTED wr_att=${fixed2(n.wratt)} ${this.path(i)}`);
+      this.log(`${t("증명: 예산 소진")} EXHAUSTED wr_att=${fixed2(n.wratt)} ${this.path(i)}`);
       this.orWiden(n.parent);
     } else if (this.options.byDepth) {
       // +2 수는 시간 두 배와 비슷한 값이다.

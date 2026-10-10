@@ -1,4 +1,5 @@
 import { DEFAULT_SIZE, type Move } from "../model/move";
+import { t } from "../../i18n/i18n";
 import { keyOf as posKeyOf } from "../model/pos-key";
 import { MAX_PLY, frameTransform, keyOf, move2Kind } from "./frame";
 import { NONSTD, classify, nameOf } from "./opening26";
@@ -24,10 +25,10 @@ export function nameAt(
   if (frameTransform(line, size) < 0) return null;
   switch (ply) {
     case 1:
-      return "천원";
+      return t("천원");
     case 2: {
       const k = move2Kind(line, size);
-      return k === "direct" ? "직접막기" : k === "indirect" ? "간접막기" : null;
+      return k === "direct" ? t("직접막기") : k === "indirect" ? t("간접막기") : null;
     }
     case 3: {
       const id = classify(line);

@@ -32,7 +32,7 @@ export const useLinkBackup = create<LinkBackupState>((set, get) => ({
     useGameStore.getState().loadMoves(b.moves, {
       future: b.future,
       name: b.name || null,
-      what: `링크를 열기 전 판으로 — ${b.moves.length}수`,
+      what: `링크를 열기 전 판으로: ${b.moves.length}수`,
     });
     set({ backup: null });
     if (db) await clearSlot(db, "beforeLink").catch(() => {});

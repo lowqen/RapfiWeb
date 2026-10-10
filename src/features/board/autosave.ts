@@ -114,7 +114,7 @@ export function startAutosave(
         useGameStore.getState().loadMoves(saved.moves, {
           future: saved.future,
           name: saved.name || null,
-          what: `지난 판을 이어서 — ${saved.moves.length}수`,
+          what: `지난 판을 이어서: ${saved.moves.length}수`,
         });
       }
     } catch {
@@ -136,5 +136,5 @@ export function startAutosave(
 
 /** 링크의 국면을 판에 올린다. */
 function loadLink(moves: readonly Move[]) {
-  useGameStore.getState().loadMoves(moves, { what: `링크로 연 국면 — ${moves.length}수` });
+  useGameStore.getState().loadMoves(moves, { what: `링크로 연 국면: ${moves.length}수` });
 }
