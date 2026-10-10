@@ -1416,6 +1416,14 @@ a:focus-visible {
   padding: 0;
   list-style: none;
 }
+/* 직전 국면의 분석(엔진 정지 · 판이 바뀜) — 값은 그대로 두고 흐리게, 위에 «직전 국면» 한 줄. */
+.stats__stale {
+  margin-top: var(--space-s);
+}
+.kv.stats[data-stale] dd,
+.pvlist[data-stale] {
+  color: var(--c-on-surface-variant);
+}
 .pvlist__row {
   display: flex;
   gap: var(--space-m);

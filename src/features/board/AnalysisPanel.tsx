@@ -6,7 +6,7 @@ import { useBoardStore } from "./boardStore";
 import { label } from "../../core/model/move";
 import { colorsForTag, DEFAULT_PALETTE } from "../../core/board/ladder";
 import { useSettingsStore } from "../settings/settingsStore";
-import { useCurrentAnalysis } from "./currentAnalysis";
+import { useDisplayedAnalysis } from "./currentAnalysis";
 import { STATUS_TEXT, useStartAnalysis, useStopAnalysis } from "./analysisActions";
 import { AnalysisTimeControl, MultiPvControl, PlayBestOnStopControl, Row } from "./boardControls";
 
@@ -15,9 +15,11 @@ import { AnalysisTimeControl, MultiPvControl, PlayBestOnStopControl, Row } from 
  * 모았다. 분석의 설정(시간 · 후보 수 · 정지하면 최선수 두기)은 바로 아래 `AnalysisOptions`
  * 카드가 진다.
  *
- * 여기 있는 숫자는 전부 **지금 판의** 집계된 스냅샷에서 온다(`useCurrentAnalysis` —
- * 엔진이 다른 국면을 말하고 있으면 비어 보인다. 무른 직후 옛 국면의 PV·최선수가 남지
- * 않게). 원시 줄은 워커 안에서 파싱되고 메인 스레드는 ~10Hz 스냅샷만 받는다(계획서 §3).
+ * 숫자는 엔진의 집계된 스냅샷에서 온다(`useDisplayedAnalysis`). **멈춰도 지우지 않는다** —
+ * 정지(최선수 착수) · 무르기 · 새 수로 판이 바뀌어도 마지막 결과(깊이 · 평가 · 승률 · BEST · PV)를
+ * 그대로 두고 «직전 국면(N수)의 분석»이라고 밝힌다(`data-stale`, 흐리게). 새 국면의 답이 오면 그것으로
+ * 바뀐다. 판 위의 값 칩 · 최선수 링은 지금 국면의 것만 그린다(`useCurrentAnalysis`).
+ * 원시 줄은 워커 안에서 파싱되고 메인 스레드는 ~10Hz 스냅샷만 받는다(계획서 §3).
  *
  * 실시간으로 바뀌는 숫자(깊이·노드·속도)는 **보간하지 않는다.** 초당 몇 번씩
  * 바뀌는 값을 애니메이션하는 것은 이미 지나간 값에 대한 거짓말이다(`Motion.kt` 규칙).
@@ -51,11 +53,12 @@ export function AnalysisPanel() {
   const render = useBoardStore((s) => s.render);
   const size = render.size;
 
-  const snapshot = useCurrentAnalysis();
+  const { snapshot, stale, ply } = useDisplayedAnalysis();
   const { stats, pvs, bestMove } = snapshot;
   const searching = status === "searching";
   const clockMs = useSearchClock(searching);
-  const timeMs = clockMs === null ? stats.timeMs : Math.max(stats.timeMs ?? 0, clockMs);
+  // 직전 국면의 값을 보이는 동안은 그 탐색의 시간 — 새 탐색의 벽시계와 섞지 않는다.
+  const timeMs = clockMs === null || stale ? stats.timeMs : Math.max(stats.timeMs ?? 0, clockMs);
 
   if (!caps.variant) {
     return (
@@ -110,7 +113,15 @@ export function AnalysisPanel() {
         {playBest ? ` · ${t("정지하면 최선수")}` : ""}
       </p>
 
-      <dl className="kv stats">
+      {stale && (
+        <p className="panel__hint stats__stale" data-k="analysis-stale">
+          {searching
+            ? t("새 국면을 읽는 중 · 직전 국면({n}수)의 분석", { n: ply ?? 0 })
+            : t("정지됨 · 직전 국면({n}수)의 분석", { n: ply ?? 0 })}
+        </p>
+      )}
+
+      <dl className="kv stats" data-stale={stale || undefined}>
         <Stat k="DEPTH">
           {stats.depth || NONE()}
           {stats.depth && stats.selDepth ? `/${stats.selDepth}` : ""}
@@ -125,7 +136,7 @@ export function AnalysisPanel() {
         </Stat>
       </dl>
 
-      {snapshot.instant && (
+      {snapshot.instant && !stale && (
         <p
           className="panel__hint"
           data-instant
@@ -136,7 +147,7 @@ export function AnalysisPanel() {
       )}
 
       {pvs.length > 0 && (
-        <ol className="pvlist" aria-label={t("후보 수순(PV)")}>
+        <ol className="pvlist" aria-label={t("후보 수순(PV)")} data-stale={stale || undefined}>
           {pvs.map((pv) => {
             const c = colorsForTag(
               DEFAULT_PALETTE,

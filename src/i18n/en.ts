@@ -1075,4 +1075,8 @@ export const EN: Readonly<Record<string, string>> = {
   "화면 라이브러리": "UI libraries",
   "저장 라이브러리(IndexedDB)": "Storage library (IndexedDB)",
   "엔진 소스": "Engine source",
+
+  // 엔진 카드 — 멈춰도 직전 분석을 고정해 보인다
+  "새 국면을 읽는 중 · 직전 국면({n}수)의 분석": "Reading the new position · showing the analysis after move {n}",
+  "정지됨 · 직전 국면({n}수)의 분석": "Stopped · showing the analysis after move {n}",
 };

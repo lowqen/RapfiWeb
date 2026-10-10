@@ -29,6 +29,37 @@ export function useCurrentAnalysis(): AnalysisSnapshot {
   return snapshotKey === key ? snapshot : EMPTY_SNAPSHOT;
 }
 
+/** 엔진 카드가 보여 줄 분석 — 지금 국면의 것이거나, 없으면 마지막으로 받은 것을 «직전»으로. */
+export interface DisplayedAnalysis {
+  snapshot: AnalysisSnapshot;
+  /** 지금 판이 아니라 앞서 읽은 국면의 값이다(정지 뒤 최선수 착수 · 무르기 · 새 수). */
+  stale: boolean;
+  /** `stale` 일 때 그 국면의 수 — «직전 국면(N수)». */
+  ply: number | null;
+}
+
+/**
+ * **엔진 카드(수치 · BEST · PV)만** 쓰는 분석 — 엔진이 멈추거나 판이 바뀌어도 마지막 결과를
+ * 지우지 않고 «직전 국면의 분석»으로 고정해 보여 준다. 새 국면의 답이 오면 그것으로 바뀐다.
+ *
+ * 판 위의 덧그림(값 칩 · 최선수 링 · 고스트)은 여전히 `useCurrentAnalysis`(지금 국면만)다 —
+ * 옛 국면의 칩이 새 판의 칸을 가리키면 조용히 틀린 그림이 된다. 카드는 글자로 «직전»을
+ * 밝히므로 고정해도 오해가 없다.
+ */
+export function useDisplayedAnalysis(): DisplayedAnalysis {
+  const key = useBoardKey();
+  const snapshot = useEngineStore((s) => s.snapshot);
+  const snapshotKey = useEngineStore((s) => s.snapshotKey);
+  return useMemo(() => {
+    if (snapshotKey === key) return { snapshot, stale: false, ply: null };
+    const hasData = snapshot.stats.depth > 0 || snapshot.pvs.length > 0 || snapshot.bestMove;
+    if (snapshotKey === null || !hasData)
+      return { snapshot: EMPTY_SNAPSHOT, stale: false, ply: null };
+    const ply = snapshotKey === "" ? 0 : snapshotKey.split(",").length;
+    return { snapshot, stale: true, ply };
+  }, [key, snapshot, snapshotKey]);
+}
+
 /**
  * 평가 바가 그릴 값. **지금 국면이나 그 앞 국면**의 값만 쓴다 — 수를 두면 새 값이 올
  * 때까지 앞 값을 그대로 두고(체스닷컴처럼 비지 않는다), 무르면 **뒤 국면**의 값이므로

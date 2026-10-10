@@ -374,11 +374,38 @@ try {
   if (stoppedOn !== bestBeforeStop)
     fail(`정지가 화면의 BEST(${bestBeforeStop}) 가 아니라 ${stoppedOn} 에 두었습니다`);
   else console.log(`정지 → 최선수 ${stoppedOn} 착수`);
-  // 둔 직후 옛 국면(1수)의 BEST·PV 가 새 국면(2수)에 남지 않는다.
-  const afterPlace = (await analysisPanel.locator(".kv dd").last().innerText()).trim();
-  if (afterPlace !== "없음") fail(`착수 뒤에 옛 국면의 BEST(${afterPlace}) 가 남아 있습니다`);
-  if ((await page.locator(".pvlist__row").count()) !== 0)
-    fail("착수 뒤에 옛 국면의 PV 가 남아 있습니다");
+  // 정지해도 **엔진 카드는 직전 분석을 고정해 보인다** — 깊이 · 평가 · BEST · PV 가 사라지지 않고
+  // «직전 국면(1수)»으로 밝혀진다(`data-stale`). 판 위의 값 칩 · 최선수 링은 새 국면(2수)에 남지 않는다.
+  const frozen = (await page.evaluate(`(() => {
+    const dds = [...document.querySelectorAll(".kv.stats dd")];
+    return {
+      stale: !!document.querySelector(".kv.stats[data-stale]"),
+      label: document.querySelector('[data-k="analysis-stale"]')?.textContent ?? "",
+      best: dds[dds.length - 1].textContent.trim(),
+      depth: dds[0].textContent.trim(),
+      pv: document.querySelectorAll(".pvlist__row").length,
+      tags: window.__rapfiBoard().tags.length,
+    };
+  })()`)) as {
+    stale: boolean;
+    label: string;
+    best: string;
+    depth: string;
+    pv: number;
+    tags: number;
+  };
+  if (!frozen.stale || !frozen.label.includes("1수"))
+    fail(`정지 뒤 엔진 카드가 직전 분석으로 고정되지 않았습니다 (${JSON.stringify(frozen)})`);
+  else if (frozen.best === "없음" || frozen.depth === "없음" || frozen.pv === 0)
+    fail(
+      `정지 뒤 직전 분석이 지워졌습니다 — BEST ${frozen.best} · DEPTH ${frozen.depth} · PV ${frozen.pv}줄`,
+    );
+  else if (frozen.tags !== 0)
+    fail(`착수 뒤에 옛 국면의 값 칩 ${frozen.tags}개가 판에 남아 있습니다`);
+  else
+    console.log(
+      `정지 고정: 직전 분석 BEST ${frozen.best} · DEPTH ${frozen.depth} · PV ${frozen.pv}줄, 판 칩 0`,
+    );
 
   // 5b. **무르기 정리.** 2수 국면을 분석해 값이 차오른 뒤 분석 중에 한 수 무른다. 그 순간
   // 2수 국면의 BEST · PV · 평가 바 · 값 칩이 1수 판에 남으면 안 된다 — 새 국면의 첫 답이
@@ -389,6 +416,7 @@ try {
       () => {
         const dds = [...document.querySelectorAll(".kv.stats dd")];
         return (
+          !document.querySelector(".kv.stats[data-stale]") &&
           document.querySelectorAll(".pvlist__row").length > 0 &&
           dds.length > 0 &&
           dds[dds.length - 1]!.textContent?.trim() !== "없음"
@@ -407,23 +435,34 @@ try {
     const dds = [...document.querySelectorAll(".kv.stats dd")];
     return {
       best: dds[dds.length - 1].textContent.trim(),
-      pv: document.querySelectorAll(".pvlist__row").length,
+      stale: !!document.querySelector(".kv.stats[data-stale]"),
       bar: document.querySelector(".evalbar").getAttribute("aria-valuetext"),
       stones: document.querySelector("canvas[role=img]").getAttribute("aria-label"),
+      tags: window.__rapfiBoard().tags.length,
     };
-  })()`)) as { best: string; pv: number; bar: string; stones: string };
+  })()`)) as { best: string; stale: boolean; bar: string; stones: string; tags: number };
+  // 무른 판: 평가 바와 판 위의 값 칩은 뒤 국면(2수)의 것을 버린다. 엔진 카드는 그 값을 «직전
+  // 국면»으로 밝혀 보인다(지우지 않는다) — 새 국면의 답이 오면 그것으로 바뀐다(아래).
   if (!undone.stones.includes("돌 1개")) fail(`무르기가 돌지 않았습니다: ${undone.stones}`);
-  else if (undone.best !== "없음" || undone.pv !== 0 || undone.bar !== "평가 없음") {
+  else if (undone.bar !== "평가 없음" || undone.tags !== 0) {
     fail(
-      `무른 판에 뒤 국면의 분석이 남았습니다 — BEST ${undone.best} · PV ${undone.pv}줄 · 평가 바 «${undone.bar}»`,
+      `무른 판에 뒤 국면의 평가 · 칩이 남았습니다 — 평가 바 «${undone.bar}» · 칩 ${undone.tags}개`,
     );
-  } else console.log(`무르기 정리: 평가 바 «${before.bar}» → «평가 없음» · BEST · PV 비움`);
+  } else if (undone.best !== "없음" && !undone.stale) {
+    fail(`무른 판의 엔진 카드가 뒤 국면의 BEST(${undone.best})를 «직전»으로 밝히지 않습니다`);
+  } else
+    console.log(
+      `무르기 정리: 평가 바 «${before.bar}» → «평가 없음» · 판 칩 0 · 카드는 직전 분석 표시`,
+    );
   // 분석은 켜져 있으므로 1수 국면을 이어 읽어 다시 차오른다.
   await page
     .waitForFunction(
       () => {
         const dds = [...document.querySelectorAll(".kv.stats dd")];
-        return dds[dds.length - 1]?.textContent?.trim() !== "없음";
+        return (
+          !document.querySelector(".kv.stats[data-stale]") &&
+          dds[dds.length - 1]?.textContent?.trim() !== "없음"
+        );
       },
       undefined,
       { timeout: 30_000 },
