@@ -1,6 +1,7 @@
 import { useGameStore } from "./gameStore";
 import { COMPUTER_SIDE_LABEL, swappedSide } from "../../core/model/game";
-import { Icon, ICON } from "../../components/icons";
+import { Icon } from "../../components/icons";
+import { ICON } from "../../components/icon-paths";
 import { t } from "../../i18n/i18n";
 
 /**

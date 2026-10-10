@@ -1,5 +1,6 @@
 import { useEffect, useId, useState, type ReactNode } from "react";
-import { Icon, ICON } from "./icons";
+import { Icon } from "./icons";
+import { ICON } from "./icon-paths";
 import { durationText, parseDuration, type DurationSpec } from "../core/settings/duration";
 import { t } from "../i18n/i18n";
 

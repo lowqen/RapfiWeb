@@ -2,7 +2,8 @@ import { useEffect } from "react";
 import { useBoardStore } from "./boardStore";
 import { useGameStore } from "./gameStore";
 import { useEngineStore } from "../../engine/engine-state";
-import { Icon, ICON } from "../../components/icons";
+import { Icon } from "../../components/icons";
+import { ICON } from "../../components/icon-paths";
 import { useStartAnalysis, useStopAnalysis } from "./analysisActions";
 import { t } from "../../i18n/i18n";
 
