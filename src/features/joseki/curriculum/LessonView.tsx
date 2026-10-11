@@ -10,6 +10,7 @@ import {
   startQuiz,
   type QuizState,
 } from "../../../core/curriculum/quiz";
+import { lessonUrl, type LessonMode } from "../../../core/curriculum/link";
 import { resolveNode, textOf, type Course, type Lesson } from "../../../core/curriculum/schema";
 import { ROLE_LABEL, movesTo, nodeAt, type JosekiNode } from "../../../core/joseki/tree";
 import { label, moveKey, sameMove, type Move } from "../../../core/model/move";
@@ -24,7 +25,7 @@ import { TreeView } from "../TreeView";
  * `core/curriculum/quiz.ts`). 고칠 길은 없다 — 읽기 전용이다(docs/공식-정석-설계.md §4 · §5).
  */
 
-type Mode = "browse" | "learn";
+type Mode = LessonMode;
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 /** 자식 수를 판에 — 기호가 있으면 그 기호, 없으면 A · B · C. 좋은 수는 초록, 나쁜 수 · 함정은 빨강. */
@@ -46,12 +47,16 @@ export function LessonView({
   course,
   lesson,
   next,
+  mode,
+  onMode,
   onBack,
   onNext,
 }: {
   course: Course;
   lesson: Lesson;
   next: Lesson | null;
+  mode: Mode;
+  onMode: (m: Mode) => void;
   onBack: () => void;
   onNext: () => void;
 }) {
@@ -61,7 +66,7 @@ export function LessonView({
   const record = useCurriculum((s) => s.record);
   const best = useCurriculum((s) => s.progress[lesson.id]?.best);
   const size = 15;
-  const [mode, setMode] = useState<Mode>("browse");
+  const [copied, setCopied] = useState(false);
   const [path, setPath] = useState<number[]>([]);
   const [quiz, setQuiz] = useState<QuizState>(() => startQuiz(root, lesson.quiz.side));
   const recorded = useRef(false);
@@ -79,6 +84,18 @@ export function LessonView({
       record(lesson.id, scoreOf(quiz));
     }
   }, [mode, quiz, lesson.id, record]);
+
+  const copyLink = async () => {
+    const url = lessonUrl(location.origin, import.meta.env.BASE_URL, lesson.id, mode);
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // 클립보드를 쓸 수 없는 곳(보안 맥락이 아님 · 권한 거부) — 직접 복사하게 보여 준다.
+      window.prompt(t("이 레슨의 링크입니다. 복사해 쓰세요"), url);
+    }
+  };
 
   const restart = () => {
     setQuiz(startQuiz(root, lesson.quiz.side));
@@ -150,12 +167,15 @@ export function LessonView({
                 className="modetabs__tab"
                 data-mode={m}
                 aria-selected={mode === m}
-                onClick={() => setMode(m)}
+                onClick={() => onMode(m)}
               >
                 {m === "browse" ? t("살펴보기") : t("학습")}
               </button>
             ))}
           </div>
+          <button type="button" onClick={() => void copyLink()} data-k="lesson-copy-link">
+            {copied ? t("링크를 복사했습니다") : t("링크 복사")}
+          </button>
         </div>
         <h2 className="panel__title">
           {textOf(course.title, lang)} › {textOf(lesson.title, lang)}

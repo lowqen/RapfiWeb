@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { findLesson, textOf, type Level } from "../../../core/curriculum/schema";
 import { useCurriculum } from "../../../data/curriculum";
 import { msg, t, useLang } from "../../../i18n/i18n";
@@ -8,6 +9,9 @@ import { LessonView } from "./LessonView";
 /**
  * 공식 정석 커리큘럼 — 코스 목록과 레슨(docs/공식-정석-설계.md §4). 모든 사용자에게 읽기 전용이다. 고치는
  * 길은 관리자의 내보내기(정석 편집기)와 저장소 커밋뿐이다.
+ *
+ * **열린 레슨은 주소가 정한다** — `/joseki?lesson=<id>`(학습으로 바로 열려면 `&mode=learn`). 그래서 레슨을
+ * 링크로 주고받을 수 있고, 새로고침해도 그 레슨이며, 브라우저의 «뒤로»가 코스 목록으로 돌아간다.
  */
 
 const LEVEL_LABEL: Record<Level, string> = {
@@ -22,7 +26,14 @@ export function CurriculumHome() {
   const file = useCurriculum((s) => s.file);
   const error = useCurriculum((s) => s.error);
   const progress = useCurriculum((s) => s.progress);
-  const [open, setOpen] = useState<string | null>(null);
+  const [params, setParams] = useSearchParams();
+  const open = params.get("lesson");
+  const mode = params.get("mode") === "learn" ? "learn" : "browse";
+  /** 레슨 열기 · 닫기는 기록에 남긴다(뒤로 = 목록). 모드 바꾸기는 기록을 늘리지 않는다. */
+  const setOpen = (id: string | null) => setParams(id ? { lesson: id } : {});
+  const setMode = (m: "browse" | "learn") =>
+    open &&
+    setParams(m === "learn" ? { lesson: open, mode: m } : { lesson: open }, { replace: true });
 
   useEffect(() => {
     void useCurriculum.getState().load();
@@ -61,9 +72,12 @@ export function CurriculumHome() {
     const next = list[at + 1] ?? null;
     return (
       <LessonView
+        key={found.lesson.id}
         course={found.course}
         lesson={found.lesson}
         next={next}
+        mode={mode}
+        onMode={setMode}
         onBack={() => setOpen(null)}
         onNext={() => next && setOpen(next.id)}
       />
@@ -77,6 +91,11 @@ export function CurriculumHome() {
           {t("공식 커리큘럼")}{" "}
           {file.version && <span className="panel__status tnum">{file.version}</span>}
         </h2>
+        {open && (
+          <p className="panel__hint" role="alert" data-k="lesson-missing">
+            {t("레슨 «{id}» 을(를) 찾지 못했습니다. 아래 목록에서 고르세요.", { id: open })}
+          </p>
+        )}
         <p className="panel__hint">
           {t(
             "전문가가 차례를 정해 만든 오프닝 정석입니다. 살펴보기로 수순마다의 해설과 나쁜 수 · 함정의 갈래를 읽고, 학습으로 수순을 직접 맞히며 따라 둡니다. 진도는 이 브라우저에 남습니다.",

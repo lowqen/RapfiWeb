@@ -249,6 +249,47 @@ try {
     "진도가 목록에 남는다",
     "진도가 없다",
   );
+
+  console.log("8. 레슨 링크 — 주소로 열기 · 링크 복사 · 뒤로");
+  await page.goto(`${BASE}/joseki?lesson=direct-and-indirect&mode=learn`);
+  await page.locator('[data-k="lesson"][data-lesson="direct-and-indirect"]').waitFor();
+  check(
+    (await page.locator('[role="tab"][data-mode="learn"]').getAttribute("aria-selected")) ===
+      "true" && (await page.locator('[data-k="quiz"]').count()) === 1,
+    "?lesson=…&mode=learn 이 그 레슨의 학습 모드로 연다",
+    "레슨 링크가 학습 모드로 열리지 않았다",
+  );
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"], { origin: BASE });
+  await page.locator('[data-k="lesson-copy-link"]').click();
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  check(
+    copied === `${BASE}/joseki?lesson=direct-and-indirect&mode=learn`,
+    "링크 복사: 지금 레슨 · 모드의 주소",
+    `복사한 링크: ${copied}`,
+  );
+  await page.getByRole("tab", { name: "살펴보기", exact: true }).click();
+  check(
+    new URL(page.url()).search === "?lesson=direct-and-indirect",
+    "모드를 바꾸면 주소도 바뀐다(기록은 늘리지 않음)",
+    `주소: ${page.url()}`,
+  );
+  await page.getByRole("button", { name: /코스 목록/ }).click();
+  await page.locator('[data-k="curriculum"]').waitFor();
+  check(new URL(page.url()).search === "", "목록으로 가면 주소의 레슨이 빠진다", page.url());
+  await page.locator('.lessonlist__item[data-lesson="hogetsu-shape"]').click();
+  await page.locator('[data-k="lesson"][data-lesson="hogetsu-shape"]').waitFor();
+  await page.goBack();
+  await page.locator('[data-k="curriculum"]').waitFor();
+  check(
+    (await page.locator('[data-k="lesson"]').count()) === 0,
+    "브라우저 «뒤로»가 코스 목록으로",
+    "뒤로가 목록으로 가지 않았다",
+  );
+  await page.goto(`${BASE}/joseki?lesson=no-such-lesson`);
+  await page.locator('[data-k="lesson-missing"]').waitFor();
+  ok("없는 레슨 id 는 알리고 목록을 보인다");
+  await page.locator('[data-tab="mine"]').click();
+  check(new URL(page.url()).search === "", "내 정석 탭으로 가면 레슨 링크를 걷는다", page.url());
 } catch (e) {
   fail(e instanceof Error ? e.message : String(e));
 }

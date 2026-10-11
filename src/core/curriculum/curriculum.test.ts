@@ -14,6 +14,7 @@ import {
   type CurriculumNode,
   type Lesson,
 } from "./schema";
+import { lessonUrl } from "./link";
 import { answer, expected, learnerCount, scoreOf, showHint, startQuiz } from "./quiz";
 import type { JosekiNode } from "../joseki/tree";
 
@@ -267,5 +268,16 @@ describe("관리자 내보내기", () => {
     expect(r.problems).toEqual([]);
     const kids = r.file.courses[0]!.lessons[0]!.root.children[0]!.children[0]!.children;
     expect(kids.map((k) => k.role ?? k.mark ?? "")).toEqual(["", "!?", "??", "trap"]);
+  });
+});
+
+describe("레슨 링크", () => {
+  it("배포 경로(base)와 학습 모드까지", () => {
+    expect(lessonUrl("https://x.dev", "/", "first-three-moves", "browse")).toBe(
+      "https://x.dev/joseki?lesson=first-three-moves",
+    );
+    expect(lessonUrl("https://x.dev", "/RapfiWeb/", "a-b", "learn")).toBe(
+      "https://x.dev/RapfiWeb/joseki?lesson=a-b&mode=learn",
+    );
   });
 });

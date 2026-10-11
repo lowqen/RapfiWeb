@@ -1137,4 +1137,8 @@ export const EN: Readonly<Record<string, string>> = {
   함정수: "Trap",
   "해설이 없습니다.": "No commentary.",
   힌트: "Hint",
+  "레슨 «{id}» 을(를) 찾지 못했습니다. 아래 목록에서 고르세요.":
+    "Lesson “{id}” was not found. Pick one from the list below.",
+  "이 레슨의 링크입니다. 복사해 쓰세요": "This is the link to the lesson. Copy it.",
+  "링크를 복사했습니다": "Link copied",
 };
