@@ -2,6 +2,12 @@ name: web
 
 # W1 스캐폴딩부터 이 워크플로가 «빌드된다»를 지킨다.
 # 엔진(WASM) 빌드 · 검증 게이트는 engine-release.yml 이 릴리스를 낼 때 본다.
+#
+# **잡이 셋이다 — 정적 검사 ‖ 빌드 → 스모크 묶음 셋(나란히).** 예전에는 한 잡에서 모든 단계를 줄 세워
+# 5분 반이 걸렸고, 그중 4분이 스모크 일곱 개가 차례를 기다린 시간이었다(2026-10-11 실측: 다국어 74초 ·
+# 대국 72초 · 정석 36초 · 엔진 두 번 33초 …). 스모크는 서로 기대지 않으므로 묶음마다 다른 러너에서
+# 돌고, 벽시계는 가장 긴 묶음(대국) 하나로 준다. 묶음 안에서는 앞 스크립트가 실패해도 뒤를 마저 돌려
+# 한 번의 실행으로 실패를 모두 본다.
 on:
   # push 는 main 만 — 다른 브랜치(Dependabot 등)는 pull_request 로 한 번만 돈다. 예전에는 PR 브랜치마다
   # push 와 pull_request 로 같은 커밋을 두 번 돌렸다.
@@ -12,6 +18,7 @@ on:
       - "spike/**"
       - "tools/**"
       - "bench/**"
+      - "**/*.md"
       - ".github/workflows/bench-*.yml"
       - ".github/workflows/n1-*.yml"
   pull_request:
@@ -21,31 +28,28 @@ on:
 permissions:
   contents: read
 
+# 같은 브랜치에 새 커밋이 오면 앞선 검사는 접는다 — 새 커밋의 검사가 그 내용까지 본다.
+# (배포 deploy.yml 은 접지 않는다 — 그쪽은 반쯤 올라간 상태가 제일 나쁘다.)
+concurrency:
+  group: web-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   # 엔진 릴리스 — src/engine/engine-manifest.json 의 tag 와 같아야 한다(verify-engine.ts 가 본다).
   ENGINE_TAG: engine-3c94c2a9-w8
 
 jobs:
-  build:
+  # 브라우저가 필요 없는 검사. 빌드 · 스모크와 나란히 돈다.
+  static:
+    name: 정적 검사
     # **언제나 GitHub 호스트 러너다**(보안 강화 계획 Phase 2). 공개 저장소라 호스트 러너가 무료이고,
     # 포크 PR 의 코드가 self-hosted 기계에서 돌면 그 기계가 남의 손에 넘어간다. 예전의 저장소 변수
     # CI_RUNNER(결제 한도로 호스트 러너가 막혔을 때의 우회)는 없앴다.
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-
-      # 버전은 package.json 의 packageManager 필드에서 온다 — 여기 또 적으면 충돌한다.
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: "26"
-          cache: pnpm
-
-      # 잠금 파일 그대로만 설치한다(보안 강화 계획 F3). `^` 범위 안에서 새로 나온 판이 검토 없이
-      # 들어오지 않게 — 의존성을 바꿀 때는 로컬에서 `pnpm install` 로 잠금 파일을 함께 고쳐 커밋한다.
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup
 
       # 공급망 감사(보안 강화 계획 Phase 2) — 배포 번들에 들어가는 의존성(--prod)에 high 이상 권고가 있으면
       # **잡을 막는다.** 경고 단계로 시작했고, react-router 7 이전으로 배포 의존성의 권고가 0건이 된 뒤
@@ -64,101 +68,7 @@ jobs:
       - name: 단위 시험 (팔레트 골든 앵커 · 프로토콜)
         run: pnpm test
 
-      - name: 프로덕션 빌드
-        run: pnpm build
-
-      # 「빌드가 됐다」와 「화면이 뜬다」는 다르다. 라우터 설정 오류, CSS 변수 오타,
-      # 워커 URL 실수는 전부 빌드를 통과하고 빈 화면으로 끝난다. 그래서 이 단계가 있다.
-      - name: Playwright(Chromium) 설치
-        # --with-deps 는 apt(sudo)를 쓴다 — 안 되는 self-hosted 러너면 브라우저만 받는다.
-        run: pnpm exec playwright install --with-deps chromium || pnpm exec playwright install chromium
-
-      - name: 스모크 — AppShell 이 실제로 렌더되는가
-        run: pnpm exec tsx scripts/smoke.ts
-
-      # W9: 정석 — 판 · 글 입력, 갈래, 메모(마크다운 · 좌표 링크), 새로고침 뒤 남기, 뒤집은 판으로 찾기.
-      - name: 정석 스모크 — 편집 · 저장 · 국면으로 찾기
-        run: pnpm exec tsx scripts/joseki-smoke.ts
-
-      # W7: 합성 .rif(RenjuNet 기보가 아니다 — 라이선스)를 보드에 떨어뜨려 변환 · 랭킹 · 오프닝 통계 ·
-      # 대국 목록 · 새로고침 뒤 유지 · 지우기 → 내 기보 폴백까지.
-      - name: W7 스모크 — .rif 드롭 · 변환 · 랭킹 · 오프닝 빈도
-        run: pnpm exec tsx scripts/rif-smoke.ts
-
-      # W10: 영어 화면에 한글이 새지 않는가 · 대시 금지 · 휴대폰/태블릿 폭의 가로 넘침 · 24px 터치 타깃 ·
-      # 두 테마의 명암비 · 언어 전환 유지 · 보드 키보드 착수. 엔진이 필요 없어 조립 전에 돈다.
-      - name: W10 스모크 — 다국어 · 반응형 · 접근성
-        run: pnpm exec tsx scripts/i18n-smoke.ts
-
-      # 엔진 산출물 조립. .js/.wasm 은 작아서 저장소에 두고 가중치(rapfi.data, 20MB — 모든
-      # 변형 공유)는 릴리스에서 받는다(계획서 §8). 받은 뒤 커밋된 매니페스트·글루와 짝인지
-      # 검증한다 — 어긋나면 배포된 앱의 가중치 무결성 검사가 모든 사용자에게서 실패한다.
-      #
-      # 「릴리스가 정말 없다」(release-download 코드 3)일 때만 엔진 스모크를 건너뛴다. 그 밖의 실패(gh 없음 ·
-      # 인증 · 네트워크)는 실패로 — 예전에는 무엇이든 「없다」로 읽어 엔진 검사가 조용히 빠졌다(deploy.yml 주석).
-      - name: 엔진 조립
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          mkdir -p dist/engine
-          # tools/ci/release-download.mjs — gh 가 없으면 REST(c4 러너). 종료 코드 3 = 릴리스가 정말 없다(그때만 건너뛴다).
-          set +e
-          node tools/ci/release-download.mjs "$ENGINE_TAG" dist/engine 'rapfi-*.js' 'rapfi-*.wasm' 'rapfi.data' 'engine-manifest.json'
-          code=$?
-          set -e
-          if [ "$code" = 3 ]; then echo "릴리스가 아직 없습니다 — 엔진 스모크는 건너뜁니다."; exit 0; fi
-          if [ "$code" != 0 ]; then echo "::error::엔진 릴리스 $ENGINE_TAG 를 받지 못했습니다(코드 $code)"; exit 1; fi
-          echo '{ "type": "commonjs" }' > dist/engine/package.json
-          ls -la dist/engine | sed 's/^/  /'
-          pnpm exec tsx scripts/verify-engine.ts
-
-      # 두 번 돈다: 격리(배포와 같은 COOP/COEP) → 멀티스레드 엔진이 떠야 하고,
-      # 비격리(헤더를 못 붙이는 호스팅) → 단일 스레드로 물러서야 한다.
-      - name: 엔진 스모크 — 클릭 -> 분석 -> 보드 (격리 · 멀티스레드)
-        run: pnpm exec tsx scripts/engine-smoke.ts
-
-      - name: 엔진 스모크 — 비격리 → 단일 스레드 폴백
-        env:
-          SMOKE_ISOLATE: "0"
-        run: pnpm exec tsx scripts/engine-smoke.ts
-
-      - name: 스모크 — 비격리 화면(스레드 선택 잠김)
-        env:
-          SMOKE_ISOLATE: "0"
-        run: pnpm exec tsx scripts/smoke.ts
-
-      # W4 부터: 분석이 아니라 **대국**을 돈다. 협상은 엔진이 실제로 무엇을
-      # 말하는지가 답이라, 우리가 답을 만들어 넣는 단위 시험으로는 닿지 않는다.
-      - name: 대국 스모크 — 협상·시계·기권까지 한 판
-        run: pnpm exec tsx scripts/game-smoke.ts
-
-      # W8: 진짜 엔진에 yixindb 를 붙이고 쓰고 저장한 뒤 새로고침해 다시 읽는다 — 메모리 FS
-      # 왕복(w8 엔진의 FS 내보내기)과 한글 주석의 UTF-8 전선은 엔진이 실제로 답해야 드러난다.
-      - name: DB 스모크 — 붙이기 · 쓰기 · 저장 · 새로고침 뒤 다시 붙기
-        run: pnpm exec tsx scripts/db-smoke.ts
-
-      # RenjuNet 오염 게이트. 이 저장소에서 가장 중요한 CI 단계다 —
-      # 앱은 실수로 포함해도 기기에 머물지만, 웹은 그 순간 «온라인 시스템에 게시»가
-      # 되어 라이선스를 바로 위반한다.
-      - name: RenjuNet 오염 게이트
-        run: |
-          if find dist -iname '*.rif' -o -iname '*.pack' -o -iname 'freq_data.json' \
-                       -o -iname 'renju*.sqlite' | grep -q .; then
-            echo "::error::RenjuNet 파생 자료가 배포물에 있습니다 — 라이선스 위반. 중단."
-            exit 1
-          fi
-          echo "깨끗합니다."
-
-      - name: dist 업로드
-        continue-on-error: true
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: dist
-          path: dist/
-          if-no-files-found: error
-          retention-days: 3
-
-      # 서식은 **맨 뒤**다. 들여쓰기 한 칸 때문에 진짜 고장(타입·시험·스모크)이
+      # 서식은 **맨 뒤**다. 들여쓰기 한 칸 때문에 진짜 고장(타입·시험)이
       # 가려지면 안 된다. 그리고 «틀렸다»고만 말하지 않고 고칠 패치까지 준다 —
       # 로컬에 Node 툴체인이 없는 환경에서도 받아서 그대로 적용할 수 있게.
       - name: 서식
@@ -193,3 +103,160 @@ jobs:
           path: prettier.patch
           if-no-files-found: ignore
           retention-days: 7
+
+  # 프로덕션 빌드 한 번 — 스모크 묶음들이 이것을 받아 쓴다(묶음마다 다시 빌드하지 않는다).
+  build:
+    name: 빌드 · 엔진 조립
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      engine: ${{ steps.engine.outputs.present }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: ./.github/actions/setup
+
+      # 타입 검사는 정적 검사 잡이 한다 — `pnpm build` 의 tsc 를 여기서 또 돌리지 않는다.
+      - name: 프로덕션 빌드
+        run: pnpm gen:tokens && pnpm exec vite build
+
+      # **엔진을 얹기 전의** dist. 화면 · 정석 · RIF · 다국어 스모크는 이것으로 돈다 — 특히 화면 스모크는
+      # 「가중치가 없으면 자동 기동이 조용히 «오류»로 끝나고 「다시 시도」를 낸다」를 여기서만 본다.
+      - name: 앱 업로드 (엔진 릴리스 없이)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist-app
+          path: dist/
+          if-no-files-found: error
+          retention-days: 3
+
+      # 엔진 산출물 조립. .js/.wasm 은 작아서 저장소에 두고 가중치(rapfi.data, 20MB — 모든
+      # 변형 공유)는 릴리스에서 받는다(계획서 §8). 받은 뒤 커밋된 매니페스트·글루와 짝인지
+      # 검증한다 — 어긋나면 배포된 앱의 가중치 무결성 검사가 모든 사용자에게서 실패한다.
+      #
+      # 「릴리스가 정말 없다」(release-download 코드 3)일 때만 엔진 스모크를 건너뛴다. 그 밖의 실패(gh 없음 ·
+      # 인증 · 네트워크)는 실패로 — 예전에는 무엇이든 「없다」로 읽어 엔진 검사가 조용히 빠졌다(deploy.yml 주석).
+      - name: 엔진 조립
+        id: engine
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p dist/engine
+          # tools/ci/release-download.mjs — gh 가 없으면 REST(c4 러너). 종료 코드 3 = 릴리스가 정말 없다(그때만 건너뛴다).
+          set +e
+          node tools/ci/release-download.mjs "$ENGINE_TAG" dist/engine 'rapfi-*.js' 'rapfi-*.wasm' 'rapfi.data' 'engine-manifest.json'
+          code=$?
+          set -e
+          if [ "$code" = 3 ]; then
+            echo "릴리스가 아직 없습니다 — 엔진 스모크는 건너뜁니다."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$code" != 0 ]; then echo "::error::엔진 릴리스 $ENGINE_TAG 를 받지 못했습니다(코드 $code)"; exit 1; fi
+          echo '{ "type": "commonjs" }' > dist/engine/package.json
+          ls -la dist/engine | sed 's/^/  /'
+          pnpm exec tsx scripts/verify-engine.ts
+          echo "present=true" >> "$GITHUB_OUTPUT"
+
+      # RenjuNet 오염 게이트. 이 저장소에서 가장 중요한 CI 단계다 —
+      # 앱은 실수로 포함해도 기기에 머물지만, 웹은 그 순간 «온라인 시스템에 게시»가
+      # 되어 라이선스를 바로 위반한다.
+      - name: RenjuNet 오염 게이트
+        run: |
+          if find dist -iname '*.rif' -o -iname '*.pack' -o -iname 'freq_data.json' \
+                       -o -iname 'renju*.sqlite' | grep -q .; then
+            echo "::error::RenjuNet 파생 자료가 배포물에 있습니다 — 라이선스 위반. 중단."
+            exit 1
+          fi
+          echo "깨끗합니다."
+
+      - name: 엔진 업로드
+        if: steps.engine.outputs.present == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist-engine
+          path: dist/engine/
+          if-no-files-found: error
+          retention-days: 3
+
+  # 「빌드가 됐다」와 「화면이 뜬다」는 다르다. 라우터 설정 오류, CSS 변수 오타,
+  # 워커 URL 실수는 전부 빌드를 통과하고 빈 화면으로 끝난다. 그래서 이 잡이 있다.
+  #
+  # 묶음은 시간으로 나눈다(각 1분 안팎) — 가장 긴 대국 스모크는 혼자 돈다. 엔진 스모크는 묶음마다
+  # **다른 러너**라 서로 CPU 를 다투지 않는다(fps · 시간 착수 검사가 그것에 민감하다).
+  smoke:
+    name: 스모크 — ${{ matrix.shard }}
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # W4 부터: 분석이 아니라 **대국**을 돈다. 협상은 엔진이 실제로 무엇을
+          # 말하는지가 답이라, 우리가 답을 만들어 넣는 단위 시험으로는 닿지 않는다.
+          - shard: 대국
+            engine: true
+            run: |
+              pnpm exec tsx scripts/game-smoke.ts
+          # 엔진은 두 번 돈다: 격리(배포와 같은 COOP/COEP) → 멀티스레드 엔진이 떠야 하고,
+          # 비격리(헤더를 못 붙이는 호스팅) → 단일 스레드로 물러서야 한다.
+          # W8: 진짜 엔진에 yixindb 를 붙이고 쓰고 저장한 뒤 새로고침해 다시 읽는다 — 메모리 FS
+          # 왕복(w8 엔진의 FS 내보내기)과 한글 주석의 UTF-8 전선은 엔진이 실제로 답해야 드러난다.
+          - shard: 엔진 · DB
+            engine: true
+            run: |
+              pnpm exec tsx scripts/engine-smoke.ts
+              SMOKE_ISOLATE=0 pnpm exec tsx scripts/engine-smoke.ts
+              SMOKE_ISOLATE=0 pnpm exec tsx scripts/smoke.ts
+              pnpm exec tsx scripts/db-smoke.ts
+          # 엔진 릴리스를 얹지 않은 dist 로 돈다(위 «앱 업로드» 주석).
+          # W9 정석 — 판 · 글 입력, 갈래, 메모, 새로고침 뒤 남기, 뒤집은 판으로 찾기, 커리큘럼.
+          # W7 — 합성 .rif(RenjuNet 기보가 아니다 — 라이선스)를 보드에 떨어뜨려 변환 · 랭킹 · 오프닝 통계.
+          # W10 — 영어 화면에 한글이 새지 않는가 · 대시 금지 · 가로 넘침 · 24px 터치 타깃 · 명암비 ·
+          # 언어 전환 유지 · 보드 키보드 착수.
+          - shard: 화면 · 정석 · RIF · 다국어
+            engine: false
+            run: |
+              pnpm exec tsx scripts/smoke.ts
+              pnpm exec tsx scripts/joseki-smoke.ts
+              pnpm exec tsx scripts/rif-smoke.ts
+              pnpm exec tsx scripts/i18n-smoke.ts
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: ./.github/actions/setup
+        with:
+          playwright: "true"
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist-app
+          path: dist/
+
+      - if: matrix.engine && needs.build.outputs.engine == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist-engine
+          path: dist/engine/
+
+      # 엔진 스모크 · 대국 · DB 는 dist/engine 에 가중치가 없으면 스스로 건너뛴다(scripts/isolation.ts 의 hasEngine).
+      - name: 스모크
+        env:
+          RUN: ${{ matrix.run }}
+        run: |
+          failed=()
+          while IFS= read -r line; do
+            [ -n "$line" ] || continue
+            echo "──── $line"
+            start=$SECONDS
+            if bash -c "$line"; then
+              echo "──── 통과 $((SECONDS - start))초 · $line"
+            else
+              echo "::error::실패 — $line"
+              failed+=("$line")
+            fi
+          done <<< "$RUN"
+          if [ ${#failed[@]} -ne 0 ]; then
+            printf '실패한 스모크:\n'
+            printf '  %s\n' "${failed[@]}"
+            exit 1
+          fi

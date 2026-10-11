@@ -23,6 +23,7 @@ on:
       - "spike/**"
       - "tools/**"
       - "bench/**"
+      - "**/*.md"
       - ".github/workflows/bench-*.yml"
       - ".github/workflows/n1-*.yml"
       - ".github/workflows/tone-dump.yml"
@@ -60,13 +61,12 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      # pnpm · Node · 의존성, 그리고 배포 검증에 쓸 Playwright Chromium(브라우저는 캐시) — .github/actions/setup.
+      - uses: ./.github/actions/setup
         with:
-          node-version: "26"
-          cache: pnpm
+          playwright: ${{ env.TARGET == 'cloudflare' }}
 
-      - run: pnpm install --frozen-lockfile
+      # 타입 검사(tsc)까지 하는 빌드다 — 이 워크플로는 web.yml 을 기다리지 않으므로 타입 오류가 배포되지 않게.
       - run: pnpm build
 
       # 엔진 쇼케이스(showcase/) — 앱과 따로 빌드해 같은 배포의 /showcase/ 에 싣는다. 앱 번들 · 라우팅과 섞이지 않는다
@@ -157,11 +157,6 @@ jobs:
             exit 1
           fi
           echo "확인됨."
-
-      - name: Playwright(Chromium) 설치
-        if: env.TARGET == 'cloudflare'
-        # --with-deps 는 apt(sudo)를 쓴다 — 안 되는 self-hosted 러너면 브라우저만 받는다.
-        run: pnpm exec playwright install --with-deps chromium || pnpm exec playwright install chromium
 
       - name: Cloudflare Pages 배포
         id: cf
@@ -263,8 +258,12 @@ jobs:
       # 분석이 흐르는 것과 **한 판 두는 것**은 다르다. 차례가 오가고, 시계가
       # 줄고, 협상이 끝까지 가고, 기권이 판을 닫는가 — W4 의 검수 항목이다.
       # 단위 시험은 엔진의 답을 우리가 만들어 넣으므로 여기서만 드러나는 것이 있다.
+      #
+      # 「무제한이면 20초가 지나도 끊기지 않는다」(20초를 그냥 기다린다)는 여기서 건너뛴다 — 앱 안의 감시견
+      # 논리라 CDN 이 바꿀 수 있는 것이 아니고, 같은 커밋 · 같은 번들로 web.yml 의 대국 스모크가 본다.
       - name: 배포 검증 — 실제로 한 판 둔다
         if: env.TARGET == 'cloudflare'
         env:
           SMOKE_BASE_URL: ${{ steps.cf.outputs.url }}
+          SMOKE_SKIP_UNLIMITED_WAIT: "1"
         run: pnpm exec tsx scripts/game-smoke.ts

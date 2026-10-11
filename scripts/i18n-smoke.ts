@@ -14,44 +14,11 @@
  *  7. 보드는 Tab 으로 초점을 받고 방향키 · Enter 로 둘 수 있다.
  */
 import { chromium, type Browser, type Page } from "playwright";
-import { createServer } from "node:http";
-import { readFileSync, existsSync } from "node:fs";
-import { dirname, extname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { SITE_HEADERS } from "./isolation.ts";
+import { CURRICULUM_FIXTURE, serveDist } from "./serve-dist.ts";
 import { watchBrowser } from "./csp-watch.ts";
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-const DIST = resolve(HERE, "../dist");
 const PORT = Number(process.env.SMOKE_PORT ?? 4183);
 const BASE = `http://localhost:${PORT}`;
-
-const MIME: Record<string, string> = {
-  ".html": "text/html; charset=utf-8",
-  ".js": "text/javascript",
-  ".css": "text/css",
-  ".json": "application/json",
-  ".svg": "image/svg+xml",
-  ".wasm": "application/wasm",
-  ".data": "application/octet-stream",
-  ".map": "application/json",
-};
-
-const server = createServer((req, res) => {
-  const url = new URL(req.url ?? "/", "http://localhost");
-  let file = join(DIST, decodeURIComponent(url.pathname));
-  if (!existsSync(file) || extname(file) === "") file = join(DIST, "index.html");
-  try {
-    const body = readFileSync(file);
-    res.writeHead(200, {
-      ...SITE_HEADERS,
-      "content-type": MIME[extname(file)] ?? "application/octet-stream",
-    });
-    res.end(body);
-  } catch {
-    res.writeHead(404).end("not found");
-  }
-});
 
 let failures = 0;
 const fail = (m: string) => {
@@ -303,7 +270,8 @@ async function sweep(
   await ctx.close();
 }
 
-await new Promise<void>((r) => server.listen(PORT, r));
+// 커리큘럼 화면은 고정 자료로 훑는다(serve-dist.ts) — 배포 파일의 영어 · 글은 curriculum.test.ts 가 본다.
+const server = await serveDist(PORT, CURRICULUM_FIXTURE);
 const browser = watchBrowser(await chromium.launch());
 
 try {
@@ -413,24 +381,27 @@ try {
     { width: 768, height: 1024, label: "태블릿" },
     { width: 1440, height: 900, label: "데스크톱" },
   ];
-  for (const scheme of ["light", "dark"] as const) {
-    await sweep(browser, {
+  const sweeps: Parameters<typeof sweep>[1][] = [
+    ...(["light", "dark"] as const).map((scheme) => ({
       locale: "en-US",
       viewport: { width: 1440, height: 900 },
       scheme,
       checkLang: true,
       label: `en ${scheme}`,
-    });
-  }
-  for (const v of VIEWPORTS) {
-    await sweep(browser, {
+    })),
+    ...VIEWPORTS.map((v) => ({
       locale: v.width < 700 ? "en-US" : "ko-KR",
       viewport: v,
-      scheme: "dark",
+      scheme: "dark" as const,
       checkLang: v.width < 700,
       label: `${v.label} ${v.width}×${v.height}`,
-    });
-  }
+    })),
+  ];
+  // 훑기는 저마다 제 컨텍스트(저장소 · 쿠키 따로)라 서로 기대지 않는다 — 셋씩 나란히 돈다. 하나씩 돌던
+  // 때는 화면마다 networkidle(최소 0.5초)을 84번 줄 서 기다려 70초가 걸렸다(2026-10-11 CI).
+  const SWEEP_PARALLEL = 3;
+  for (let i = 0; i < sweeps.length; i += SWEEP_PARALLEL)
+    await Promise.all(sweeps.slice(i, i + SWEEP_PARALLEL).map((o) => sweep(browser, o)));
   console.log(`화면 ${ROUTES.length}곳 × (영어 2테마 + 폭 ${VIEWPORTS.length}가지) 훑음`);
 } finally {
   await browser.close();

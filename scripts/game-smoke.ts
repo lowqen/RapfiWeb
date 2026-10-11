@@ -23,51 +23,26 @@
  * 8단계가 「배포본에 정말 셋만 있는가」를 확인한다.
  */
 import { chromium, type Page } from "playwright";
-import { createServer } from "node:http";
-import { SITE_HEADERS, ISOLATE, expectedVariant, hasEngine } from "./isolation.ts";
+import { DIST, serveDist } from "./serve-dist.ts";
+import { ISOLATE, expectedVariant, hasEngine } from "./isolation.ts";
 import { watchBrowser } from "./csp-watch.ts";
-import { readFileSync, existsSync } from "node:fs";
-import { extname, join, resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-const DIST = resolve(HERE, "../dist");
 const PORT = Number(process.env.SMOKE_PORT ?? 4182);
 
 const REMOTE = process.env.SMOKE_BASE_URL?.replace(/\/$/, "") ?? "";
 const BASE = REMOTE || `http://localhost:${PORT}`;
+/**
+ * 「무제한이면 끊기지 않는다」를 볼 때 그냥 기다리는 시간. 배포 검증(deploy.yml)은
+ * `SMOKE_SKIP_UNLIMITED_WAIT=1` 로 줄인다 — 앱 안의 감시견 논리라 CDN 이 바꿀 수 없고, 같은 번들을
+ * web.yml 의 대국 스모크가 20초 그대로 본다. 줄여도 그 대목(새 판 · 「지금 두기」)은 그대로 돈다.
+ */
+const SKIP_UNLIMITED_WAIT = process.env.SMOKE_SKIP_UNLIMITED_WAIT === "1";
 
 if (!REMOTE && !hasEngine(DIST)) {
   console.log("엔진 산출물이 없어 건너뜁니다 (dist/engine/).");
   process.exit(0);
 }
 if (REMOTE) console.log(`원격 검사: ${REMOTE}`);
-
-const MIME: Record<string, string> = {
-  ".html": "text/html; charset=utf-8",
-  ".js": "text/javascript",
-  ".css": "text/css",
-  ".json": "application/json",
-  ".svg": "image/svg+xml",
-  ".wasm": "application/wasm",
-  ".data": "application/octet-stream",
-  ".map": "application/json",
-};
-
-const server = createServer((req, res) => {
-  const url = new URL(req.url ?? "/", "http://localhost");
-  let file = join(DIST, decodeURIComponent(url.pathname));
-  if (!existsSync(file) || extname(file) === "") file = join(DIST, "index.html");
-  try {
-    res.writeHead(200, {
-      ...SITE_HEADERS,
-      "content-type": MIME[extname(file)] ?? "application/octet-stream",
-    });
-    res.end(readFileSync(file));
-  } catch {
-    res.writeHead(404).end("not found");
-  }
-});
 
 const failures: string[] = [];
 const fail = (m: string) => {
@@ -158,7 +133,7 @@ const STOP_AND_READ_BEST = `(() => {
   return best;
 })()`;
 
-if (!REMOTE) await new Promise<void>((r) => server.listen(PORT, r));
+const server = REMOTE ? null : await serveDist(PORT);
 const browser = watchBrowser(await chromium.launch());
 // 화면 문구를 한국어로 고정한다 — 앱은 브라우저 언어가 한국어가 아니면 영어로 뜬다(W10).
 const page: Page = await browser.newPage({
@@ -640,7 +615,7 @@ try {
   await click("새 판");
   await tap(7, 7);
   await waitStones(1, 5_000, "(무제한 대기 전 사람 수)");
-  await page.waitForTimeout(20_000);
+  await page.waitForTimeout(SKIP_UNLIMITED_WAIT ? 1_500 : 20_000);
   const nowBtn = page.getByRole("button", { name: "지금 두기", exact: true });
   const cut = await prompt();
   if (cut === "info") fail("무제한인데 감시견이 대국을 끊었습니다");
@@ -648,6 +623,7 @@ try {
     fail("20초 뒤 엔진이 생각을 멈췄습니다 (「지금 두기」 없음)");
   else if ((await stoneCount()) !== 1)
     fail(`엔진이 저절로 두었습니다 (돌 ${await stoneCount()}개)`);
+  else if (SKIP_UNLIMITED_WAIT) ok("무제한: 「지금 두기」까지 읽는다(20초 대기는 web.yml 이 본다)");
   else ok("무제한: 20초가 지나도 끊기지 않고 계속 읽는다");
   lastAction = "무제한 20초 뒤 「지금 두기」 누르기";
   await page.evaluate(PRESS_MOVE_NOW);
@@ -967,7 +943,7 @@ try {
   fail(`[${step}] ${first}`);
 } finally {
   await browser.close();
-  if (!REMOTE) server.close();
+  server?.close();
 }
 
 if (failures.length) console.log(`\n대국 스모크 실패 ${failures.length}건`);

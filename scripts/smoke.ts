@@ -9,57 +9,23 @@
  * 라우팅 이동, 다크 토큰이 실제로 적용되는지.
  */
 import { chromium } from "playwright";
-import { createServer } from "node:http";
-import { SITE_HEADERS, ISOLATE, hasEngine } from "./isolation.ts";
+import { DIST, serveDist } from "./serve-dist.ts";
+import { ISOLATE, hasEngine } from "./isolation.ts";
 import { watchBrowser } from "./csp-watch.ts";
-import { readFileSync, existsSync } from "node:fs";
-import { extname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
 import {
   DESKTOP_DEFAULTS,
   render as renderDesktop,
 } from "../src/core/settings/desktop-settings.ts";
-import { dirname } from "node:path";
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-const DIST = resolve(HERE, "../dist");
 const PORT = Number(process.env.SMOKE_PORT ?? 4179);
-
-const MIME: Record<string, string> = {
-  ".html": "text/html; charset=utf-8",
-  ".js": "text/javascript",
-  ".css": "text/css",
-  ".json": "application/json",
-  ".svg": "image/svg+xml",
-  ".wasm": "application/wasm",
-  ".data": "application/octet-stream",
-  ".map": "application/json",
-};
-
-// SPA 폴백이 있는 최소 정적 서버. vite preview 를 쓰지 않는 이유는
-// 종료 처리를 우리가 확실히 쥐고 있어야 CI 가 매달리지 않기 때문이다.
-const server = createServer((req, res) => {
-  const url = new URL(req.url ?? "/", "http://localhost");
-  let file = join(DIST, decodeURIComponent(url.pathname));
-  if (!existsSync(file) || extname(file) === "") file = join(DIST, "index.html");
-  try {
-    const body = readFileSync(file);
-    res.writeHead(200, {
-      ...SITE_HEADERS,
-      "content-type": MIME[extname(file)] ?? "application/octet-stream",
-    });
-    res.end(body);
-  } catch {
-    res.writeHead(404).end("not found");
-  }
-});
 
 const fail = (m: string) => {
   console.error(`스모크 실패: ${m}`);
   process.exitCode = 1;
 };
 
-await new Promise<void>((r) => server.listen(PORT, r));
+const server = await serveDist(PORT);
 const browser = watchBrowser(await chromium.launch());
 
 try {

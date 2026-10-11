@@ -6,39 +6,12 @@
  *   SMOKE_SHOT=out.png …   # 편집 화면 스크린숏
  */
 import { chromium, type Page } from "playwright";
-import { createServer } from "node:http";
-import { SITE_HEADERS } from "./isolation.ts";
+import { CURRICULUM_FIXTURE, serveDist } from "./serve-dist.ts";
 import { watchBrowser } from "./csp-watch.ts";
-import { readFileSync, existsSync } from "node:fs";
-import { extname, join, resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-const DIST = resolve(HERE, "../dist");
 const PORT = Number(process.env.SMOKE_PORT ?? 4184);
 const BASE = `http://localhost:${PORT}`;
-const MIME: Record<string, string> = {
-  ".html": "text/html; charset=utf-8",
-  ".js": "text/javascript",
-  ".css": "text/css",
-  ".json": "application/json",
-  ".svg": "image/svg+xml",
-  ".wasm": "application/wasm",
-};
-const server = createServer((req, res) => {
-  const url = new URL(req.url ?? "/", "http://localhost");
-  let file = join(DIST, decodeURIComponent(url.pathname));
-  if (!existsSync(file) || extname(file) === "") file = join(DIST, "index.html");
-  try {
-    res.writeHead(200, {
-      ...SITE_HEADERS,
-      "content-type": MIME[extname(file)] ?? "application/octet-stream",
-    });
-    res.end(readFileSync(file));
-  } catch {
-    res.writeHead(404).end("not found");
-  }
-});
 
 const failures: string[] = [];
 const fail = (m: string) => {
@@ -63,7 +36,8 @@ async function tap(page: Page, x: number, y: number) {
 }
 const where = (page: Page) => page.locator('[data-k="joseki-where"]').innerText();
 
-await new Promise<void>((r) => server.listen(PORT, r));
+// 공식 커리큘럼은 고정 자료로(serve-dist.ts 의 CURRICULUM_FIXTURE) — 관리자가 레슨을 고쳐도 이 스모크는 기능만 본다.
+const server = await serveDist(PORT, CURRICULUM_FIXTURE);
 const browser = watchBrowser(await chromium.launch());
 const page = await browser.newPage({
   locale: "ko-KR", // 한국어 화면으로 고정(W10 — 그 밖의 언어면 영어로 뜬다)
@@ -111,10 +85,10 @@ try {
   );
   // 이름은 «기호 + 뜻»(W10 접근성, 예: «?! 의문수») — 기호로 시작하는 단추를 집는다.
   await page.getByRole("radio", { name: /^\?! / }).click();
-  await page
-    .getByRole("button", { name: "고치기" })
-    .click()
-    .catch(() => {});
+  // 메모가 미리 보기 상태면 «고치기»로 연다. 없으면 곧바로 지나간다 — 예전에는 `click().catch()` 라
+  // 단추가 없을 때(보통) 기본 제한 30초를 다 기다리고서야 넘어갔다.
+  const edit = page.getByRole("button", { name: "고치기" });
+  if (await edit.isVisible()) await edit.click();
   await page
     .getByLabel("메모", { exact: true })
     .fill("**의문수** — h8 로 돌아가 보자\n- 하나\n- 둘");

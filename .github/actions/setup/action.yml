@@ -1,0 +1,43 @@
+name: setup
+description: >-
+  pnpm · Node · 의존성(잠금 파일 그대로) — 그리고 바라면 Playwright Chromium(브라우저는 캐시).
+  web.yml 의 잡들과 deploy.yml 이 같은 준비를 한곳에서 쓴다. 저장소를 체크아웃한 뒤에 부른다.
+
+inputs:
+  playwright:
+    description: "Playwright Chromium 을 설치한다 (스모크 · 배포 검증)"
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    # 버전은 package.json 의 packageManager 필드에서 온다 — 여기 또 적으면 충돌한다.
+    - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: "26"
+        cache: pnpm
+
+    # 잠금 파일 그대로만 설치한다(보안 강화 계획 F3). `^` 범위 안에서 새로 나온 판이 검토 없이
+    # 들어오지 않게 — 의존성을 바꿀 때는 로컬에서 `pnpm install` 로 잠금 파일을 함께 고쳐 커밋한다.
+    - shell: bash
+      run: pnpm install --frozen-lockfile
+
+    # 브라우저(~170MB)는 Playwright 판마다 같으므로 캐시한다 — 매번 받던 10초 남짓이 빠진다.
+    # 시스템 라이브러리(--with-deps, apt)는 캐시할 수 없어 그대로 깐다.
+    - id: pw
+      if: inputs.playwright == 'true'
+      shell: bash
+      run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+    - if: inputs.playwright == 'true'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-chromium-${{ runner.os }}-${{ steps.pw.outputs.version }}
+
+    # --with-deps 는 apt(sudo)를 쓴다 — 안 되는 self-hosted 러너면 브라우저만 받는다.
+    - if: inputs.playwright == 'true'
+      shell: bash
+      run: pnpm exec playwright install --with-deps chromium || pnpm exec playwright install chromium

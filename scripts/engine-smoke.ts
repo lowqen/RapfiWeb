@@ -9,15 +9,10 @@
  * 「없어서 건너뛰었다」와 「있는데 실패했다」는 구별돼야 한다.
  */
 import { chromium } from "playwright";
-import { createServer } from "node:http";
-import { SITE_HEADERS, ISOLATE, expectedVariant, hasEngine } from "./isolation.ts";
+import { DIST, serveDist } from "./serve-dist.ts";
+import { ISOLATE, expectedVariant, hasEngine } from "./isolation.ts";
 import { watchBrowser } from "./csp-watch.ts";
-import { readFileSync, existsSync } from "node:fs";
-import { extname, join, resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-const DIST = resolve(HERE, "../dist");
 const PORT = Number(process.env.SMOKE_PORT ?? 4181);
 
 /**
@@ -35,33 +30,6 @@ if (!REMOTE && !hasEngine(DIST)) {
   process.exit(0);
 }
 if (REMOTE) console.log(`원격 검사: ${REMOTE}`);
-
-const MIME: Record<string, string> = {
-  ".html": "text/html; charset=utf-8",
-  ".js": "text/javascript",
-  ".css": "text/css",
-  ".json": "application/json",
-  ".svg": "image/svg+xml",
-  ".wasm": "application/wasm",
-  ".data": "application/octet-stream",
-  ".map": "application/json",
-};
-
-const server = createServer((req, res) => {
-  const url = new URL(req.url ?? "/", "http://localhost");
-  let file = join(DIST, decodeURIComponent(url.pathname));
-  if (!existsSync(file) || extname(file) === "") file = join(DIST, "index.html");
-  try {
-    const body = readFileSync(file);
-    res.writeHead(200, {
-      ...SITE_HEADERS,
-      "content-type": MIME[extname(file)] ?? "application/octet-stream",
-    });
-    res.end(body);
-  } catch {
-    res.writeHead(404).end("not found");
-  }
-});
 
 const fail = (m: string) => {
   console.error(`엔진 스모크 실패: ${m}`);
@@ -84,7 +52,7 @@ const STOP_AND_READ_BEST = `(() => {
   return best;
 })()`;
 
-if (!REMOTE) await new Promise<void>((r) => server.listen(PORT, r));
+const server = REMOTE ? null : await serveDist(PORT);
 const browser = watchBrowser(await chromium.launch());
 let page: import("playwright").Page | null = null;
 const pageErrors: string[] = [];
@@ -560,5 +528,5 @@ try {
   fail(first);
 } finally {
   await browser.close();
-  if (!REMOTE) server.close();
+  server?.close();
 }

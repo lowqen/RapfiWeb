@@ -9,39 +9,11 @@
  * 국면별 대조(데스크톱 팩 116,191국면 전부 일치)는 `tools/w7/rif-crosscheck.ts` 가 로컬에서 한다.
  */
 import { chromium, type Page } from "playwright";
-import { createServer } from "node:http";
-import { SITE_HEADERS } from "./isolation.ts";
+import { serveDist } from "./serve-dist.ts";
 import { watchBrowser } from "./csp-watch.ts";
-import { readFileSync, existsSync } from "node:fs";
-import { extname, join, resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-const DIST = resolve(HERE, "../dist");
 const PORT = Number(process.env.SMOKE_PORT ?? 4185);
 const BASE = `http://localhost:${PORT}`;
-const MIME: Record<string, string> = {
-  ".html": "text/html; charset=utf-8",
-  ".js": "text/javascript",
-  ".css": "text/css",
-  ".json": "application/json",
-  ".svg": "image/svg+xml",
-  ".wasm": "application/wasm",
-};
-const server = createServer((req, res) => {
-  const url = new URL(req.url ?? "/", "http://localhost");
-  let file = join(DIST, decodeURIComponent(url.pathname));
-  if (!existsSync(file) || extname(file) === "") file = join(DIST, "index.html");
-  try {
-    res.writeHead(200, {
-      ...SITE_HEADERS,
-      "content-type": MIME[extname(file)] ?? "application/octet-stream",
-    });
-    res.end(readFileSync(file));
-  } catch {
-    res.writeHead(404).end("not found");
-  }
-});
 
 const failures: string[] = [];
 const fail = (m: string) => {
@@ -147,7 +119,7 @@ type PackView = {
 };
 const packView = (page: Page) => page.evaluate("window.__rapfiPack()") as Promise<PackView>;
 
-await new Promise<void>((r) => server.listen(PORT, r));
+const server = await serveDist(PORT);
 const browser = watchBrowser(await chromium.launch());
 const page = await browser.newPage({ viewport: { width: 1280, height: 1000 }, locale: "ko-KR" });
 const pageErrors: string[] = [];
