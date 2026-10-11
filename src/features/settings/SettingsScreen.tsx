@@ -81,7 +81,7 @@ function AutoBootControl() {
   );
 }
 
-/** 관리자 도구 — 정석 편집기에 «공식 커리큘럼으로 내보내기»를 보인다(보안 장치 아님, `joseki/admin.ts`). */
+/** 관리자 도구 — 커리큘럼 스튜디오와 정석 편집기의 «레슨으로» 단추를 연다(보안 장치 아님, `joseki/admin.ts`). */
 function AdminToolsControl() {
   const on = useAdminTools((a) => a.on);
   const set = useAdminTools((a) => a.set);
@@ -491,8 +491,10 @@ const ROWS: readonly RowSpec[] = [
     id: "adminTools",
     sec: "system",
     label: msg("관리자 도구"),
-    note: msg("정석 편집기에 공식 커리큘럼 내보내기를 보입니다. 배포는 저장소 커밋으로만 됩니다"),
-    keywords: "admin 관리자 커리큘럼 curriculum 공식 정석 내보내기",
+    note: msg(
+      "정석 ▸ 공식 커리큘럼에 «커리큘럼 편집»(스튜디오)을 엽니다. 배포는 저장소 커밋으로만 됩니다",
+    ),
+    keywords: "admin 관리자 커리큘럼 curriculum 공식 정석 내보내기 스튜디오 studio 레슨 lesson",
     Control: AdminToolsControl,
   },
   {

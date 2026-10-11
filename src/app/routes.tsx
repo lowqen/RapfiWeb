@@ -5,6 +5,7 @@ import { EngineScreen } from "../features/engine/EngineScreen";
 import { SettingsScreen } from "../features/settings/SettingsScreen";
 import { DatabaseScreen } from "../features/database/DatabaseScreen";
 import { JosekiScreen } from "../features/joseki/JosekiScreen";
+import { CurriculumStudio } from "../features/joseki/studio/CurriculumStudio";
 import { OpeningExplorer } from "../features/research/OpeningExplorer";
 import { ReviewScreen } from "../features/research/review/ReviewScreen";
 import { SequenceScreen } from "../features/research/sequence/SequenceScreen";
@@ -53,6 +54,8 @@ export const router = createBrowserRouter(
 
         // W9: 정석 — 수순 입력(판 · 글), 분기, 메모(마크다운), 분류 자동, 국면으로 찾기.
         { path: "joseki", element: <JosekiScreen /> },
+        // 관리자 도구: 공식 커리큘럼 스튜디오(docs/공식-정석-관리.md).
+        { path: "joseki/studio", element: <CurriculumStudio /> },
 
         // 앱 `SettingsScreen.kt` 의 분류(대국·엔진·표시…)를 옮긴 것. 대국 설정·조작은
         // 보드 옆 칸에서 이리로 왔다. settings.txt 67항목 파일 왕복(W5b)은 고급 ▸ 시스템에 있다.

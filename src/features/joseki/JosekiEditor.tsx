@@ -22,7 +22,6 @@ import {
 import { label, moveKey } from "../../core/model/move";
 import { useOpeningTables } from "../../data/opening-tables";
 import { useBoardStore } from "../board/boardStore";
-import { AdminExport } from "./AdminExport";
 import { useAdminTools } from "./admin";
 import { JosekiComment } from "./JosekiComment";
 import { useJosekiStore } from "./josekiStore";
@@ -67,7 +66,6 @@ export function JosekiEditor() {
   const [asking, setAsking] = useState(false);
   const [tagText, setTagText] = useState(jk.tags.join(", "));
   const admin = useAdminTools((a) => a.on);
-  const [exporting, setExporting] = useState(false);
   const area = useRef<HTMLTextAreaElement>(null);
 
   const node = nodeAt(jk.root, s.path) ?? jk.root;
@@ -157,14 +155,14 @@ export function JosekiEditor() {
           {admin && (
             <button
               type="button"
-              onClick={go(() => setExporting((x) => !x))}
-              aria-expanded={exporting}
+              data-k="joseki-to-studio"
+              onClick={go(() => navigate(`/joseki/studio?import=${encodeURIComponent(jk.id)}`))}
+              title={t("커리큘럼 스튜디오에서 공식 커리큘럼의 레슨으로 넣습니다")}
             >
-              {t("공식 커리큘럼으로 내보내기")}
+              {t("공식 커리큘럼 레슨으로")}
             </button>
           )}
         </div>
-        {admin && exporting && <AdminExport tree={jk} onClose={() => setExporting(false)} />}
         <label className="jfield">
           <span>{t("제목")}</span>
           <input

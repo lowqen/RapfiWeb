@@ -58,6 +58,7 @@ export function LessonView({
   onMode,
   onBack,
   onNext,
+  preview = false,
 }: {
   course: Course;
   lesson: Lesson;
@@ -68,6 +69,8 @@ export function LessonView({
   onMode: (m: Mode) => void;
   onBack: () => void;
   onNext: () => void;
+  /** 스튜디오의 미리 보기 — 학습을 마쳐도 진도를 남기지 않는다. */
+  preview?: boolean;
 }) {
   const lang = useLang((s) => s.lang);
   const root = useMemo(() => resolveNode(lesson.root, lang), [lesson.root, lang]);
@@ -88,11 +91,11 @@ export function LessonView({
   }, [root, lesson.quiz.side]);
 
   useEffect(() => {
-    if (mode === "learn" && quiz.done && !recorded.current) {
+    if (!preview && mode === "learn" && quiz.done && !recorded.current) {
       recorded.current = true;
       record(lesson.id, scoreOf(quiz));
     }
-  }, [mode, quiz, lesson.id, record]);
+  }, [preview, mode, quiz, lesson.id, record]);
 
   const copyLink = async () => {
     const url = lessonUrl(location.origin, import.meta.env.BASE_URL, lesson.id, mode);

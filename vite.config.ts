@@ -2,6 +2,7 @@ import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath, URL } from "node:url";
 import { CSP_KEYS, ISOLATION_KEYS, omit, siteHeaders } from "./scripts/headers";
+import { studioPlugin } from "./scripts/studio-plugin";
 
 /**
  * 헤더는 `public/_headers` 의 `/*` 블록을 그대로 쓴다(`scripts/headers.ts` — 원본은 그 파일 하나).
@@ -23,7 +24,8 @@ export default defineConfig(({ command }) => ({
   // GitHub Pages 는 저장소 이름이 경로에 붙는다(https://lowqen.github.io/RapfiWeb/).
   // 기본값은 "/" 로 두어 로컬 개발·스모크가 그대로 돌고, 배포 잡만 이 값을 준다.
   base: process.env.RAPFIWEB_BASE ?? "/",
-  plugins: [react()],
+  // studioPlugin: 커리큘럼 스튜디오의 «저장소에 저장»(개발 서버에만 — scripts/studio-plugin.ts).
+  plugins: [react(), studioPlugin()],
   resolve: {
     alias: {
       "~": fileURLToPath(new URL("./src", import.meta.url)),

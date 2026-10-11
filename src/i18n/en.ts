@@ -1060,21 +1060,15 @@ export const EN: Readonly<Record<string, string>> = {
 
   // 공식 정석 커리큘럼(docs/공식-정석-설계.md)
   "curriculum.json 내려받기": "Download curriculum.json",
-  "curriculum.json 을 내려받았습니다. public/joseki/ 에 두고 pnpm test 뒤 커밋하세요.":
-    "curriculum.json downloaded. Put it in public/joseki/, run pnpm test, then commit.",
   "{a} / {b}수": "{a} of {b} {b|move|moves}",
   "{a}/{b} 레슨": "{a}/{b} {b|lesson|lessons}",
   "갈래 쓰임": "Branch role",
-  "검증 실패: 형식이 맞지 않습니다": "Validation failed: wrong format",
   고급: "Advanced",
   "공식 커리큘럼": "Official curriculum",
   "공식 커리큘럼 파일의 형식이 맞지 않습니다": "The official curriculum file has the wrong format",
-  "공식 커리큘럼으로 내보내기": "Export to official curriculum",
   "공식 커리큘럼을 받지 못했습니다": "Could not load the official curriculum",
   "관리자 도구": "Maintainer tools",
   "내 정석": "My joseki",
-  "내려받았지만 검증 경고가 {n}개 있습니다: {first}":
-    "Downloaded, but validation reported {n} {n|warning|warnings}: {first}",
   "다시 두어 보세요.": "Try again.",
   "다시 하기": "Play again",
   "다음 레슨": "Next lesson",
@@ -1083,7 +1077,6 @@ export const EN: Readonly<Record<string, string>> = {
   "레슨 모드": "Lesson mode",
   "레슨 제목": "Lesson title",
   살펴보기: "Explore",
-  "새 코스": "New course",
   수준: "Level",
   "아쉬운 수": "Not the best",
   "아직 실린 코스가 없습니다.": "No courses yet.",
@@ -1091,13 +1084,9 @@ export const EN: Readonly<Record<string, string>> = {
   요약: "Summary",
   응징: "Refutation",
   "응징: {move}": "Refutation: {move}",
-  "이 정석을 레슨으로 넣은 커리큘럼 파일을 만듭니다. 배포는 저장소 커밋으로만 됩니다.":
-    "Builds a curriculum file with this joseki as a lesson. Publishing happens only through a repository commit.",
   정답: "Correct",
   "정답 · 다른 좋은 수": "Correct · another good move",
   "정석 보기": "Joseki view",
-  "정석 편집기에 공식 커리큘럼 내보내기를 보입니다. 배포는 저장소 커밋으로만 됩니다":
-    "Shows Export to official curriculum in the joseki editor. Publishing happens only through a repository commit",
   "정석에 없는 수입니다": "Not in the joseki",
   "첫 시도 {a}/{b}": "First try {a}/{b}",
   "최고 {n}점": "Best {n}",
@@ -1154,4 +1143,141 @@ export const EN: Readonly<Record<string, string>> = {
   "커리큘럼으로 돌아가기": "Back to the curriculum",
   레슨: "Lessons",
   "코스로 돌아가기": "Back to the course",
+
+  // ── 커리큘럼 스튜디오(관리자 도구) · 검사 ──
+  "해설은 {a} 라고 하지만 이 수순은 {b} 입니다": "The note says {a}, but this line is {b}",
+  "영어 없음: {what}": "No English: {what}",
+  "코스 설명": "course description",
+  "레슨 요약": "lesson summary",
+  해설: "Note",
+  "첫 해설": "opening note",
+  "코스가 하나도 없습니다": "There are no courses",
+  "코스 id «{id}» 가 잘못되었거나 겹칩니다": "Course id «{id}» is invalid or taken",
+  "레슨이 없는 코스입니다": "This course has no lessons",
+  "코스 제목이 비었습니다": "The course title is empty",
+  "레슨 id «{id}» 가 잘못되었거나 겹칩니다": "Lesson id «{id}» is invalid or taken",
+  "학습자가 둘 수가 주 변화에 없습니다(앱이 이 레슨을 버립니다)":
+    "The main line has no move for the learner (the app would drop this lesson)",
+  "레슨 제목이 비었습니다": "The lesson title is empty",
+  "수가 {n}개입니다. 레슨을 나누면 가볍습니다":
+    "{n} {n|move|moves}. Splitting the lesson keeps it light",
+  "주 변화에 나쁜 수나 함정수가 있습니다(학습이 정답으로 가르칩니다)":
+    "The main line has a bad move or a trap (learning would teach it as the answer)",
+  "형식이 맞지 않습니다": "Wrong format",
+  "배포본의 코스 «{id}» 가 사라집니다(그 코스 링크가 끊깁니다)":
+    "Published course «{id}» goes away (links to it break)",
+  "배포본의 레슨 «{id}» 가 사라집니다(링크와 사용자의 진도가 끊깁니다)":
+    "Published lesson «{id}» goes away (its links and learners' progress break)",
+  "영문 소문자, 숫자, 하이픈만 씁니다(64자까지)":
+    "Lowercase letters, digits and hyphens only (up to 64)",
+  "이미 쓰는 id 입니다": "That id is taken",
+  "커리큘럼 편집": "Edit curriculum",
+  "커리큘럼 스튜디오에서 공식 커리큘럼의 레슨으로 넣습니다":
+    "Adds this joseki to the official curriculum as a lesson, in the curriculum studio",
+  "공식 커리큘럼 레슨으로": "To a curriculum lesson",
+  "정석 ▸ 공식 커리큘럼에 «커리큘럼 편집»(스튜디오)을 엽니다. 배포는 저장소 커밋으로만 됩니다":
+    "Opens «Edit curriculum» (the studio) in Joseki ▸ Official curriculum. Publishing happens only through a repository commit",
+  "커리큘럼 스튜디오": "Curriculum studio",
+  "공식 정석 커리큘럼을 만드는 관리자 도구입니다. 배포는 저장소에 쓸 권한이 있어야 합니다":
+    "A maintainer tool for building the official joseki curriculum. Publishing needs write access to the repository",
+  "관리자 도구 켜기": "Turn on maintainer tools",
+  정석으로: "To Joseki",
+  "배포본과 다름": "Differs from published",
+  "배포본과 같음": "Same as published",
+  "초안 저장됨": "Draft saved",
+  "배포본 {v}": "Published {v}",
+  "오류 {e} · 경고 {w}": "{e} {e|error|errors} · {w} {w|warning|warnings}",
+  "오류 없음 · 경고 {w}": "No errors · {w} {w|warning|warnings}",
+  "오류 없음": "No errors",
+  "public/joseki/curriculum.json 에 씁니다(개발 서버)":
+    "Writes public/joseki/curriculum.json (dev server)",
+  "저장소에 저장": "Save to repository",
+  "파일 열기": "Open file",
+  "초안 버리기": "Discard draft",
+  "배포본으로 되돌리기": "Revert to published",
+  "코스와 레슨": "Courses and lessons",
+  개요: "Overview",
+  "코스 {c} · 레슨 {l}": "{c} {c|course|courses} · {l} {l|lesson|lessons}",
+  "코스 추가": "Add course",
+  검사: "Checks",
+  "오류도 경고도 없습니다. 배포해도 됩니다": "No errors or warnings. Ready to publish",
+  배포: "Publish",
+  "다음 버전 {v} · {kb}KB": "Next version {v} · {kb} KB",
+  "«저장소에 저장»을 누르면 public/joseki/curriculum.json 에 씁니다":
+    "«Save to repository» writes public/joseki/curriculum.json",
+  "«curriculum.json 내려받기»로 파일을 받습니다(이 브라우저의 초안은 그대로 남습니다)":
+    "«Download curriculum.json» saves the file (the draft stays in this browser)",
+  "터미널에서 pnpm curriculum:publish 를 실행합니다": "Run pnpm curriculum:publish in a terminal",
+  "저장소에서 pnpm curriculum:publish <받은 파일> 을 실행합니다":
+    "In the repository, run pnpm curriculum:publish <downloaded file>",
+  "검사 · 시험을 통과하면 커밋 · push 되고, 몇 분 뒤 웹과 RapfiDroid 앱이 새 커리큘럼을 받습니다":
+    "If the checks and tests pass it is committed and pushed, and a few minutes later the web app and RapfiDroid get the new curriculum",
+  "pnpm studio 로 띄우면 이 화면에서 저장소 파일에 바로 씁니다":
+    "Started with pnpm studio, this screen writes the repository file directly",
+  "가져올 정석을 찾지 못했습니다": "Could not find the joseki to import",
+  "«{title}» 을(를) 레슨으로 넣을 코스": "Course for «{title}» as a lesson",
+  "내 정석이 없습니다. 정석 ▸ 내 정석에서 먼저 쓰면 여기서 레슨으로 가져옵니다":
+    "No joseki of your own yet. Write one in Joseki ▸ My joseki and import it here as a lesson",
+  "가져올 내 정석": "Joseki to import",
+  "내 정석 고르기": "Pick a joseki",
+  "제목 없음": "Untitled",
+  "레슨으로 가져오기": "Import as lesson",
+  "id 는 링크 주소(?course=)입니다. 배포한 뒤에는 바꾸지 마세요":
+    "The id is the link address (?course=). Do not change it once published",
+  설명: "Description",
+  "레슨 추가": "Add lesson",
+  위로: "Move up",
+  아래로: "Move down",
+  "코스 지우기": "Delete course",
+  "레슨 {n}개와 함께 지우기": "Delete with {n} {n|lesson|lessons}",
+  "내 정석에서 가져오기": "Import from my joseki",
+  "미리 보기 닫기": "Close preview",
+  "배포했을 때의 화면입니다. 진도는 남지 않습니다":
+    "This is how it looks once published. Progress is not recorded",
+  "id 는 링크 주소(?lesson=)이자 사용자 진도의 열쇠입니다. 배포한 뒤에는 바꾸지 마세요":
+    "The id is the link address (?lesson=) and the key of learners' progress. Do not change it once published",
+  "사본 만들기": "Duplicate",
+  "레슨 지우기": "Delete lesson",
+  "{n}수와 함께 지우기": "Delete with {n} {n|move|moves}",
+  "뿌리(첫 화면)": "Root (first screen)",
+  "{n}수 · 학습자가 둘 수 {k}개": "{n} {n|move|moves} · {k} for the learner",
+  "다음은 학습자 차례(정답을 고르는 수)": "Learner to move next (the move to answer)",
+  "다음은 상대 차례(저절로 두는 수)": "Opponent to move next (played automatically)",
+  "보드 탭에 놓인 수순을 뿌리부터 넣습니다": "Adds the line on the Board tab from the root",
+  "보드의 수순 넣기": "Add board line",
+  "주 변화([0])가 추천 수입니다. !! ! !? 는 다른 정답, ?! ? ?? 와 함정수는 오답으로 학습합니다. 응징은 나쁜 수의 첫 자식으로 둡니다":
+    "The main line ([0]) is the recommended move. !! ! !? are other correct answers; ?! ? ?? and traps are wrong answers in learning. Put the refutation as the first child of the bad move",
+  "이 수의 해설": "Note for this move",
+  "첫 해설(레슨을 열면 보이는 글)": "Opening note (shown when the lesson opens)",
+  "한국어 미리 보기": "Korean preview",
+  "영어 미리 보기": "English preview",
+  "마크다운: **굵게**, *기울임*, 줄 앞에 하이픈을 붙이면 목록, [글](주소). 좌표(h8)는 누르면 그 수로 갑니다":
+    "Markdown: **bold**, *italic*, a hyphen at the start of a line for a list, [text](address). Coordinates (h8) jump to that move",
+  한국어: "Korean",
+  "문제가 없습니다": "No problems",
+  경고: "Warning",
+  "초안을 이 브라우저에 남기지 못했습니다. 파일로 내려받아 두세요":
+    "Could not keep the draft in this browser. Download it as a file",
+  "이 브라우저에 남은 초안에서 이어서 고칩니다": "Continuing from the draft kept in this browser",
+  "배포본을 받지 못해 빈 커리큘럼에서 시작합니다":
+    "Could not load the published curriculum, starting empty",
+  "«{title}» 을(를) 레슨으로 넣었습니다. 영어 해설과 요약을 채우세요":
+    "Added «{title}» as a lesson. Fill in the English notes and summary",
+  "{n}번째 수에서 멈췄습니다(이미 돌이 있거나 판 밖)":
+    "Stopped at move {n} (occupied or off the board)",
+  "보드에 둔 수가 없습니다": "There are no moves on the board",
+  "보드의 {n}수를 뿌리부터 넣었습니다(있는 수는 따라갔습니다)":
+    "Added the board's {n} {n|move|moves} from the root (existing moves were followed)",
+  "커리큘럼 파일(rapfiweb-curriculum)이 아닙니다": "Not a curriculum file (rapfiweb-curriculum)",
+  "불러왔지만 {n}곳을 버렸습니다: {first}": "Loaded, but dropped {n} {n|part|parts}: {first}",
+  "파일을 불러왔습니다": "File loaded",
+  "배포본으로 되돌렸습니다. 되돌리기로 초안을 다시 살릴 수 있습니다":
+    "Reverted to the published curriculum. Undo brings the draft back",
+  "curriculum.json 을 내려받았습니다(버전 {v}). pnpm curriculum:publish 로 싣습니다":
+    "Downloaded curriculum.json (version {v}). Publish it with pnpm curriculum:publish",
+  "저장소에 쓰지 못했습니다: {e}": "Could not write to the repository: {e}",
+  "개발 서버에 닿지 못했습니다. pnpm studio 로 띄웠는지 보세요":
+    "Could not reach the dev server. Check that it was started with pnpm studio",
+  "저장소 파일에 썼습니다(버전 {v}). pnpm curriculum:publish 로 커밋 · push 합니다":
+    "Wrote the repository file (version {v}). Commit and push it with pnpm curriculum:publish",
 };

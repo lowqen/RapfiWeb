@@ -11,6 +11,8 @@
   },
   "scripts": {
     "dev": "tsx scripts/gen-tokens.ts && vite",
+    "studio": "tsx scripts/gen-tokens.ts && vite --open /joseki/studio",
+    "curriculum:publish": "tsx scripts/curriculum-publish.ts",
     "build": "tsx scripts/gen-tokens.ts && tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsx scripts/gen-tokens.ts && tsc --noEmit",

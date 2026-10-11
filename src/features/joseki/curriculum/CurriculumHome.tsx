@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   findLesson,
   mainLine,
@@ -14,6 +14,7 @@ import { Icon } from "../../../components/icons";
 import { ICON } from "../../../components/icon-paths";
 import { JosekiComment } from "../JosekiComment";
 import { LessonView } from "./LessonView";
+import { useAdminTools } from "../admin";
 
 /**
  * 공식 정석 커리큘럼 — 코스 목록 · 코스 · 레슨 세 층(docs/공식-정석-설계.md §4). 모든 사용자에게 읽기
@@ -49,6 +50,8 @@ export function CurriculumHome() {
   const error = useCurriculum((s) => s.error);
   const progress = useCurriculum((s) => s.progress);
   const [params, setParams] = useSearchParams();
+  const admin = useAdminTools((a) => a.on);
+  const navigate = useNavigate();
   const open = params.get("lesson");
   const courseId = params.get("course");
   const mode = params.get("mode") === "learn" ? "learn" : "browse";
@@ -128,6 +131,16 @@ export function CurriculumHome() {
         <BooksArt />
         <h2 className="cur__title">{t("공식 커리큘럼")}</h2>
         <p className="cur__lead">{t("정해진 차례대로 오프닝 정석을 배웁니다")}</p>
+        {admin && (
+          <button
+            type="button"
+            className="textbtn"
+            data-k="open-studio"
+            onClick={() => navigate("/joseki/studio")}
+          >
+            {t("커리큘럼 편집")}
+          </button>
+        )}
       </header>
       {(open || courseId) && (
         <p className="cur__notice" role="alert" data-k="lesson-missing">

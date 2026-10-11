@@ -1,5 +1,12 @@
 import { DEFAULT_SIZE, inBoard, moveKey, type Move } from "../model/move";
-import { MARKS, ROLES, type JosekiMark, type JosekiNode, type JosekiRole } from "../joseki/tree";
+import {
+  MARKS,
+  ROLES,
+  type JosekiMark,
+  type JosekiNode,
+  type JosekiRole,
+  type TreeNode,
+} from "../joseki/tree";
 
 /**
  * 공식 정석 커리큘럼 — 관리자가 만들어 저장소의 정적 자산(`public/joseki/curriculum.json`)으로 싣고,
@@ -20,12 +27,9 @@ export type Text = string | { ko: string; en?: string };
 export type Level = "beginner" | "intermediate" | "advanced";
 export const LEVELS: readonly Level[] = ["beginner", "intermediate", "advanced"];
 
-export interface CurriculumNode {
-  move: Move | null;
+/** 마디 — 읽기 · 고치기는 «내 정석»과 같은 함수를 쓴다(`TreeNode`). */
+export interface CurriculumNode extends TreeNode<CurriculumNode> {
   comment: Text;
-  mark?: JosekiMark;
-  role?: JosekiRole;
-  children: CurriculumNode[];
 }
 
 export interface Lesson {
@@ -58,6 +62,22 @@ const MAX_SUMMARY = 4_000;
 const MAX_COURSES = 100;
 const MAX_LESSONS = 200;
 const ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
+
+/**
+ * 한 언어의 글만 바꾼 새 글. 영어가 비면 한국어 글 하나(`string`)로 접는다 — 파일이 «영어 없음»을 그대로
+ * 말하게(시험과 스튜디오의 검사가 그것을 짚는다).
+ */
+export function withLang(x: Text | undefined, lang: "ko" | "en", value: string): Text {
+  const ko = lang === "ko" ? value : textOf(x, "ko");
+  const en = lang === "en" ? value : typeof x === "object" ? (x.en ?? "") : "";
+  return en ? { ko, en } : ko;
+}
+
+/** 영어 글이 따로 있는가(한국어가 비었으면 물을 것이 없다 — 참). */
+export function hasEnglish(x: Text | undefined): boolean {
+  if (!textOf(x, "ko")) return true;
+  return typeof x === "object" && !!x.en;
+}
 
 /** 지금 언어의 글. */
 export function textOf(x: Text | undefined, lang: "ko" | "en"): string {
@@ -154,8 +174,8 @@ function cleanNode(
   return out;
 }
 
-/** 학습자가 둘 수가 주 변화에 하나라도 있는가. */
-function learnerMoves(root: CurriculumNode, side: "black" | "white"): number {
+/** 주 변화에서 학습자가 둘 수의 개수 — 0 이면 학습할 것이 없는 레슨이다. */
+export function learnerMoves(root: CurriculumNode, side: "black" | "white"): number {
   let n = root;
   let ply = 0;
   let count = 0;
@@ -244,7 +264,7 @@ export function findLesson(
   return null;
 }
 
-// ── 관리자 내보내기 ──────────────────────────────────────────────────
+// ── «내 정석»에서 ────────────────────────────────────────────────────
 
 /** «내 정석»의 트리를 레슨 마디로(해설은 한국어 글 그대로). */
 export function fromJoseki(n: JosekiNode): CurriculumNode {
@@ -257,44 +277,3 @@ export function fromJoseki(n: JosekiNode): CurriculumNode {
   if (n.role) out.role = n.role;
   return out;
 }
-
-export interface CourseMeta {
-  id: string;
-  title: Text;
-  level: Level;
-  summary: Text;
-}
-
-/**
- * 레슨 하나를 커리큘럼에 넣거나 바꾼다(같은 id 면 그 자리에서 바꾼다 — 다른 코스에 있었으면 옮긴다).
- * 코스가 없으면 `meta` 로 만든다. 원본은 고치지 않고 새 파일을 돌려준다.
- */
-export function upsertLesson(
-  file: CurriculumFile,
-  meta: CourseMeta,
-  lesson: Lesson,
-  version: string,
-): CurriculumFile {
-  const courses = file.courses.map((c) => ({
-    ...c,
-    lessons: c.lessons.filter((l) => l.id !== lesson.id || c.id === meta.id),
-  }));
-  let course = courses.find((c) => c.id === meta.id);
-  if (!course) {
-    course = { ...meta, lessons: [] };
-    courses.push(course);
-  } else {
-    Object.assign(course, { title: meta.title, level: meta.level, summary: meta.summary });
-  }
-  const at = course.lessons.findIndex((l) => l.id === lesson.id);
-  if (at >= 0) course.lessons[at] = lesson;
-  else course.lessons.push(lesson);
-  return { format: CURRICULUM_FORMAT, schema: 1, version, courses };
-}
-
-export const emptyCurriculum = (version = ""): CurriculumFile => ({
-  format: CURRICULUM_FORMAT,
-  schema: 1,
-  version,
-  courses: [],
-});

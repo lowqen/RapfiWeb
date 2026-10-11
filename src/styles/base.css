@@ -4413,14 +4413,241 @@ button.theory__row:hover {
   display: flex;
   gap: 2px;
 }
-.adminexport {
-  display: grid;
+/* ── 커리큘럼 스튜디오(관리자 도구, features/joseki/studio) ─────────────── */
+.studio {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-m);
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+.studio__title {
+  font: var(--type-title-medium);
+  margin: 0 var(--space-s);
+}
+.studio__check.is-bad {
+  color: var(--c-on-error-container);
+  background: var(--c-error-container);
+  border-color: transparent;
+}
+.studio__import {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-s);
   margin-top: var(--space-m);
-  background: var(--c-surface-container);
+  padding: var(--space-m);
+  font: var(--type-body-medium);
+  background: var(--c-secondary-container);
+  border-radius: var(--radius-m);
 }
-.adminexport select {
+.studio__body {
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+  gap: var(--space-m);
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .studio__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.studio__outline {
+  position: sticky;
+  top: var(--space-m);
+  max-height: calc(100dvh - 2 * var(--space-m));
+  overflow: auto;
+}
+@media (max-width: 860px) {
+  .studio__outline {
+    position: static;
+    max-height: none;
+  }
+}
+.studio__main,
+.studio__editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-m);
+  min-width: 0;
+}
+.studio__steps {
+  margin: var(--space-s) 0 0;
+  padding-left: 1.4em;
+  font: var(--type-body-medium);
+  line-height: 1.7;
+}
+.sout,
+.sout__lessons {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sout__lessons {
+  margin: 0 0 var(--space-s) var(--space-m);
+}
+.sout__home,
+.sout__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s);
+  width: 100%;
+  min-height: 36px;
+  padding: var(--space-xs) var(--space-s);
+  font: var(--type-label-large);
+  text-align: left;
+  color: var(--c-on-surface);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-s);
+}
+.sout__home {
+  justify-content: space-between;
+  margin-bottom: var(--space-s);
+}
+.sout__home span,
+.sout__meta,
+.sout__num {
+  font: var(--type-label-medium);
+  color: var(--c-on-surface-variant);
+}
+.sout__row--lesson {
+  font: var(--type-body-medium);
+}
+.sout__home:hover,
+.sout__row:hover {
+  background: var(--c-surface-container-high);
+}
+.sout__home.is-sel,
+.sout__row.is-sel {
+  color: var(--c-on-secondary-container);
+  background: var(--c-secondary-container);
+}
+.sout__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sout__row[data-bad]::after {
+  content: "";
+  flex: 0 0 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c-error);
+}
+.sform {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s);
+  margin-top: var(--space-s);
+}
+.sfield {
+  display: grid;
+  grid-template-columns: 6.5em minmax(0, 1fr);
+  gap: var(--space-m);
+  align-items: start;
+  font: var(--type-body-medium);
+}
+.sfield__label {
+  padding-top: var(--space-s);
+  color: var(--c-on-surface-variant);
+}
+.sfield select {
+  justify-self: start;
+  min-height: 36px;
+}
+.sfield__box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+.sfield__box input,
+.sfield__box textarea {
+  width: 100%;
+  min-height: 36px;
+  padding: var(--space-s) var(--space-m);
+  font: var(--type-body-medium);
+  color: var(--c-on-surface);
+  background: var(--c-surface);
+  border: 1px solid var(--c-outline-variant);
+  border-radius: var(--radius-s);
+  resize: vertical;
+}
+.sfield__box [aria-invalid="true"] {
+  border-color: var(--c-error);
+}
+.sfield__problem {
+  font: var(--type-body-small);
+  color: var(--c-error);
+}
+.spair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-s);
+}
+@media (max-width: 760px) {
+  .sfield {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-xs);
+  }
+  .spair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.jcomment .sfield {
+  grid-template-columns: minmax(0, 1fr);
+}
+.jcomment .sfield__label {
+  display: none;
+}
+.sissues {
+  list-style: none;
+  margin: var(--space-s) 0 0;
+  padding: 0;
+}
+.sissues button {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-xs) var(--space-s);
+  width: 100%;
   min-height: 32px;
+  padding: var(--space-xs) var(--space-s);
+  font: var(--type-body-medium);
+  text-align: left;
+  color: var(--c-on-surface);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-s);
+}
+.sissues button:hover:not(:disabled) {
+  background: var(--c-surface-container-high);
+}
+.sissues button:disabled {
+  opacity: 1;
+  cursor: default;
+}
+.sissues__dot {
+  flex: 0 0 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c-caution);
+}
+li[data-level="error"] .sissues__dot {
+  background: var(--c-error);
+}
+.sissues__text {
+  flex: 1;
+  min-width: 12em;
+}
+.sissues__where {
+  font: var(--type-label-medium);
+  color: var(--c-on-surface-variant);
+  overflow-wrap: anywhere;
 }
 
 /* ── UI 개편 공용 부품(.calm-design/DESIGN.md §4) ─────────────────────── */

@@ -33,15 +33,22 @@ export const ROLE_LABEL: Readonly<Record<JosekiRole, string>> = localized({
   refute: msg("응징"),
 });
 
-export interface JosekiNode {
+/**
+ * 마디의 뼈대 — «내 정석»(`JosekiNode`, 글 하나)과 공식 커리큘럼(`CurriculumNode`, 두 언어 글)이 같은 모양이라
+ * 아래의 읽기 · 고치기를 함께 쓴다. 다른 것은 해설(`comment`)의 꼴뿐이다.
+ */
+export interface TreeNode<N> {
   /** 뿌리만 null. */
   move: Move | null;
-  /** 마크다운(굵게 · 기울임 · 목록 · 링크 · 좌표). */
-  comment: string;
   mark?: JosekiMark;
   role?: JosekiRole;
   /** `[0]` 이 주 변화. */
-  children: JosekiNode[];
+  children: N[];
+}
+
+export interface JosekiNode extends TreeNode<JosekiNode> {
+  /** 마크다운(굵게 · 기울임 · 목록 · 링크 · 좌표). */
+  comment: string;
 }
 
 export interface JosekiTree {
@@ -93,8 +100,8 @@ export function newTree(title = t("새 정석"), now = Date.now()): JosekiTree {
 // ── 읽기 ─────────────────────────────────────────────────────────────
 
 /** 경로의 마디. 경로가 틀리면 null. */
-export function nodeAt(root: JosekiNode, path: Path): JosekiNode | null {
-  let n: JosekiNode | undefined = root;
+export function nodeAt<N extends TreeNode<N>>(root: N, path: Path): N | null {
+  let n: N | undefined = root;
   for (const i of path) {
     n = n.children[i];
     if (!n) return null;
@@ -103,9 +110,9 @@ export function nodeAt(root: JosekiNode, path: Path): JosekiNode | null {
 }
 
 /** 뿌리에서 경로까지의 수. */
-export function movesTo(root: JosekiNode, path: Path): Move[] {
+export function movesTo<N extends TreeNode<N>>(root: N, path: Path): Move[] {
   const out: Move[] = [];
-  let n: JosekiNode = root;
+  let n: N = root;
   for (const i of path) {
     const c = n.children[i];
     if (!c) break;
@@ -116,7 +123,7 @@ export function movesTo(root: JosekiNode, path: Path): Move[] {
 }
 
 /** 경로에서 주 변화(`[0]`)를 끝까지 따라간 경로. */
-export function mainLineFrom(root: JosekiNode, path: Path = []): number[] {
+export function mainLineFrom<N extends TreeNode<N>>(root: N, path: Path = []): number[] {
   const out = [...path];
   let n = nodeAt(root, path);
   while (n && n.children.length > 0) {
@@ -126,20 +133,18 @@ export function mainLineFrom(root: JosekiNode, path: Path = []): number[] {
   return out;
 }
 
-export function countNodes(root: JosekiNode): number {
+export function countNodes<N extends TreeNode<N>>(root: N): number {
   let n = 0;
   walk(root, () => n++);
   return n - 1; // 뿌리는 수가 아니다
 }
 
 /** 모든 마디를 깊이 우선으로 — 뿌리 포함, 수순과 함께. */
-export function walk(
-  root: JosekiNode,
-  fn: (node: JosekiNode, path: number[], moves: Move[]) => void,
+export function walk<N extends TreeNode<N>>(
+  root: N,
+  fn: (node: N, path: number[], moves: Move[]) => void,
 ): void {
-  const stack: { node: JosekiNode; path: number[]; moves: Move[] }[] = [
-    { node: root, path: [], moves: [] },
-  ];
+  const stack: { node: N; path: number[]; moves: Move[] }[] = [{ node: root, path: [], moves: [] }];
   while (stack.length) {
     const { node, path, moves } = stack.pop()!;
     fn(node, path, moves);
@@ -151,7 +156,12 @@ export function walk(
 }
 
 /** 이 수를 이 경로 끝에 둘 수 있나 — 판 밖이나 이미 돌이 있으면 까닭. */
-export function illegal(root: JosekiNode, path: Path, m: Move, size = DEFAULT_SIZE): string | null {
+export function illegal<N extends TreeNode<N>>(
+  root: N,
+  path: Path,
+  m: Move,
+  size = DEFAULT_SIZE,
+): string | null {
   if (!inBoard(m, size)) return t("판 밖입니다");
   const k = moveKey(m, size);
   if (movesTo(root, path).some((x) => moveKey(x, size) === k))
@@ -162,7 +172,7 @@ export function illegal(root: JosekiNode, path: Path, m: Move, size = DEFAULT_SI
 // ── 고치기(새 뿌리를 돌려준다) ─────────────────────────────────────────
 
 /** 경로의 마디를 `f` 로 바꾼 새 뿌리. */
-function replaceAt(root: JosekiNode, path: Path, f: (n: JosekiNode) => JosekiNode): JosekiNode {
+export function replaceAt<N extends TreeNode<N>>(root: N, path: Path, f: (n: N) => N): N {
   if (path.length === 0) return f(root);
   const [i, ...rest] = path;
   const child = root.children[i!];
@@ -176,28 +186,30 @@ function replaceAt(root: JosekiNode, path: Path, f: (n: JosekiNode) => JosekiNod
  * 경로 끝에 수 하나. **이미 있는 수면 더하지 않고 그 자식으로 간다**(기보 편집기의 표준 동작).
  * 둘 수 없으면 null.
  */
-export function addMove(
-  root: JosekiNode,
+export function addMove<N extends TreeNode<N>>(
+  root: N,
   path: Path,
   m: Move,
   size = DEFAULT_SIZE,
-): { root: JosekiNode; path: number[]; added: boolean } | null {
+): { root: N; path: number[]; added: boolean } | null {
   const at = nodeAt(root, path);
   if (!at) return null;
   const existing = at.children.findIndex((c) => sameMove(c.move, m));
   if (existing >= 0) return { root, path: [...path, existing], added: false };
   if (illegal(root, path, m, size)) return null;
-  const next = replaceAt(root, path, (n) => ({ ...n, children: [...n.children, emptyNode(m)] }));
+  // 빈 해설 "" 은 두 꼴(글 하나 · 두 언어 글) 모두에 맞는 값이다.
+  const leaf = emptyNode(m) as unknown as N;
+  const next = replaceAt(root, path, (n) => ({ ...n, children: [...n.children, leaf] }));
   return { root: next, path: [...path, at.children.length], added: true };
 }
 
 /** 수순 하나를 뿌리(또는 `from`)부터 잇는다 — 있는 마디는 따라가고 없는 곳부터 더한다. */
-export function addLine(
-  root: JosekiNode,
+export function addLine<N extends TreeNode<N>>(
+  root: N,
   moves: readonly Move[],
   from: Path = [],
   size = DEFAULT_SIZE,
-): { root: JosekiNode; path: number[]; added: number; stoppedAt: number | null } {
+): { root: N; path: number[]; added: number; stoppedAt: number | null } {
   let r = root;
   let p: number[] = [...from];
   let added = 0;
@@ -212,10 +224,10 @@ export function addLine(
 }
 
 /** 마디(와 그 아래)를 지운다. 뿌리는 지울 수 없다. 부모 경로를 돌려준다. */
-export function removeAt(
-  root: JosekiNode,
+export function removeAt<N extends TreeNode<N>>(
+  root: N,
   path: Path,
-): { root: JosekiNode; path: number[] } | null {
+): { root: N; path: number[] } | null {
   if (path.length === 0 || !nodeAt(root, path)) return null;
   const parent = path.slice(0, -1);
   const i = path[path.length - 1]!;
@@ -231,7 +243,10 @@ export function removeAt(
 /**
  * 이 줄을 주 변화로 — 경로의 모든 단계에서 그 자식을 `[0]` 으로 올린다. 새 경로(전부 0)를 돌려준다.
  */
-export function promoteLine(root: JosekiNode, path: Path): { root: JosekiNode; path: number[] } {
+export function promoteLine<N extends TreeNode<N>>(
+  root: N,
+  path: Path,
+): { root: N; path: number[] } {
   let r = root;
   for (let d = 0; d < path.length; d++) {
     const parent = path.slice(0, d);
@@ -247,11 +262,11 @@ export function promoteLine(root: JosekiNode, path: Path): { root: JosekiNode; p
 }
 
 /** 형제 사이에서 한 칸 옮긴다(`-1` 앞으로 · `+1` 뒤로). 새 경로. */
-export function moveSibling(
-  root: JosekiNode,
+export function moveSibling<N extends TreeNode<N>>(
+  root: N,
   path: Path,
   dir: -1 | 1,
-): { root: JosekiNode; path: number[] } {
+): { root: N; path: number[] } {
   if (path.length === 0) return { root, path: [] };
   const parent = path.slice(0, -1);
   const i = path[path.length - 1]!;
@@ -270,7 +285,7 @@ export function setComment(root: JosekiNode, path: Path, comment: string): Josek
   return replaceAt(root, path, (n) => ({ ...n, comment }));
 }
 
-export function setMark(root: JosekiNode, path: Path, mark: JosekiMark | null): JosekiNode {
+export function setMark<N extends TreeNode<N>>(root: N, path: Path, mark: JosekiMark | null): N {
   return replaceAt(root, path, (n) => {
     const next = { ...n };
     if (mark) next.mark = mark;
@@ -279,7 +294,7 @@ export function setMark(root: JosekiNode, path: Path, mark: JosekiMark | null): 
   });
 }
 
-export function setRole(root: JosekiNode, path: Path, role: JosekiRole | null): JosekiNode {
+export function setRole<N extends TreeNode<N>>(root: N, path: Path, role: JosekiRole | null): N {
   return replaceAt(root, path, (n) => {
     const next = { ...n };
     if (role) next.role = role;
@@ -290,7 +305,7 @@ export function setRole(root: JosekiNode, path: Path, role: JosekiRole | null): 
 
 /** 경로에서 한 걸음 — 앞으로는 주 변화, 뒤로는 부모. */
 export const stepBack = (path: Path): number[] => path.slice(0, -1);
-export function stepForward(root: JosekiNode, path: Path): number[] {
+export function stepForward<N extends TreeNode<N>>(root: N, path: Path): number[] {
   const n = nodeAt(root, path);
   return n && n.children.length > 0 ? [...path, 0] : [...path];
 }

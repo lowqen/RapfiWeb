@@ -174,7 +174,7 @@ try {
     "JSON 이 이상하다",
   );
 
-  console.log("6. 갈래 쓰임 · 관리자 내보내기(공식 커리큘럼 JSON)");
+  console.log("6. 갈래 쓰임 · 커리큘럼 스튜디오(레슨으로 · 검사 · 미리 보기 · 내려받기 · 초안)");
   await page.evaluate(() => localStorage.setItem("rapfi.adminTools", "1"));
   await page.reload(); // 관리자 스위치는 뜰 때 읽는다 — 새로고침하면 목록으로 돌아와 다시 연다
   await page.locator(".jlist__open", { hasText: "스모크 정석" }).first().click();
@@ -188,28 +188,72 @@ try {
     "지금 마디에 «함정수» 쓰임",
     "함정수 단추가 눌리지 않았다",
   );
-  await page.getByRole("button", { name: "공식 커리큘럼으로 내보내기" }).click();
-  await page.locator('[data-k="admin-export"]').waitFor();
-  await page.getByLabel("레슨 id").fill("smoke-lesson");
-  const [cdl] = await Promise.all([
-    page.waitForEvent("download"),
-    page.getByRole("button", { name: "curriculum.json 내려받기" }).click(),
-  ]);
-  const cur = JSON.parse(readFileSync((await cdl.path())!, "utf8"));
-  const lessons = cur.courses.flatMap((c: { lessons: { id: string }[] }) => c.lessons);
-  const text = JSON.stringify(cur);
+  // 정석 편집기 → 커리큘럼 스튜디오(`?import=`) → 어느 코스에 넣을지 묻는다.
+  await page.locator('[data-k="joseki-to-studio"]').click();
+  await page.locator('[data-k="studio-import"]').waitFor();
+  await page.locator('[data-k="studio-import"]').getByRole("button", { name: "넣기" }).click();
+  await page.locator('[data-k="studio-lesson"]').waitFor();
+  const lessonId = await page.locator(".sout__row--lesson.is-sel").getAttribute("data-lesson");
   check(
-    cur.format === "rapfiweb-curriculum" &&
-      lessons.some((l: { id: string }) => l.id === "smoke-lesson") &&
-      lessons.some((l: { id: string }) => l.id === "first-three-moves") &&
-      text.includes('"role":"trap"'),
-    `커리큘럼 내보내기 — 배포 레슨 ${lessons.length - 1}개에 새 레슨을 넣고 함정 쓰임을 지켰다`,
-    `커리큘럼 JSON 이 이상하다: ${text.slice(0, 200)}`,
+    lessonId === "lesson",
+    "스튜디오: 내 정석을 레슨으로(한글 제목이면 id «lesson»)",
+    `레슨 id: ${lessonId}`,
   );
   check(
-    (await page.locator('[data-k="admin-export-result"]').innerText()).includes("내려받았습니다"),
-    "내보내기 검증 경고 없음",
-    `내보내기 결과: ${await page.locator('[data-k="admin-export-result"]').innerText()}`,
+    (await page.locator('[data-k="studio-check"]').getAttribute("class"))!.includes("is-bad") &&
+      (await page.locator('[data-k="studio-issues"] li[data-level="error"]').count()) > 0,
+    "스튜디오 검사: 영어가 빠진 새 레슨을 오류로 짚는다",
+    "검사가 오류를 보이지 않는다",
+  );
+  await page.getByLabel("제목 (English)").first().fill("Smoke lesson");
+  await page.getByLabel("제목 (English)").first().press("Enter");
+  await page.locator('[data-k="studio-preview-open"]').click();
+  await page.locator('[data-k="studio-preview"] [data-k="lesson"]').waitFor();
+  ok("스튜디오: 레슨 미리 보기(배포 화면 그대로)");
+  await page.getByRole("button", { name: "미리 보기 닫기" }).click();
+
+  const [cdl] = await Promise.all([
+    page.waitForEvent("download"),
+    page.locator('[data-k="studio-download"]').click(),
+  ]);
+  const curText = readFileSync((await cdl.path())!, "utf8");
+  const cur = JSON.parse(curText);
+  const lessons = cur.courses.flatMap((c: { lessons: { id: string }[] }) => c.lessons);
+  const mine = lessons.find((l: { id: string }) => l.id === "lesson") as
+    { title: { en?: string } } | undefined;
+  check(
+    cur.format === "rapfiweb-curriculum" &&
+      /^\d{4}\.\d{2}\.\d{2}/.test(cur.version) &&
+      mine?.title.en === "Smoke lesson" &&
+      lessons.some((l: { id: string }) => l.id === "first-three-moves") &&
+      curText.includes('"role": "trap"') &&
+      curText.endsWith("}\n"),
+    `스튜디오 내려받기 — 배포 레슨 ${lessons.length - 1}개 + 새 레슨, 영어 제목 · 함정 쓰임 · 배포 글꼴 · 버전 ${cur.version}`,
+    `커리큘럼 JSON 이 이상하다: ${curText.slice(0, 200)}`,
+  );
+
+  // 초안은 이 브라우저에 남는다 — 새로고침해도 그 레슨이 있다. 되돌리면 배포본.
+  await page.waitForTimeout(600);
+  await page.reload();
+  await page.locator('[data-k="studio"]').waitFor();
+  check(
+    (await page.locator('.sout__row--lesson[data-lesson="lesson"]').count()) === 1 &&
+      (await page.locator('[data-k="studio-notice"]').innerText()).includes("초안"),
+    "스튜디오 초안: 새로고침 뒤에도 남는다",
+    "초안이 남지 않았다",
+  );
+  await page.getByRole("button", { name: "배포본으로 되돌리기" }).click();
+  await page.getByRole("button", { name: "초안 버리기" }).click();
+  check(
+    (await page.locator('.sout__row--lesson[data-lesson="lesson"]').count()) === 0 &&
+      (await page.locator('[data-k="studio-state"]').innerText()).includes("배포본과 같음"),
+    "배포본으로 되돌리기",
+    "되돌린 뒤에도 새 레슨이 남았다",
+  );
+  check(
+    (await page.locator('[data-k="studio-save"]').count()) === 0,
+    "배포본에는 «저장소에 저장»이 없다(개발 서버에만)",
+    "배포 빌드에 저장소 쓰기 단추가 보인다",
   );
 
   console.log("7. 공식 커리큘럼 — 살펴보기 · 학습");
