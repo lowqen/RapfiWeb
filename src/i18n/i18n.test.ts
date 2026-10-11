@@ -77,6 +77,38 @@ describe("다국어 사전", () => {
     expect(t("사전에 없는 문장")).toBe("사전에 없는 문장");
   });
 
+  it("t: 영어의 단수 · 복수 {n|one|other}", () => {
+    setLangForTest("en");
+    expect(t("{n}수", { n: 1 })).toBe("1 move");
+    expect(t("{n}수", { n: 2 })).toBe("2 moves");
+    expect(t("{n}수", { n: 0 })).toBe("0 moves");
+    expect(t("{a} / {b}수", { a: 1, b: 1 })).toBe("1 of 1 move");
+    expect(
+      t("{n}판 · 국면 {p} · {time} · 저장 {size}", {
+        n: 1,
+        p: "116,191",
+        time: "4s",
+        size: "15MB",
+      }),
+    ).toBe("1 game · 116,191 positions · 4s · 15MB stored");
+    setLangForTest("ko");
+    expect(t("{n}수", { n: 1 })).toBe("1수");
+  });
+
+  it("단수 · 복수 자리는 원문에 있는 자리만 쓴다", () => {
+    const bad = Object.entries(EN).filter(([k, v]) =>
+      [...v.matchAll(/\{(\w+)\|/g)].some((m) => !slots(k).includes(m[1]!)),
+    );
+    expect(bad).toEqual([]);
+  });
+
+  it("수를 세는 영어 낱말은 단수 · 복수를 고른다(«1 moves» 막기)", () => {
+    // 수 뒤에 바로 오는 셀 수 있는 낱말 — 새 문구가 «{n} moves» 처럼 복수로 박히면 여기서 잡는다.
+    const COUNTED =
+      /\{\w+\} (?:\w+ )?(moves|nodes|candidates|records|games|positions|points|stones|lines|branches|threads|cores|searches|conclusions|arrangements|lessons|warnings|defenses|children)\b/;
+    expect(Object.entries(EN).filter(([, v]) => COUNTED.test(v))).toEqual([]);
+  });
+
   it("브라우저 언어 감지 — 한국어 계열이 앞서면 한국어, 아니면 영어", () => {
     expect(detectLang(["ko-KR", "en-US"])).toBe("ko");
     expect(detectLang(["ko"])).toBe("ko");

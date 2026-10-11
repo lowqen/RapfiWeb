@@ -64,11 +64,21 @@ export function setLang(l: Lang): void {
 
 export type Vars = Readonly<Record<string, string | number>>;
 
-/** 한국어 원문 → 지금 언어의 문구. 사전에 없으면 원문. */
+/**
+ * 한국어 원문 → 지금 언어의 문구. 사전에 없으면 원문.
+ *
+ * 영어 문구는 **단수 · 복수**를 고를 수 있다: `{n|move|moves}` 는 `n` 이 1 이면 앞, 아니면 뒤 —
+ * `"{n} {n|move|moves}"` 처럼 쓴다(«1 moves» 를 막는다). 한국어는 수에 따라 꼴이 바뀌지 않아 쓰지 않는다.
+ * 값이 숫자로 읽히지 않으면(«116,191» 같은 꾸민 글) 복수다.
+ */
 export function t(ko: string, vars?: Vars): string {
   const s = current === "en" ? (EN[ko] ?? ko) : ko;
   if (!vars) return s;
-  return s.replace(/\{(\w+)\}/g, (m, k: string) => (vars[k] !== undefined ? String(vars[k]) : m));
+  return s
+    .replace(/\{(\w+)\|([^|{}]*)\|([^|{}]*)\}/g, (m, k: string, one: string, other: string) =>
+      vars[k] === undefined ? m : Number(vars[k]) === 1 ? one : other,
+    )
+    .replace(/\{(\w+)\}/g, (m, k: string) => (vars[k] !== undefined ? String(vars[k]) : m));
 }
 
 /**

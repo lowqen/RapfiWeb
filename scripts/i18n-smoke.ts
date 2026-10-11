@@ -318,8 +318,8 @@ try {
     await page.keyboard.press("Enter");
     await page.waitForTimeout(300);
     const label = await page.locator(".board canvas[role=img]").first().getAttribute("aria-label");
-    if (!label || !/\b1 stones\b/.test(label))
-      fail(`키보드 착수가 돌을 놓지 않았습니다 (${label})`);
+    // 영어는 단수 · 복수를 고른다 — 돌 하나면 «1 stone».
+    if (!label || !/\b1 stone\b/.test(label)) fail(`키보드 착수가 돌을 놓지 않았습니다 (${label})`);
     const live = await page.locator(".board .sr-only[aria-live]").first().innerText();
     if (!/H9/.test(live)) fail(`키보드 커서 안내가 «H9» 가 아닙니다 (${live})`);
     await ctx.close();
