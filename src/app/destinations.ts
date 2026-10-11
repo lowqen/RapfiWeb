@@ -17,10 +17,13 @@ export interface Dest {
   path: string;
   /** 레일·탭 라벨 — 번역 열쇠(`msg`). 그릴 때 `t()` 한다. */
   label: string;
-  /** 상단 바 부제 — 앱의 화면 설명과 같은 자리. */
-  subtitle: string;
   /** 인라인 SVG path. 아이콘 폰트도 CDN 도 쓰지 않는다(§5의 «외부 리소스 없음»). */
   icon: string;
+  /**
+   * 레일에서 어느 묶음인가. 두고 · 공부하는 셋(보드 · 연구 · 정석)이 위, 도구 셋(DB · 엔진 · 설정)이
+   * 아래로 떨어진다 — 처음 온 사람의 눈이 위의 셋에 먼저 간다. 하단 탭은 순서만 이 묶음을 따른다.
+   */
+  group?: "tools";
 }
 
 /** Material Symbols 계열의 24×24 뷰박스에 맞춘 단순 도형들. */
@@ -38,22 +41,12 @@ const ICON = {
 } as const;
 
 export const RAIL: readonly Dest[] = [
-  { path: "/board", label: msg("보드"), subtitle: msg("대국과 분석"), icon: ICON.board },
-  {
-    path: "/research",
-    label: msg("연구"),
-    subtitle: msg("국면을 보드 밖에서 읽는다"),
-    icon: ICON.research,
-  },
-  { path: "/database", label: "DB", subtitle: msg("yixindb 국면 저장소"), icon: ICON.database },
-  { path: "/engine", label: msg("엔진"), subtitle: msg("엔진 상태와 도구"), icon: ICON.engine },
-  { path: "/joseki", label: msg("정석"), subtitle: msg("오프닝 정석 노트"), icon: ICON.joseki },
-  {
-    path: "/settings",
-    label: msg("설정"),
-    subtitle: msg("엔진 · 표시 · 고급"),
-    icon: ICON.settings,
-  },
+  { path: "/board", label: msg("보드"), icon: ICON.board },
+  { path: "/research", label: msg("연구"), icon: ICON.research },
+  { path: "/joseki", label: msg("정석"), icon: ICON.joseki },
+  { path: "/database", label: "DB", icon: ICON.database, group: "tools" },
+  { path: "/engine", label: msg("엔진"), icon: ICON.engine, group: "tools" },
+  { path: "/settings", label: msg("설정"), icon: ICON.settings, group: "tools" },
 ];
 
 /**
@@ -61,20 +54,10 @@ export const RAIL: readonly Dest[] = [
  * 경로 이름은 W1 지시서의 것을 쓴다(explorer = 오프닝 익스플로러, sequence = 수순).
  */
 export const RESEARCH_TABS: readonly Dest[] = [
-  {
-    path: "/research/review",
-    label: msg("리뷰·증명"),
-    subtitle: msg("대국을 되짚고 수를 증명한다"),
-    icon: "",
-  },
-  { path: "/research/explorer", label: msg("오프닝"), subtitle: msg("주형과 빈도"), icon: "" },
-  {
-    path: "/research/sequence",
-    label: msg("수순"),
-    subtitle: msg("같은 국면에 이르는 다른 길"),
-    icon: "",
-  },
-  { path: "/research/ranking", label: msg("랭킹"), subtitle: msg("기록과 순위"), icon: "" },
+  { path: "/research/review", label: msg("리뷰·증명"), icon: "" },
+  { path: "/research/explorer", label: msg("오프닝"), icon: "" },
+  { path: "/research/sequence", label: msg("수순"), icon: "" },
+  { path: "/research/ranking", label: msg("랭킹"), icon: "" },
 ];
 
 /** 지금 위치에 해당하는 레일 항목. 접두사 일치 — `/research/review` 는 «연구». */
@@ -82,12 +65,10 @@ export function activeDest(pathname: string): Dest | undefined {
   return RAIL.find((d) => pathname === d.path || pathname.startsWith(d.path + "/"));
 }
 
-/** 상단 바가 쓸 제목·부제. 연구 안에서는 탭 쪽이 더 구체적이므로 그것을 쓴다. */
-export function titleFor(pathname: string): { title: string; subtitle: string } {
+/** 상단 바가 쓸 제목. 연구 안에서는 탭 쪽이 더 구체적이므로 그것을 쓴다. */
+export function titleFor(pathname: string): { title: string } {
   const tab = RESEARCH_TABS.find((r) => pathname.startsWith(r.path));
-  if (tab) return { title: `${t("연구")} · ${t(tab.label)}`, subtitle: t(tab.subtitle) };
+  if (tab) return { title: `${t("연구")} · ${t(tab.label)}` };
   const dest = activeDest(pathname);
-  return dest
-    ? { title: t(dest.label), subtitle: t(dest.subtitle) }
-    : { title: "RapfiWeb", subtitle: "" };
+  return { title: dest ? t(dest.label) : "RapfiWeb" };
 }

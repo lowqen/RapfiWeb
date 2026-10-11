@@ -64,6 +64,12 @@ const COMPONENTS: readonly Component[] = [
     role: msg("저장 라이브러리(IndexedDB)"),
     license: "Apache-2.0",
   },
+  {
+    name: "Pretendard © 2021 Kil Hyung-jin",
+    href: "https://github.com/orioncactus/pretendard",
+    role: msg("본문 글꼴"),
+    license: "OFL-1.1",
+  },
 ];
 
 function Ext({ href, children }: { href: string; children: ReactNode }) {

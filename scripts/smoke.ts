@@ -301,6 +301,11 @@ try {
     if ((await page.getByRole("button", { name, exact: true }).count()) !== 1)
       fail(`분석 탭에 「${name}」 이 하나가 아닙니다`);
   }
+  // 분석 설정은 접혀 있고(머리에 요약 한 줄) 펼치면 줄이 나온다 — 펼친 상태는 기억된다.
+  const optionsHead = page.getByRole("button", { name: /^분석 설정/ });
+  if ((await optionsHead.getAttribute("aria-expanded")) !== "false")
+    fail("분석 설정이 처음부터 펼쳐져 있습니다 — 접혀 있어야 합니다");
+  await optionsHead.click();
   if (
     (await page
       .getByRole("switch", { name: "정지하면 최선수 두기" })

@@ -18,6 +18,7 @@ shown inside the app under **Settings ▸ About**.
 | React Router | npm | [remix-run/react-router](https://github.com/remix-run/react-router) | MIT |
 | Zustand | npm | [pmndrs/zustand](https://github.com/pmndrs/zustand) | MIT |
 | Dexie.js | npm | [dexie/Dexie.js](https://github.com/dexie/Dexie.js) | Apache-2.0 |
+| **Pretendard** (variable, dynamic-subset WOFF2; the CSS carries the copyright header) | npm, bundled under `assets/` | [orioncactus/pretendard](https://github.com/orioncactus/pretendard) | SIL OFL 1.1, © 2021 Kil Hyung-jin, with Reserved Font Name Pretendard |
 
 Build and test tooling (Vite, TypeScript, Vitest, ESLint, Prettier, Playwright, Emscripten) is
 not shipped in the bundle.

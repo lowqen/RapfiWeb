@@ -19,6 +19,16 @@ body {
   color: var(--c-on-background);
   background: var(--c-background);
   -webkit-font-smoothing: antialiased;
+  /* 한국어는 낱말 중간에서 줄을 끊지 않는다. 낱말 하나가 칸보다 길 때만 끊는다. */
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+/* 카드 면 — 밝게는 종이 위의 흰 카드, 어둡게는 배경보다 한 단 밝은 면. 팔레트 값은 그대로 두고
+   (앱과 골든 시험으로 묶여 있다) 역할만 고른다. 테마는 tokens.css 가 root 의 color-scheme 으로 정한다. */
+:root {
+  --c-card: light-dark(var(--c-surface-container-lowest), var(--c-surface-container));
+  --c-card-hover: light-dark(var(--c-surface-container-low), var(--c-surface-container-high));
 }
 
 h1,
@@ -135,15 +145,20 @@ a:focus-visible {
 /* ── 좌측 레일 ──────────────────────────────────────────────────── */
 .rail {
   flex: 0 0 auto;
-  width: 88px;
-  padding: var(--space-m) var(--space-s);
-  background: var(--c-surface-container-low);
+  width: 80px;
+  padding: var(--space-l) var(--space-s);
+  background: var(--c-background);
   border-right: 1px solid var(--c-outline-variant);
 }
 .rail__list {
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
+  height: 100%;
+}
+/* 도구 묶음(DB · 엔진 · 설정)은 레일 바닥으로 — 위의 셋(보드 · 연구 · 정석)이 먼저 읽힌다. */
+.rail__item--tools {
+  margin-top: auto;
 }
 .rail__item {
   position: relative;
@@ -258,57 +273,66 @@ a:focus-visible {
 }
 
 /* ── 상단 바 ────────────────────────────────────────────────────── */
+/* 한 줄 — 제목 하나와 오른쪽의 엔진 표시 · 테마. 부제를 걷어 판 위 높이를 돌려주었다. */
 .topbar {
   display: flex;
   gap: var(--space-l);
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-l) var(--space-xl);
-  background: var(--c-surface);
+  min-height: 56px;
+  padding: var(--space-m) var(--space-xl);
+  background: var(--c-background);
   border-bottom: 1px solid var(--c-outline-variant);
 }
 .topbar__title {
-  font: var(--type-title-large);
-  letter-spacing: var(--track-title-large);
+  font: var(--type-title-medium);
+  letter-spacing: var(--track-title-medium);
 }
-.topbar__subtitle {
-  font: var(--type-body-small);
-  color: var(--c-on-surface-variant);
-}
+/* 아이콘 단추 — 누르는 자리는 40px, 휴대폰에서도 24px 이상(WCAG 2.5.8). */
 .themetoggle {
-  padding: var(--space-s) var(--space-l);
-  font: var(--type-label-large);
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
   color: var(--c-on-surface-variant);
-  border: 1px solid var(--c-outline-variant);
-  border-radius: var(--radius-s);
+  border-radius: 50%;
+  transition: background var(--motion-quick) ease-out;
+}
+.themetoggle .icon {
+  width: 20px;
+  height: 20px;
 }
 .themetoggle:hover {
+  color: var(--c-on-surface);
   background: var(--c-surface-container);
-}
-/* 좁은 폭(W10): 상단 바에 엔진 칩 · 테마가 한 줄로 서도록 단추를 줄인다. */
-@media (max-width: 640px) {
-  .themetoggle {
-    padding: var(--space-s) var(--space-m);
-  }
 }
 
 /* ── 연구 탭 ────────────────────────────────────────────────────── */
+/* 밑줄 탭 — 채운 알약 대신 글자색 + 2px 밑줄. 상단 바 바로 밑에서 면이 둘 겹치지 않게. */
 .rtabs {
   display: flex;
-  gap: var(--space-xs);
-  padding: var(--space-m) var(--space-xl);
-  background: var(--c-surface);
+  gap: var(--space-l);
+  padding: 0 var(--space-xl);
+  overflow-x: auto;
+  background: var(--c-background);
   border-bottom: 1px solid var(--c-outline-variant);
 }
 .rtabs__tab {
-  padding: var(--space-m) var(--space-l);
+  flex: none;
+  padding: var(--space-l) var(--space-xs);
   font: var(--type-label-large);
   color: var(--c-on-surface-variant);
-  border-radius: var(--radius-s);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color var(--motion-quick) ease-out;
+}
+.rtabs__tab:hover {
+  color: var(--c-on-surface);
 }
 .rtabs__tab.is-active {
-  color: var(--c-on-secondary-container);
-  background: var(--c-secondary-container);
+  font-weight: 600;
+  color: var(--c-on-surface);
+  border-bottom-color: var(--c-secondary);
 }
 
 /* ── 보드 ───────────────────────────────────────────────────────────
@@ -596,9 +620,9 @@ a:focus-visible {
    앱의 다크 카드처럼 테두리 없이 한 단 밝은 면으로 구획한다. 테두리를 두르면
    카드가 여덟 장 쌓이는 옆 칸이 격자처럼 시끄러워진다. */
 .panel {
-  padding: var(--space-l);
-  background: var(--c-surface-container);
-  border: 0;
+  padding: var(--space-xl);
+  background: var(--c-card);
+  border: 1px solid var(--c-outline-variant);
   border-radius: var(--radius-l);
 }
 /* 고를 때까지 남는 안내(링크를 열기 전 판 등) — 카드와 구별되는 한 단 진한 면. */
@@ -678,7 +702,21 @@ a:focus-visible {
 .panel__hint {
   margin-top: var(--space-l);
   font: var(--type-body-small);
+  line-height: 1.55;
   color: var(--c-on-surface-variant);
+}
+/* 카드 제목 밑 한 줄 — 이 카드가 무엇을 하는지만. 두 줄이 넘으면 문구를 줄일 때다. */
+.panel__lead {
+  max-width: 60ch;
+  margin-top: var(--space-s);
+  font: var(--type-body-medium);
+  line-height: 1.6;
+  color: var(--c-on-surface-variant);
+}
+/* 카드 안의 접힌 묶음 — 위와 머리카락 한 줄로 가른다. */
+.panel__fold {
+  margin-top: var(--space-l);
+  border-top: 1px solid var(--c-outline-variant);
 }
 
 .kv {
@@ -699,26 +737,31 @@ a:focus-visible {
   color: var(--c-on-surface-variant);
 }
 
-/* ── 엔진 수치 타일 ─────────────────────────────────────────────────
-   앱의 「DEPTH 0 · EVAL — · WINRATE —」 줄을 옆 칸 폭에 맞게 3열 타일로.
-   라벨은 앱과 같은 영문 대문자라 양수 트래킹을 조금 준다(한글이 아니므로). */
+/* ── 엔진 수치 ──────────────────────────────────────────────────────
+   최선수 한 줄(크게) 밑에 승률 · 평가 · 깊이 세 칸. 칸에 면을 깔지 않는다 — 흰 카드 위의 회색
+   타일 일곱 장이 «계기판»으로 읽혔다. 시간 · 노드 · 속도는 «세부 수치»를 켰을 때만. */
 .kv.stats {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-s);
+  gap: var(--space-l) var(--space-m);
   margin-top: var(--space-l);
+}
+.kv.stats[hidden] {
+  display: none;
 }
 .stat {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
-  padding: var(--space-m) var(--space-l);
-  background: var(--c-surface-container-high);
-  border-radius: var(--radius-s);
+}
+.stat--minor {
+  display: none;
+}
+.stats[data-detail] .stat--minor {
+  display: flex;
 }
 .stats .stat__key {
-  font: var(--type-label-small);
-  letter-spacing: 0.04em;
+  font: var(--type-label-medium);
   color: var(--c-on-surface-variant);
 }
 .stats .stat__value {
@@ -728,16 +771,24 @@ a:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* 최선수는 한 줄을 다 쓴다 — 이 카드에서 가장 먼저 읽힐 값이다. */
+/* 최선수는 한 줄을 다 쓰고 맨 위에 온다 — 이 카드에서 가장 먼저 읽힐 값이다. 문서 순서는
+   맨 끝 그대로다(스모크가 마지막 dd 를 최선수로 읽는다). */
 .stat--wide {
   grid-column: 1 / -1;
+  order: -1;
   flex-direction: row;
   align-items: baseline;
   justify-content: space-between;
+  padding-bottom: var(--space-l);
+  border-bottom: 1px solid var(--c-outline-variant);
 }
 .stats .stat--wide .stat__value {
-  font: var(--type-title-large);
-  color: var(--c-on-secondary-container);
+  font: var(--type-headline-small);
+  letter-spacing: var(--track-headline-small);
+  color: var(--c-on-surface);
+}
+.stats__toggle {
+  margin-top: var(--space-m);
 }
 
 /* ── 엔진 카드의 분석 상태 줄 ───────────────────────────────────────
@@ -1114,11 +1165,11 @@ a:focus-visible {
   display: flex;
   gap: var(--space-m);
   align-items: center;
-  min-height: 48px;
+  min-height: 44px;
   padding: 0 var(--space-l);
-  background: var(--c-surface-container-high);
-  border: 1px solid transparent;
-  border-radius: var(--radius-xl);
+  background: var(--c-card);
+  border: 1px solid var(--c-outline-variant);
+  border-radius: var(--radius-m);
   transition: border-color var(--motion-quick) ease-out;
 }
 .search:focus-within {
@@ -1649,6 +1700,7 @@ a:focus-visible {
   min-width: 0;
 }
 .poscard__rule {
+  flex: 1;
   overflow: hidden;
   font: var(--type-label-medium);
   color: var(--c-on-surface-variant);
@@ -1666,9 +1718,6 @@ a:focus-visible {
   flex-direction: column;
   gap: 2px;
   min-width: 0;
-  padding: var(--space-s) var(--space-l);
-  background: var(--c-surface-container-high);
-  border-radius: var(--radius-s);
 }
 .poscard__tile dt {
   font: var(--type-label-small);
@@ -1880,8 +1929,7 @@ a:focus-visible {
 .topbar__text {
   min-width: 0;
 }
-.topbar__title,
-.topbar__subtitle {
+.topbar__title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1902,16 +1950,15 @@ a:focus-visible {
   gap: var(--space-m);
   align-items: center;
   height: 32px;
-  padding: 0 var(--space-l);
+  padding: 0 var(--space-m);
   font: var(--type-label-medium);
   color: var(--c-on-surface-variant);
   white-space: nowrap;
-  border: 1px solid var(--c-outline-variant);
   border-radius: var(--radius-xl);
 }
-/* 글자 칸의 폭을 고정한다 — 「가중치 받는 중 → 엔진 올리는 중 → 예열 중 → 준비」로 바뀔
-   때마다 칩이 늘었다 줄며 옆의 드롭다운을 밀었다(기동 중 깜빡임의 절반). */
-.enginechip__text {
+/* 기동 중에는 글자 칸의 폭을 고정한다 — 「가중치 받는 중 → 엔진 올리는 중 → 예열 중」으로 바뀔
+   때마다 칩이 늘었다 줄던 것(기동 중 깜빡임의 절반). 준비가 되면 낱말 하나 폭으로 한 번 줄어든다. */
+.enginechip[data-status="starting"] .enginechip__text {
   min-width: 13.5em;
 }
 .enginechip__dot {
@@ -2187,20 +2234,43 @@ a:focus-visible {
 
 /* ── 연구 ▸ 오프닝 (W6a) ─────────────────────────────────────────────
    계획서 §6: 연구 화면은 넓은 화면에서도 «국면 → 다음 수» 한 열, 가운데 정렬. */
-.explorer {
+.explorer,
+.explorer__stage,
+.explorer__side {
   display: flex;
   flex-direction: column;
-  gap: var(--space-m);
+  gap: var(--space-l);
+}
+.explorer {
   width: 100%;
   max-width: var(--reading-width);
   margin: 0 auto;
 }
-/* 판은 화면 높이의 60% 를 넘지 않는다 — 넓은 화면에서 판 하나가 첫 화면을 다 먹으면
+.explorer__stage {
+  gap: var(--space-m);
+}
+/* 판은 화면 높이의 60% 를 넘지 않는다 — 좁은 화면에서 판 하나가 첫 화면을 다 먹으면
    «국면 → 다음 수»의 다음 수가 접힌다. */
 .explorer__board {
   width: min(100%, 60vh);
   aspect-ratio: 1;
   margin: 0 auto;
+}
+/* 넓은 화면은 보드 화면처럼 판 왼쪽 · 읽을 것 오른쪽. 판은 첫 화면 높이에 맞춘다. */
+@media (min-width: 1024px) {
+  .explorer {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
+    align-items: start;
+    max-width: 1280px;
+  }
+  .explorer__stage {
+    position: sticky;
+    top: 0;
+  }
+  .explorer__board {
+    width: min(100%, calc(100dvh - 220px));
+  }
 }
 .explorer__nav {
   justify-content: center;
@@ -2265,9 +2335,9 @@ button.theory__row:hover {
 .review {
   display: flex;
   flex-direction: column;
-  gap: var(--space-m);
+  gap: var(--space-l);
   width: 100%;
-  max-width: 880px;
+  max-width: 760px;
   margin: 0 auto;
 }
 .review__row {
@@ -3149,21 +3219,16 @@ button.theory__row:hover {
 }
 
 /* 가져오기 안내 — 세 걸음을 번호 원으로. 첫 화면에서 «무엇을 · 어디서 · 얼마나»가 한눈에. */
-.rifcard {
-  background: linear-gradient(
-    160deg,
-    var(--c-secondary-container) 0%,
-    var(--c-surface-container) 55%
-  );
-}
+/* 평범한 카드 — 예전의 초록 그러데이션은 «광고 배너»로 읽혔다. 강조는 채운 단추 하나가 진다. */
 .rifcard--compact {
-  background: var(--c-surface-container);
-  border: 1px dashed var(--c-outline-variant);
+  background: transparent;
+  border-style: dashed;
 }
 .rifcard__lead {
-  margin-top: var(--space-m);
+  margin-top: var(--space-s);
   font: var(--type-body-medium);
-  color: var(--c-on-surface);
+  line-height: 1.6;
+  color: var(--c-on-surface-variant);
 }
 .rifsteps {
   display: grid;
@@ -3186,8 +3251,8 @@ button.theory__row:hover {
   height: 24px;
   place-items: center;
   font: var(--type-label-medium);
-  color: var(--c-on-primary);
-  background: var(--c-primary);
+  color: var(--c-on-surface-variant);
+  background: var(--c-surface-container-high);
   border-radius: 50%;
 }
 .rifsteps a {
@@ -3668,12 +3733,13 @@ button.theory__row:hover {
   min-height: 44px;
   padding: var(--space-m) var(--space-l);
   text-align: left;
-  background: var(--c-surface-container);
+  background: transparent;
   border: 1px solid var(--c-outline-variant);
-  border-radius: var(--radius-s);
+  border-radius: var(--radius-m);
+  transition: background var(--motion-quick) ease-out;
 }
 .lessonlist__item:hover {
-  background: var(--c-surface-container-high);
+  background: var(--c-card-hover);
 }
 .lessonlist__item[data-done] {
   border-color: var(--c-positive);
@@ -3724,4 +3790,132 @@ button.theory__row:hover {
 }
 .adminexport select {
   min-height: 32px;
+}
+
+/* ── UI 개편 공용 부품(.calm-design/DESIGN.md §4) ─────────────────────── */
+
+/* 글자 단추 — 테두리 없는 보조 행동(«세부 수치» 등). 누르는 자리는 32px. */
+.textbtn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 var(--space-s);
+  margin-left: calc(-1 * var(--space-s));
+  font: var(--type-label-medium);
+  color: var(--c-on-surface-variant);
+  border-radius: var(--radius-s);
+}
+.textbtn:hover {
+  color: var(--c-on-surface);
+  background: var(--c-surface-container);
+}
+
+/* 펼침 — 머리 한 줄 전체가 단추. 제목 · 요약(오른쪽, 물러선 색) · 꺾쇠. */
+.disclosure__heading {
+  font: inherit;
+}
+.disclosure__head {
+  display: flex;
+  gap: var(--space-m);
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  text-align: left;
+}
+.disclosure__title {
+  flex: none;
+  font: var(--type-title-small);
+  color: var(--c-on-surface);
+}
+.disclosure__summary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font: var(--type-body-small);
+  color: var(--c-on-surface-variant);
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.disclosure__chev {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  fill: var(--c-on-surface-variant);
+  transition: transform var(--motion-quick) ease-out;
+}
+.disclosure[data-open] .disclosure__chev {
+  transform: rotate(90deg);
+}
+.disclosure__head:hover .disclosure__title {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.disclosure__body {
+  padding-top: var(--space-m);
+}
+/* 펼침이 카드 전체인 자리 — 머리가 카드 위아래 여백을 대신한다. */
+.panel--disclosure {
+  padding-top: var(--space-xs);
+  padding-bottom: var(--space-xs);
+}
+.panel--disclosure .disclosure__body {
+  padding-bottom: var(--space-l);
+}
+
+/* 메뉴 — 단추 하나 뒤에 가끔 쓰는 동작들. 떠 있는 것만 그림자를 쓴다(§6). */
+.menu {
+  position: relative;
+  flex: none;
+}
+.menu__button {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 var(--space-s) 0 var(--space-m);
+  font: var(--type-label-medium);
+  color: var(--c-on-surface-variant);
+  border: 1px solid var(--c-outline-variant);
+  border-radius: var(--radius-xl);
+}
+.menu__button:hover,
+.menu__button[aria-expanded="true"] {
+  color: var(--c-on-surface);
+  background: var(--c-surface-container);
+}
+.menu__chev {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+.menu__list {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 168px;
+  padding: var(--space-s);
+  background: var(--c-card);
+  border: 1px solid var(--c-outline-variant);
+  border-radius: var(--radius-m);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.12);
+}
+.menu__item {
+  min-height: 40px;
+  padding: 0 var(--space-l);
+  font: var(--type-body-medium);
+  text-align: left;
+  border-radius: var(--radius-s);
+}
+.menu__item:hover:not(:disabled),
+.menu__item:focus-visible {
+  background: var(--c-surface-container);
+}
+.menu__item:disabled {
+  color: var(--c-outline);
+  cursor: default;
 }

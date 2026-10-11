@@ -7,13 +7,19 @@
  */
 
 /**
- * 시스템 폰트만 쓴다. 근거 셋이 같은 답을 가리킨다:
- * (1) 앱이 시스템 폰트를 쓴다 — «앱과 일치» 제약,
- * (2) 40MB 를 받는 앱에 폰트를 더할 이유가 없다,
- * (3) 멀티스레드를 되살려 COEP 를 켜면 외부 폰트는 어차피 막힌다(계획서 §8).
+ * 본문은 Pretendard(가변, 동적 서브셋)다. 예전에는 시스템 폰트만 썼다 — 앱과 일치, 40MB 앱에
+ * 폰트를 더할 이유가 없음, COEP 가 외부 폰트를 막음. UI 개편(.calm-design/DESIGN.md)에서 뒤집었다:
+ *
+ * - 시스템 폰트는 OS 마다 한글 자형 · 굵기 · 자간이 달라(윈도우 맑은 고딕 · 맥 SD 고딕) 같은 화면이
+ *   기기마다 다른 밀도로 보였다. 차분한 화면은 글꼴 하나에서 시작한다.
+ * - 외부가 아니라 **번들 안**이다(`main.tsx` 가 `pretendard` npm 의 CSS 를 들인다). CSP
+ *   `font-src 'self'` · COEP 아래서 그대로 뜬다.
+ * - 동적 서브셋이라 화면에 실제로 나온 글자의 조각(각 30~60KB)만 받는다. 엔진 40MB 앞에서 작다.
+ *
+ * 받기 전과 받지 못한 곳은 시스템 폰트로 물러선다(`font-display: swap`).
  */
 export const FONT_STACKS = {
-  sans: `system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", "Malgun Gothic", sans-serif`,
+  sans: `"Pretendard Variable", Pretendard, system-ui, -apple-system, "Segoe UI", sans-serif`,
   mono: `ui-monospace, SFMono-Regular, "Cascadia Mono", Consolas, "D2Coding", monospace`,
 } as const;
 

@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { Segmented } from "../../../components/controls";
+import { Disclosure } from "../../../components/Disclosure";
 import { useRifStore } from "./rifStore";
 import { RENJUNET_DOWNLOADS, fmtInt, pct } from "./format";
 import { t } from "../../../i18n/i18n";
@@ -93,6 +94,47 @@ export function PickRifButton({ label, tonal }: { label?: string; tonal?: boolea
  * 이 파일과 통계가 기기 밖으로 나가지 않는다는 것을 말한다(왜 앱이 대신 받아 주지 않는지도).
  */
 export function RifImportCard({ compact }: { compact?: boolean }) {
+  // 받는 방법 세 걸음 — 처음 화면(랭킹)에서는 펼쳐 두고, 오프닝 화면의 작은 카드에서는 접는다.
+  const steps = (
+    <ol className="rifsteps">
+      <li>
+        <span className="rifsteps__n" aria-hidden="true">
+          1
+        </span>
+        <span>
+          {rich(
+            t(
+              "{link}에서 {xml} 버튼을 눌러 기보 파일(약 43MB)을 받습니다. 옆의 [XML.GZ] 는 압축본이라 읽지 못합니다.",
+            ),
+            {
+              link: (
+                <a href={RENJUNET_DOWNLOADS} target="_blank" rel="noreferrer noopener">
+                  {t("renju.net 기보 화면")}
+                </a>
+              ),
+              xml: <b>[XML]</b>,
+            },
+          )}
+        </span>
+      </li>
+      <li>
+        <span className="rifsteps__n" aria-hidden="true">
+          2
+        </span>
+        <span>
+          {rich(t("받은 파일을 {drop} 아래에서 고릅니다."), {
+            drop: <b>{t("이 앱의 아무 화면에나 끌어다 놓거나")}</b>,
+          })}
+        </span>
+      </li>
+      <li>
+        <span className="rifsteps__n" aria-hidden="true">
+          3
+        </span>
+        <span>{t("몇 초 뒤 랭킹과 오프닝 통계가 열립니다. 다음부터는 바로 뜹니다.")}</span>
+      </li>
+    </ol>
+  );
   return (
     <section
       className={"panel rifcard" + (compact ? " rifcard--compact" : "")}
@@ -101,64 +143,29 @@ export function RifImportCard({ compact }: { compact?: boolean }) {
       <h2 id="rifcard-title" className="panel__title">
         {t("RenjuNet 기보로 통계 만들기")}
       </h2>
-      {!compact && (
-        <p className="rifcard__lead">
-          {t(
-            "세계 렌주 대국 약 12만 판으로 오프닝마다 몇 판이 두어졌고 흑이 얼마나 이겼는지, 어떤 개시가 많이 쓰이는지를 봅니다. 파일은 한 번만 넣으면 됩니다.",
-          )}
-        </p>
-      )}
-      <ol className="rifsteps">
-        <li>
-          <span className="rifsteps__n" aria-hidden="true">
-            1
-          </span>
-          <span>
-            {rich(
-              t(
-                "{link}에서 {xml} 버튼을 눌러 기보 파일(약 43MB)을 받습니다. 옆의 [XML.GZ] 는 압축본이라 읽지 못합니다.",
-              ),
-              {
-                link: (
-                  <a href={RENJUNET_DOWNLOADS} target="_blank" rel="noreferrer noopener">
-                    {t("renju.net 기보 화면")}
-                  </a>
-                ),
-                xml: <b>[XML]</b>,
-              },
-            )}
-          </span>
-        </li>
-        <li>
-          <span className="rifsteps__n" aria-hidden="true">
-            2
-          </span>
-          <span>
-            {rich(t("받은 파일을 {drop} 아래에서 고릅니다."), {
-              drop: <b>{t("이 앱의 아무 화면에나 끌어다 놓거나")}</b>,
-            })}
-          </span>
-        </li>
-        <li>
-          <span className="rifsteps__n" aria-hidden="true">
-            3
-          </span>
-          <span>{t("몇 초 뒤 랭킹과 오프닝 통계가 열립니다. 다음부터는 바로 뜹니다.")}</span>
-        </li>
-      </ol>
+      <p className="rifcard__lead">
+        {t(
+          "세계 렌주 대국 약 12만 판으로 오프닝 통계와 랭킹을 봅니다. 파일은 한 번만 넣으면 됩니다.",
+        )}
+      </p>
+      {!compact && steps}
       <div className="panel__actions">
         <PickRifButton tonal />
         <a className="btn" href={RENJUNET_DOWNLOADS} target="_blank" rel="noreferrer noopener">
           {t("renju.net 열기")}
         </a>
       </div>
+      {compact && (
+        <div className="panel__fold">
+          <Disclosure id="rif-howto" level={3} title={t("받는 방법")}>
+            {steps}
+          </Disclosure>
+        </div>
+      )}
       <p className="panel__hint rifcard__legal">
-        {rich(
-          t(
-            "파일과 만든 통계는 {here} 남고 어디로도 보내지 않습니다. RenjuNet 자료는 비상업 · 오프라인 사용만 허락되어 있어, 앱이 대신 받아 오거나 통계를 미리 실어 둘 수 없습니다.",
-          ),
-          { here: <b>{t("이 브라우저 안에만")}</b> },
-        )}
+        {rich(t("파일과 통계는 {here} 남습니다."), {
+          here: <b>{t("이 브라우저 안에만")}</b>,
+        })}
       </p>
     </section>
   );

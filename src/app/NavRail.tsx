@@ -7,6 +7,7 @@ import { msg, t } from "../i18n/i18n";
  * 좌측 아이콘 레일 여섯 항목.
  *
  * - **엔진 상태 점**은 «엔진» 항목에 붙는다 — 앱이 «연결» 탭에 붙이던 그 점이다.
+ * - **두 묶음**: 보드 · 연구 · 정석이 위, 도구(DB · 엔진 · 설정)가 맨 아래로 떨어진다(`Dest.group`).
  * - **연구 hover 서브메뉴**: 다른 화면에서도 연구 네 탭에 1클릭으로 닿게 한다.
  *   터치 환경에서는 hover 가 없으므로 CSS `@media (hover: hover)` 로만 켠다 —
  *   터치에서는 «연구» 진입 후 상단 탭(2클릭)이고, 그게 앱과 같은 동작이다.
@@ -18,10 +19,11 @@ export function NavRail() {
   return (
     <nav className="rail" aria-label={t("주 메뉴")}>
       <ul className="rail__list">
-        {RAIL.map((d) => {
+        {RAIL.map((d, i) => {
           const isResearch = d.path === "/research";
+          const firstTool = d.group === "tools" && RAIL[i - 1]?.group !== "tools";
           return (
-            <li key={d.path} className="rail__item">
+            <li key={d.path} className={"rail__item" + (firstTool ? " rail__item--tools" : "")}>
               <NavLink
                 to={d.path}
                 className={({ isActive }) => "rail__link" + (isActive ? " is-active" : "")}

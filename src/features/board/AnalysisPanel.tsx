@@ -9,11 +9,17 @@ import { useSettingsStore } from "../settings/settingsStore";
 import { useDisplayedAnalysis } from "./currentAnalysis";
 import { STATUS_TEXT, useStartAnalysis, useStopAnalysis } from "./analysisActions";
 import { AnalysisTimeControl, MultiPvControl, PlayBestOnStopControl, Row } from "./boardControls";
+import { Disclosure } from "../../components/Disclosure";
+import { useRememberedOpen } from "../../components/useRememberedOpen";
 
 /**
  * [분석] 탭의 엔진 카드 — 앱의 수치 줄(DEPTH·EVAL·WINRATE·NPS…)과 후보 수순을 한 카드에
  * 모았다. 분석의 설정(시간 · 후보 수 · 정지하면 최선수 두기)은 바로 아래 `AnalysisOptions`
  * 카드가 진다.
+ *
+ * **처음 보는 사람 기준(UI 개편).** 화면 글은 영문 약어 대신 «최선수 · 승률 · 평가 · 깊이»이고,
+ * 최선수가 맨 위다. 시간 · 노드 · 속도는 «세부 수치»를 켰을 때만 보인다(켠 것은 기억한다).
+ * 아직 아무것도 읽지 않았으면 «없음» 일곱 칸 대신 한 줄 안내다. 엔진 「종료」는 엔진 화면에 있다.
  *
  * 숫자는 엔진의 집계된 스냅샷에서 온다(`useDisplayedAnalysis`). **멈춰도 지우지 않는다** —
  * 정지(최선수 착수) · 무르기 · 새 수로 판이 바뀌어도 마지막 결과(깊이 · 평가 · 승률 · BEST · PV)를
@@ -43,10 +49,6 @@ export function AnalysisPanel() {
   const error = useEngineStore((s) => s.error);
   const start = useEngineStore((s) => s.start);
   const startAnalysis = useStartAnalysis();
-  const terminate = useEngineStore((s) => s.terminate);
-  const multiPv = useEngineStore((s) => s.multiPv);
-  const analysisMs = useEngineStore((s) => s.analysisMs);
-  const analyzing = useEngineStore((s) => s.analyzing);
   const stopAnalysis = useStopAnalysis();
   const playBest = useSettingsStore((s) => s.playBestOnStop);
 
@@ -59,6 +61,17 @@ export function AnalysisPanel() {
   const clockMs = useSearchClock(searching);
   // 직전 국면의 값을 보이는 동안은 그 탐색의 시간 — 새 탐색의 벽시계와 섞지 않는다.
   const timeMs = clockMs === null || stale ? stats.timeMs : Math.max(stats.timeMs ?? 0, clockMs);
+  const [detail, setDetail] = useRememberedOpen("engine-detail");
+  // 아직 읽은 것이 하나도 없으면 «없음» 일곱 칸 대신 한 줄 — 무엇을 누르면 되는지만.
+  const blank =
+    !searching &&
+    !stale &&
+    !bestMove &&
+    pvs.length === 0 &&
+    !stats.depth &&
+    stats.evalCp === null &&
+    !stats.mate &&
+    stats.winRatePct === null;
 
   if (!caps.variant) {
     return (
@@ -98,20 +111,9 @@ export function AnalysisPanel() {
         >
           {t("정지")}
         </button>
-        <button type="button" onClick={terminate} disabled={status === "idle"}>
-          {t("종료")}
-        </button>
       </div>
 
       {error && <p className="panel__error">{error}</p>}
-
-      <p className="engine-mode" data-on={analyzing || undefined}>
-        <span className="engine-mode__dot" aria-hidden="true" />
-        {analyzing ? t("분석 중") : t("분석 꺼짐")} ·{" "}
-        {Number.isFinite(analysisMs) ? t("{n}초", { n: analysisMs / 1000 }) : t("무제한")} ·{" "}
-        {t("후보 {n}수", { n: multiPv })}
-        {playBest ? ` · ${t("정지하면 최선수")}` : ""}
-      </p>
 
       {stale && (
         <p className="panel__hint stats__stale" data-k="analysis-stale">
@@ -121,20 +123,53 @@ export function AnalysisPanel() {
         </p>
       )}
 
-      <dl className="kv stats" data-stale={stale || undefined}>
-        <Stat k="DEPTH">
+      {blank && (
+        <p className="panel__hint" data-k="analysis-empty">
+          {t("「분석」을 누르면 엔진이 이 국면의 최선수를 찾습니다")}
+        </p>
+      )}
+
+      {/* 화면에서는 최선수가 맨 위(CSS order), 문서 순서는 그대로 — 스모크가 첫 dd 를 깊이로,
+          마지막 dd 를 최선수로 읽는다. 시간 · 노드 · 속도는 «세부 수치»를 켰을 때만. */}
+      <dl
+        className="kv stats"
+        data-stale={stale || undefined}
+        data-detail={detail || undefined}
+        hidden={blank}
+      >
+        <Stat id="depth" k={t("깊이")}>
           {stats.depth || NONE()}
           {stats.depth && stats.selDepth ? `/${stats.selDepth}` : ""}
         </Stat>
-        <Stat k="EVAL">{formatEval(stats)}</Stat>
-        <Stat k="WINRATE">{stats.winRatePct === null ? NONE() : `${stats.winRatePct}%`}</Stat>
-        <Stat k="TIME">{formatTime(timeMs)}</Stat>
-        <Stat k="NODE">{compact(stats.nodes)}</Stat>
-        <Stat k="NPS">{stats.speed === null ? NONE() : `${compact(stats.speed)}/s`}</Stat>
-        <Stat k="BEST" wide>
+        <Stat id="eval" k={t("평가")}>
+          {formatEval(stats)}
+        </Stat>
+        <Stat id="winrate" k={t("승률")}>
+          {stats.winRatePct === null ? NONE() : `${stats.winRatePct}%`}
+        </Stat>
+        <Stat id="time" k={t("시간")} minor>
+          {formatTime(timeMs)}
+        </Stat>
+        <Stat id="nodes" k={t("노드")} minor>
+          {compact(stats.nodes)}
+        </Stat>
+        <Stat id="speed" k={t("속도")} minor>
+          {stats.speed === null ? NONE() : `${compact(stats.speed)}/s`}
+        </Stat>
+        <Stat id="best" k={t("최선수")} wide>
           {bestMove ? label(bestMove, size) : NONE()}
         </Stat>
       </dl>
+      {!blank && (
+        <button
+          type="button"
+          className="textbtn stats__toggle"
+          aria-pressed={detail}
+          onClick={() => setDetail(!detail)}
+        >
+          {detail ? t("세부 수치 접기") : t("세부 수치")}
+        </button>
+      )}
 
       {snapshot.instant && !stale && (
         <p
@@ -174,28 +209,36 @@ export function AnalysisPanel() {
   );
 }
 
-/** [분석] 탭의 설정 카드 — 예전에 설정 화면의 「자주 쓰는 설정」에 있던 줄들. */
+/**
+ * [분석] 탭의 설정 카드 — 예전에 설정 화면의 「자주 쓰는 설정」에 있던 줄들.
+ *
+ * 접혀 있고 머리에 지금 값 한 줄(«무제한 · 후보 1수»)만 보인다. 기본값으로 충분한 사람이
+ * 대부분이고, 고치는 사람은 한 번 열면 열린 채로 남는다(`Disclosure`). 예전에 엔진 카드에
+ * 따로 있던 «분석 꺼짐 · 무제한 · 후보 1수 · 정지하면 최선수» 줄의 몫도 이 요약이 진다.
+ */
 export function AnalysisOptions() {
+  const multiPv = useEngineStore((s) => s.multiPv);
+  const analysisMs = useEngineStore((s) => s.analysisMs);
+  const summary = `${Number.isFinite(analysisMs) ? t("{n}초", { n: analysisMs / 1000 }) : t("무제한")} · ${t("후보 {n}수", { n: multiPv })}`;
   return (
-    <section className="panel" aria-labelledby="analysis-options-title">
-      <h2 id="analysis-options-title" className="panel__title">
-        {t("분석 설정")}
-      </h2>
-      <div className="panel__rows">
-        <Row id="analysisTime" label={t("분석 시간")} note={t("무제한 = 정지할 때까지")} wide>
-          <AnalysisTimeControl />
-        </Row>
-        <Row id="multiPv" label={t("후보 수")} note={t("YXNBEST: 1 이면 최선 수 하나만 깊게")}>
-          <MultiPvControl />
-        </Row>
-        <Row
-          id="playBestOnStop"
-          label={t("정지하면 최선수 두기")}
-          note={t("정지하는 순간의 BEST 를 둡니다(빈 판은 H8)")}
-        >
-          <PlayBestOnStopControl />
-        </Row>
-      </div>
+    <section className="panel panel--disclosure">
+      <Disclosure id="analysis-options" title={t("분석 설정")} summary={summary}>
+        <div className="panel__rows">
+          <Row id="analysisTime" label={t("분석 시간")} note={t("무제한 = 정지할 때까지")} wide>
+            <AnalysisTimeControl />
+          </Row>
+          <Row id="multiPv" label={t("후보 수")} note={t("1 이면 최선수 하나만 깊게 읽습니다")}>
+            <MultiPvControl />
+          </Row>
+          <Row
+            id="playBestOnStop"
+            label={t("정지하면 최선수 두기")}
+            note={t("정지하는 순간의 최선수를 둡니다(빈 판은 H8)")}
+          >
+            <PlayBestOnStopControl />
+          </Row>
+        </div>
+      </Disclosure>
     </section>
   );
 }
@@ -222,9 +265,24 @@ function useSearchClock(searching: boolean): number | null {
 /** 값이 아직 없는 칸 — 대시 대신 말로(W10). */
 const NONE = () => t("없음");
 
-function Stat({ k, wide, children }: { k: string; wide?: boolean; children: ReactNode }) {
+function Stat({
+  id,
+  k,
+  wide,
+  minor,
+  children,
+}: {
+  id: string;
+  k: string;
+  wide?: boolean;
+  minor?: boolean;
+  children: ReactNode;
+}) {
   return (
-    <div className={"stat" + (wide ? " stat--wide" : "")}>
+    <div
+      className={"stat" + (wide ? " stat--wide" : "") + (minor ? " stat--minor" : "")}
+      data-k={id}
+    >
       <dt className="stat__key">{k}</dt>
       <dd className="stat__value tnum">{children}</dd>
     </div>

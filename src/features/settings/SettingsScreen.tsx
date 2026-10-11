@@ -2,7 +2,6 @@ import { useMemo, useRef, useState, type ComponentType } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGameStore, type BoardMode } from "../board/gameStore";
 import { useBoardStore } from "../board/boardStore";
-import { useEngineStore } from "../../engine/engine-state";
 import { useThemeStore, type ThemeMode } from "../../app/theme";
 import {
   HASH_CHOICES_MB,
@@ -558,7 +557,6 @@ function Group({ sec, rows }: { sec: Section; rows: readonly RowSpec[] }) {
 export function SettingsScreen() {
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
-  const status = useEngineStore((s) => s.status);
   const advanced = useSettingsStore((s) => s.showAdvanced);
   const update = useSettingsStore((s) => s.update);
 
@@ -571,7 +569,6 @@ export function SettingsScreen() {
     sec,
     rows: visible.filter((r) => r.sec === sec),
   })).filter((g) => g.rows.length > 0);
-  const live = status === "ready" || status === "searching";
   const basic = groups.find((g) => g.sec === "basic");
   const rest = groups.filter((g) => g.sec !== "basic");
 
@@ -591,9 +588,12 @@ export function SettingsScreen() {
             onChange={(e) => setQuery(e.target.value)}
           />
         </div>
-        <p className="settings__meta tnum">
-          {visible.length}/{ROWS.length} · {live ? t("즉시 반영") : t("기동할 때 반영")}
-        </p>
+        {/* 찾는 중에만 몇 줄이 걸렸는지. 평소의 «6/18 · 기동할 때 반영»은 읽을 이유가 없는 숫자였다. */}
+        {q && (
+          <p className="settings__meta tnum">
+            {visible.length}/{ROWS.length}
+          </p>
+        )}
       </div>
 
       {groups.length === 0 ? (

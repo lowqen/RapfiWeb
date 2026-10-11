@@ -9,6 +9,7 @@ import { copyPositionLink } from "./positionLink";
 import { useOpeningTables } from "../../data/opening-tables";
 import { chain, gradeAt } from "../../core/opening/opening-name";
 import { GradeBadge } from "../../components/GradeBadge";
+import { Menu } from "../../components/Menu";
 import { useCurrentReview } from "../../data/current-review";
 import {
   QUALITY_INFO,
@@ -71,7 +72,7 @@ function usePosition() {
  * 대국/엔진 카드 뒤로 물러서고(`order`, base.css) 대신 `PositionStrip` 한 줄이 옆 칸 맨 위 —
  * 휴대폰 세로에서는 판 바로 밑 — 에 붙는다.
  *
- * 기보 열기 · 저장은 두 탭 모두에 있다(판은 함께 쓴다). 열기는 보드에 파일을 끌어다
+ * 기보 열기 · 저장은 두 탭 모두의 카드 머리 «기보» 메뉴에 있다(판은 함께 쓴다). 열기는 보드에 파일을 끌어다
  * 놓아도 된다(`BoardScreen`). 저장은 지금 판까지 — 무른 수는 넣지 않는다(데스크톱과 같다).
  * 「링크 복사」는 지금 판을 `?p=…` 주소로 — 받은 사람이 열면 그 국면이 뜬다.
  *
@@ -100,6 +101,28 @@ export function PositionCard({ game }: { game: boolean }) {
         <span className="poscard__rule" data-k="ruleset">
           {RULE_LABEL.renju} · {OPENING_LABEL[opening]}
         </span>
+        <Menu
+          label={t("기보")}
+          items={[
+            { label: t("기보 열기"), onSelect: () => fileInput.current?.click() },
+            {
+              label: t(".psq 저장"),
+              title: t("Piskvork 기보(.psq)로 저장"),
+              onSelect: () => void saveGameFile("psq"),
+            },
+            {
+              label: t(".sav 저장"),
+              title: t("Yixin 저장 국면(.sav)으로 저장"),
+              onSelect: () => void saveGameFile("sav"),
+            },
+            {
+              label: t("링크 복사"),
+              title: t("지금 판을 여는 주소(?p=…)를 복사합니다"),
+              disabled: p.count === 0,
+              onSelect: () => void copyPositionLink(),
+            },
+          ]}
+        />
       </div>
       {p.result && (
         <p className="gameover" data-winner={p.result.winner ?? "draw"}>
@@ -194,44 +217,18 @@ export function PositionCard({ game }: { game: boolean }) {
           )}
         </dl>
       )}
-      <div className="panel__actions panel__actions--compact">
-        <button type="button" onClick={() => fileInput.current?.click()}>
-          {t("기보 열기")}
-        </button>
-        <button
-          type="button"
-          title={t("Piskvork 기보(.psq)로 저장")}
-          onClick={() => void saveGameFile("psq")}
-        >
-          {t(".psq 저장")}
-        </button>
-        <button
-          type="button"
-          title={t("Yixin 저장 국면(.sav)으로 저장")}
-          onClick={() => void saveGameFile("sav")}
-        >
-          {t(".sav 저장")}
-        </button>
-        <button
-          type="button"
-          title={t("지금 판을 여는 주소(?p=…)를 복사합니다")}
-          disabled={p.count === 0}
-          onClick={() => void copyPositionLink()}
-        >
-          {t("링크 복사")}
-        </button>
-        <input
-          ref={fileInput}
-          type="file"
-          accept={GAME_FILE_ACCEPT}
-          hidden
-          onChange={(e) => {
-            const file = e.currentTarget.files?.[0];
-            e.currentTarget.value = ""; // 같은 파일을 다시 골라도 onChange 가 오게
-            if (file) void openGameFile(file).then((r) => showNotice(r.text));
-          }}
-        />
-      </div>
+      {/* 기보 파일 · 링크 — 가끔 쓰는 넷이라 «기보» 메뉴 하나 뒤에 둔다. 판에 끌어다 놓아도 열린다. */}
+      <input
+        ref={fileInput}
+        type="file"
+        accept={GAME_FILE_ACCEPT}
+        hidden
+        onChange={(e) => {
+          const file = e.currentTarget.files?.[0];
+          e.currentTarget.value = ""; // 같은 파일을 다시 골라도 onChange 가 오게
+          if (file) void openGameFile(file).then((r) => showNotice(r.text));
+        }}
+      />
       {game && (
         <>
           <OpeningProgress />

@@ -15,7 +15,7 @@ import { buildSeries, evalAtOrBefore, showMarkers, type SeriesPoint } from "./ev
  *
  * 엔진이 읽은 국면끼리 **이어 긋는다**(`buildSeries`) — 대국에서는 엔진 차례의 국면만
  * 평가가 있어 한 수 걸러 점이 선다. 점이 드물면 점 표시를 함께 그려 실제로 읽은 국면을 가른다.
- * 축과 기준선은 데이터가 없어도(빈 판 · 아직 분석 전) 늘 그린다.
+ * 읽은 국면이 하나도 없으면(빈 판 · 아직 분석 전) 축을 그리지 않고 카드가 한 줄로 접힌다.
  *
  * 크기는 `viewBox` 가 진다 — 컨테이너 폭을 재지 않으므로 탭을 오가며 다시 붙어도 0 폭으로
  * 그려질 일이 없다. 가로축은 지금 판 + 앞으로 갈 수(무른 수)까지, 곧 기보 한 줄이다.
@@ -93,6 +93,18 @@ export function EvalGraph() {
     : t("평가 없음");
   const markers = showMarkers(series);
 
+  // 읽은 국면이 하나도 없으면 빈 축 대신 한 줄 — 빈 그래프는 «고장»처럼 읽힌다.
+  if (series.length === 0) {
+    return (
+      <section className="panel evalgraph evalgraph--empty" aria-labelledby="evalgraph-title">
+        <h2 id="evalgraph-title" className="panel__title">
+          {t("형세 그래프")}
+        </h2>
+        <p className="panel__hint">{t("분석하면 수마다 쌓입니다")}</p>
+      </section>
+    );
+  }
+
   return (
     <section className="panel evalgraph" aria-labelledby="evalgraph-title">
       <h2 id="evalgraph-title" className="panel__title">
@@ -120,7 +132,7 @@ export function EvalGraph() {
         onClick={(e) => go(plyAt(e))}
         onKeyDown={onKey}
       >
-        {/* 축과 기준선 — 데이터가 없어도 늘. 머리카락 굵기, 물러선 색. */}
+        {/* 축과 기준선 — 머리카락 굵기, 물러선 색. */}
         {[0, 50, 100].map((v) => (
           <g key={v}>
             <line
@@ -193,7 +205,6 @@ export function EvalGraph() {
           </>
         )}
       </svg>
-      {series.length === 0 && <p className="panel__hint">{t("분석하면 수마다 쌓입니다")}</p>}
     </section>
   );
 }

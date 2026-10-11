@@ -5,7 +5,7 @@ import type { BootPhase, EngineStatus } from "../engine/engine-types";
 import { isMultiVariant, isRelaxedVariant } from "../engine/engine-client";
 
 /**
- * 상단 바의 엔진 표시 — 지금 엔진이 어떤지 한 줄. 엔진 선택은 설정 ▸ 자주 쓰는 설정에 있다.
+ * 상단 바의 엔진 표시 — 지금 엔진이 어떤지 낱말 하나. 엔진 선택은 설정 ▸ 자주 쓰는 설정에 있다.
  *
  * 앱이 뜨면 엔진이 뒤에서 기동한다(`useAutoBoot`). 그동안 이 표시가 **무엇을 기다리는지**
  * (가중치 받기 → 엔진 → 예열) 말하고, 상단 바 밑에 가는 진행 줄이 흐른다. 끝나면 「준비」와
@@ -94,18 +94,13 @@ export function EngineIndicator() {
   const variant = engine.variant
     ? `${isMultiVariant(engine.variant) ? t("멀티") : t("단일")}${isRelaxedVariant(engine.variant) ? " · relaxed" : ""}`
     : null;
-  const detail =
-    status === "starting"
-      ? phase
-        ? t(PHASE_TEXT[phase])
-        : null
-      : status === "ready" || status === "searching"
-        ? variant
-        : null;
+  // 화면 글은 상태 낱말과(기동 중이면) 단계까지만. 변형(멀티 · relaxed · 이름)은 툴팁 — 처음 온
+  // 사람에게 «multi-simd128-relaxed» 는 읽을 거리가 아니라 소음이다.
+  const detail = status === "starting" && phase ? t(PHASE_TEXT[phase]) : null;
   const title =
     status === "error"
       ? (error ?? t("엔진 오류"))
-      : `${t(STATUS_TEXT[status])}${detail ? ` · ${detail}` : ""}${engine.variant ? ` (${engine.variant})` : ""}`;
+      : `${t(STATUS_TEXT[status])}${detail ? ` · ${detail}` : ""}${variant ? ` · ${variant}` : ""}${engine.variant ? ` (${engine.variant})` : ""}`;
 
   return (
     <div className="enginechip-wrap">

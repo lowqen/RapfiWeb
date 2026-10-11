@@ -10,6 +10,7 @@ import { theoryNext } from "../../core/opening/explore";
 import type { Grade } from "../../core/opening/tables";
 import { gameMoves, gamesThrough, lookup } from "../../core/rif/query";
 import { RES_BLACK, RES_DRAW, RES_WHITE } from "../../core/rif/rif-parse";
+import { Disclosure } from "../../components/Disclosure";
 import { GradeBadge } from "../../components/GradeBadge";
 import { useOpeningTables } from "../../data/opening-tables";
 import { useBoardStore } from "../board/boardStore";
@@ -201,207 +202,217 @@ export function OpeningExplorer() {
 
   return (
     <div className="explorer">
-      <div className="explorer__board">
-        <BoardCanvas render={view} onTap={onTap} zoomable={false} keyboard />
+      {/* 넓은 화면에서는 판이 왼쪽, 읽을 것이 오른쪽(보드 화면과 같은 배치). 좁으면 위아래. */}
+      <div className="explorer__stage">
+        <div className="explorer__board">
+          <BoardCanvas render={view} onTap={onTap} zoomable={false} keyboard />
+        </div>
+        <div className="panel__actions explorer__nav">
+          <button type="button" onClick={undoAll} disabled={stones.length === 0}>
+            {t("처음으로")}
+          </button>
+          <button type="button" onClick={undo} disabled={stones.length === 0}>
+            {t("한 수 무르기")}
+          </button>
+          <Link className="btn" to="/board">
+            {t("보드에서 보기")}
+          </Link>
+        </div>
       </div>
-      <div className="panel__actions explorer__nav">
-        <button type="button" onClick={undoAll} disabled={stones.length === 0}>
-          {t("처음으로")}
-        </button>
-        <button type="button" onClick={undo} disabled={stones.length === 0}>
-          {t("한 수 무르기")}
-        </button>
-        <Link className="btn" to="/board">
-          {t("보드에서 보기")}
-        </Link>
-      </div>
 
-      {ready && !hasRenjuNet && <RifImportCard compact />}
-      <PackSourceBar />
+      <div className="explorer__side">
+        <PackSourceBar />
 
-      <section className="panel">
-        <h2 className="panel__title">{t("국면")}</h2>
-        <dl className="kv">
-          <dt>{t("수순")}</dt>
-          <dd className="tnum" data-k="explorer-line">
-            {stones.length ? fmtLine(stones, size) : t("시작 국면")}
-          </dd>
-          <dt>{t("이름")}</dt>
-          <dd data-k="explorer-chain" lang={langOf(names.join(" "))}>
-            {names.length ? names.join(" › ") : t("없음")}
-          </dd>
-          {grade && (
-            <>
-              <dt>{t("유불리")}</dt>
-              <dd>
-                <GradeBadge grade={grade} />
-              </dd>
-            </>
-          )}
-          {pack && (
-            <>
-              <dt>{pack.source === "renjunet" ? t("대국") : t("내 기보")}</dt>
-              <dd data-k="explorer-games" className="explorer__stat">
-                {stat ? (
-                  <>
-                    <span className="tnum">{t("{n}판", { n: fmtInt(stat.n) })}</span>
-                    <WdlBar b={stat.b} d={stat.d} w={stat.w} />
-                  </>
-                ) : stones.length > pack.maxPlies ? (
-                  t("{n}수까지 셉니다", { n: pack.maxPlies })
-                ) : (
-                  t("이 국면을 지난 판이 없습니다")
-                )}
-              </dd>
-            </>
-          )}
-        </dl>
-      </section>
-
-      <section className="panel">
-        <h2 className="panel__title">
-          {t("다음 수")}{" "}
-          <span className="panel__status">{rows.length ? t("{n}곳", { n: rows.length }) : ""}</span>
-        </h2>
-        {rows.length === 0 ? (
-          <p className="panel__hint">
-            {stat
-              ? t("이 국면에서 더 둔 판이 없습니다.")
-              : stones.length >= 5
-                ? t(
-                    "이름과 흑 5수 유불리는 5수까지입니다. 그 뒤로는 기록(통계)이나 엔진이 읽습니다(보드 ▸ 분석).",
-                  )
-                : offFrame
-                  ? t("이 수순은 표준 개시 틀(1수 천원 · 3수까지 가운데 5×5)을 벗어났습니다.")
-                  : t(
-                      "표에 이 국면의 다음 수가 없습니다. 대부분의 4수에는 이름이 없고, 그것이 정상입니다.",
-                    )}
-          </p>
-        ) : (
-          <ul className="theory" aria-label={t("다음 수")}>
-            {rows.map((r) => (
-              <li key={moveKey(r.move, size)}>
-                <button
-                  type="button"
-                  className={"theory__row" + (pack ? " theory__row--stat" : "")}
-                  onClick={() => play(r.move)}
-                >
-                  <span className="theory__move tnum">{label(r.move, size)}</span>
-                  <span className="theory__name" lang={langOf(r.name ?? "")}>
-                    {r.name ?? ""}
-                    {r.grade && (
-                      <>
-                        {" "}
-                        <GradeBadge grade={r.grade} compact />
-                      </>
-                    )}
-                  </span>
-                  {pack && (
+        <section className="panel">
+          <h2 className="panel__title">{t("국면")}</h2>
+          <dl className="kv">
+            <dt>{t("수순")}</dt>
+            <dd className="tnum" data-k="explorer-line">
+              {stones.length ? fmtLine(stones, size) : t("시작 국면")}
+            </dd>
+            <dt>{t("이름")}</dt>
+            <dd data-k="explorer-chain" lang={langOf(names.join(" "))}>
+              {names.length ? names.join(" › ") : t("없음")}
+            </dd>
+            {grade && (
+              <>
+                <dt>{t("유불리")}</dt>
+                <dd>
+                  <GradeBadge grade={grade} />
+                </dd>
+              </>
+            )}
+            {pack && (
+              <>
+                <dt>{pack.source === "renjunet" ? t("대국") : t("내 기보")}</dt>
+                <dd data-k="explorer-games" className="explorer__stat">
+                  {stat ? (
                     <>
-                      <span className="theory__games tnum">
-                        {r.n ? t("{n}판", { n: fmtInt(r.n) }) : ""}
-                      </span>
-                      {r.n ? <WdlBar b={r.b} d={r.d} w={r.w} compact /> : <span />}
+                      <span className="tnum">{t("{n}판", { n: fmtInt(stat.n) })}</span>
+                      <WdlBar b={stat.b} d={stat.d} w={stat.w} />
                     </>
+                  ) : stones.length > pack.maxPlies ? (
+                    t("{n}수까지 셉니다", { n: pack.maxPlies })
+                  ) : (
+                    t("이 국면을 지난 판이 없습니다")
                   )}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+                </dd>
+              </>
+            )}
+          </dl>
+        </section>
 
-      {pack && stat && (
-        <section className="panel" aria-label={t("이 국면을 지난 대국")}>
+        <section className="panel">
           <h2 className="panel__title">
-            {t("대국")}{" "}
-            <span className="panel__status tnum">
-              {games
-                ? games.matched > GAMES_SHOWN
-                  ? t("{n}판 중 {shown}판", { n: fmtInt(games.matched), shown: GAMES_SHOWN })
-                  : t("{n}판", { n: fmtInt(games.matched) })
-                : t("{n}판", { n: fmtInt(stat.n) })}
+            {t("다음 수")}{" "}
+            <span className="panel__status">
+              {rows.length ? t("{n}곳", { n: rows.length }) : ""}
             </span>
           </h2>
-          {!showGames ? (
-            <div className="panel__actions">
-              <button type="button" onClick={() => setShowGames(true)}>
-                {t("대국 목록 보기")}
-              </button>
-            </div>
+          {rows.length === 0 ? (
+            <p className="panel__hint">
+              {stat
+                ? t("이 국면에서 더 둔 판이 없습니다.")
+                : stones.length >= 5
+                  ? t(
+                      "이름과 흑 5수 유불리는 5수까지입니다. 그 뒤로는 기록(통계)이나 엔진이 읽습니다(보드 ▸ 분석).",
+                    )
+                  : offFrame
+                    ? t("이 수순은 표준 개시 틀(1수 천원 · 3수까지 가운데 5×5)을 벗어났습니다.")
+                    : t(
+                        "표에 이 국면의 다음 수가 없습니다. 대부분의 4수에는 이름이 없고, 그것이 정상입니다.",
+                      )}
+            </p>
           ) : (
-            <>
-              {pack.source === "renjunet" && (
-                <input
-                  className="ranking__input explorer__needle"
-                  type="search"
-                  placeholder={t("선수 이름으로 거르기")}
-                  aria-label={t("선수 이름으로 거르기")}
-                  value={needle}
-                  onChange={(e) => setNeedle(e.target.value)}
-                />
-              )}
-              <ol className="gamelist" data-k="explorer-gamelist">
-                {games?.games.map((g) => (
-                  <li key={g}>
-                    <button type="button" className="gamelist__row" onClick={() => openGame(g)}>
-                      <span className="gamelist__year tnum">
-                        {pack.tourYear[pack.games.tour[g]!] || ""}
-                      </span>
-                      <span className="gamelist__players">
-                        {pack.players[pack.games.black[g]!]}{" "}
-                        <span className="gamelist__vs">vs</span>{" "}
-                        {pack.players[pack.games.white[g]!]}
-                      </span>
-                      <span className="gamelist__res" data-res={pack.games.res[g]}>
-                        {RESULT_TEXT[pack.games.res[g]!] ?? t("결과 모름")}
-                      </span>
-                      <span className="gamelist__tour">
-                        {pack.tournaments[pack.games.tour[g]!]}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ol>
-              {games && games.matched === 0 && (
-                <p className="panel__hint">{t("그 이름의 선수가 둔 판이 없습니다.")}</p>
-              )}
-            </>
+            <ul className="theory" aria-label={t("다음 수")}>
+              {rows.map((r) => (
+                <li key={moveKey(r.move, size)}>
+                  <button
+                    type="button"
+                    className={"theory__row" + (pack ? " theory__row--stat" : "")}
+                    onClick={() => play(r.move)}
+                  >
+                    <span className="theory__move tnum">{label(r.move, size)}</span>
+                    <span className="theory__name" lang={langOf(r.name ?? "")}>
+                      {r.name ?? ""}
+                      {r.grade && (
+                        <>
+                          {" "}
+                          <GradeBadge grade={r.grade} compact />
+                        </>
+                      )}
+                    </span>
+                    {pack && (
+                      <>
+                        <span className="theory__games tnum">
+                          {r.n ? t("{n}판", { n: fmtInt(r.n) }) : ""}
+                        </span>
+                        {r.n ? <WdlBar b={r.b} d={r.d} w={r.w} compact /> : <span />}
+                      </>
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
         </section>
-      )}
 
-      {alts.length > 0 && (
-        <section className="panel">
-          <h2 className="panel__title">{t("환원: 같은 돌, 다른 수순")}</h2>
-          <p className="panel__hint">
-            {t(
-              "돌과 색이 같으니 한 판이고 유불리와 통계도 하나지만, 수순이 달라 이름은 다를 수 있습니다.",
+        {pack && stat && (
+          <section className="panel" aria-label={t("이 국면을 지난 대국")}>
+            <h2 className="panel__title">
+              {t("대국")}{" "}
+              <span className="panel__status tnum">
+                {games
+                  ? games.matched > GAMES_SHOWN
+                    ? t("{n}판 중 {shown}판", { n: fmtInt(games.matched), shown: GAMES_SHOWN })
+                    : t("{n}판", { n: fmtInt(games.matched) })
+                  : t("{n}판", { n: fmtInt(stat.n) })}
+              </span>
+            </h2>
+            {!showGames ? (
+              <div className="panel__actions">
+                <button type="button" onClick={() => setShowGames(true)}>
+                  {t("대국 목록 보기")}
+                </button>
+              </div>
+            ) : (
+              <>
+                {pack.source === "renjunet" && (
+                  <input
+                    className="ranking__input explorer__needle"
+                    type="search"
+                    placeholder={t("선수 이름으로 거르기")}
+                    aria-label={t("선수 이름으로 거르기")}
+                    value={needle}
+                    onChange={(e) => setNeedle(e.target.value)}
+                  />
+                )}
+                <ol className="gamelist" data-k="explorer-gamelist">
+                  {games?.games.map((g) => (
+                    <li key={g}>
+                      <button type="button" className="gamelist__row" onClick={() => openGame(g)}>
+                        <span className="gamelist__year tnum">
+                          {pack.tourYear[pack.games.tour[g]!] || ""}
+                        </span>
+                        <span className="gamelist__players">
+                          {pack.players[pack.games.black[g]!]}{" "}
+                          <span className="gamelist__vs">vs</span>{" "}
+                          {pack.players[pack.games.white[g]!]}
+                        </span>
+                        <span className="gamelist__res" data-res={pack.games.res[g]}>
+                          {RESULT_TEXT[pack.games.res[g]!] ?? t("결과 모름")}
+                        </span>
+                        <span className="gamelist__tour">
+                          {pack.tournaments[pack.games.tour[g]!]}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ol>
+                {games && games.matched === 0 && (
+                  <p className="panel__hint">{t("그 이름의 선수가 둔 판이 없습니다.")}</p>
+                )}
+              </>
             )}
-          </p>
-          <ul className="theory">
-            {alts.map((a) => (
-              <li key={fmtLine(a.line, size)} className="theory__row theory__row--static">
-                <span className="theory__move tnum">{fmtLine(a.line, size)}</span>
-                <span className="theory__name" lang={langOf(a.chain.join(" "))}>
-                  {a.chain.join(" › ")}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+          </section>
+        )}
 
-      <p className="explorer__note">
-        {t(
-          "1~3수 이름은 계산하고, 4수 이름 249개와 흑 5수 유불리 1,889모양은 내장 표에서 읽습니다.",
+        {alts.length > 0 && (
+          <section className="panel">
+            <h2 className="panel__title">{t("환원: 같은 돌, 다른 수순")}</h2>
+            <p className="panel__hint">
+              {t(
+                "돌과 색이 같으니 한 판이고 유불리와 통계도 하나지만, 수순이 달라 이름은 다를 수 있습니다.",
+              )}
+            </p>
+            <ul className="theory">
+              {alts.map((a) => (
+                <li key={fmtLine(a.line, size)} className="theory__row theory__row--static">
+                  <span className="theory__move tnum">{fmtLine(a.line, size)}</span>
+                  <span className="theory__name" lang={langOf(a.chain.join(" "))}>
+                    {a.chain.join(" › ")}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
-        {!loaded && ` ${t("표를 받는 중입니다…")}`}{" "}
-        {t(
-          "빈도 통계는 RenjuNet .rif 를 넣으면(이 브라우저 안에서만 만들고 보관) 세계 대국으로, 없으면 내 기보로 셉니다.",
-        )}
-        {pick("", ` ${t("4수 이름은 한국어 원표 그대로입니다.")}`)}
-      </p>
+
+        {!loaded && <p className="explorer__note">{t("표를 받는 중입니다…")}</p>}
+        {/* 통계가 없어도 이름 · 유불리는 뜬다 — 가져오기 안내는 읽을 것들 뒤로 물린다. */}
+        {ready && !hasRenjuNet && <RifImportCard compact />}
+        <Disclosure id="explorer-about" level={3} title={t("자료 출처")}>
+          <p className="explorer__note">
+            {t(
+              "1~3수 이름은 계산하고, 4수 이름 249개와 흑 5수 유불리 1,889모양은 내장 표에서 읽습니다.",
+            )}{" "}
+            {t(
+              "빈도 통계는 RenjuNet .rif 를 넣으면(이 브라우저 안에서만 만들고 보관) 세계 대국으로, 없으면 내 기보로 셉니다.",
+            )}
+            {pick("", ` ${t("4수 이름은 한국어 원표 그대로입니다.")}`)}
+          </p>
+        </Disclosure>
+      </div>
     </div>
   );
 }

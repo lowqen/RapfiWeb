@@ -86,22 +86,13 @@ export function CurriculumHome() {
 
   return (
     <div className="review joseki curriculum" data-k="curriculum">
-      <section className="panel">
-        <h2 className="panel__title">
-          {t("공식 커리큘럼")}{" "}
-          {file.version && <span className="panel__status tnum">{file.version}</span>}
-        </h2>
-        {open && (
-          <p className="panel__hint" role="alert" data-k="lesson-missing">
-            {t("레슨 «{id}» 을(를) 찾지 못했습니다. 아래 목록에서 고르세요.", { id: open })}
-          </p>
-        )}
-        <p className="panel__hint">
-          {t(
-            "전문가가 차례를 정해 만든 오프닝 정석입니다. 살펴보기로 수순마다의 해설과 나쁜 수 · 함정의 갈래를 읽고, 학습으로 수순을 직접 맞히며 따라 둡니다. 진도는 이 브라우저에 남습니다.",
-          )}
+      {/* 머리 카드(«공식 커리큘럼» + 설명 문단)는 걷었다 — 바로 위 탭이 이미 같은 이름을 말하고,
+          처음 온 사람이 읽을 것은 코스 목록이다. 무엇을 하는 곳인지는 레슨 줄이 말한다. */}
+      {open && (
+        <p className="panel__hint" role="alert" data-k="lesson-missing">
+          {t("레슨 «{id}» 을(를) 찾지 못했습니다. 아래 목록에서 고르세요.", { id: open })}
         </p>
-      </section>
+      )}
       {file.courses.length === 0 && (
         <section className="panel">
           <p className="panel__hint">{t("아직 실린 코스가 없습니다.")}</p>

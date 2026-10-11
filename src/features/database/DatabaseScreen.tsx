@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NumberField, Segmented, Switch } from "../../components/controls";
 import { ConfirmBox } from "../../components/ConfirmBox";
+import { Disclosure } from "../../components/Disclosure";
 import { downloadBlob, stamp } from "../../app/download";
 import { BoardCanvas } from "../../core/board/BoardCanvas";
 import { emptyRender, type BoardRender } from "../../core/board/board-renderer";
@@ -135,13 +136,18 @@ export function DatabaseScreen() {
                   : t("꺼짐")}
           </span>
         </h2>
-        <p className="panel__hint">
+        <p className="panel__lead">
           {t(
-            "엔진이 국면마다 증명된 승패 · 값 · 주석을 쌓는 데이터베이스입니다. 파일은 이 브라우저(IndexedDB)에 두고, 엔진이 뜰 때 엔진 메모리에 올립니다.",
-          )}{" "}
-          <b>{t("저장하지 않은 변경은 엔진을 다시 띄우면 사라집니다.")}</b>{" "}
-          {t("자동 저장을 켜 두거나 «지금 저장»을 누르세요.")}
+            "엔진이 증명한 승패 · 값 · 주석을 국면마다 쌓아 둡니다. 파일은 이 브라우저에 남습니다.",
+          )}
         </p>
+        {/* 잃을 것이 생겼을 때만 경고한다 — 늘 펼쳐 둔 굵은 경고문은 아무도 읽지 않는다. */}
+        {on && s.dirty && !ro && !s.settings.autoSave && (
+          <p className="panel__hint" role="note">
+            <b>{t("저장하지 않은 변경은 엔진을 다시 띄우면 사라집니다.")}</b>{" "}
+            {t("자동 저장을 켜 두거나 «지금 저장»을 누르세요.")}
+          </p>
+        )}
         {s.message && (
           <p className="panel__hint" role="alert">
             {s.message}
@@ -155,50 +161,61 @@ export function DatabaseScreen() {
             onChange={(enabled) => void s.setSettings({ enabled }).then((m) => tell(m))}
           />
         </div>
-        <div className="review__row">
-          <span className="review__label">{t("읽기 전용")}</span>
-          <Switch
-            label={t("읽기 전용")}
-            on={ro}
-            onChange={(readonly) => void s.setSettings({ readonly })}
-          />
-        </div>
-        <div className="review__row">
-          <span className="review__label">{t("자동 저장")}</span>
-          <Switch
-            label={t("자동 저장")}
-            on={s.settings.autoSave}
-            onChange={(autoSave) => void s.setSettings({ autoSave })}
-          />
-        </div>
-        {s.settings.autoSave && (
-          <div className="review__row">
-            <span className="review__label">{t("저장 간격")}</span>
-            <NumberField
-              label={t("자동 저장 간격(분)")}
-              value={s.settings.autoSaveMinutes}
-              min={1}
-              max={1440}
-              unit={t("분")}
-              onCommit={(autoSaveMinutes) => void s.setSettings({ autoSaveMinutes })}
-            />
-          </div>
-        )}
-        <div className="review__row">
-          <span className="review__label">{t("칸 글자를 태그보다 먼저")}</span>
-          <Switch
-            label={t("칸 글자를 태그보다 먼저")}
-            on={s.settings.showBoardText}
-            onChange={(showBoardText) => void s.setSettings({ showBoardText })}
-          />
-        </div>
-        <div className="review__row">
-          <span className="review__label">{t("일괄 삭제 전에 묻기")}</span>
-          <Switch
-            label={t("일괄 삭제 전에 묻기")}
-            on={s.settings.confirmDeleteAll}
-            onChange={(confirmDeleteAll) => void s.setSettings({ confirmDeleteAll })}
-          />
+        <div className="panel__fold">
+          <Disclosure
+            id="db-options"
+            level={3}
+            title={t("옵션")}
+            summary={[ro ? t("읽기 전용") : null, s.settings.autoSave ? t("자동 저장") : null]
+              .filter(Boolean)
+              .join(" · ")}
+          >
+            <div className="review__row">
+              <span className="review__label">{t("읽기 전용")}</span>
+              <Switch
+                label={t("읽기 전용")}
+                on={ro}
+                onChange={(readonly) => void s.setSettings({ readonly })}
+              />
+            </div>
+            <div className="review__row">
+              <span className="review__label">{t("자동 저장")}</span>
+              <Switch
+                label={t("자동 저장")}
+                on={s.settings.autoSave}
+                onChange={(autoSave) => void s.setSettings({ autoSave })}
+              />
+            </div>
+            {s.settings.autoSave && (
+              <div className="review__row">
+                <span className="review__label">{t("저장 간격")}</span>
+                <NumberField
+                  label={t("자동 저장 간격(분)")}
+                  value={s.settings.autoSaveMinutes}
+                  min={1}
+                  max={1440}
+                  unit={t("분")}
+                  onCommit={(autoSaveMinutes) => void s.setSettings({ autoSaveMinutes })}
+                />
+              </div>
+            )}
+            <div className="review__row">
+              <span className="review__label">{t("칸 글자를 태그보다 먼저")}</span>
+              <Switch
+                label={t("칸 글자를 태그보다 먼저")}
+                on={s.settings.showBoardText}
+                onChange={(showBoardText) => void s.setSettings({ showBoardText })}
+              />
+            </div>
+            <div className="review__row">
+              <span className="review__label">{t("일괄 삭제 전에 묻기")}</span>
+              <Switch
+                label={t("일괄 삭제 전에 묻기")}
+                on={s.settings.confirmDeleteAll}
+                onChange={(confirmDeleteAll) => void s.setSettings({ confirmDeleteAll })}
+              />
+            </div>
+          </Disclosure>
         </div>
         <p className="panel__hint tnum" data-k="db-stored">
           {t("저장된 파일:")}{" "}
@@ -235,74 +252,6 @@ export function DatabaseScreen() {
           >
             {t("지금 저장")}
           </button>
-        </div>
-      </section>
-
-      <section className="panel" aria-label={t("DB 파일")}>
-        <h2 className="panel__title">{t("파일")}</h2>
-        <p className="panel__hint">
-          {t(
-            "데스크톱 · 앱의 rapfi.db 를 그대로 주고받습니다. CSV 는 엔진의 dbtotxt all 형식입니다.",
-          )}
-        </p>
-        <div className="panel__actions">
-          <button type="button" disabled={s.busy} onClick={() => fileInput.current?.click()}>
-            {t(".db 올리기")}
-          </button>
-          <button
-            type="button"
-            disabled={s.busy || (!s.stored && !on)}
-            onClick={() =>
-              void s.exportFile().then((r) => {
-                if ("error" in r) tell(r.error);
-                else downloadBlob(`rapfi-${stamp()}.db`, r.bytes, "application/octet-stream");
-              })
-            }
-          >
-            {t(".db 내려받기")}
-          </button>
-          <button
-            type="button"
-            disabled={!on || s.busy}
-            onClick={() =>
-              void s.exportCsv().then((r) => {
-                if ("error" in r) tell(r.error);
-                else downloadBlob(`rapfi-${stamp()}.csv`, r.bytes, "text/csv");
-              })
-            }
-          >
-            {t("CSV 내보내기")}
-          </button>
-          <button
-            type="button"
-            className="btn--danger"
-            disabled={s.busy || (!s.stored && !on)}
-            onClick={() =>
-              setConfirm({
-                text: t(
-                  "저장된 DB 파일을 지우고 빈 DB 로 시작합니다. 되돌릴 수 없습니다. 먼저 내려받아 두세요.",
-                ),
-                run: () => s.clearFile(),
-              })
-            }
-          >
-            {t("저장된 DB 지우기")}
-          </button>
-          <input
-            ref={fileInput}
-            type="file"
-            accept=".db,application/octet-stream"
-            hidden
-            onChange={(e) => {
-              const f = e.currentTarget.files?.[0];
-              e.currentTarget.value = "";
-              if (!f) return;
-              void f
-                .arrayBuffer()
-                .then((b) => s.importFile(new Uint8Array(b)))
-                .then((m) => tell(m, t("{name} 을(를) 가져왔습니다", { name: f.name })));
-            }}
-          />
         </div>
       </section>
 
@@ -503,65 +452,68 @@ export function DatabaseScreen() {
               </button>
             </div>
 
-            <h3 className="db__sub">{t("아래 분기 일괄 삭제")}</h3>
-            <div className="review__row">
-              <span className="review__label">{t("대상")}</span>
-              <select
-                aria-label={t("일괄 삭제 대상")}
-                value={scope.filter}
-                disabled={ro}
-                onChange={(e) => {
-                  const filter = e.currentTarget.value as DbDeleteScope["filter"];
-                  setScope((x) => ({ ...x, filter }));
-                }}
-              >
-                {DELETE_FILTERS.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {t(f.title)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {scope.filter !== "all" && (
-              <div className="review__row">
-                <span className="review__label">{t("하위 분기까지")}</span>
-                <Switch
-                  label={t("하위 분기까지")}
-                  on={scope.recursive}
-                  onChange={(recursive) => setScope((x) => ({ ...x, recursive }))}
-                  disabled={ro}
-                />
-              </div>
-            )}
-            {scope.filter === "wlinstep" && (
-              <div className="review__row">
-                <span className="review__label">{t("수")}</span>
-                <NumberField
-                  label={t("N수 이내")}
-                  value={scope.step}
-                  min={1}
-                  max={225}
-                  onCommit={(step) => setScope((x) => ({ ...x, step }))}
-                  disabled={ro}
-                />
-              </div>
-            )}
-            <div className="panel__actions">
-              <button
-                type="button"
-                className="btn--danger"
-                disabled={ro || s.busy}
-                onClick={() =>
-                  ask(
-                    t("이 국면 아래의 «{scope}»를 지웁니다. 되돌릴 수 없습니다.", {
-                      scope: deleteScopeTitle(scope),
-                    }),
-                    () => s.deleteAll(stones, scope),
-                  )
-                }
-              >
-                {t("일괄 삭제")}
-              </button>
+            <div className="panel__fold">
+              <Disclosure id="db-bulk" level={3} title={t("아래 분기 일괄 삭제")}>
+                <div className="review__row">
+                  <span className="review__label">{t("대상")}</span>
+                  <select
+                    aria-label={t("일괄 삭제 대상")}
+                    value={scope.filter}
+                    disabled={ro}
+                    onChange={(e) => {
+                      const filter = e.currentTarget.value as DbDeleteScope["filter"];
+                      setScope((x) => ({ ...x, filter }));
+                    }}
+                  >
+                    {DELETE_FILTERS.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {t(f.title)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {scope.filter !== "all" && (
+                  <div className="review__row">
+                    <span className="review__label">{t("하위 분기까지")}</span>
+                    <Switch
+                      label={t("하위 분기까지")}
+                      on={scope.recursive}
+                      onChange={(recursive) => setScope((x) => ({ ...x, recursive }))}
+                      disabled={ro}
+                    />
+                  </div>
+                )}
+                {scope.filter === "wlinstep" && (
+                  <div className="review__row">
+                    <span className="review__label">{t("수")}</span>
+                    <NumberField
+                      label={t("N수 이내")}
+                      value={scope.step}
+                      min={1}
+                      max={225}
+                      onCommit={(step) => setScope((x) => ({ ...x, step }))}
+                      disabled={ro}
+                    />
+                  </div>
+                )}
+                <div className="panel__actions">
+                  <button
+                    type="button"
+                    className="btn--danger"
+                    disabled={ro || s.busy}
+                    onClick={() =>
+                      ask(
+                        t("이 국면 아래의 «{scope}»를 지웁니다. 되돌릴 수 없습니다.", {
+                          scope: deleteScopeTitle(scope),
+                        }),
+                        () => s.deleteAll(stones, scope),
+                      )
+                    }
+                  >
+                    {t("일괄 삭제")}
+                  </button>
+                </div>
+              </Disclosure>
             </div>
           </>
         )}
@@ -572,6 +524,76 @@ export function DatabaseScreen() {
               : t("리뷰가 엔진을 쓰는 동안은 고칠 수 없습니다(읽기는 됩니다).")}
           </p>
         )}
+      </section>
+
+      <section className="panel" aria-label={t("DB 파일")}>
+        <h2
+          className="panel__title"
+          title={t(
+            "데스크톱 · 앱의 rapfi.db 를 그대로 주고받습니다. CSV 는 엔진의 dbtotxt all 형식입니다.",
+          )}
+        >
+          {t("파일")}
+        </h2>
+        <div className="panel__actions">
+          <button type="button" disabled={s.busy} onClick={() => fileInput.current?.click()}>
+            {t(".db 올리기")}
+          </button>
+          <button
+            type="button"
+            disabled={s.busy || (!s.stored && !on)}
+            onClick={() =>
+              void s.exportFile().then((r) => {
+                if ("error" in r) tell(r.error);
+                else downloadBlob(`rapfi-${stamp()}.db`, r.bytes, "application/octet-stream");
+              })
+            }
+          >
+            {t(".db 내려받기")}
+          </button>
+          <button
+            type="button"
+            disabled={!on || s.busy}
+            onClick={() =>
+              void s.exportCsv().then((r) => {
+                if ("error" in r) tell(r.error);
+                else downloadBlob(`rapfi-${stamp()}.csv`, r.bytes, "text/csv");
+              })
+            }
+          >
+            {t("CSV 내보내기")}
+          </button>
+          <button
+            type="button"
+            className="btn--danger"
+            disabled={s.busy || (!s.stored && !on)}
+            onClick={() =>
+              setConfirm({
+                text: t(
+                  "저장된 DB 파일을 지우고 빈 DB 로 시작합니다. 되돌릴 수 없습니다. 먼저 내려받아 두세요.",
+                ),
+                run: () => s.clearFile(),
+              })
+            }
+          >
+            {t("저장된 DB 지우기")}
+          </button>
+          <input
+            ref={fileInput}
+            type="file"
+            accept=".db,application/octet-stream"
+            hidden
+            onChange={(e) => {
+              const f = e.currentTarget.files?.[0];
+              e.currentTarget.value = "";
+              if (!f) return;
+              void f
+                .arrayBuffer()
+                .then((b) => s.importFile(new Uint8Array(b)))
+                .then((m) => tell(m, t("{name} 을(를) 가져왔습니다", { name: f.name })));
+            }}
+          />
+        </div>
       </section>
 
       {confirm && (

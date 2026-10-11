@@ -1,6 +1,8 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { router } from "./app/routes";
+// 본문 글꼴 — 번들 안의 Pretendard 가변 동적 서브셋(OFL-1.1). 근거는 core/design/tokens.ts.
+import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 import "./styles/tokens.css";
 import "./styles/base.css";
 // 저장된 엔진·분석 설정을 엔진 스토어로 흘려 둔다 — 설정 화면을 열지 않아도

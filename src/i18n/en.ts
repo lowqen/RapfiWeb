@@ -7,24 +7,14 @@
 export const EN: Readonly<Record<string, string>> = {
   // ── 앱 셸 — 메뉴 · 연구 탭 · 상단 바 ──
   보드: "Board",
-  "대국과 분석": "Play and analysis",
   연구: "Research",
-  "국면을 보드 밖에서 읽는다": "Study positions away from the board",
-  "yixindb 국면 저장소": "yixindb position store",
   엔진: "Engine",
-  "엔진 상태와 도구": "Engine status and tools",
   정석: "Joseki",
-  "오프닝 정석 노트": "Opening joseki notes",
   설정: "Settings",
-  "엔진 · 표시 · 고급": "Engine · display · advanced",
   "리뷰·증명": "Review·Prove",
-  "대국을 되짚고 수를 증명한다": "Review games and prove positions",
   오프닝: "Openings",
-  "주형과 빈도": "Patterns and frequency",
   수순: "Move order",
-  "같은 국면에 이르는 다른 길": "Other ways to reach the same position",
   랭킹: "Rankings",
-  "기록과 순위": "Records and rankings",
   "주 메뉴": "Main menu",
   "엔진: {s}": "Engine: {s}",
   "연구 하위 항목": "Research sections",
@@ -152,19 +142,13 @@ export const EN: Readonly<Record<string, string>> = {
   "정지하고 최선수를 둡니다": "Stop and play the best move",
   정지: "Stop",
   종료: "Shut down",
-  "분석 중": "Analyzing",
-  "분석 꺼짐": "Analysis off",
   "후보 {n}수": "{n} {n|candidate|candidates}",
-  "정지하면 최선수": "best move on stop",
   "빈 판의 천원이나 막아야만 하는 수처럼 정해진 자리라 깊이와 평가가 없습니다":
     "A forced point (like the center on an empty board or a must block), so there is no depth or eval",
   "즉답: 탐색 없이 정해진 수": "Instant: forced move without search",
   "후보 수순(PV)": "Candidate lines (PV)",
   "분석 설정": "Analysis settings",
   "무제한 = 정지할 때까지": "Unlimited = until you stop",
-  "YXNBEST: 1 이면 최선 수 하나만 깊게": "YXNBEST: 1 searches only the best move, deeper",
-  "정지하는 순간의 BEST 를 둡니다(빈 판은 H8)":
-    "Plays the BEST at the moment you stop (H8 on an empty board)",
   없음: "None",
   "평가 바": "Evaluation bar",
   "평가 없음": "No evaluation",
@@ -267,8 +251,6 @@ export const EN: Readonly<Record<string, string>> = {
   "결과가 난 판이 없습니다": "No decided games",
   "파일 고르기": "Choose file",
   "RenjuNet 기보로 통계 만들기": "Build statistics from RenjuNet games",
-  "세계 렌주 대국 약 12만 판으로 오프닝마다 몇 판이 두어졌고 흑이 얼마나 이겼는지, 어떤 개시가 많이 쓰이는지를 봅니다. 파일은 한 번만 넣으면 됩니다.":
-    "About 120,000 renju games from around the world show how often each opening was played, how well Black scored, and which openings are popular. You only need to add the file once.",
   "{link}에서 {xml} 버튼을 눌러 기보 파일(약 43MB)을 받습니다. 옆의 [XML.GZ] 는 압축본이라 읽지 못합니다.":
     "On the {link}, press the {xml} button to download the games file (about 43 MB). The [XML.GZ] next to it is compressed and cannot be read.",
   "renju.net 기보 화면": "renju.net games page",
@@ -277,8 +259,6 @@ export const EN: Readonly<Record<string, string>> = {
   "몇 초 뒤 랭킹과 오프닝 통계가 열립니다. 다음부터는 바로 뜹니다.":
     "Rankings and opening statistics open a few seconds later. After that they load instantly.",
   "renju.net 열기": "Open renju.net",
-  "파일과 만든 통계는 {here} 남고 어디로도 보내지 않습니다. RenjuNet 자료는 비상업 · 오프라인 사용만 허락되어 있어, 앱이 대신 받아 오거나 통계를 미리 실어 둘 수 없습니다.":
-    "The file and the statistics stay {here} and are never sent anywhere. RenjuNet data is licensed for non commercial offline use only, so the app cannot download it for you or ship the statistics.",
   "이 브라우저 안에만": "in this browser only",
   자료: "Data",
   "내 기보": "My games",
@@ -410,8 +390,6 @@ export const EN: Readonly<Record<string, string>> = {
   "깊이 예산은 시간 한도가 없어 국면마다 오래 걸릴 수 있습니다.":
     "A depth budget has no time limit, so each position can take a while.",
   "{n}초 × 국면 수만큼 걸립니다.": "Takes {n}s × the number of positions.",
-  실행: "Run",
-  "리뷰 중: 엔진을 리뷰가 쓰고 있습니다": "Reviewing: the review is using the engine",
   "지금 판 리뷰": "Review current game",
   "기보 파일 추가": "Add game files",
   "큐 시작": "Start queue",
@@ -426,8 +404,6 @@ export const EN: Readonly<Record<string, string>> = {
   "{name} 빼기": "Remove {name}",
   "끝난 것 걷어내기 ({n})": "Clear finished ({n})",
   "{n}건": "{n}",
-  "아직 리포트가 없습니다. 「지금 판 리뷰」나 기보 파일로 큐를 돌리면 여기에 쌓입니다.":
-    "No reports yet. Run “Review current game” or queue game files and they will appear here.",
   "리포트 목록": "Reports",
   "흑 {b} / 백 {w}": "Black {b} / White {w}",
 
@@ -600,9 +576,6 @@ export const EN: Readonly<Record<string, string>> = {
   패: "L",
   소진: "out",
   "국면 증명": "Position proof",
-  "증명 중: 엔진을 증명이 쓰고 있습니다": "Proving: the proof is using the engine",
-  "지금 판에서 둘 차례({side})의 승리를 엔진이 모는 AND/OR 탐색으로 증명하거나 반증합니다. 메이트만 결론으로 칩니다. 높은 승률은 증거일 뿐입니다.":
-    "Proves or disproves a win for the side to move ({side}) with an engine driven AND/OR search. Only mates count as conclusions. A high score is just evidence.",
   "데이터베이스(읽기 전용)를 먼저 묻습니다. 결론은 적지 않습니다.":
     "Asks the database (read only) first. Conclusions are not written.",
   "데이터베이스를 먼저 묻고, 증명된 메이트를 데이터베이스에 적습니다.":
@@ -742,8 +715,6 @@ export const EN: Readonly<Record<string, string>> = {
   붙음: "attached",
   "붙이는 중…": "attaching…",
   "붙이지 못함": "attach failed",
-  "엔진이 국면마다 증명된 승패 · 값 · 주석을 쌓는 데이터베이스입니다. 파일은 이 브라우저(IndexedDB)에 두고, 엔진이 뜰 때 엔진 메모리에 올립니다.":
-    "A database where the engine stores proven results, values and comments for each position. The file lives in this browser (IndexedDB) and is loaded into engine memory when the engine starts.",
   "저장하지 않은 변경은 엔진을 다시 띄우면 사라집니다.":
     "Unsaved changes are lost when the engine restarts.",
   "자동 저장을 켜 두거나 «지금 저장»을 누르세요.": "Turn on auto save or press “Save now”.",
@@ -865,8 +836,6 @@ export const EN: Readonly<Record<string, string>> = {
   "설정 초기화": "Reset settings",
   "대국은 그대로입니다": "The game is kept",
   "설정 검색": "Search settings",
-  "즉시 반영": "applies now",
-  "기동할 때 반영": "applies at startup",
   "「{q}」에 맞는 설정이 없습니다.": "No settings match “{q}”.",
   "고급 설정": "Advanced settings",
   "해시 · 스타일 · 깊이 · 노드 · 표시": "Hash · style · depth · nodes · display",
@@ -1125,8 +1094,6 @@ export const EN: Readonly<Record<string, string>> = {
   "응징: {move}": "Refutation: {move}",
   "이 정석을 레슨으로 넣은 커리큘럼 파일을 만듭니다. 배포는 저장소 커밋으로만 됩니다.":
     "Builds a curriculum file with this joseki as a lesson. Publishing happens only through a repository commit.",
-  "전문가가 차례를 정해 만든 오프닝 정석입니다. 살펴보기로 수순마다의 해설과 나쁜 수 · 함정의 갈래를 읽고, 학습으로 수순을 직접 맞히며 따라 둡니다. 진도는 이 브라우저에 남습니다.":
-    "Opening joseki arranged step by step by experts. Explore to read the commentary on every move and the branches with bad moves and traps; Learn to play the sequence yourself and guess each move. Progress is kept in this browser.",
   정답: "Correct",
   "정답 · 다른 좋은 수": "Correct · another good move",
   "정석 보기": "Joseki view",
@@ -1149,4 +1116,36 @@ export const EN: Readonly<Record<string, string>> = {
     "Lesson “{id}” was not found. Pick one from the list below.",
   "이 레슨의 링크입니다. 복사해 쓰세요": "This is the link to the lesson. Copy it.",
   "링크를 복사했습니다": "Link copied",
+  // ── UI 개편(calm-design) — 한 줄 안내 · 펼침 머리 · 엔진 수치 ──
+  "「분석」을 누르면 엔진이 이 국면의 최선수를 찾습니다":
+    "Press “Analyze” and the engine looks for the best move here",
+  노드: "Nodes",
+  속도: "Speed",
+  최선수: "Best move",
+  "세부 수치": "Details",
+  "세부 수치 접기": "Hide details",
+  "1 이면 최선수 하나만 깊게 읽습니다": "With 1, only the best move is searched, deeper",
+  "정지하는 순간의 최선수를 둡니다(빈 판은 H8)":
+    "Plays the best move at the moment you stop (H8 on an empty board)",
+  "엔진이 증명한 승패 · 값 · 주석을 국면마다 쌓아 둡니다. 파일은 이 브라우저에 남습니다.":
+    "Keeps proven results, values and notes for each position. The file stays in this browser.",
+  옵션: "Options",
+  "자료 출처": "Data sources",
+  "증명 중": "Proving",
+  "증명 설정": "Proof settings",
+  "지금 판에서 {side}의 승리를 증명하거나 반증합니다. 메이트만 결론으로 칩니다.":
+    "Proves or refutes a win for {side} from this position. Only a forced mate counts as a result.",
+  "대국 리뷰": "Game review",
+  "리뷰 중": "Reviewing",
+  "엔진이 수마다 좋은 수와 실수를 가려 정확도를 매깁니다.":
+    "The engine grades every move and scores each side's accuracy.",
+  "깊이 {n}": "Depth {n}",
+  "첫 5수 건너뜀": "First 5 moves skipped",
+  "리뷰한 대국이 여기에 쌓입니다.": "Reviewed games appear here.",
+  "세계 렌주 대국 약 12만 판으로 오프닝 통계와 랭킹을 봅니다. 파일은 한 번만 넣으면 됩니다.":
+    "See opening statistics and rankings from about 120,000 world renju games. You only add the file once.",
+  "받는 방법": "How to get the file",
+  "파일과 통계는 {here} 남습니다.": "The file and statistics stay {here}.",
+  "보드로 가기": "Go to the board",
+  "본문 글꼴": "Body typeface",
 };

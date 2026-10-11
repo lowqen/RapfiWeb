@@ -17,7 +17,7 @@ import { RifImportLayer } from "../features/research/rif/RifImportLayer";
 export function AppShell() {
   const { pathname } = useLocation();
   const compact = useIsCompact();
-  const { title, subtitle } = titleFor(pathname);
+  const { title } = titleFor(pathname);
   const inResearch = pathname.startsWith("/research");
   // 앱이 뜨면 엔진을 뒤에서 띄운다 — 셸은 화면을 옮겨도 남으므로 한 번만 돈다.
   useAutoBoot();
@@ -26,7 +26,7 @@ export function AppShell() {
     <div className="shell" data-compact={compact || undefined}>
       {!compact && <NavRail />}
       <div className="shell__main">
-        <TopBar title={title} subtitle={subtitle} />
+        <TopBar title={title} />
         {inResearch && <ResearchTabs />}
         <main className="shell__content">
           <Outlet />

@@ -309,8 +309,8 @@ try {
   // 총계로 그려 노드가 튀었고, `TOTALTIME` 을 몰라 시간이 조각(0.5초) 안에서만 돌았다.
   // 0.5초 간격으로 여덟 번 읽어 단조 증가와 0.5초 천장 돌파를 본다.
   const pg = page; // 닫힘 안에서는 null 좁히기가 풀린다
-  const tile = (k: string) =>
-    pg.locator(".stat", { has: pg.locator(`dt:text-is("${k}")`) }).locator("dd");
+  // 화면 이름(«시간» · «노드»)이 아니라 data-k 로 집는다 — 세부 수치는 접혀 있어도 값은 돈다.
+  const tile = (k: string) => pg.locator(`.stat[data-k="${k}"] dd`);
   const readNum = (t: string): number => {
     const s = t.trim();
     const mmss = /^(\d+):(\d{2})$/.exec(s);
@@ -323,8 +323,8 @@ try {
   const samples: { t: number; n: number }[] = [];
   for (let i = 0; i < 8; i++) {
     samples.push({
-      t: readNum(await tile("TIME").innerText()),
-      n: readNum(await tile("NODE").innerText()),
+      t: readNum(await tile("time").innerText()),
+      n: readNum(await tile("nodes").innerText()),
     });
     await page.waitForTimeout(500);
   }
