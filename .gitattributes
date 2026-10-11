@@ -1,2 +1,6 @@
+# 저장소의 글은 모두 LF 다(Prettier 의 endOfLine 기본값과 같다). Windows 에서 core.autocrlf=true 로 받으면
+# 작업 트리가 CRLF 가 되어 로컬 `prettier --check` 만 빨갛게 났다(CI 는 깨끗한데) — 어느 OS 에서 받아도 LF 로.
+* text=auto eol=lf
+
 # upstream 패치는 git apply 가 줄 끝까지 맞춰 읽는다 — 어느 OS 에서 받아도 LF 로.
 *.patch text eol=lf
