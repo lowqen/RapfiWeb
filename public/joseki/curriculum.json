@@ -1,12 +1,12 @@
 {
   "format": "rapfiweb-curriculum",
   "schema": 1,
-  "version": "2026.10.11-sample",
+  "version": "2026.10.12",
   "courses": [
     {
       "id": "renju-opening-basics",
       "title": { "ko": "렌주 개시 첫걸음 (예시)", "en": "Renju opening basics (sample)" },
-      "level": "beginner",
+      "level": "intermediate",
       "summary": {
         "ko": "첫 세 수의 개시 규칙과 직접 · 간접 개시, 대표 주형을 따라 두며 익힙니다. 이 코스는 커리큘럼 기능을 보여 주는 **예시**입니다. 깊은 정석 해설은 관리자가 채웁니다.",
         "en": "Learn the opening rules for the first three moves, direct and indirect openings, and two well known shapes by playing them. This course is a **sample** that shows the curriculum feature; in depth commentary is added by the maintainer."
@@ -19,7 +19,7 @@
             "ko": "흑이 되어 1수와 3수를 둡니다.",
             "en": "Play Black's first and third moves."
           },
-          "quiz": { "side": "black" },
+          "quiz": { "side": "white" },
           "root": {
             "move": null,
             "comment": {
@@ -29,7 +29,6 @@
             "children": [
               {
                 "move": { "x": 7, "y": 7 },
-                "mark": "!",
                 "comment": {
                   "ko": "천원 h8. 렌주의 첫 수는 판의 한가운데입니다.",
                   "en": "The center, h8. The first move of renju is always the middle of the board."
@@ -37,6 +36,7 @@
                 "children": [
                   {
                     "move": { "x": 7, "y": 6 },
+                    "mark": "!",
                     "comment": {
                       "ko": "백이 천원에 가로 · 세로로 붙였습니다(h9): **직접 개시**. 이제 흑의 3수입니다.",
                       "en": "White touches the center orthogonally (h9): a **direct opening**. Now Black plays move 3."
@@ -69,6 +69,16 @@
                         "children": []
                       }
                     ]
+                  },
+                  {
+                    "move": { "x": 8, "y": 6 },
+                    "comment": "",
+                    "children": []
+                  },
+                  {
+                    "move": { "x": 8, "y": 8 },
+                    "comment": "",
+                    "children": []
                   }
                 ]
               },
@@ -193,6 +203,36 @@
                           "ko": "3수는 천원 둘레 5×5 안에 둡니다. m13 은 그 밖입니다.",
                           "en": "Move 3 must be inside the 5×5 square around the center. m13 is outside it."
                         },
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "new-lesson",
+          "title": { "ko": "직접 개시 화월", "en": "d" },
+          "summary": { "ko": "흑이 되어 화월을 만듭니다.", "en": "d" },
+          "quiz": { "side": "black" },
+          "root": {
+            "move": null,
+            "comment": { "ko": "흑이 되어 직접 개시의 **화월**을 만들어 봅니다.", "en": "d" },
+            "children": [
+              {
+                "move": { "x": 7, "y": 7 },
+                "comment": { "ko": "천원 h8", "en": "d" },
+                "children": [
+                  {
+                    "move": { "x": 7, "y": 6 },
+                    "comment": { "ko": "직접막기", "en": "d" },
+                    "children": [
+                      {
+                        "move": { "x": 8, "y": 6 },
+                        "mark": "!",
+                        "comment": { "ko": "**화월**(IHogetsu)입니다.", "en": "d" },
                         "children": []
                       }
                     ]
