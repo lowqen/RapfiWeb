@@ -1,15 +1,17 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import { AppShell } from "./AppShell";
 import { BoardScreen } from "../features/board/BoardScreen";
-import { EngineScreen } from "../features/engine/EngineScreen";
-import { SettingsScreen } from "../features/settings/SettingsScreen";
-import { DatabaseScreen } from "../features/database/DatabaseScreen";
-import { JosekiScreen } from "../features/joseki/JosekiScreen";
-import { CurriculumStudio } from "../features/joseki/studio/CurriculumStudio";
-import { OpeningExplorer } from "../features/research/OpeningExplorer";
-import { ReviewScreen } from "../features/research/review/ReviewScreen";
-import { SequenceScreen } from "../features/research/sequence/SequenceScreen";
-import { RankingScreen } from "../features/research/ranking/RankingScreen";
+import {
+  CurriculumStudio,
+  DatabaseScreen,
+  EngineScreen,
+  JosekiScreen,
+  OpeningExplorer,
+  RankingScreen,
+  ReviewScreen,
+  SequenceScreen,
+  SettingsScreen,
+} from "./screens";
 
 /**
  * 아홉 화면. 계획서 §6 의 라우트 표를 그대로 옮긴 것이다.
