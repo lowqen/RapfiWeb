@@ -161,5 +161,44 @@ export function colorsForTag(p: TagPalette, kind: TagKind, winRatePct?: number):
   }
 }
 
+/**
+ * 보드 위 **글자만**의 색(UI 개편 2차) — 동그라미(칩)를 걷고 글자만 판 위에 쓴다. 데스크톱 Yixin 의 판
+ * 위 숫자와 같은 읽기다: 승률 · DB 값 · 정석 기호 모두.
+ *
+ * 칩이 없으니 위의 «명도 사다리»(어두운 채움 + 흰 글자)는 쓸 수 없다 — 글자 자체가 색을 져야 한다.
+ * 그래서 이쪽은 **색상**이 값을 진다: 지는 파랑 → 막상막하 초록 → 노랑 · 주황 → 이기는 빨강. 두 극은
+ * 데스크톱 `winrate2colorstr` 그대로(이기면 빨강), 0% 쪽은 청록에서 파랑까지 내려 L(확정 패)과 짝이 맞는다.
+ * 순서는 위와 같은 `ratePosition` 이 정하므로 설정의 다섯 색 값(가파르기 · 밝기)이 그대로 먹는다.
+ *
+ * 밝은 채움 + 어두운 외곽선(`TAG_OUTLINE`)이라 나무 · 다크 판 · 돌 그림자 어디에 앉아도 읽힌다.
+ */
+export interface TagText {
+  ink: string;
+  outline: string;
+}
+
+export const TAG_OUTLINE = "#140F0A";
+
+const hslHex = (h: number, s: number, l: number): string => {
+  const k = (n: number) => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number) => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
+  const c = (v: number) =>
+    Math.round(v * 255)
+      .toString(16)
+      .padStart(2, "0");
+  return `#${c(f(0))}${c(f(8))}${c(f(4))}`.toUpperCase();
+};
+
+/** 사다리 위치(0 = 짐 … 1 = 이김) → 색상(240° 파랑 … 0° 빨강). */
+export const textHue = (position: number): number => (1 - clamp(position, 0, 1)) * 240;
+
+export function textForTag(p: TagPalette, kind: TagKind, winRatePct?: number): TagText {
+  const light = 0.62 * clamp(p.value / 100, 0.6, 1);
+  const hue =
+    kind === "win" ? 0 : kind === "lose" ? 220 : textHue(ratePosition(p, winRatePct ?? 50));
+  return { ink: hslHex(hue, 0.95, light), outline: TAG_OUTLINE };
+}
+
 /** 흰 글씨가 이 칩 위에서 4.5:1 을 넘는가. 시험이 사다리 전 구간에서 확인한다. */
 export const inkContrast = (fillHex: string): number => contrastRatio(WHITE, hexToRgb(fillHex));

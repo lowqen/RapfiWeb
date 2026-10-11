@@ -11,6 +11,9 @@ import {
   winPosition,
   losePosition,
   LADDER_STOPS,
+  textForTag,
+  textHue,
+  TAG_OUTLINE,
 } from "./ladder";
 import { luminanceOf } from "../design/oklch";
 import { label, moveKey, fromKey } from "../model/move";
@@ -176,3 +179,41 @@ describe("값 사다리", () => {
     expect(floorLit.fill).toBe(at40.fill);
   });
 });
+
+describe("판 위 글자 색(칩 없이 글자만)", () => {
+  const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+
+  it("확정 승은 빨강, 확정 패는 파랑 — 데스크톱 Yixin 의 양극", () => {
+    const [wr, , wb] = rgb(textForTag(DEFAULT_PALETTE, "win").ink);
+    const [lr, , lb] = rgb(textForTag(DEFAULT_PALETTE, "lose").ink);
+    expect(wr).toBeGreaterThan(200);
+    expect(wb).toBeLessThan(120);
+    expect(lb).toBeGreaterThan(200);
+    expect(lr).toBeLessThan(120);
+  });
+
+  it("승률이 오를수록 색상이 파랑(240°)에서 빨강(0°)으로 한 방향으로 간다", () => {
+    let prev = Infinity;
+    for (let pct = 0; pct <= 100; pct += 5) {
+      const hue = textHue(ratePosition(DEFAULT_PALETTE, pct));
+      expect(hue).toBeLessThanOrEqual(prev + 1e-9);
+      prev = hue;
+    }
+    expect(textHue(ratePosition(DEFAULT_PALETTE, 50))).toBeCloseTo(120); // 막상막하 = 초록
+  });
+
+  it("글자는 밝고 외곽선은 어둡다 — 나무 위에서 읽히게", () => {
+    for (const pct of [0, 25, 50, 75, 100]) {
+      const ink = textForTag(DEFAULT_PALETTE, "rate", pct).ink;
+      expect(luminanceOf(rgbOf(ink))).toBeGreaterThan(luminanceOf(rgbOf(TAG_OUTLINE)) + 0.15);
+    }
+  });
+});
+
+function rgbOf(hex: string) {
+  return {
+    r: parseInt(hex.slice(1, 3), 16) / 255,
+    g: parseInt(hex.slice(3, 5), 16) / 255,
+    b: parseInt(hex.slice(5, 7), 16) / 255,
+  };
+}

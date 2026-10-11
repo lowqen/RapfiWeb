@@ -30,8 +30,9 @@ import { t } from "../../i18n/i18n";
  * 탭은 `boardStore.place` 가 아니라 **`gameStore.tap`** 으로 간다. 그래야
  * 금수·차례·협상 단계·탭(모드)이 한 곳에서 판단된다 — 보드는 여전히 규칙을 모른다.
  *
- * **배치.** 왼쪽 칸은 위에서부터 탭 + 퀵 액션 바 · 평가 바와 보드 · 이동 바다. 판과 기보는
- * 두 탭이 함께 쓰고, 오른쪽 칸(좁은 세로 화면에서는 아래)만 탭마다 바뀐다:
+ * **배치.** 왼쪽 칸은 평가 바와 보드뿐이라 판이 화면 높이를 다 쓴다. 오른쪽 칸은 위에서부터
+ * 탭 + 퀵 액션 바 · 카드 · 이동 바다(좁은 세로 화면에서는 판 밑으로 이동 바 · 탭 · 카드). 판과
+ * 기보는 두 탭이 함께 쓰고, 카드만 탭마다 바뀐다:
  *
  *   - **대국**: 대국 카드(엔진 상태 · 「지금 두기」 · 흑/백 · 시간 · 레벨 · 스레드 · 개시)
  *     → 국면(기권 · 무승부). 판에 분석 오버레이(값 칩 · 최선수 링 · 고스트)를 얹지 않는다.
@@ -124,31 +125,31 @@ export function BoardScreen() {
 
   return (
     <div className="boardscreen" data-evalbar={showEvalBar || undefined} data-mode={mode}>
-      <div className="boardscreen__stage">
-        <div className="stagebar">
-          <ModeTabs />
-          <QuickActions />
+      {/* 판은 왼쪽 칸의 높이를 다 쓴다 — 판 위아래에 조작 줄을 두지 않는다. 탭 · 새 판은 오른쪽
+          칸 맨 위(`stagebar`), 기보 이동은 오른쪽 칸 맨 아래(`transport`)다. 휴대폰 세로에서는
+          판 → 이동 바 → 탭 · 새 판 → 카드 순으로 쌓인다(base.css 의 grid-template-areas). */}
+      <div
+        className="boardscreen__board"
+        data-drop={dropping || undefined}
+        onDragOver={onDragOver}
+        onDragLeave={() => setDropping(false)}
+        onDrop={onDrop}
+      >
+        {/* 평가 바와 판을 한 줄로 — 판은 바 몫을 뺀 정사각형이고, 바는 판과 같은
+            높이다(CSS 의 컨테이너 단위). 둘을 묶어 가운데 둔다. */}
+        <div className="boardrow">
+          {showEvalBar && <EvalBar empty={render.stones.length === 0} />}
+          <BoardCanvas render={render} onTap={onTap} onLongPress={markBlocked} keyboard />
         </div>
-        <div
-          className="boardscreen__board"
-          data-drop={dropping || undefined}
-          onDragOver={onDragOver}
-          onDragLeave={() => setDropping(false)}
-          onDrop={onDrop}
-        >
-          {/* 평가 바와 판을 한 줄로 — 판은 바 몫을 뺀 정사각형이고, 바는 판과 같은
-              높이다(CSS 의 컨테이너 단위). 둘을 묶어 가운데 둔다. */}
-          <div className="boardrow">
-            {showEvalBar && <EvalBar empty={render.stones.length === 0} />}
-            <BoardCanvas render={render} onTap={onTap} onLongPress={markBlocked} keyboard />
-          </div>
-          {notice && (
-            <p className="board-notice" role="status">
-              {notice}
-            </p>
-          )}
-        </div>
-        <MoveTransport />
+        {notice && (
+          <p className="board-notice" role="status">
+            {notice}
+          </p>
+        )}
+      </div>
+      <div className="stagebar">
+        <ModeTabs />
+        <QuickActions />
       </div>
 
       <aside
@@ -172,6 +173,7 @@ export function BoardScreen() {
           </>
         )}
       </aside>
+      <MoveTransport />
     </div>
   );
 }

@@ -2,13 +2,14 @@ import type { Move } from "../model/move";
 import { moveKey } from "../model/move";
 import { boardGeometry, starPoints, type BoardGeometry } from "./board-geometry";
 import type { BoardSkin } from "./board-skin";
-import {
-  colorsForTag,
-  DEFAULT_PALETTE,
-  type TagColors,
-  type TagKind,
-  type TagPalette,
-} from "./ladder";
+import { DEFAULT_PALETTE, textForTag, type TagKind, type TagPalette, type TagText } from "./ladder";
+import { FONT_STACKS } from "../design/tokens";
+
+/**
+ * 판 위 글자의 글꼴 — 캔버스의 `ctx.font` 는 CSS 변수(`var(--font-sans)`)를 풀지 못해 예전에는 모든
+ * 판 글자(좌표 · 돌 번호 · 값)가 조용히 `10px sans-serif` 로 떨어졌다. 글꼴 이름을 그대로 넣는다.
+ */
+const FONT = FONT_STACKS.sans;
 
 /**
  * 한 프레임에 필요한 전부 — 순수 데이터. `BoardRender` 의 이식본이다.
@@ -92,7 +93,7 @@ function drawWood(ctx: CanvasRenderingContext2D, g: BoardGeometry, skin: BoardSk
  */
 function drawLabels(ctx: CanvasRenderingContext2D, g: BoardGeometry, skin: BoardSkin): void {
   ctx.fillStyle = skin.label;
-  ctx.font = `${g.step * 0.36}px var(--font-sans, sans-serif)`;
+  ctx.font = `${g.step * 0.3}px ${FONT}`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   for (let i = 0; i < g.n; i++) {
@@ -178,7 +179,7 @@ function drawStone(
   if (number) {
     ctx.globalAlpha = alpha;
     ctx.fillStyle = black ? skin.whiteHigh : skin.blackLow;
-    ctx.font = `${r * 0.88}px var(--font-sans, sans-serif)`;
+    ctx.font = `600 ${r * 0.88}px ${FONT}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(number, cx, cy);
@@ -187,12 +188,9 @@ function drawStone(
 }
 
 /**
- * 한 교점의 값 칩: 사다리에서 온 불투명한 채움과 그 위의 글자.
- * 링은 없다 — 채움만으로 나무에서 충분히 떨어지고, 백 번 그려진 링은 그것이
- * 숨기려던 잡음 그 자체다. 다크 보드만 예외고, 그 이유는 `BoardSkin.chipRim` 에 있다.
- *
- * 확정 승패는 **굵게** 그린다. `W5` 와 `63%` 의 차이가 그것이다 — 하나는 사실이고
- * 하나는 숫자다.
+ * 한 교점의 값 — **글자만**(UI 개편 2차). 예전의 동그라미 칩을 걷어 판 위에 승률 · DB 값 · 정석 기호를
+ * 글자로만 쓴다(데스크톱 Yixin 처럼). 색은 `textForTag`(색상이 값), 어두운 외곽선이 나무 위에서 글자를
+ * 띄운다. 글자는 한 칸 폭을 넘지 않게 줄인다 — 옆 칸 글자와 붙지 않게.
  */
 function drawTag(
   ctx: CanvasRenderingContext2D,
@@ -200,25 +198,26 @@ function drawTag(
   cx: number,
   cy: number,
   text: string,
-  colors: TagColors,
+  colors: TagText,
   textScale: number,
-  rim: string | null,
 ): void {
-  const r = g.radius;
-  ctx.fillStyle = colors.fill;
-  circle(ctx, cx, cy, r * 0.82);
-  ctx.fill();
-  if (rim) {
-    ctx.strokeStyle = rim;
-    ctx.lineWidth = g.hair * 1.3;
-    ctx.stroke();
-  }
   const scale = Math.min(1.4, Math.max(0.6, textScale));
-  ctx.fillStyle = colors.ink;
-  // 앉아 있는 점보다 넓어지지 않는다 — 설정이 아무리 커도.
-  ctx.font = `${colors.bold ? "700 " : ""}${r * (text.length >= 4 ? 0.62 : 0.78) * scale}px var(--font-sans, sans-serif)`;
+  let size = g.radius * (text.length >= 4 ? 0.8 : text.length === 3 ? 0.9 : 1.05) * scale;
+  ctx.font = `800 ${size}px ${FONT}`;
+  // 외곽선까지 한 칸의 84% 안 — 옆 칸 글자와 틈이 남는다(«87%83%» 처럼 붙지 않게).
+  const room = g.step * 0.84;
+  const width = ctx.measureText(text).width * 1.2;
+  if (width > room) {
+    size *= room / width;
+    ctx.font = `800 ${size}px ${FONT}`;
+  }
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
+  ctx.lineJoin = "round";
+  ctx.lineWidth = Math.max(2, size * 0.2);
+  ctx.strokeStyle = colors.outline;
+  ctx.strokeText(text, cx, cy);
+  ctx.fillStyle = colors.ink;
   ctx.fillText(text, cx, cy);
 }
 
@@ -285,24 +284,6 @@ export function drawDynamic(
     if (render.tags.get(key)?.label) corner.push([m, mark]);
     else drawMark(ctx, cx(m), cy(m), r * 0.62, mark, skin.line, hair);
   }
-  for (const [key, tag] of render.tags) {
-    if (!tag.label || occupied.has(key)) continue;
-    const m = fromKey(key, render.size);
-    drawTag(
-      ctx,
-      g,
-      cx(m),
-      cy(m),
-      tag.label,
-      colorsForTag(render.palette, tag.kind, tag.winRatePct),
-      render.textScale,
-      skin.chipRim,
-    );
-  }
-  for (const [m, mark] of corner) {
-    drawMark(ctx, cx(m) + r * 0.62, cy(m) - r * 0.62, r * 0.34, mark, skin.line, hair);
-  }
-
   render.stones.forEach((m, i) => {
     drawStone(ctx, g, cx(m), cy(m), i % 2 === 0, render.showNumbers ? String(i + 1) : "", 1, skin);
   });
@@ -338,6 +319,25 @@ export function drawDynamic(
       skin,
     );
   });
+
+  // 값 글자는 고스트 **위**에 — 칩을 걷고 글자만 남긴 뒤로는 반투명 고스트가 글자를 덮어 흐려졌다
+  // (최선수 칸에는 늘 PV 의 첫 고스트가 앉는다). 외곽선이 있어 고스트 위에서도 읽힌다.
+  for (const [key, tag] of render.tags) {
+    if (!tag.label || occupied.has(key)) continue;
+    const m = fromKey(key, render.size);
+    drawTag(
+      ctx,
+      g,
+      cx(m),
+      cy(m),
+      tag.label,
+      textForTag(render.palette, tag.kind, tag.winRatePct),
+      render.textScale,
+    );
+  }
+  for (const [m, mark] of corner) {
+    drawMark(ctx, cx(m) + r * 0.62, cy(m) - r * 0.62, r * 0.34, mark, skin.line, hair);
+  }
 
   // 최선수: 어두운 후광 위의 밝은 링. 맨 나무 위에 앉는 만큼 어두운 값 칩 위에도
   // 앉으므로 둘 다에서 살아남아야 한다.

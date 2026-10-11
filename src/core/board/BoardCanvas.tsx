@@ -88,9 +88,13 @@ export function BoardCanvas({
     observer.observe(root, { attributes: true, attributeFilter: ["data-theme"] });
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     mq.addEventListener("change", reread);
+    // 본문 글꼴(Pretendard)이 늦게 도착하면 판 글자를 그 글꼴로 다시 그린다 — 스킨을 새로 읽으면
+    // 두 레이어가 다시 그려진다.
+    document.fonts?.addEventListener("loadingdone", reread);
     return () => {
       observer.disconnect();
       mq.removeEventListener("change", reread);
+      document.fonts?.removeEventListener("loadingdone", reread);
     };
   }, []);
 

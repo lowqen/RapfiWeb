@@ -404,34 +404,48 @@ a:focus-visible {
 .shell__content:has(> .boardscreen) {
   overflow: hidden;
 }
+/*
+ * 판이 주인공이다(UI 개편 2차). 왼쪽 칸에는 평가 바와 판**만** 둔다 — 판이 칸의 높이를 그대로
+ * 받는다. 탭 · 새 판(`stagebar`)은 오른쪽 칸 맨 위, 카드는 가운데(스크롤), 기보 이동(`transport`)은
+ * 맨 아래. 예전에는 판 위아래의 두 줄(40 + 52px)이 판에서 높이를 빼 갔다(1440×900 에서 판 ~710px →
+ * 이제 ~810px).
+ */
 .boardscreen {
-  /* 보드 밑 이동 바의 높이. 세로 화면에서 보드 높이를 셈할 때도 쓴다. */
+  /* 이동 바 · 퀵 바의 높이. 세로 화면에서 판 높이를 셈할 때 쓴다. */
   --transport-h: 52px;
+  --quickbar-h: 40px;
+  /* 휴대폰 세로에서 판 밑에 남겨 둘 카드 몫 — 국면 요약 줄과 첫 카드의 머리가 보이게. */
+  --side-peek: 150px;
 
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(260px, 28vw, 360px);
-  grid-template-rows: minmax(0, 1fr);
-  gap: var(--space-xl);
+  grid-template-columns: minmax(0, 1fr) clamp(300px, 27vw, 380px);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "board bar"
+    "board side"
+    "board nav";
+  gap: var(--space-m) var(--space-xl);
   height: 100%;
   min-height: 0;
   container-type: size;
 }
-/* 왼쪽 칸 = 퀵 바 + 보드 + 이동 바. 셋 다 높이가 정해진 한 줄짜리라 판의 크기를
-   셈할 수 있다 — 그 밖의 것은 **넣지 않는다**(BoardScreen 주석). */
-.boardscreen__stage {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-s);
-  min-width: 0;
-  min-height: 0;
-}
 .boardscreen__board {
   position: relative;
-  flex: 1 1 auto;
+  grid-area: board;
   min-width: 0;
   min-height: 0;
   /* 판과 평가 바의 크기를 이 칸 기준으로 잰다(아래 `--board-side`). */
   container-type: size;
+}
+.boardscreen > .stagebar {
+  grid-area: bar;
+}
+.boardscreen > .boardscreen__side {
+  grid-area: side;
+}
+.boardscreen > .transport {
+  grid-area: nav;
+  border-top: 1px solid var(--c-outline-variant);
 }
 /* 기보 파일을 끌어 오는 동안 — 놓을 수 있는 곳이라는 표시. */
 .boardscreen__board[data-drop] {
@@ -442,7 +456,7 @@ a:focus-visible {
 /* 평가 바 몫. 바를 끄면 0 이 되어 판이 그만큼 커진다. */
 .boardscreen {
   --evalbar-w: 28px;
-  --evalbar-gap: var(--space-m);
+  --evalbar-gap: var(--space-s);
   --evalbar-space: 0px;
 }
 .boardscreen[data-evalbar] {
@@ -477,25 +491,32 @@ a:focus-visible {
   scrollbar-width: thin;
   scrollbar-color: var(--c-outline-variant) transparent;
 }
-/* 세로로 긴 좁은 화면(휴대폰 세로·좁은 창): 보드와 이동 바 위, 옆 칸 아래.
-   보드는 너비를 다 쓰되 (남은 높이의 60% − 이동 바)를 넘지 않는다. */
+/* 세로로 긴 좁은 화면(휴대폰 세로 · 태블릿 세로): 판이 너비를 다 쓰고, 그 밑으로 이동 바 · 탭 ·
+   카드. 판은 (너비, 남은 높이 − 이동 바 − 퀵 바 − 카드 몫) 중 작은 쪽. */
 @media (max-width: 1024px) and (orientation: portrait) {
   .boardscreen {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
-    gap: var(--space-l);
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+    grid-template-areas:
+      "board"
+      "nav"
+      "bar"
+      "side";
+    gap: var(--space-s);
   }
   .boardscreen__board {
-    flex: none;
     width: 100%;
     height: min(
       100cqw - var(--evalbar-space),
-      60cqh - var(--transport-h) - var(--quickbar-h) - var(--space-s)
+      100cqh - var(--transport-h) - var(--quickbar-h) - var(--side-peek)
     );
+  }
+  .boardscreen > .transport {
+    border-top: 0;
   }
 }
 /* 휴대폰 세로 — 판을 화면 끝까지. 바깥 여백을 걷고(옆 칸만 제 여백을 둔다), 평가 바는 숫자 없는
-   가는 띠(6px)로 줄이고, 판이 남은 높이의 70% 까지 쓴다. 예전 390 폭에서 판 332px → 380px 안팎. */
+   가는 띠(6px)로 줄인다. */
 @media (max-width: 640px) and (orientation: portrait) {
   .shell__content:has(> .boardscreen) {
     padding: var(--space-s) 0 0;
@@ -503,13 +524,6 @@ a:focus-visible {
   .boardscreen {
     --evalbar-w: 6px;
     --evalbar-gap: 2px;
-    gap: var(--space-m);
-  }
-  .boardscreen__board {
-    height: min(
-      100cqw - var(--evalbar-space),
-      70cqh - var(--transport-h) - var(--quickbar-h) - var(--space-s)
-    );
   }
   .boardscreen .evalbar {
     border-radius: 0 2px 2px 0;
@@ -517,8 +531,12 @@ a:focus-visible {
   .boardscreen .evalbar__label {
     display: none;
   }
+  .boardscreen__side,
+  .boardscreen > .stagebar {
+    padding: 0 var(--space-m);
+  }
   .boardscreen__side {
-    padding: 0 var(--space-m) var(--space-m);
+    padding-bottom: var(--space-m);
   }
 }
 
@@ -526,9 +544,6 @@ a:focus-visible {
    보드 위 — 새 판 · 진영 전환. 분석·무르기·되돌리기는 이동 바(아래)의 몫이라 두지
    않는다. 이동 바와 같은 면 위의 알약 버튼이되 이름을 적는다. 버튼이 둘뿐이라 휴대폰
    폭에서도 한 줄에 들어간다 — 줄을 넘기면 판이 그만큼 작아지므로 한 줄을 지킨다. */
-.boardscreen {
-  --quickbar-h: 40px;
-}
 .quickbar {
   display: flex;
   flex: none;
@@ -1873,20 +1888,21 @@ a:focus-visible {
 }
 
 /* ── 보드 탭 · 엔진 표시 · 형세 그래프 ────────────────────────────────
-   탭은 퀵 액션 바와 **한 줄**에 선다 — 줄이 하나 늘면 그만큼 판이 작아진다
-   (`--quickbar-h` 가 판의 높이 셈에 들어간다). */
+   탭은 퀵 액션 바와 **한 줄**에 서서 오른쪽 칸 맨 위에 붙는다(판 위에는 아무것도 없다). 휴대폰
+   세로에서는 이동 바 밑이고, 그때는 줄이 하나 늘면 그만큼 판이 작아진다(`--quickbar-h`). */
 .stagebar {
   display: flex;
   flex: none;
-  gap: var(--space-l);
+  gap: var(--space-m);
   align-items: center;
-  justify-content: safe center;
+  justify-content: space-between;
   min-width: 0;
-  height: var(--quickbar-h);
+  min-height: var(--quickbar-h);
 }
 .stagebar .quickbar {
   /* 줄어들 수 있어야 안에서 스크롤한다 — `flex: none` 이면 본문을 옆으로 밀어낸다(W10 360px 영어). */
   flex: 0 1 auto;
+  justify-content: safe flex-end;
   min-width: 0;
 }
 .modetabs {
@@ -2283,20 +2299,50 @@ a:focus-visible {
   aspect-ratio: 1;
   margin: 0 auto;
 }
-/* 넓은 화면은 보드 화면처럼 판 왼쪽 · 읽을 것 오른쪽. 판은 첫 화면 높이에 맞춘다. */
+/* 넓은 화면은 보드 화면처럼 판 왼쪽 · 읽을 것 오른쪽. 판 밑의 이동 단추는 오른쪽 칸 맨 위로 옮겨
+   (`display: contents` 로 stage 를 풀어 grid 자리를 준다) 판이 첫 화면 높이를 다 쓴다. */
 @media (min-width: 1024px) {
   .explorer {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
+    grid-template-columns: minmax(0, 1fr) clamp(320px, 27vw, 400px);
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "board nav"
+      "board side";
+    column-gap: var(--space-xl);
     align-items: start;
-    max-width: 1280px;
+    max-width: none;
   }
   .explorer__stage {
-    position: sticky;
-    top: 0;
+    display: contents;
   }
   .explorer__board {
-    width: min(100%, calc(100dvh - 220px));
+    position: sticky;
+    top: 0;
+    grid-area: board;
+    /* 화면 높이 − 상단 바 · 연구 탭 · 바깥 여백. */
+    width: min(100%, calc(100dvh - 150px));
+  }
+  .explorer__nav {
+    grid-area: nav;
+    justify-content: flex-start;
+  }
+  .explorer__side {
+    grid-area: side;
+  }
+}
+/* 휴대폰 세로 — 판을 화면 끝까지, 읽을 것만 제 여백. */
+@media (max-width: 640px) and (orientation: portrait) {
+  .shell__content:has(> .explorer) {
+    padding-right: 0;
+    padding-left: 0;
+  }
+  .explorer__board {
+    width: 100%;
+  }
+  .explorer__nav,
+  .explorer__side {
+    padding: 0 var(--space-m);
   }
 }
 .explorer__nav {
@@ -2709,7 +2755,7 @@ button.theory__row:hover {
   border-radius: var(--radius-m);
 }
 .sequence__board {
-  width: min(100%, 60vh);
+  width: min(100%, calc(100dvh - 160px));
   margin: 0 auto;
 }
 .moboard {
@@ -2861,8 +2907,9 @@ button.theory__row:hover {
   opacity: 0.8;
   word-break: break-word;
 }
+/* 카드 안의 판(증명 · DB · 내 정석) — 카드 폭을 다 쓰되 한 화면 높이를 넘지 않는다. */
 .prove__board {
-  width: min(100%, 52vh);
+  width: min(100%, calc(100dvh - 160px));
   aspect-ratio: 1;
   margin: var(--space-l) auto 0;
 }
