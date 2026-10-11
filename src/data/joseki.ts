@@ -12,8 +12,6 @@ export async function listJoseki(d: RapfiDb): Promise<JosekiTree[]> {
   return d.joseki.orderBy("updatedAt").reverse().toArray();
 }
 
-export const getJoseki = (d: RapfiDb, id: string) => d.joseki.get(id);
-
 export async function putJoseki(d: RapfiDb, t: JosekiTree): Promise<void> {
   await d.transaction("rw", d.joseki, d.josekiIndex, async () => {
     await d.joseki.put(t);

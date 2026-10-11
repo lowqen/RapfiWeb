@@ -166,8 +166,6 @@ export function winRateAt(d: ReviewData, index: number, n = maxIndex(d)): number
   return p ?? q ?? 0.5;
 }
 
-export const hasAnyRecord = (d: ReviewData): boolean => d.records.some(isRecorded);
-
 // ── 판정기 ───────────────────────────────────────────────────────────
 
 const EPS = 1e-9;

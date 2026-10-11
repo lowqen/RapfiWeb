@@ -35,8 +35,6 @@ export const RULE_LABEL: Readonly<Record<RuleName, string>> = localized({
   swap2: msg("스왑2"),
 });
 
-export const isSupported = (rule: RuleName): boolean => SUPPORTED_RULES.includes(rule);
-
 /**
  * 지원하지 않는 규칙을 고를 때 보여 줄 문장.
  *

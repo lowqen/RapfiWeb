@@ -93,8 +93,9 @@ const ILLEGAL_OPENING = msg(
 
 /** 지금 물어보고 있는 것. 데스크톱의 대화상자 하나에 대응한다. */
 function Prompt() {
-  const g = useGameStore();
-  const p = g.prompt;
+  // 물음만 구독한다 — 스토어 통째로 구독하면 대국 로그 한 줄 · 생각 시작/끝마다 다시 그렸다. 동작은 바뀌지 않는다.
+  const p = useGameStore((s) => s.prompt);
+  const g = useGameStore.getState();
   if (!p) return null;
 
   switch (p.kind) {

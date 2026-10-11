@@ -303,8 +303,7 @@ export function setRole<N extends TreeNode<N>>(root: N, path: Path, role: Joseki
   });
 }
 
-/** 경로에서 한 걸음 — 앞으로는 주 변화, 뒤로는 부모. */
-export const stepBack = (path: Path): number[] => path.slice(0, -1);
+/** 경로에서 한 걸음 앞으로 — 주 변화. */
 export function stepForward<N extends TreeNode<N>>(root: N, path: Path): number[] {
   const n = nodeAt(root, path);
   return n && n.children.length > 0 ? [...path, 0] : [...path];
