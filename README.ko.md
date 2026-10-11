@@ -139,7 +139,8 @@ pnpm dev          # http://localhost:5173
 | `pnpm build` | 토큰 · 타입 검사 · 프로덕션 빌드(`dist/`) |
 | `pnpm preview` | 프로덕션 빌드를 로컬에서 띄운다 |
 | `pnpm test` | 단위 시험(Vitest) |
-| `pnpm check` | 타입 검사 · 린트 · 시험 · 빌드를 CI 순서로 |
+| `pnpm check` | 타입 검사 · 린트 · 시험 · 서식 · 빌드 — CI 가 보는 것 그대로(tsc · ESLint · Prettier 는 캐시를 남겨 두 번째부터 빠르다) |
+| `pnpm check:quick` | 커밋 직전용: 타입 · 린트 · 서식, 그리고 바뀐 파일에 걸린 시험만(전부는 CI 가 돈다) |
 | `pnpm engine:build` | WASM 엔진을 소스에서 다시 빌드(리눅스 x86_64, Emscripten) |
 
 Cloudflare Pages 배포는 [`deploy.yml`](.github/workflows/deploy.yml) 이 자동으로 한다. 처음 한 번의 설정은

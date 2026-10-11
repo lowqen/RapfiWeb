@@ -24,6 +24,9 @@
     /* scripts/ 는 tsx 로 직접 돌아가므로 .ts 확장자를 붙여 import 한다. */
     "allowImportingTsExtensions": true,
     "noEmit": true,
+    /* 두 번째 검사부터는 바뀐 파일만 다시 본다 — 정보 파일은 node_modules/.cache(커밋되지 않는다). */
+    "incremental": true,
+    "tsBuildInfoFile": "./node_modules/.cache/tsc/tsconfig.tsbuildinfo",
     /* baseUrl 없이 tsconfig 기준 상대 경로로 — TypeScript 6 은 baseUrl 을 폐기 예정으로 막는다(TS5101). */
     "paths": {
       "~/*": ["./src/*"]

@@ -150,7 +150,8 @@ Without `rapfi.data` the UI still runs; the engine indicator simply reports an e
 | `pnpm build` | Tokens, type check, production build into `dist/` |
 | `pnpm preview` | Serve the production build locally |
 | `pnpm test` | Unit tests (Vitest) |
-| `pnpm check` | Type check, lint, test and build, in CI order |
+| `pnpm check` | Type check, lint, test, format check and build: what CI checks (tsc, ESLint and Prettier keep caches, so repeat runs are fast) |
+| `pnpm check:quick` | Before a commit: type check, lint, format, and only the tests affected by your changes (CI still runs everything) |
 | `pnpm engine:build` | Rebuild the WASM engine from source (Linux x86_64, Emscripten) |
 
 Deployment to Cloudflare Pages is automated by [`deploy.yml`](.github/workflows/deploy.yml);
