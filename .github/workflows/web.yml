@@ -48,7 +48,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
 
       # 공급망 감사(보안 강화 계획 Phase 2) — 배포 번들에 들어가는 의존성(--prod)에 high 이상 권고가 있으면
@@ -112,7 +112,7 @@ jobs:
     outputs:
       engine: ${{ steps.engine.outputs.present }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
 
       # 타입 검사는 정적 검사 잡이 한다 — `pnpm build` 의 tsc 를 여기서 또 돌리지 않는다.
@@ -222,7 +222,7 @@ jobs:
               pnpm exec tsx scripts/rif-smoke.ts
               pnpm exec tsx scripts/i18n-smoke.ts
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
         with:
           playwright: "true"

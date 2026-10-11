@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # 러너에 이미 JDK 가 있지만 버전을 고정해 둔다 — 부동소수 결과가 JDK 버전에
       # 좌우되지는 않지만, 재현할 때 무엇으로 돌렸는지는 남아야 한다.
