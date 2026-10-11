@@ -25,7 +25,7 @@ import { useGameStore } from "../../board/gameStore";
 import { PackSourceBar, RifImportCard, WdlBar } from "../rif/RifParts";
 import { fmtInt } from "../rif/format";
 import { activePack, useRifStore } from "../rif/rifStore";
-import { MiniBoard } from "./MiniBoard";
+import { MiniBoard } from "../../../components/MiniBoard";
 import { langOf, msg, pick, t } from "../../../i18n/i18n";
 
 /**

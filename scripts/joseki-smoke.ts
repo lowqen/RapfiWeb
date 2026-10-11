@@ -51,7 +51,11 @@ const check = (cond: boolean, good: string, bad: string) => (cond ? ok(good) : f
 
 /** 정석 판의 칸(열 x · 행 y, 위에서부터)을 누른다. */
 async function tap(page: Page, x: number, y: number) {
-  const view = await page.locator(".jboardbox .board__view").boundingBox();
+  // 내 정석 편집기의 판, 또는 공식 레슨의 판(체스닷컴 구조 — 왼쪽 큰 판).
+  const view = await page
+    .locator(".jboardbox .board__view, .lesson__board .board__view")
+    .first()
+    .boundingBox();
   if (!view) throw new Error("정석 판이 없습니다");
   const step = view.width / 15.5;
   await page.mouse.click(view.x + step * (0.75 + x), view.y + step * (0.75 + y));
@@ -212,10 +216,14 @@ try {
   await page.goto(`${BASE}/joseki`);
   await page.locator('[data-tab="official"]').click();
   await page.locator('[data-k="curriculum"]').waitFor();
+  // 목록 → 코스(썸네일 카드) → 레슨. 코스 머리에는 「시작」이 있다.
+  await page.locator('[data-k="curriculum"] .card[data-course]').first().click();
+  await page.locator('[data-k="course"]').waitFor();
   check(
-    (await page.locator(".lessonlist__item").count()) >= 3,
-    "코스 · 레슨 목록(배포 파일)",
-    "레슨 목록이 비었다",
+    (await page.locator(".lessonlist__item").count()) >= 3 &&
+      (await page.locator('[data-k="course-start"]').count()) === 1,
+    "코스 · 레슨 목록(배포 파일) · 「시작」",
+    "레슨 목록이나 「시작」이 없다",
   );
   await page.locator('.lessonlist__item[data-lesson="first-three-moves"]').click();
   await page.locator('[data-k="lesson"]').waitFor();
@@ -241,12 +249,13 @@ try {
   await tap(page, 6, 6); // g9 — 정답, 끝
   const done = await page.locator('[data-k="quiz-done"]').innerText();
   check(done.includes("50점"), `학습 끝: ${done.replace(/\s+/g, " ")}`, `학습 끝: ${done}`);
-  await page.getByRole("button", { name: /코스 목록/ }).click();
+  await page.getByRole("button", { name: "코스로 돌아가기" }).click();
+  await page.locator('[data-k="course"]').waitFor();
   check(
     (await page.locator('.lessonlist__item[data-lesson="first-three-moves"]').innerText()).includes(
       "최고 50점",
     ),
-    "진도가 목록에 남는다",
+    "진도가 코스의 레슨 카드에 남는다",
     "진도가 없다",
   );
 
@@ -273,18 +282,25 @@ try {
     "모드를 바꾸면 주소도 바뀐다(기록은 늘리지 않음)",
     `주소: ${page.url()}`,
   );
-  await page.getByRole("button", { name: /코스 목록/ }).click();
-  await page.locator('[data-k="curriculum"]').waitFor();
-  check(new URL(page.url()).search === "", "목록으로 가면 주소의 레슨이 빠진다", page.url());
+  await page.getByRole("button", { name: "코스로 돌아가기" }).click();
+  await page.locator('[data-k="course"]').waitFor();
+  check(
+    new URL(page.url()).search.startsWith("?course="),
+    "레슨의 ← 는 그 코스로(주소의 레슨이 빠지고 코스가 남는다)",
+    page.url(),
+  );
   await page.locator('.lessonlist__item[data-lesson="hogetsu-shape"]').click();
   await page.locator('[data-k="lesson"][data-lesson="hogetsu-shape"]').waitFor();
   await page.goBack();
-  await page.locator('[data-k="curriculum"]').waitFor();
+  await page.locator('[data-k="course"]').waitFor();
   check(
     (await page.locator('[data-k="lesson"]').count()) === 0,
-    "브라우저 «뒤로»가 코스 목록으로",
-    "뒤로가 목록으로 가지 않았다",
+    "브라우저 «뒤로»가 한 층 위(코스)로",
+    "뒤로가 코스로 가지 않았다",
   );
+  await page.getByRole("button", { name: "커리큘럼으로 돌아가기" }).click();
+  await page.locator('[data-k="curriculum"]').waitFor();
+  check(new URL(page.url()).search === "", "코스의 ← 는 목록으로(주소가 빈다)", page.url());
   await page.goto(`${BASE}/joseki?lesson=no-such-lesson`);
   await page.locator('[data-k="lesson-missing"]').waitFor();
   ok("없는 레슨 id 는 알리고 목록을 보인다");

@@ -75,7 +75,7 @@ const ROUTES: readonly { path: string; prepare?: (p: Page) => Promise<void> }[] 
   { path: "/research/ranking" },
   { path: "/database" },
   { path: "/engine" },
-  // 정석은 [공식 커리큘럼] 탭으로 연다 — 코스 목록, 레슨의 살펴보기 · 학습, 그리고 [내 정석]의 편집기.
+  // 정석은 [공식 커리큘럼] 탭으로 연다 — 코스 목록, 코스, 레슨의 살펴보기 · 학습, 그리고 [내 정석]의 편집기.
   {
     path: "/joseki",
     prepare: async (p) => {
@@ -87,6 +87,15 @@ const ROUTES: readonly { path: string; prepare?: (p: Page) => Promise<void> }[] 
     path: "/joseki",
     prepare: async (p) => {
       await p.locator('[data-tab="official"]').click();
+      await p.locator(".card[data-course]").first().click();
+      await p.locator('[data-k="course"]').waitFor({ timeout: 5000 });
+    },
+  },
+  {
+    path: "/joseki",
+    prepare: async (p) => {
+      await p.locator('[data-tab="official"]').click();
+      await p.locator(".card[data-course]").first().click();
       await p.locator(".lessonlist__item").first().click();
       await p.locator('[data-k="lesson"]').waitFor({ timeout: 5000 });
       await p.locator(".jtree__move").first().click();
@@ -96,6 +105,7 @@ const ROUTES: readonly { path: string; prepare?: (p: Page) => Promise<void> }[] 
     path: "/joseki",
     prepare: async (p) => {
       await p.locator('[data-tab="official"]').click();
+      await p.locator(".card[data-course]").first().click();
       await p.locator(".lessonlist__item").first().click();
       await p.locator('[role="tab"][data-mode="learn"]').click();
       await p.locator('[data-k="quiz"]').waitFor({ timeout: 5000 });

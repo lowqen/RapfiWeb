@@ -1064,7 +1064,6 @@ export const EN: Readonly<Record<string, string>> = {
     "curriculum.json downloaded. Put it in public/joseki/, run pnpm test, then commit.",
   "{a} / {b}수": "{a} of {b} {b|move|moves}",
   "{a}/{b} 레슨": "{a}/{b} {b|lesson|lessons}",
-  "{side} 차례입니다": "{side} to move",
   "갈래 쓰임": "Branch role",
   "검증 실패: 형식이 맞지 않습니다": "Validation failed: wrong format",
   고급: "Advanced",
@@ -1105,7 +1104,6 @@ export const EN: Readonly<Record<string, string>> = {
   "커리큘럼을 받는 중입니다…": "Loading the curriculum…",
   코스: "Course",
   "코스 id": "Course id",
-  "코스 목록": "Courses",
   "코스 제목": "Course title",
   학습: "Learn",
   학습자: "Learner",
@@ -1148,4 +1146,12 @@ export const EN: Readonly<Record<string, string>> = {
   "파일과 통계는 {here} 남습니다.": "The file and statistics stay {here}.",
   "보드로 가기": "Go to the board",
   "본문 글꼴": "Body typeface",
+  // ── 정석 커리큘럼 — 체스닷컴 구조(목록 · 코스 · 레슨) ──
+  "정해진 차례대로 오프닝 정석을 배웁니다": "Learn opening joseki in a set order",
+  시작: "Start",
+  "이어서 배우기": "Continue",
+  "처음부터 다시": "Start over",
+  "커리큘럼으로 돌아가기": "Back to the curriculum",
+  레슨: "Lessons",
+  "코스로 돌아가기": "Back to the course",
 };

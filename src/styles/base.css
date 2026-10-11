@@ -494,6 +494,33 @@ a:focus-visible {
     );
   }
 }
+/* 휴대폰 세로 — 판을 화면 끝까지. 바깥 여백을 걷고(옆 칸만 제 여백을 둔다), 평가 바는 숫자 없는
+   가는 띠(6px)로 줄이고, 판이 남은 높이의 70% 까지 쓴다. 예전 390 폭에서 판 332px → 380px 안팎. */
+@media (max-width: 640px) and (orientation: portrait) {
+  .shell__content:has(> .boardscreen) {
+    padding: var(--space-s) 0 0;
+  }
+  .boardscreen {
+    --evalbar-w: 6px;
+    --evalbar-gap: 2px;
+    gap: var(--space-m);
+  }
+  .boardscreen__board {
+    height: min(
+      100cqw - var(--evalbar-space),
+      70cqh - var(--transport-h) - var(--quickbar-h) - var(--space-s)
+    );
+  }
+  .boardscreen .evalbar {
+    border-radius: 0 2px 2px 0;
+  }
+  .boardscreen .evalbar__label {
+    display: none;
+  }
+  .boardscreen__side {
+    padding: 0 var(--space-m) var(--space-m);
+  }
+}
 
 /* ── 퀵 액션 바 ─────────────────────────────────────────────────────
    보드 위 — 새 판 · 진영 전환. 분석·무르기·되돌리기는 이동 바(아래)의 몫이라 두지
@@ -3706,8 +3733,190 @@ button.theory__row:hover {
 .josekiscreen__tabs {
   align-self: flex-start;
 }
+/* 코스 · 레슨 안에서는 두 탭을 숨긴다 — 그 화면의 ← 가 길잡이다. */
+.josekiscreen:has(.lesson, .cur--course) .josekiscreen__tabs {
+  display: none;
+}
+
+/* ── 정석 커리큘럼 — 체스닷컴 레슨 구조(목록 · 코스 · 레슨) ─────────────────
+   목록: 그림 · 제목 · 한 줄의 머리 + 썸네일 카드. 코스: 큰 썸네일 · 제목 · 설명 · 「시작」 + 레슨
+   카드. 레슨: 판 + 오른쪽 칸(머리 · 탭 · 코치 말풍선 · 바닥). 내용은 관리자가 채운다. */
+.cur {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-l);
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+}
+.cur__hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s);
+  align-items: center;
+  padding: var(--space-l) 0 var(--space-m);
+  text-align: center;
+}
+.cur__art {
+  width: 112px;
+  height: auto;
+  margin-bottom: var(--space-s);
+}
+.cur__title {
+  font: var(--type-headline-medium);
+  letter-spacing: var(--track-headline-medium);
+}
+.cur__lead {
+  font: var(--type-body-medium);
+  color: var(--c-on-surface-variant);
+}
+.cur__notice {
+  padding: var(--space-m) var(--space-l);
+  font: var(--type-body-small);
+  color: var(--c-on-error-container);
+  background: var(--c-error-container);
+  border-radius: var(--radius-m);
+}
+.cur__empty {
+  padding: var(--space-xxl);
+  font: var(--type-body-medium);
+  color: var(--c-on-surface-variant);
+  text-align: center;
+}
+.cur__bar {
+  display: flex;
+  gap: var(--space-s);
+  align-items: center;
+  margin-left: calc(-1 * var(--space-s));
+}
+.cur__crumb {
+  font: var(--type-label-large);
+  color: var(--c-on-surface-variant);
+}
+
+/* 그림 — 판 · 돌 토큰으로 칠한다(다크에서도 같은 결). 코치 얼굴도 같은 돌을 쓴다. */
+.books__a {
+  fill: var(--c-board-wood);
+}
+.books__b {
+  fill: var(--c-board-wood-edge);
+}
+.books__c {
+  fill: var(--c-board-line);
+}
+.books__page {
+  fill: var(--c-board-white-high);
+  opacity: 0.85;
+}
+.books__black {
+  fill: var(--c-board-black-low);
+}
+.books__white {
+  fill: var(--c-board-white-high);
+  stroke: var(--c-board-white-rim);
+  stroke-width: 1;
+}
+
+/* 썸네일 카드 — 왼쪽 판 그림, 가운데 제목 · 메타 · 두 줄 요약, 오른쪽 꺾쇠. */
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  gap: var(--space-l);
+  align-items: center;
+  width: 100%;
+  padding: var(--space-l);
+  overflow: hidden;
+  text-align: left;
+  background: var(--c-card);
+  border: 1px solid var(--c-outline-variant);
+  border-radius: var(--radius-l);
+  transition:
+    background var(--motion-quick) ease-out,
+    border-color var(--motion-quick) ease-out;
+}
+.card:hover {
+  background: var(--c-card-hover);
+  border-color: var(--c-outline);
+}
+.card__thumb {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-s);
+}
+.card__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s);
+  min-width: 0;
+}
+.card__title {
+  font: var(--type-title-medium);
+  letter-spacing: var(--track-title-medium);
+  color: var(--c-on-surface);
+}
+.card__num {
+  color: var(--c-on-surface-variant);
+}
+.card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-m);
+  align-items: center;
+  font: var(--type-label-medium);
+  color: var(--c-on-surface-variant);
+}
+.card__text {
+  display: -webkit-box;
+  overflow: hidden;
+  font: var(--type-body-small);
+  line-height: 1.5;
+  color: var(--c-on-surface-variant);
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.card__text:empty {
+  display: none;
+}
+.card__done {
+  display: inline-flex;
+  gap: var(--space-xs);
+  align-items: center;
+  font: var(--type-label-medium);
+  color: var(--c-positive);
+}
+.card__check {
+  width: 16px;
+  height: 16px;
+}
+.card__chev {
+  width: 20px;
+  height: 20px;
+  color: var(--c-on-surface-variant);
+}
+/* 코스 진도 — 카드 바닥의 가는 막대. */
+.card__meter {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: var(--c-surface-container-high);
+}
+.card__meter > span {
+  display: block;
+  height: 100%;
+  background: var(--c-secondary);
+}
 .course__level {
-  margin-left: var(--space-s);
   padding: 1px var(--space-m);
   font: var(--type-label-small);
   color: var(--c-on-secondary-container);
@@ -3718,57 +3927,329 @@ button.theory__row:hover {
   color: var(--c-on-tertiary-container);
   background: var(--c-tertiary-container);
 }
-.lessonlist {
+
+/* 코스 머리 — 체스닷컴 코스 페이지의 큰 그림 + 제목 + 「시작」. 그림 자리는 첫 레슨의 수순. */
+.coursehero {
   display: grid;
-  gap: var(--space-s);
-  margin: var(--space-m) 0 0;
-  padding: 0;
-  list-style: none;
-  counter-reset: lesson;
-}
-.lessonlist__item {
-  display: grid;
-  gap: 2px;
-  width: 100%;
-  min-height: 44px;
-  padding: var(--space-m) var(--space-l);
-  text-align: left;
-  background: transparent;
+  grid-template-columns: 184px minmax(0, 1fr);
+  gap: var(--space-xl);
+  align-items: start;
+  padding: var(--space-xl);
+  background: var(--c-card);
   border: 1px solid var(--c-outline-variant);
+  border-radius: var(--radius-l);
+}
+.coursehero__art .miniboard {
+  width: 100%;
+  height: auto;
   border-radius: var(--radius-m);
+}
+.coursehero__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-m);
+  min-width: 0;
+}
+.coursehero__top {
+  display: flex;
+  gap: var(--space-l);
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.coursehero__title {
+  font: var(--type-headline-medium);
+  letter-spacing: var(--track-headline-medium);
+}
+.coursehero__summary {
+  font: var(--type-body-medium);
+  line-height: 1.6;
+  color: var(--c-on-surface-variant);
+}
+.coursehero__summary p + p {
+  margin-top: var(--space-s);
+}
+@media (max-width: 640px) {
+  .coursehero {
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--space-l);
+  }
+  .coursehero__art {
+    width: 152px;
+    margin: 0 auto;
+  }
+  .coursehero__top {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* 큰 주 행동 — 체스닷컴의 초록 「시작 · 연습」 단추. 바닥에 한 단 진한 그늘로 눌리는 결. */
+.cta {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 var(--space-xxl);
+  font: var(--type-title-medium);
+  color: var(--c-on-secondary);
+  background: var(--c-secondary);
+  border-radius: var(--radius-m);
+  box-shadow: inset 0 -3px 0 rgb(0 0 0 / 0.18);
+  transition: filter var(--motion-quick) ease-out;
+}
+.cta:hover {
+  filter: brightness(1.08);
+}
+.cta:active {
+  box-shadow: inset 0 -1px 0 rgb(0 0 0 / 0.18);
+  transform: translateY(1px);
+}
+.ghostbtn {
+  min-height: 40px;
+  padding: 0 var(--space-l);
+  font: var(--type-label-large);
+  color: inherit;
+  border-radius: var(--radius-m);
+}
+.ghostbtn:hover {
+  background: rgb(0 0 0 / 0.06);
+}
+/* 아이콘만 있는 둥근 단추 — 뒤로 · 링크 · 수 이동. 이름은 aria-label 이 진다. */
+.iconbtn {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  color: var(--c-on-surface-variant);
+  border-radius: 50%;
   transition: background var(--motion-quick) ease-out;
 }
-.lessonlist__item:hover {
-  background: var(--c-card-hover);
+.iconbtn .icon {
+  width: 22px;
+  height: 22px;
 }
-.lessonlist__item[data-done] {
-  border-color: var(--c-positive);
+.iconbtn:hover:not(:disabled) {
+  color: var(--c-on-surface);
+  background: var(--c-surface-container);
 }
-.lessonlist__title {
-  font: var(--type-title-small);
+.iconbtn:disabled {
+  color: var(--c-outline-variant);
+  cursor: default;
+}
+.iconbtn[data-copied] {
+  color: var(--c-positive);
+}
+
+/* 레슨 — 넓은 화면: 판(왼쪽, 남은 높이에 맞춘 정사각형) + 오른쪽 칸. 좁은 화면: 위아래. */
+.lesson {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-l);
+}
+.lesson__stage {
+  container-type: inline-size;
+  min-width: 0;
+}
+.lesson__board {
+  width: 100%;
+  aspect-ratio: 1;
+  margin: 0 auto;
+}
+@media (min-width: 900px) {
+  .shell__content:has(.lesson) {
+    overflow: hidden;
+  }
+  .josekiscreen:has(.lesson) {
+    height: 100%;
+  }
+  .lesson {
+    display: grid;
+    flex: 1;
+    grid-template-columns: minmax(0, 1fr) clamp(320px, 32vw, 420px);
+    gap: var(--space-xl);
+    min-height: 0;
+  }
+  .lesson__stage {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+    container-type: size;
+  }
+  .lesson__board {
+    width: min(100cqw, 100cqh);
+    height: min(100cqw, 100cqh);
+    aspect-ratio: auto;
+  }
+}
+@media (max-width: 640px) {
+  .shell__content:has(.lesson) {
+    padding: var(--space-s) 0 var(--space-m);
+  }
+  .lessonpanel {
+    margin: 0 var(--space-m);
+  }
+}
+
+.lessonpanel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--c-card);
+  border: 1px solid var(--c-outline-variant);
+  border-radius: var(--radius-l);
+}
+.lessonpanel__head {
+  display: flex;
+  gap: var(--space-s);
+  align-items: center;
+  padding: var(--space-m) var(--space-l) var(--space-m) var(--space-s);
+  border-bottom: 1px solid var(--c-outline-variant);
+}
+.lessonpanel__titles {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+.lessonpanel__crumb,
+.lessonpanel__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lessonpanel__crumb {
+  font: var(--type-label-medium);
+  color: var(--c-on-surface-variant);
+}
+.lessonpanel__title {
+  font: var(--type-title-medium);
+  letter-spacing: var(--track-title-medium);
+}
+.lessonpanel__best {
+  flex: none;
+  font: var(--type-label-medium);
+  color: var(--c-positive);
+}
+/* 모드 탭 — 체스닷컴 «연습 | 학습» 처럼 반반, 고른 쪽에 밑줄. */
+.lessontabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: 1px solid var(--c-outline-variant);
+}
+.lessontabs__tab {
+  min-height: 44px;
+  margin-bottom: -1px;
+  font: var(--type-label-large);
+  color: var(--c-on-surface-variant);
+  border-bottom: 2px solid transparent;
+  transition: color var(--motion-quick) ease-out;
+}
+.lessontabs__tab:hover {
   color: var(--c-on-surface);
 }
-.lessonlist__title::before {
-  content: counter(lesson) ". ";
-  counter-increment: lesson;
+.lessontabs__tab[aria-selected="true"] {
+  font-weight: 600;
+  color: var(--c-on-surface);
+  border-bottom-color: var(--c-secondary);
 }
-.lessonlist__meta {
-  font: var(--type-body-small);
+.lessonpanel__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-l);
+  min-height: 0;
+  padding: var(--space-l);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* 코치 말풍선 — 왼쪽 얼굴(돌 두 알), 오른쪽 꼬리 달린 풍선. 머리에 둘 차례 돌 · 짧은 상황. */
+.coach {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: var(--space-m);
+  align-items: start;
+}
+.coach__avatar {
+  width: 44px;
+  height: 44px;
+}
+.coach__bg {
+  fill: var(--c-surface-container-high);
+}
+.coach__bubble {
+  --bubble: light-dark(var(--c-surface-container-low), var(--c-surface-container-highest));
+  position: relative;
+  min-width: 0;
+  padding: var(--space-m) var(--space-l) var(--space-l);
+  font: var(--type-body-medium);
+  line-height: 1.6;
+  background: var(--bubble);
+  border-radius: var(--radius-l);
+}
+.coach__bubble::before {
+  position: absolute;
+  top: 16px;
+  left: -5px;
+  width: 12px;
+  height: 12px;
+  background: var(--bubble);
+  border-radius: 2px;
+  transform: rotate(45deg);
+  content: "";
+}
+.coach__head {
+  position: relative;
+  display: flex;
+  gap: var(--space-s);
+  align-items: center;
+  margin-bottom: var(--space-s);
+  font: var(--type-label-large);
+}
+.coach__stone {
+  width: 14px;
+  height: 14px;
+  background: var(--c-board-black-low);
+  border-radius: 50%;
+}
+.coach__stone[data-side="white"] {
+  background: var(--c-board-white-high);
+  box-shadow: inset 0 0 0 1px var(--c-board-white-rim);
+}
+.coach__where {
+  margin-left: auto;
+  font: var(--type-label-medium);
+  color: var(--c-on-surface-variant);
+}
+.coach .jcomment {
+  margin-top: 0;
+}
+.coach .lesson__fb {
+  margin: 0;
+  padding: 0;
+  background: none;
+}
+.coach .jmd p + p {
+  margin-top: var(--space-s);
+}
+.lesson__sub {
+  margin-bottom: var(--space-s);
+  font: var(--type-label-large);
   color: var(--c-on-surface-variant);
 }
 .lesson__legend {
   margin-top: var(--space-m);
+  font: var(--type-body-small);
+  color: var(--c-on-surface-variant);
 }
-.lesson__bar {
-  width: 100%;
-  height: 6px;
-  accent-color: var(--c-primary);
-}
-.lesson__fb {
-  margin: var(--space-m) 0;
-  padding: var(--space-m) var(--space-l);
-  background: var(--c-surface-container);
-  border-radius: var(--radius-s);
+.lesson__quiz {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-l);
 }
 .lesson__verdict {
   font: var(--type-title-small);
@@ -3779,8 +4260,111 @@ button.theory__row:hover {
 .lesson__verdict[data-bad] {
   color: var(--c-error);
 }
+.lesson__done {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  align-items: center;
+  padding: var(--space-xl) var(--space-l) var(--space-l);
+  color: var(--c-on-secondary-container);
+  text-align: center;
+  background: var(--c-secondary-container);
+  border-radius: var(--radius-l);
+}
 .lesson__score {
-  font: var(--type-title-medium);
+  font: var(--type-headline-small);
+  letter-spacing: var(--track-headline-small);
+}
+.lesson__firsttry {
+  font: var(--type-body-small);
+}
+.lesson__doneactions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s);
+  width: 100%;
+  margin-top: var(--space-m);
+}
+.lesson__doneactions .cta {
+  width: 100%;
+}
+
+/* 바닥 — 진행(챌린지 n/N + 막대) · 큰 타일 단추 둘 · 링크와 수 이동. */
+.lessonpanel__foot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-m);
+  padding: var(--space-l) var(--space-l) var(--space-m);
+  border-top: 1px solid var(--c-outline-variant);
+}
+.lessonpanel__progress {
+  display: flex;
+  gap: var(--space-m);
+  align-items: baseline;
+  justify-content: space-between;
+  font: var(--type-title-small);
+}
+.lessonpanel__side {
+  font: var(--type-label-medium);
+  color: var(--c-on-surface-variant);
+}
+.lesson__bar {
+  width: 100%;
+  height: 8px;
+  overflow: hidden;
+  background: var(--c-surface-container-high);
+  border: 0;
+  border-radius: 4px;
+  appearance: none;
+}
+.lesson__bar::-webkit-progress-bar {
+  background: var(--c-surface-container-high);
+  border-radius: 4px;
+}
+.lesson__bar::-webkit-progress-value {
+  background: var(--c-secondary);
+  border-radius: 4px;
+}
+.lesson__bar::-moz-progress-bar {
+  background: var(--c-secondary);
+}
+.lessonpanel__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-s);
+}
+.tilebtn {
+  display: inline-flex;
+  gap: var(--space-s);
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  font: var(--type-label-large);
+  color: var(--c-on-surface);
+  background: var(--c-surface-container);
+  border-radius: var(--radius-m);
+  transition: background var(--motion-quick) ease-out;
+}
+.tilebtn .icon {
+  width: 20px;
+  height: 20px;
+}
+.tilebtn:hover:not(:disabled) {
+  background: var(--c-surface-container-high);
+}
+.tilebtn:disabled {
+  color: var(--c-outline);
+  cursor: default;
+}
+.lessonpanel__tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 calc(-1 * var(--space-s));
+}
+.lessonpanel__nav {
+  display: flex;
+  gap: 2px;
 }
 .adminexport {
   display: grid;

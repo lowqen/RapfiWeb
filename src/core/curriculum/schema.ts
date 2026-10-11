@@ -66,6 +66,13 @@ export function textOf(x: Text | undefined, lang: "ko" | "en"): string {
   return (lang === "en" ? x.en : undefined) || x.ko;
 }
 
+/** 주 변화(맨 앞 자식만 따라간 수순) — 코스 · 레슨 카드의 썸네일이 이 국면을 그린다. */
+export function mainLine(root: CurriculumNode): Move[] {
+  const out: Move[] = [];
+  for (let n = root.children[0]; n; n = n.children[0]) if (n.move) out.push(n.move);
+  return out;
+}
+
 /** 언어를 고른 `JosekiNode` — 트리 · 판 · 마크다운 화면이 그대로 받는다. */
 export function resolveNode(n: CurriculumNode, lang: "ko" | "en"): JosekiNode {
   const out: JosekiNode = {

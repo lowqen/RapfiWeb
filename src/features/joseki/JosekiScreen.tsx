@@ -14,8 +14,9 @@ import { useJosekiStore } from "./josekiStore";
  *     docs/공식-정석-설계.md).
  *   - **내 정석**(W9, 계획서 §7): 목록과 편집 두 얼굴. 정석 하나가 열려 있으면 편집, 아니면 목록.
  *
- * 고른 탭은 이 브라우저에 남는다. 편집 중인 내 정석이 있으면 그 탭으로 연다. 레슨 링크
- * (`/joseki?lesson=<id>`, `CurriculumHome`)로 열면 공식 커리큘럼 탭이다.
+ * 고른 탭은 이 브라우저에 남는다. 편집 중인 내 정석이 있으면 그 탭으로 연다. 코스 · 레슨 링크
+ * (`/joseki?course=<id>` · `?lesson=<id>`, `CurriculumHome`)로 열면 공식 커리큘럼 탭이다. 코스나 레슨이
+ * 열려 있는 동안 두 탭은 숨는다(base.css) — 그 화면의 ← 가 길잡이다.
  */
 
 type Tab = "official" | "mine";
@@ -33,7 +34,8 @@ export function JosekiScreen() {
   const open = useJosekiStore((s) => s.current !== null);
   const loaded = useJosekiStore((s) => s.loaded);
   const [params, setParams] = useSearchParams();
-  const linked = params.has("lesson");
+  // 커리큘럼 안쪽(코스 · 레슨)을 가리키는 주소면 공식 탭이다.
+  const linked = params.has("lesson") || params.has("course");
   const [tab, setTabState] = useState<Tab>(() => (linked ? "official" : open ? "mine" : loadTab()));
   // 레슨 링크를 따라 들어오면(앱 안의 이동 포함) 공식 탭으로.
   useEffect(() => {

@@ -1,9 +1,10 @@
-import { DEFAULT_SIZE, type Move } from "../../../core/model/move";
-import { t } from "../../../i18n/i18n";
+import { DEFAULT_SIZE, type Move } from "../core/model/move";
+import { t } from "../i18n/i18n";
 
 /**
  * 개시 썸네일 — 천원 둘레 7×7 만 그린 작은 판(SVG). 3수 · 5수 개시는 늘 그 안에 있다(벗어난 돌은
  * 가장자리에 붙인다). 캔버스 보드를 줄 수십 개에 띄우면 무겁고, 이 크기에서는 돌과 격자만 읽히면 된다.
+ * 랭킹과 정석 커리큘럼(코스 · 레슨 카드)이 함께 쓴다.
  */
 const R = 3; // 천원에서 위아래 · 좌우로 몇 칸
 const N = 2 * R + 1;
