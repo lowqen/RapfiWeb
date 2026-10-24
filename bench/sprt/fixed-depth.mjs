@@ -8,7 +8,8 @@
  *        [--positions a.json,b.json] [--out r.json]
  *
  * - 해시 비움 · 1 스레드 · MAX_DEPTH 고정 — 노드 수는 CPU 와 무관하게 정해진다(시간만 흔들린다).
- * - 국면마다 엔진 순서를 번갈아(반복마다 뒤집어) 러너의 시간 흐름(데우기 · 열)이 한쪽에 몰리지 않게 한다.
+ * - 국면 · 반복마다 엔진 순서를 돌려(회전 × 뒤집기) 엔진마다 모든 자리를 고르게 맡긴다 — 러너의 시간 흐름(데우기 · 열)과
+ *   자리 효과가 한쪽에 몰리지 않게.
  * - 첫 엔진이 기준이다: 나머지의 노드 · 시간 비(국면별 기하 평균), 최선수 일치율, 평가 차.
  * - 국면 파일: openings-balanced.json(openings) · mate-suite.json · positions.json(positions) — 모두 `moves` 를 쓴다.
  */
@@ -88,6 +89,17 @@ async function solve(e, moves) {
 }
 
 const gm = (xs) => Math.exp(xs.reduce((s, x) => s + Math.log(x), 0) / xs.length);
+/**
+ * k 번째 국면의 엔진 순서 — 회전 n 가지 × 뒤집기 2 가지(엔진 셋이면 순열 6 가지 전부)를 차례로 돈다.
+ * 예전의 「번갈아 뒤집기」는 엔진이 셋이면 가운데 엔진(control)이 **늘 가운데**였고, AMD 호스트 러너에서
+ * 그 자리가 1 ~ 3% 느려 A/A 가 깨졌다(A4 관문 3 — 최적화-마스터플랜 2부 §8.12). 엔진마다 프로세스 · 역사표가
+ * 따로라 순서는 트리에 닿지 않는다.
+ */
+const orderOf = (list, k) => {
+  const r = k % list.length;
+  const rot = [...list.slice(r), ...list.slice(0, r)];
+  return Math.floor(k / list.length) % 2 ? rot.reverse() : rot;
+};
 const engines = [];
 let code = 0;
 const rows = []; // { id, engine, rep, move, nodes, ms, depth, eval }
@@ -120,8 +132,7 @@ try {
   const t0 = performance.now();
   for (let rep = 0; rep < repeat; rep++)
     for (const [pi, p] of positions.entries()) {
-      const order = (pi + rep) % 2 === 0 ? engines : [...engines].reverse();
-      for (const e of order)
+      for (const e of orderOf(engines, pi + rep))
         rows.push({ id: p.id, engine: e.name, rep, ...(await solve(e, p.moves)) });
       if ((pi + 1) % 20 === 0)
         console.log(
