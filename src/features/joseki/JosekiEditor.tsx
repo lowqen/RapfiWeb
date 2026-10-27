@@ -79,13 +79,18 @@ export function JosekiEditor() {
 
   // 마디가 바뀌면 메모 초안을 그 마디의 것으로.
   const nodeKey = `${jk.id}:${s.path.join(".")}`;
-  useEffect(() => {
+  const [draftFor, setDraftFor] = useState(nodeKey);
+  if (draftFor !== nodeKey) {
+    setDraftFor(nodeKey);
     setDraft(node.comment);
     setPreview(node.comment.length > 0);
     setAsking(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodeKey]);
-  useEffect(() => setTagText(jk.tags.join(", ")), [jk.id, jk.tags]);
+  }
+  const [tagsFor, setTagsFor] = useState({ id: jk.id, tags: jk.tags });
+  if (tagsFor.id !== jk.id || tagsFor.tags !== jk.tags) {
+    setTagsFor({ id: jk.id, tags: jk.tags });
+    setTagText(jk.tags.join(", "));
+  }
 
   // 메모는 쉬면 저장(글자마다 문서를 쓰지 않게).
   useEffect(() => {

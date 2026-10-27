@@ -71,9 +71,13 @@ export function DatabaseScreen() {
     void useDbStore.getState().loadStored();
   }, []);
 
-  // 판이 바뀌거나 DB 가 붙으면 다시 읽는다.
-  useEffect(() => {
+  // 판이 바뀌거나 DB 가 붙으면 고른 칸을 놓고(렌더 중에) 다시 읽는다(effect — 저장소 일).
+  const [readFor, setReadFor] = useState({ stones, on });
+  if (readFor.stones !== stones || readFor.on !== on) {
+    setReadFor({ stones, on });
     setPicked(null);
+  }
+  useEffect(() => {
     if (on) void useDbStore.getState().refresh(stones);
   }, [stones, on]);
 
@@ -91,7 +95,12 @@ export function DatabaseScreen() {
   }, [snap?.comment]);
 
   const pickedCell = picked && snap ? (snap.cells.get(moveKey(picked, board.size)) ?? null) : null;
-  useEffect(() => setLabelText(pickedCell?.text ?? ""), [pickedCell?.text, picked]);
+  // 고른 칸이나 그 칸의 글이 바뀌면 입력 칸을 그 글로.
+  const [labelFor, setLabelFor] = useState({ picked, text: pickedCell?.text });
+  if (labelFor.picked !== picked || labelFor.text !== pickedCell?.text) {
+    setLabelFor({ picked, text: pickedCell?.text });
+    setLabelText(pickedCell?.text ?? "");
+  }
 
   const render: BoardRender = useMemo(() => {
     const tags = new Map<number, { label: string; kind: TagKind; winRatePct?: number }>();

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties, type KeyboardEvent } from "react";
+import { useMemo, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { Link } from "react-router-dom";
 import { BoardCanvas } from "../../../core/board/BoardCanvas";
 import { emptyRender, type BoardRender } from "../../../core/board/board-renderer";
@@ -119,7 +119,11 @@ export function ReportView({
   const n = report.moves.length;
   const [cursor, setCursor] = useState(n);
   // 다른 리포트를 고르면 끝 수부터.
-  useEffect(() => setCursor(report.moves.length), [report.data, report.moves.length]);
+  const [cursorFor, setCursorFor] = useState({ data: report.data, n });
+  if (cursorFor.data !== report.data || cursorFor.n !== n) {
+    setCursorFor({ data: report.data, n });
+    setCursor(n);
+  }
   const palette = useBoardStore((s) => s.render.palette);
 
   const current: GradedMove | undefined = report.moves[cursor - 1];

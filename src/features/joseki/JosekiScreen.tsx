@@ -38,9 +38,11 @@ export function JosekiScreen() {
   const linked = params.has("lesson") || params.has("course");
   const [tab, setTabState] = useState<Tab>(() => (linked ? "official" : open ? "mine" : loadTab()));
   // 레슨 링크를 따라 들어오면(앱 안의 이동 포함) 공식 탭으로.
-  useEffect(() => {
+  const [wasLinked, setWasLinked] = useState(linked);
+  if (linked !== wasLinked) {
+    setWasLinked(linked);
     if (linked) setTabState("official");
-  }, [linked]);
+  }
   useEffect(() => {
     if (!loaded) void useJosekiStore.getState().load();
     void loadOpeningTables();
