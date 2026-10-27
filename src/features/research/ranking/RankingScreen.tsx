@@ -73,11 +73,13 @@ export function RankingScreen() {
   const [allRules, setAllRules] = useState(false);
 
   // 자료가 바뀌면(RenjuNet ↔ 내 기보 · 새 파일) 선수 · 규칙 번호가 다른 표를 가리킨다 — 비운다.
-  useEffect(() => {
+  const [filtersFor, setFiltersFor] = useState(pack);
+  if (filtersFor !== pack) {
+    setFiltersFor(pack);
     setPlayers([]);
     setRules([]);
     setQuery("");
-  }, [pack]);
+  }
 
   const isLocal = pack?.source === "local";
   const filter: RankingFilter = useMemo(

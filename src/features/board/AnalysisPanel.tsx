@@ -248,14 +248,16 @@ export function AnalysisOptions() {
  * 탐색이 끝났다 다시 시작하면(분석 중 착수 등) 0 부터 — 집계기도 그때 0 으로 돈다.
  */
 function useSearchClock(searching: boolean): number | null {
-  const [ms, setMs] = useState<number | null>(null);
+  const [ms, setMs] = useState(0);
+  // 탐색이 새로 시작되면 0 부터 — 렌더 중에 맞춘다. 탐색 중이 아니면 값은 null 로 읽힌다.
+  const [wasSearching, setWasSearching] = useState(searching);
+  if (searching !== wasSearching) {
+    setWasSearching(searching);
+    if (searching) setMs(0);
+  }
   useEffect(() => {
-    if (!searching) {
-      setMs(null);
-      return;
-    }
+    if (!searching) return;
     const t0 = performance.now();
-    setMs(0);
     const id = window.setInterval(() => setMs(performance.now() - t0), 100);
     return () => window.clearInterval(id);
   }, [searching]);

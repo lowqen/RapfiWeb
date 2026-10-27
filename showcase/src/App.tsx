@@ -54,14 +54,11 @@ function useTheme() {
 }
 
 function useCountUp(target: number, ms = 1100) {
-  const [v, setV] = useState(() =>
-    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? target : 0,
-  );
+  // 움직임을 줄인 환경은 세지 않고 바로 목표값 — 상태가 아니라 읽는 값에서 가른다.
+  const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+  const [v, setV] = useState(() => (reduced ? target : 0));
   useEffect(() => {
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
-      setV(target);
-      return;
-    }
+    if (reduced) return;
     let raf = 0;
     const t0 = performance.now();
     const tick = (now: number) => {
@@ -71,8 +68,8 @@ function useCountUp(target: number, ms = 1100) {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [target, ms]);
-  return v;
+  }, [target, ms, reduced]);
+  return reduced ? target : v;
 }
 
 const STATUS_ICON: Record<Status, string> = {

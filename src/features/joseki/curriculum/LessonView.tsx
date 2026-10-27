@@ -83,10 +83,14 @@ export function LessonView({
   const [quiz, setQuiz] = useState<QuizState>(() => startQuiz(root, lesson.quiz.side));
   const recorded = useRef(false);
 
-  // 레슨 · 언어가 바뀌면 처음부터.
-  useEffect(() => {
+  // 레슨 · 언어가 바뀌면 처음부터 — 상태는 렌더 중에, 기록 여부(ref)는 effect 에서 되돌린다.
+  const [startedFor, setStartedFor] = useState({ root, side: lesson.quiz.side });
+  if (startedFor.root !== root || startedFor.side !== lesson.quiz.side) {
+    setStartedFor({ root, side: lesson.quiz.side });
     setPath([]);
     setQuiz(startQuiz(root, lesson.quiz.side));
+  }
+  useEffect(() => {
     recorded.current = false;
   }, [root, lesson.quiz.side]);
 

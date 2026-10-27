@@ -194,7 +194,12 @@ export function NumberField({
 }) {
   const id = useId();
   const [text, setText] = useState(String(value));
-  useEffect(() => setText(String(value)), [value]);
+  // 값이 밖에서 바뀌면 입력 칸도 그 값으로 — 렌더 중에 맞춘다(effect 로 한 번 더 그리지 않게).
+  const [shownValue, setShownValue] = useState(value);
+  if (value !== shownValue) {
+    setShownValue(value);
+    setText(String(value));
+  }
 
   const commit = () => {
     const n = Number(text);
@@ -264,7 +269,11 @@ export function DurationField({
   const shown = custom ? durationText(valueMs, spec.unit) : "";
   const [text, setText] = useState(shown);
   const [note, setNote] = useState<string | null>(null);
-  useEffect(() => setText(shown), [shown]);
+  const [lastShown, setLastShown] = useState(shown);
+  if (shown !== lastShown) {
+    setLastShown(shown);
+    setText(shown);
+  }
   useEffect(() => {
     if (!note) return;
     const t = window.setTimeout(() => setNote(null), 3_500);
