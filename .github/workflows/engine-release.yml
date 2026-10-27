@@ -22,7 +22,7 @@ on:
     inputs:
       tag:
         description: "릴리스 태그"
-        default: "engine-3c94c2a9-w8"
+        default: "engine-3c94c2a9-a4"
         type: string
       runner:
         description: "러너 — ubuntu-latest(기본, GitHub 호스트) 또는 self-hosted"
@@ -58,7 +58,11 @@ jobs:
       # W8(빌드 설정만, 탐색 불변): 글루가 Emscripten FS 를 내보낸다(EXPORTED_RUNTIME_METHODS 에 'FS').
       # 웹이 yixindb 파일(/rapfi.db)을 엔진의 메모리 FS 에 쓰고 읽어 IndexedDB 에 남기는 데 쓴다 —
       # IDBFS 대신 바이트를 직접 옮긴다(멀티 변형의 pthread 아래 syncfs 를 피한다).
-      RAPFI_PATCHES: "tools/patches/p2-2-keep-evaluators-on-rebuild.patch tools/patches/a1-q15mulr.patch tools/patches/p4-1-periodic-node-stats.patch tools/patches/a3-starblock-multi.patch tools/patches/w8-export-fs.patch"
+      # A4(결과 불변, 모든 변형): 같은 국면(zobristKey + ply)의 정책 출력을 스레드별 2^12 직접 사상 표로 재사용 —
+      # 요청 칸이 모두 저장돼 있을 때만 복사(스레드마다 ~3.9MB). 관문 0 재사용 29.4% · 관문 2 cachegrind Ir/노드 −2.68%
+      # (39096412125) · 관문 3 같은 트리 relaxed +5.01% · +5.46%, A/A −0.12 · +0.04%(wasm-speed 40056642650 ·
+      # 40056644994) — docs/최적화-마스터플랜.md 2부 §8.12.
+      RAPFI_PATCHES: "tools/patches/p2-2-keep-evaluators-on-rebuild.patch tools/patches/a1-q15mulr.patch tools/patches/p4-1-periodic-node-stats.patch tools/patches/a3-starblock-multi.patch tools/patches/a4-policy-cache.patch tools/patches/w8-export-fs.patch"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
