@@ -20,7 +20,7 @@ import { fetchRetry, releaseDownload } from "../../tools/ci/release-download.mjs
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 // 배포 중인 릴리스 — 변형 4종(relaxed 포함)과 공유 가중치 rapfi.data 하나.
-const ENGINE_TAG = process.env.ENGINE_TAG ?? "engine-3c94c2a9-a3";
+const ENGINE_TAG = process.env.ENGINE_TAG ?? "engine-3c94c2a9-a4";
 const RX_VARIANTS = [
   "multi-simd128",
   "multi-simd128-relaxed",
