@@ -36,7 +36,7 @@ concurrency:
 
 env:
   # 엔진 릴리스 — src/engine/engine-manifest.json 의 tag 와 같아야 한다(verify-engine.ts 가 본다).
-  ENGINE_TAG: engine-3c94c2a9-w8
+  ENGINE_TAG: engine-3c94c2a9-a4
 
 jobs:
   # 브라우저가 필요 없는 검사. 빌드 · 스모크와 나란히 돈다.

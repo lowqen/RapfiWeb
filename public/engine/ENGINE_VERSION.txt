@@ -1,7 +1,7 @@
 engine     : Rapfi WebAssembly (SIMD 4종)
-upstream   : 3c94c2a976f24a0dd1c5517623e9ab6fffe66bd7  (dhbloo/rapfi, 패치: p2-2-keep-evaluators-on-rebuild.patch a1-q15mulr.patch p4-1-periodic-node-stats.patch a3-starblock-multi.patch w8-export-fs.patch)
+upstream   : 3c94c2a976f24a0dd1c5517623e9ab6fffe66bd7  (dhbloo/rapfi, 패치: p2-2-keep-evaluators-on-rebuild.patch a1-q15mulr.patch p4-1-periodic-node-stats.patch a3-starblock-multi.patch a4-policy-cache.patch w8-export-fs.patch)
 networks   : e32ad77a5364363b3e3a02b3f9e8610ade19ea98
-emscripten : emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 6.0.12 (5488e0871d46d19a3209988190fa6a653126256f)
+emscripten : emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 6.0.13 (e13ee988ce3d87a738dd8f3661d02223308c412a)
 cmake opts : -DNO_COMMAND_MODULES=ON -DUSE_WASM_SIMD=ON -DUSE_WASM_SIMD_RELAXED=OFF(-relaxed 변형은 ON) -DCMAKE_BUILD_TYPE=Release
 data       : rapfi.data (모든 변형 공유) 19865582 bytes sha256 c2a4c4e788cc3e4e805166ea1198c08d6ca492e5f5e57ba78313bcbab054482a
 link opts  : (upstream CMakeLists 의 EMSCRIPTEN 블록이 전부 정한다 — 우리는 얹지 않는다)
@@ -9,6 +9,6 @@ wasm-opt   : 추가 후처리 -O4 --converge (133)
 variants   : single-simd128 multi-simd128 multi-simd128-relaxed single-simd128-relaxed
 preloads   : renju
 note       : SIMD 없는 변형은 eval/mix10nnue.cpp 의 static_assert 때문에 이 커밋에서 빌드되지 않는다
-built_at   : 2026-10-09T01:51:41Z
+built_at   : 2026-10-27T05:35:58Z
 build_by   : RapfiWeb/tools/build_engine_wasm.sh
 bench      : spike/node-bench.mjs 가 두 변형에서 Hash 를 뽑아 e240ab16 과 대조한다
