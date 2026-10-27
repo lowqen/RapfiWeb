@@ -38,6 +38,9 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      // react-hooks 7 의 React Compiler 규칙. 기존 코드 13곳(effect 안의 동기 setState — 화면 크기 · 패널 열림 등을
+      // effect 에서 맞추는 꼴)에 걸린다. 고치면 렌더 순서가 바뀌므로 플러그인 갱신과 묶지 않고 경고로 남겨 하나씩 옮긴다.
+      "react-hooks/set-state-in-effect": "warn",
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
     },
