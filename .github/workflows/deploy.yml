@@ -209,7 +209,7 @@ jobs:
         run: |
           set -e
           page=$(curl -fsSL --retry 5 --retry-delay 5 "$BASE_URL/showcase/")
-          echo "$page" | grep -q "RapfiWeb 엔진 쇼케이스" || { echo "::error::/showcase/ 가 쇼케이스가 아닙니다(SPA 폴백?)"; exit 1; }
+          echo "$page" | grep -q "Zenyth Web 엔진 쇼케이스" || { echo "::error::/showcase/ 가 쇼케이스가 아닙니다(SPA 폴백?)"; exit 1; }
           for a in $(echo "$page" | grep -oE '/showcase/assets/[^"]+\.(js|css)'); do
             ct=$(curl -fsSIL "$BASE_URL$a" | grep -i '^content-type' | tail -1)
             echo "$a — $ct"

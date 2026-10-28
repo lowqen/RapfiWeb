@@ -70,5 +70,5 @@ export function titleFor(pathname: string): { title: string } {
   const tab = RESEARCH_TABS.find((r) => pathname.startsWith(r.path));
   if (tab) return { title: `${t("연구")} · ${t(tab.label)}` };
   const dest = activeDest(pathname);
-  return { title: dest ? t(dest.label) : "RapfiWeb" };
+  return { title: dest ? t(dest.label) : "Zenyth Web" };
 }

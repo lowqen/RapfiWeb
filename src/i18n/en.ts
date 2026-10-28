@@ -474,7 +474,7 @@ export const EN: Readonly<Record<string, string>> = {
   "← → 키 · 돌/점/행 클릭으로 이동": "← → keys · click a stone, dot or row to move",
   "초/수": "s/move",
   "/수": "/move",
-  "RapfiWeb 게임 리포트": "RapfiWeb game report",
+  "Zenyth Web 게임 리포트": "Zenyth Web game report",
   "흑 승률 그래프": "Black score graph",
   "리뷰 리포트: ← → 키로 한 수씩": "Review report: ← → keys step one move",
   "첫 5수 제외": "first 5 moves skipped",
@@ -1036,8 +1036,8 @@ export const EN: Readonly<Record<string, string>> = {
 
   // 설정 ▸ 정보(라이선스 고지)
   정보: "About",
-  "RapfiWeb 은 자유 소프트웨어입니다. GNU 일반 공중 사용 허가서(GPL) 3판 또는 그 이후 판의 조건에 따라 다시 배포하거나 고칠 수 있습니다.":
-    "RapfiWeb is free software. You can redistribute it and modify it under the terms of the GNU General Public License, version 3 or any later version.",
+  "Zenyth Web 은 자유 소프트웨어입니다. GNU 일반 공중 사용 허가서(GPL) 3판 또는 그 이후 판의 조건에 따라 다시 배포하거나 고칠 수 있습니다.":
+    "Zenyth Web is free software. You can redistribute it and modify it under the terms of the GNU General Public License, version 3 or any later version.",
   "이 프로그램은 쓸모 있기를 바라며 배포되지만, 상품성이나 특정 목적 적합성에 대한 묵시적 보증을 포함해 어떠한 보증도 하지 않습니다.":
     "This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
   "소스 코드": "Source code",

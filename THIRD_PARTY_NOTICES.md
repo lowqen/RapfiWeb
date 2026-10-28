@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-RapfiWeb as a whole is distributed under the **GNU General Public License v3.0 or later**
+Zenyth Web as a whole is distributed under the **GNU General Public License v3.0 or later**
 (see [`LICENSE`](LICENSE)), because the deployed bundle contains the Rapfi engine.
 Code written for this repository may additionally be used under the BSD 2-Clause License.
 
@@ -60,12 +60,12 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-The Yixin **engine** (`Yixin.exe`) is closed-source and is **not** part of RapfiWeb. Only the
+The Yixin **engine** (`Yixin.exe`) is closed-source and is **not** part of Zenyth Web. Only the
 open-source Yixin-Board GUI was used as a reference.
 
 ## RenjuNet data is never bundled
 
-RenjuNet game archives (`.rif`) are licensed for non-commercial, offline use only. RapfiWeb
+RenjuNet game archives (`.rif`) are licensed for non-commercial, offline use only. Zenyth Web
 does not ship, download or upload them: the user drops their own copy into the app and the
 statistics stay in that browser's IndexedDB. `.gitignore` and a CI gate (`web.yml`,
 `deploy.yml`) keep `*.rif`, `*.pack`, `freq_data.json` and `renju*.sqlite` out of the

@@ -21,7 +21,7 @@ const HEADERS = process.env.RAPFIWEB_ISOLATE === "0" ? omit(SITE, ISOLATION_KEYS
 export default defineConfig(({ command }) => ({
   server: { headers: omit(HEADERS, CSP_KEYS) },
   preview: { headers: HEADERS },
-  // GitHub Pages 는 저장소 이름이 경로에 붙는다(https://lowqen.github.io/RapfiWeb/).
+  // GitHub Pages 는 저장소 이름이 경로에 붙는다(https://lowqen.github.io/Zenyth-web/).
   // 기본값은 "/" 로 두어 로컬 개발·스모크가 그대로 돌고, 배포 잡만 이 값을 준다.
   base: process.env.RAPFIWEB_BASE ?? "/",
   // studioPlugin: 커리큘럼 스튜디오의 «저장소에 저장»(개발 서버에만 — scripts/studio-plugin.ts).

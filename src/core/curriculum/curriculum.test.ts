@@ -417,8 +417,8 @@ describe("레슨 링크", () => {
     expect(lessonUrl("https://x.dev", "/", "first-three-moves", "browse")).toBe(
       "https://x.dev/joseki?lesson=first-three-moves",
     );
-    expect(lessonUrl("https://x.dev", "/RapfiWeb/", "a-b", "learn")).toBe(
-      "https://x.dev/RapfiWeb/joseki?lesson=a-b&mode=learn",
+    expect(lessonUrl("https://x.dev", "/Zenyth-web/", "a-b", "learn")).toBe(
+      "https://x.dev/Zenyth-web/joseki?lesson=a-b&mode=learn",
     );
   });
 });

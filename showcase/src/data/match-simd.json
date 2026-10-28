@@ -1,5 +1,5 @@
 {
-  "label": "대조 — RapfiWeb single-simd128 vs gomocalc single-simd128(같은 ISA)",
+  "label": "대조 — Zenyth Web single-simd128 vs gomocalc single-simd128(같은 ISA)",
   "run": "37477710777",
   "runner": "Intel Xeon Platinum 8488C · 논리 4",
   "generatedAt": "2026-10-06T23:06:01.935Z",

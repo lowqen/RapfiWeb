@@ -68,7 +68,7 @@ export interface MatchReport {
   openings: { opening: string; games: number; score: number; pct: number }[];
 }
 
-/** 본 매치 — RapfiWeb single-simd128-relaxed(배포 1 스레드 최강) vs gomocalc single-simd128 */
+/** 본 매치 — Zenyth Web single-simd128-relaxed(배포 1 스레드 최강) vs gomocalc single-simd128 */
 export const MAIN = need("match-relaxed.json");
 /** 대조 — 같은 ISA(일반 SIMD)끼리: relaxed 몫을 빼고 소스 · 패치 몫만 */
 export const CONTROL = need("match-simd.json");

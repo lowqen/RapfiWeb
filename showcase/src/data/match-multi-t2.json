@@ -1,5 +1,5 @@
 {
-  "label": "멀티스레드 — RapfiWeb multi-simd128-relaxed vs gomocalc multi-simd128-relaxed (2 스레드)",
+  "label": "멀티스레드 — Zenyth Web multi-simd128-relaxed vs gomocalc multi-simd128-relaxed (2 스레드)",
   "run": "37644333550",
   "runner": "Intel Xeon 8581C · 논리 8",
   "generatedAt": "2026-10-07T22:50:40.280Z",

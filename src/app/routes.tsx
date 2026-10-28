@@ -23,7 +23,7 @@ import {
  * W1 은 골격이었고 화면마다 `Placeholder`(무엇을 하게 될지 · 어느 단계에서 채워지는지)를
  * 두었다. W7 의 랭킹을 끝으로 모든 화면이 실물이 되어 자리표시자는 걷어냈다.
  */
-// Pages 배포에서는 앱이 /RapfiWeb/ 아래 산다. BASE_URL 이 그 값을 들고 있으므로
+// Pages 배포에서는 앱이 /Zenyth-web/ 아래 산다. BASE_URL 이 그 값을 들고 있으므로
 // 라우터도 같은 것을 봐야 딥링크와 새로고침이 맞는다.
 const basename = import.meta.env.BASE_URL.replace(/\/$/, "");
 

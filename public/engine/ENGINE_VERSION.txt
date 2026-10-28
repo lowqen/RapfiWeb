@@ -10,5 +10,5 @@ variants   : single-simd128 multi-simd128 multi-simd128-relaxed single-simd128-r
 preloads   : renju
 note       : SIMD 없는 변형은 eval/mix10nnue.cpp 의 static_assert 때문에 이 커밋에서 빌드되지 않는다
 built_at   : 2026-10-27T05:35:58Z
-build_by   : RapfiWeb/tools/build_engine_wasm.sh
+build_by   : Zenyth-web/tools/build_engine_wasm.sh
 bench      : spike/node-bench.mjs 가 두 변형에서 Hash 를 뽑아 e240ab16 과 대조한다

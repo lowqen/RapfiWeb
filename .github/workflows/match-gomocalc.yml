@@ -1,4 +1,4 @@
-name: 대국 — gomocalc 순정 vs RapfiWeb 배포
+name: 대국 — gomocalc 순정 vs Zenyth Web 배포
 
 # 「gomocalc 가 서비스 중인 Rapfi」와 「우리가 서비스 중인 Rapfi」를 **배포 실물 그대로** 맞붙인다 — 엔진을 빌드하지 않는다.
 # 둘 다 bench/gomocalc/fetch-engines.mjs 로 받는다(gomocalc = www.gomocalc.com/build 그대로, rapfiweb = 엔진 릴리스).

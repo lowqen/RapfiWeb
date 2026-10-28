@@ -16,7 +16,7 @@ import { msg, t } from "../../i18n/i18n";
  * `.sgroup` 수로 설정 카드를 센다).
  */
 
-const REPO = "https://github.com/lowqen/RapfiWeb";
+const REPO = "https://github.com/lowqen/Zenyth-web";
 const UPSTREAM = engineManifest.upstream;
 
 interface Component {
@@ -87,13 +87,13 @@ export function AboutPanel() {
         <h2 id="sg-about" className="sgroup__title">
           {t("정보")}
         </h2>
-        <p className="sgroup__desc">RapfiWeb · © 2026 lowqen</p>
+        <p className="sgroup__desc">Zenyth Web · © 2026 lowqen</p>
       </header>
 
       <div className="about__body">
         <p>
           {t(
-            "RapfiWeb 은 자유 소프트웨어입니다. GNU 일반 공중 사용 허가서(GPL) 3판 또는 그 이후 판의 조건에 따라 다시 배포하거나 고칠 수 있습니다.",
+            "Zenyth Web 은 자유 소프트웨어입니다. GNU 일반 공중 사용 허가서(GPL) 3판 또는 그 이후 판의 조건에 따라 다시 배포하거나 고칠 수 있습니다.",
           )}
         </p>
         <p className="about__warranty">

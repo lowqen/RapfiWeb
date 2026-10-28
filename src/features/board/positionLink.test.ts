@@ -31,8 +31,8 @@ describe("국면 딥링크 — 주소", () => {
     b.clear();
     b.place(move(7, 7));
     b.place(move(8, 6));
-    const url = new URL(positionUrl("https://example.test", "/RapfiWeb/"));
-    expect(url.pathname).toBe("/RapfiWeb/board");
+    const url = new URL(positionUrl("https://example.test", "/Zenyth-web/"));
+    expect(url.pathname).toBe("/Zenyth-web/board");
     expect(url.searchParams.get("p")).toBe("h8i9");
     expect(readPositionLink(url.search, 15)).toEqual({
       kind: "ok",

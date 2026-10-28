@@ -1,14 +1,14 @@
 <div align="center">
 
-# RapfiWeb
+# Zenyth Web
 
 **A championship-level Gomoku & Renju engine running entirely in your browser.**<br>
 Play, analyze, review and research. No server, no install, no account.
 
 [**▶ Live demo: rapfiweb.pages.dev**](https://rapfiweb.pages.dev)
 
-[![CI](https://img.shields.io/github/actions/workflow/status/lowqen/RapfiWeb/web.yml?branch=main&label=CI&logo=githubactions&logoColor=white)](https://github.com/lowqen/RapfiWeb/actions/workflows/web.yml)
-[![Deploy](https://img.shields.io/github/actions/workflow/status/lowqen/RapfiWeb/deploy.yml?branch=main&label=deploy&logo=cloudflare&logoColor=white)](https://github.com/lowqen/RapfiWeb/actions/workflows/deploy.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/lowqen/Zenyth-web/web.yml?branch=main&label=CI&logo=githubactions&logoColor=white)](https://github.com/lowqen/Zenyth-web/actions/workflows/web.yml)
+[![Deploy](https://img.shields.io/github/actions/workflow/status/lowqen/Zenyth-web/deploy.yml?branch=main&label=deploy&logo=cloudflare&logoColor=white)](https://github.com/lowqen/Zenyth-web/actions/workflows/deploy.yml)
 [![License: GPL v3](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](LICENSE)
 <br>
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -19,16 +19,16 @@ Play, analyze, review and research. No server, no install, no account.
 
 **English** · [한국어](README.ko.md)
 
-<img src="docs/assets/analysis.png" alt="RapfiWeb analysis screen: the engine finds a forced win in 31 moves and draws the principal variation on the board" width="860">
+<img src="docs/assets/analysis.png" alt="Zenyth Web analysis screen: the engine finds a forced win in 31 moves and draws the principal variation on the board" width="860">
 
 </div>
 
 ---
 
-## Why RapfiWeb?
+## Why Zenyth Web?
 
 [Rapfi](https://github.com/dhbloo/rapfi) is one of the strongest open-source Gomoku/Renju engines,
-a C++ engine with NNUE evaluation. RapfiWeb compiles it to **WebAssembly** and
+a C++ engine with NNUE evaluation. Zenyth Web compiles it to **WebAssembly** and
 wraps it in a full analysis workbench. A desktop GUI, an Android app and a server farm, all
 inside one browser tab.
 
@@ -85,7 +85,7 @@ inside one browser tab.
   contrast** in both themes, all enforced by a Playwright smoke test.
 
 <div align="center">
-<img src="docs/assets/mobile.png" alt="RapfiWeb on a phone in Korean, light theme" width="300">
+<img src="docs/assets/mobile.png" alt="Zenyth Web on a phone in Korean, light theme" width="300">
 </div>
 
 ## 🏗 Architecture
@@ -131,8 +131,8 @@ inside one browser tab.
 **Requirements:** Node.js ≥ 20.11 (CI uses 26) and pnpm.
 
 ```bash
-git clone https://github.com/lowqen/RapfiWeb.git
-cd RapfiWeb
+git clone https://github.com/lowqen/Zenyth-web.git
+cd Zenyth Web
 pnpm install
 
 # Engine weights (~20 MB) are a release asset, not part of git.
@@ -161,7 +161,7 @@ see [`docs/배포-cloudflare.md`](docs/배포-cloudflare.md) for the one-time se
 
 WebAssembly SIMD and the CSP keyword `'wasm-unsafe-eval'` are required: **Chrome/Edge 97+, Firefox 102+,
 Safari 16.4+**. Multi-threading
-additionally needs cross-origin isolation (`public/_headers`). On hosts without it, RapfiWeb falls
+additionally needs cross-origin isolation (`public/_headers`). On hosts without it, Zenyth Web falls
 back to the single-threaded engine automatically.
 
 This web build ships **Renju** weights only (Cloudflare's 25 MB per-file limit).
@@ -177,7 +177,7 @@ This web build ships **Renju** weights only (Cloudflare's 25 MB per-file limit).
 
 ## ⚖️ License & data
 
-RapfiWeb is released under the **[GNU GPL v3.0 or later](LICENSE)** because the bundle includes the
+Zenyth Web is released under the **[GNU GPL v3.0 or later](LICENSE)** because the bundle includes the
 Rapfi engine. Code written for this repository may also be used under BSD 2-Clause. Bundled and
 ported components (Rapfi, rapfi-networks, Yixin-Board, Zenyth, npm dependencies) are listed in
 [**THIRD_PARTY_NOTICES.md**](THIRD_PARTY_NOTICES.md), together with where to find the engine's

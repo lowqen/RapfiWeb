@@ -13,7 +13,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const REPO = "lowqen/RapfiWeb";
+const REPO = "lowqen/Zenyth-web";
 
 export class ReleaseNotFound extends Error {}
 

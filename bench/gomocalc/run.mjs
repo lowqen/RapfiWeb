@@ -1,5 +1,5 @@
 /**
- * gomocalc 엔진 대 RapfiWeb 엔진 — 같은 호스트·같은 국면·같은 명령으로 잰다.
+ * gomocalc 엔진 대 Zenyth Web 엔진 — 같은 호스트·같은 국면·같은 명령으로 잰다.
  *
  *   node bench/gomocalc/fetch-engines.mjs          # 한 번
  *   node bench/gomocalc/run.mjs [옵션]

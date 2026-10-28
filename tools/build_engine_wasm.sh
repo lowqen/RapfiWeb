@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Rapfi -> WebAssembly 빌드 (RapfiWeb W0 스파이크).
+# Rapfi -> WebAssembly 빌드 (Zenyth Web W0 스파이크).
 #
 # 이 스크립트가 만드는 것:
 #   out/engine/rapfi-{single-simd128,multi-simd128}.{js,wasm,data}
@@ -500,7 +500,7 @@ ls -l "$OUT/bench" | sed "s/^/  . /"
   echo "preloads   : $PRELOAD_SET"
   echo "note       : SIMD 없는 변형은 eval/mix10nnue.cpp 의 static_assert 때문에 이 커밋에서 빌드되지 않는다"
   echo "built_at   : $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  echo "build_by   : RapfiWeb/tools/build_engine_wasm.sh"
+  echo "build_by   : Zenyth-web/tools/build_engine_wasm.sh"
   echo "bench      : spike/node-bench.mjs 가 두 변형에서 Hash 를 뽑아 e240ab16 과 대조한다"
 } > "$OUT/engine/ENGINE_VERSION.txt"
 sed "s/^/  . /" "$OUT/engine/ENGINE_VERSION.txt"

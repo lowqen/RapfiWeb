@@ -312,7 +312,7 @@ export function gameJson(r: GameReport, dateStamp: string, log: string, ver = "w
 export function html(r: GameReport, shell: ReportShell, dateStamp: string, log = ""): string {
   return (
     shell.head +
-    `${escapeHtml(r.title)} · ${t("RapfiWeb 게임 리포트")}` +
+    `${escapeHtml(r.title)} · ${t("Zenyth Web 게임 리포트")}` +
     shell.body +
     gameJson(r, dateStamp, log) +
     shell.tail

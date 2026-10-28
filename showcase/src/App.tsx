@@ -21,9 +21,9 @@ import {
 
 // 계열 색은 엔티티를 따른다(순위가 아니라) — 어느 차트에서든 같은 엔진은 같은 색.
 const C = {
-  rx: "var(--s1)", // RapfiWeb single-simd128-relaxed
+  rx: "var(--s1)", // Zenyth Web single-simd128-relaxed
   gc: "var(--s2)", // gomocalc single-simd128
-  simd: "var(--s3)", // RapfiWeb single-simd128
+  simd: "var(--s3)", // Zenyth Web single-simd128
 };
 
 const pct = (x: number, d = 1) => `${(x * 100).toFixed(d)}%`;
@@ -283,8 +283,8 @@ export function App() {
   ];
 
   const npsRows: IntervalRow[] = [
-    { m: MAIN, name: "본 매치", aName: "RapfiWeb relaxed", aColor: C.rx },
-    { m: CONTROL, name: "대조", aName: "RapfiWeb simd128", aColor: C.simd },
+    { m: MAIN, name: "본 매치", aName: "Zenyth Web relaxed", aColor: C.rx },
+    { m: CONTROL, name: "대조", aName: "Zenyth Web simd128", aColor: C.simd },
   ].flatMap(({ m, name, aName, aColor }) =>
     m.search
       ? [
@@ -352,7 +352,7 @@ export function App() {
       color: C.rx,
       tip: (
         <>
-          RapfiWeb relaxed vs Gomocalc: {signed(main.elo)} (95% {signed(main.low)} ~{" "}
+          Zenyth Web relaxed vs Gomocalc: {signed(main.elo)} (95% {signed(main.low)} ~{" "}
           {signed(main.high)})
         </>
       ),
@@ -367,7 +367,7 @@ export function App() {
       color: C.simd,
       tip: (
         <>
-          RapfiWeb simd128 vs Gomocalc: {signed(ctrl.elo)} (95% {signed(ctrl.low)} ~{" "}
+          Zenyth Web simd128 vs Gomocalc: {signed(ctrl.elo)} (95% {signed(ctrl.low)} ~{" "}
           {signed(ctrl.high)})
         </>
       ),
@@ -503,7 +503,7 @@ export function App() {
             <i />
             <i />
           </span>
-          RapfiWeb <span className="brand-sub">Engine Lab</span>
+          Zenyth Web <span className="brand-sub">Engine Lab</span>
         </a>
         <div className="navlinks">
           <a href="#match">매치</a>
@@ -523,7 +523,7 @@ export function App() {
       <main id="top">
         <header className="hero">
           <p className="eyebrow">
-            Gomocalc 순정 vs RapfiWeb 배포 · 렌주 · 1 스레드 WASM · 수당 {MAIN.tc.A.turn}ms
+            Gomocalc 순정 vs Zenyth Web 배포 · 렌주 · 1 스레드 WASM · 수당 {MAIN.tc.A.turn}ms
           </p>
           <h1>
             같은 가중치,
@@ -531,7 +531,7 @@ export function App() {
             <span className="grad">더 강한 엔진.</span>
           </h1>
           <p className="hero-lead">
-            gomocalc.com 이 서비스하는 Rapfi 와 RapfiWeb 이 배포하는 Rapfi 를{" "}
+            gomocalc.com 이 서비스하는 Rapfi 와 Zenyth Web 이 배포하는 Rapfi 를{" "}
             <strong>배포 실물 그대로</strong> 맞붙였다. 가중치는 바이트까지 같다. 1 스레드에서
             차이를 만든 것은 relaxed SIMD 변형(gomocalc 에는 없다)과 그 위의 A3 배치 — 같은 ISA
             끼리는 차이가 없었다. 둘 다 relaxed · 2 스레드면 우위가 줄고, 남는 Elo 는 노드당 속도로
@@ -549,7 +549,7 @@ export function App() {
               </p>
               <WdlBar w={MAIN.wdl.w} d={MAIN.wdl.d} l={MAIN.wdl.l} color={C.rx} />
               <p className="hero-foot">
-                {MAIN.games.toLocaleString("en-US")}판 · RapfiWeb 기준 승 {MAIN.wdl.w} · 무{" "}
+                {MAIN.games.toLocaleString("en-US")}판 · Zenyth Web 기준 승 {MAIN.wdl.w} · 무{" "}
                 {MAIN.wdl.d} · 패 {MAIN.wdl.l} · {MAIN.runner} · {decisionText(MAIN)}
               </p>
             </div>
@@ -626,8 +626,8 @@ export function App() {
             >
               <Legend
                 items={[
-                  { label: `본 매치 — RapfiWeb relaxed (${signed(main.elo)})`, color: C.rx },
-                  { label: `대조 — RapfiWeb simd128 (${signed(ctrl.elo)})`, color: C.simd },
+                  { label: `본 매치 — Zenyth Web relaxed (${signed(main.elo)})`, color: C.rx },
+                  { label: `대조 — Zenyth Web simd128 (${signed(ctrl.elo)})`, color: C.simd },
                 ]}
               />
               <TrajectoryChart
@@ -646,7 +646,7 @@ export function App() {
             </Card>
             <Card
               title="쌍 점수 분포 (오각)"
-              sub="한 쌍(같은 개시 · 흑백 교대)에서 RapfiWeb 이 딴 점수"
+              sub="한 쌍(같은 개시 · 흑백 교대)에서 Zenyth Web 이 딴 점수"
             >
               <Legend
                 items={[
@@ -721,7 +721,7 @@ export function App() {
                 />
               </Card>
             )}
-            <Card title="색별 · 끝난 까닭" sub="RapfiWeb 쪽에서 본 승-무-패" wide>
+            <Card title="색별 · 끝난 까닭" sub="Zenyth Web 쪽에서 본 승-무-패" wide>
               <div className="mini-table">
                 {[
                   { m: MAIN, n: "본 매치", c: C.rx },
@@ -781,8 +781,8 @@ export function App() {
                 caption="대국 중 NPS"
                 head={["매치", "엔진", "NPS", "평균 깊이", "수"]}
                 rows={[
-                  { m: MAIN, n: "본 매치", a: "RapfiWeb relaxed" },
-                  { m: CONTROL, n: "대조", a: "RapfiWeb simd128" },
+                  { m: MAIN, n: "본 매치", a: "Zenyth Web relaxed" },
+                  { m: CONTROL, n: "대조", a: "Zenyth Web simd128" },
                 ].flatMap(({ m, n, a }) =>
                   m.search
                     ? [
@@ -951,7 +951,7 @@ node bench/sprt/match-report.mjs --games games.jsonl --summary summary.json --js
       </main>
       <footer className="footer">
         <p>
-          RapfiWeb · GPL-3.0-or-later · 엔진 Rapfi(dhbloo) · 숫자의 출처:{" "}
+          Zenyth Web · GPL-3.0-or-later · 엔진 Rapfi(dhbloo) · 숫자의 출처:{" "}
           <code>docs/gomocalc-대국-분석.md</code> · <code>docs/최적화-마스터플랜.md</code>
           {MAIN.run && (
             <>

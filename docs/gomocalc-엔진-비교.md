@@ -1,7 +1,7 @@
 # gomocalc 엔진 — 탑재 방식 분석 · 성능 대조 · 최적화 방안
 
 > 대상: [dhbloo/gomoku-calculator](https://github.com/dhbloo/gomoku-calculator) (a742d450, 2025-11-17) 와
-> 그 배포본 `www.gomocalc.com/build/*` (Last-Modified 2025-07-27), 그리고 RapfiWeb 의 배포 엔진
+> 그 배포본 `www.gomocalc.com/build/*` (Last-Modified 2025-07-27), 그리고 Zenyth Web 의 배포 엔진
 > `engine-3c94c2a9-mt`.
 > 하네스: `bench/gomocalc/` · 원자료: `bench/gomocalc/results/*.json` (표로 푼 것: 같은 폴더 `*.md`)
 > · CI: `.github/workflows/bench-gomocalc.yml` (run 36589486422) · 측정일 2026-09-29
@@ -9,7 +9,7 @@
 ## 요약
 
 1. **같은 국면·같은 가중치에서 NPS 는 사실상 같다.** 예열 뒤 1 스레드 기하 평균
-   gomocalc 96.5K ↔ RapfiWeb 98.5K (CI Xeon, +2%) · 43.5K ↔ 45.5K (Celeron N4500, +5%).
+   gomocalc 96.5K ↔ Zenyth Web 98.5K (CI Xeon, +2%) · 43.5K ↔ 45.5K (Celeron N4500, +5%).
    노드 한 개의 값이 NNUE 추론에 묶여 있고, 그 코드는 두 버전 사이에 크게 바뀌지 않았다.
 2. **탐색 효율은 우리가 앞선다 — 깊은 쪽에서.** 1 스레드로 국면별 가장 깊은 공통 깊이에 닿는
    시간이 직접 개시 −63% · 간접 개시 −51% · 중반 −13% · VCF −7% · VCT −19% (CI). 얕은 깊이는
@@ -34,7 +34,7 @@
 
 ## 1. 무엇과 무엇을 비교하는가
 
-| | gomocalc (배포본) | RapfiWeb (`engine-3c94c2a9-mt`) |
+| | gomocalc (배포본) | Zenyth Web (`engine-3c94c2a9-mt`) |
 |---|---|---|
 | 엔진 | Rapfi **0.43.01** | Rapfi **0.43.02** (dhbloo/rapfi `3c94c2a9`, 2026-07-23, 패치 없음) |
 | 컴파일러 | clang 21.0.0 (ABOUT 문자열) | clang 24.0.0 · Emscripten 6.0.10 |
@@ -119,7 +119,7 @@ engineDir   = loadFullEngine ? '/' : '/fallback/'
 
 ### 2.3 스레딩 · 워커 구조
 
-| | gomocalc | RapfiWeb |
+| | gomocalc | Zenyth Web |
 |---|---|---|
 | 멀티 | **페이지(메인 스레드)** 에서 글루를 동적 `<script>` 로 불러 `Rapfi({...})`. PROXY_TO_PTHREAD 라 `main()` 은 pthread 에서 돈다 | **전용 워커** 안에서 불러 띄운다. pthread 워커가 같은 스크립트를 다시 읽을 때를 위해 `self.name==="em-pthread"` 가드 |
 | 단일 | `worker-loader` 워커에서 `importScripts` · 동기 `sendCommand` | 같은 워커에서 동기 `sendCommand` |
@@ -130,7 +130,7 @@ engineDir   = loadFullEngine ? '/' : '/fallback/'
 `preamble.js` 의 출력 펌프는 **글자 단위**다 — `FS.init(stdin, stdout, stderr)` 의 `stdout(char)` 가
 한 글자마다 불리고 줄바꿈에서 `onReceiveStdout(line)` 를 부른다. 멀티 빌드에서 pthread 의
 `fd_write` 는 런타임을 가진 스레드로 **동기 프록시**된다. gomocalc 에서는 그것이 **UI 스레드**라
-화면이 바쁘면 탐색 스레드가 출력에서 기다린다. RapfiWeb 은 전용 워커라 UI 와 떨어져 있다
+화면이 바쁘면 탐색 스레드가 출력에서 기다린다. Zenyth Web 은 전용 워커라 UI 와 떨어져 있다
 (이 벤치는 두 엔진을 **gomocalc 방식**으로 똑같이 띄웠으므로 이 차이는 수치에 들어 있지 않다).
 (2026-10-01 추가) 출력량 자체의 비용은 현재 출력률(후보 수 1, ~70줄/초)에서 측정되지 않았다 —
 SHOW_DETAIL 2/3 의 NPS 비 1 스레드 1.011 · 2 스레드 0.993(`bench/gomocalc/output-probe.mjs`).
@@ -139,7 +139,7 @@ SHOW_DETAIL 2/3 의 NPS 비 1 스레드 1.011 · 2 스레드 0.993(`bench/gomoca
 
 gomocalc 는 선형 메모리를 **호스트가 만들어 넘긴다**(`IMPORTED_MEMORY=1`):
 `initial 64MB, maximum 2048MB → 안 되면 1024 → 512`, `shared` 는 멀티만. 해시 기본값은 128MB
-(`INFO HASH_SIZE 131072`, KB 단위) — RapfiWeb 기본값도 128MB 다. `--preload-file` 로 구운
+(`INFO HASH_SIZE 131072`, KB 단위) — Zenyth Web 기본값도 128MB 다. `--preload-file` 로 구운
 가중치는 선형 메모리가 아니라 **JS 쪽 MEMFS** 에 올라간다.
 
 ### 2.5 가중치 / NNUE 적재
@@ -167,7 +167,7 @@ gomocalc 는 선형 메모리를 **호스트가 만들어 넘긴다**(`IMPORTED_
 `INFO TIMEOUT_TURN/MATCH` · `INFO MAX_DEPTH/MAX_NODE` · `INFO SHOW_DETAIL 3|2` · `INFO PONDERING` ·
 `INFO SWAPABLE` → `START`. 탐색: `YXBOARD …DONE` (한 덩어리) → `YXNBEST n` (기본 1) 또는
 `YXBALANCEONE/TWO`. 출력은 `INFO PV/NUMPV/DEPTH/SELDEPTH/NODES/TOTALNODES/TOTALTIME/SPEED/EVAL/
-WINRATE/BESTLINE`, `MESSAGE REALTIME BEST/LOST`, `FORBID` — RapfiWeb 파서가 읽는 것과 같은 집합이다.
+WINRATE/BESTLINE`, `MESSAGE REALTIME BEST/LOST`, `FORBID` — Zenyth Web 파서가 읽는 것과 같은 집합이다.
 
 ## 3. 측정 방법
 

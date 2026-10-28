@@ -1,14 +1,14 @@
 <div align="center">
 
-# RapfiWeb
+# Zenyth Web
 
 **세계 정상급 오목 · 렌주 엔진을 브라우저 하나로.**<br>
 대국 · 분석 · 복기 · 연구까지. 서버도, 설치도, 계정도 필요 없다.
 
 [**▶ 라이브 데모: rapfiweb.pages.dev**](https://rapfiweb.pages.dev)
 
-[![CI](https://img.shields.io/github/actions/workflow/status/lowqen/RapfiWeb/web.yml?branch=main&label=CI&logo=githubactions&logoColor=white)](https://github.com/lowqen/RapfiWeb/actions/workflows/web.yml)
-[![Deploy](https://img.shields.io/github/actions/workflow/status/lowqen/RapfiWeb/deploy.yml?branch=main&label=deploy&logo=cloudflare&logoColor=white)](https://github.com/lowqen/RapfiWeb/actions/workflows/deploy.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/lowqen/Zenyth-web/web.yml?branch=main&label=CI&logo=githubactions&logoColor=white)](https://github.com/lowqen/Zenyth-web/actions/workflows/web.yml)
+[![Deploy](https://img.shields.io/github/actions/workflow/status/lowqen/Zenyth-web/deploy.yml?branch=main&label=deploy&logo=cloudflare&logoColor=white)](https://github.com/lowqen/Zenyth-web/actions/workflows/deploy.yml)
 [![License: GPL v3](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](LICENSE)
 <br>
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -19,16 +19,16 @@
 
 [English](README.md) · **한국어**
 
-<img src="docs/assets/analysis.png" alt="RapfiWeb 분석 화면 — 엔진이 31수 필승을 찾아 수순을 판 위에 그린다" width="860">
+<img src="docs/assets/analysis.png" alt="Zenyth Web 분석 화면 — 엔진이 31수 필승을 찾아 수순을 판 위에 그린다" width="860">
 
 </div>
 
 ---
 
-## 왜 RapfiWeb 인가
+## 왜 Zenyth Web 인가
 
 [Rapfi](https://github.com/dhbloo/rapfi) 는 가장 강한 오픈소스 오목 · 렌주 엔진 가운데 하나다(C++, NNUE 평가).
-RapfiWeb 은 그것을 **WebAssembly** 로 옮기고 분석반 전체를 얹었다. 데스크톱 GUI 와 안드로이드
+Zenyth Web 은 그것을 **WebAssembly** 로 옮기고 분석반 전체를 얹었다. 데스크톱 GUI 와 안드로이드
 앱이 하던 일을 브라우저 탭 하나가 한다.
 
 - **기기 밖으로 아무것도 나가지 않는다.** 기보 · 리뷰 · DB · 통계는 모두 IndexedDB 에 남는다.
@@ -76,7 +76,7 @@ RapfiWeb 은 그것을 **WebAssembly** 로 옮기고 분석반 전체를 얹었�
   닫히는 확인 상자, 24px 이상 터치 타깃, 두 테마 모두 **명암비 4.5:1**. Playwright 스모크가 지킨다.
 
 <div align="center">
-<img src="docs/assets/mobile.png" alt="휴대폰에서 본 RapfiWeb — 한국어 · 라이트 테마" width="300">
+<img src="docs/assets/mobile.png" alt="휴대폰에서 본 Zenyth Web — 한국어 · 라이트 테마" width="300">
 </div>
 
 ## 🏗 아키텍처
@@ -120,8 +120,8 @@ RapfiWeb 은 그것을 **WebAssembly** 로 옮기고 분석반 전체를 얹었�
 **필요한 것:** Node.js 20.11 이상(CI 는 26)과 pnpm.
 
 ```bash
-git clone https://github.com/lowqen/RapfiWeb.git
-cd RapfiWeb
+git clone https://github.com/lowqen/Zenyth-web.git
+cd Zenyth Web
 pnpm install
 
 # 엔진 가중치(~20MB)는 git 이 아니라 릴리스 자산이다.
