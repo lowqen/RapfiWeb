@@ -1210,8 +1210,8 @@ export const EN: Readonly<Record<string, string>> = {
   "터미널에서 pnpm curriculum:publish 를 실행합니다": "Run pnpm curriculum:publish in a terminal",
   "저장소에서 pnpm curriculum:publish <받은 파일> 을 실행합니다":
     "In the repository, run pnpm curriculum:publish <downloaded file>",
-  "검사 · 시험을 통과하면 커밋 · push 되고, 몇 분 뒤 웹과 RapfiDroid 앱이 새 커리큘럼을 받습니다":
-    "If the checks and tests pass it is committed and pushed, and a few minutes later the web app and RapfiDroid get the new curriculum",
+  "검사 · 시험을 통과하면 커밋 · push 되고, 몇 분 뒤 웹과 Zenyth 앱이 새 커리큘럼을 받습니다":
+    "If the checks and tests pass it is committed and pushed, and a few minutes later the web app and Zenyth get the new curriculum",
   "pnpm studio 로 띄우면 이 화면에서 저장소 파일에 바로 씁니다":
     "Started with pnpm studio, this screen writes the repository file directly",
   "가져올 정석을 찾지 못했습니다": "Could not find the joseki to import",

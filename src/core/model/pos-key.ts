@@ -10,7 +10,7 @@ import { DEFAULT_SIZE, move, type Move } from "./move";
  * 역조회가 기대는 성질이다.
  *
  * **이것이 다섯 번째 구현이다** — `main.c web_poskey()`, `Yixin-Board/tests/test_webkey.c`,
- * `rifdb/rifkey.py`, RapfiDroid `PosKey.kt`. `rifdb/rif_crosscheck.py --emit` 이 앞의 셋이
+ * `rifdb/rifkey.py`, Zenyth `PosKey.kt`. `rifdb/rif_crosscheck.py --emit` 이 앞의 셋이
  * 합의한 값을 `testdata/poskey_golden.txt` 에도 쓰고, `pos-key.test.ts` 가 그것을 읽는다.
  * 어느 하나를 고치면 교차검증을 다시 돌려야 한다(test-yixin/docs/개발_핸드북.md §2-6).
  *

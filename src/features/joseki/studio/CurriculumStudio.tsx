@@ -354,7 +354,7 @@ function Overview({ issues, repo }: { issues: Issue[]; repo: boolean }) {
           </li>
           <li>
             {t(
-              "검사 · 시험을 통과하면 커밋 · push 되고, 몇 분 뒤 웹과 RapfiDroid 앱이 새 커리큘럼을 받습니다",
+              "검사 · 시험을 통과하면 커밋 · push 되고, 몇 분 뒤 웹과 Zenyth 앱이 새 커리큘럼을 받습니다",
             )}
           </li>
         </ol>

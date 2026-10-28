@@ -179,7 +179,7 @@ This web build ships **Renju** weights only (Cloudflare's 25 MB per-file limit).
 
 RapfiWeb is released under the **[GNU GPL v3.0 or later](LICENSE)** because the bundle includes the
 Rapfi engine. Code written for this repository may also be used under BSD 2-Clause. Bundled and
-ported components (Rapfi, rapfi-networks, Yixin-Board, RapfiDroid, npm dependencies) are listed in
+ported components (Rapfi, rapfi-networks, Yixin-Board, Zenyth, npm dependencies) are listed in
 [**THIRD_PARTY_NOTICES.md**](THIRD_PARTY_NOTICES.md), together with where to find the engine's
 corresponding source.
 
@@ -191,4 +191,4 @@ gate keep `.rif`-derived files out of the repository and every deployment.
 
 - [**dhbloo/rapfi**](https://github.com/dhbloo/rapfi) and [**rapfi-networks**](https://github.com/dhbloo/rapfi-networks): the engine and its networks
 - [**Yixin-Board**](https://github.com/accreator/Yixin-Board) by Kai Sun, and [dhbloo's fork](https://github.com/dhbloo/Yixin-Board): the desktop GUI whose protocol and review logic this app follows
-- [**RapfiDroid**](https://github.com/lowqen/RapfiDroid): the Android analysis board this web app was ported from
+- [**Zenyth**](https://github.com/lowqen/Zenyth): the Android analysis board this web app was ported from

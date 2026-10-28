@@ -15,7 +15,7 @@
  *   **Rapfi 는 `yxswap2step*` / `yxsoosorvstep*` 를 모른다.** 그 둘은 Yixin 의
  *   명령이고 데스크톱 main.c 가 말을 거는 상대가 Yixin 이다. Rapfi 의 명령표
  *   (`command/gomocup.cpp` @3c94c2a9)에 없으며, GUI 모드는 모르는 명령을
- *   오류도 없이 삼킨다. 앱(RapfiDroid)도 같은 명령을 보내고 같은 침묵을 받는데,
+ *   오류도 없이 삼킨다. 앱(Zenyth)도 같은 명령을 보내고 같은 침묵을 받는데,
  *   그쪽 시험도 `FakeEngine` 이라 여태 드러나지 않았다.
  *
  * 그래서 Soosorv-8 과 스왑2 는 **목록에서 내렸다**. 남은 셋(자유 렌주, RIF,

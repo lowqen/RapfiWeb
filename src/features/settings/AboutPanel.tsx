@@ -47,8 +47,8 @@ const COMPONENTS: readonly Component[] = [
     license: "BSD-2-Clause",
   },
   {
-    name: "RapfiDroid",
-    href: "https://github.com/lowqen/RapfiDroid",
+    name: "Zenyth",
+    href: "https://github.com/lowqen/Zenyth",
     role: msg("이식 원본 안드로이드 앱"),
     license: "BSD-2-Clause",
   },

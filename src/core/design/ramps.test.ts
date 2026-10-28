@@ -49,7 +49,7 @@ describe("Clay 앵커 — Color.kt 주석의 두 값", () => {
   it("톤 42 = #7E5D14 — 주석의 #7B5E22 는 틀렸다", () => {
     // Kotlin 이 실제로 내는 값이 #7E5D14 다(위 덤프). 주석은 낡았다.
     // 판정 근거와 처리는 docs/design-token-reconciliation.md 에 적었고,
-    // RapfiDroid 쪽 주석도 고쳤다.
+    // Zenyth 쪽 주석도 고쳤다.
     expect(clay[42]).toBe("#7E5D14");
   });
 });

@@ -167,7 +167,7 @@ WebAssembly SIMD 와 CSP 의 `'wasm-unsafe-eval'` 이 필수다: **Chrome/Edge 9
 
 배포물에 Rapfi 엔진이 들어 있으므로 **[GNU GPL v3.0 이상](LICENSE)** 으로 배포한다. 이 저장소가 직접 쓴
 코드는 BSD 2-Clause 로도 쓸 수 있다. 함께 싣거나 이식한 구성요소(Rapfi · rapfi-networks · Yixin-Board ·
-RapfiDroid · npm 의존성)와 엔진의 대응 소스 위치는 [**THIRD_PARTY_NOTICES.md**](THIRD_PARTY_NOTICES.md) 에 있다.
+Zenyth · npm 의존성)와 엔진의 대응 소스 위치는 [**THIRD_PARTY_NOTICES.md**](THIRD_PARTY_NOTICES.md) 에 있다.
 
 **RenjuNet 자료는 절대 싣지 않는다.** 라이선스가 비상업 · 오프라인 사용만 허락하므로, 앱은 *사용자가 가진*
 파일을 *그 브라우저 안에서만* 처리하고 아무것도 올리지 않는다. `.gitignore` 와 CI 게이트가 `.rif` 파생
@@ -177,4 +177,4 @@ RapfiDroid · npm 의존성)와 엔진의 대응 소스 위치는 [**THIRD_PARTY
 
 - [**dhbloo/rapfi**](https://github.com/dhbloo/rapfi) · [**rapfi-networks**](https://github.com/dhbloo/rapfi-networks): 엔진과 가중치
 - Kai Sun 의 [**Yixin-Board**](https://github.com/accreator/Yixin-Board) 와 [dhbloo 의 fork](https://github.com/dhbloo/Yixin-Board): 프로토콜과 리뷰 로직을 따른 데스크톱 GUI
-- [**RapfiDroid**](https://github.com/lowqen/RapfiDroid): 이 웹 앱의 원본인 안드로이드 분석반
+- [**Zenyth**](https://github.com/lowqen/Zenyth): 이 웹 앱의 원본인 안드로이드 분석반

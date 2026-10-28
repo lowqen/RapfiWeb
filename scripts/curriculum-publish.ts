@@ -11,7 +11,7 @@
  *  2. 배포 글꼴로 `public/joseki/curriculum.json` 에 쓴다(`formatCurriculum`). 바뀐 것이 없으면 끝.
  *  3. 커리큘럼 단위 시험(`src/core/curriculum`)을 돌린다 — 배포 파일 자체를 읽는 시험이 있다.
  *  4. 그 파일 하나만 커밋한다(«docs: curriculum <버전>», 본문에 더한 · 뺀 · 고친 레슨). 그리고 push.
- *     main 의 push 가 Cloudflare Pages 배포(deploy.yml)를 부르고, RapfiDroid 앱은 다음에 정석 탭을 열 때
+ *     main 의 push 가 Cloudflare Pages 배포(deploy.yml)를 부르고, Zenyth 앱은 다음에 정석 탭을 열 때
  *     같은 파일을 받는다.
  */
 import { execFileSync, spawnSync } from "node:child_process";
@@ -126,6 +126,6 @@ if (pushed.status !== 0)
   fail("push 하지 못했습니다 — 커밋은 남아 있습니다. git pull --rebase 뒤 git push");
 console.log(
   branch === "main"
-    ? "✓ push — 몇 분 뒤 https://rapfiweb.pages.dev/joseki 와 RapfiDroid 앱이 새 커리큘럼을 받습니다"
+    ? "✓ push — 몇 분 뒤 https://rapfiweb.pages.dev/joseki 와 Zenyth 앱이 새 커리큘럼을 받습니다"
     : `! ${branch} 브랜치에 push 했습니다. 배포는 main 에서만 됩니다`,
 );

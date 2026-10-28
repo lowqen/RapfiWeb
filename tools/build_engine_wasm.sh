@@ -8,7 +8,7 @@
 #   out/bench/{config.toml,*.bin.lz4,model210901.bin}   <- BENCH 대조 묶음
 #
 # 리눅스 x86_64(또는 GitHub Actions ubuntu-latest)에서 통째로 실행한다.
-# RapfiDroid/tools/build_engine_android.sh 의 구조를 그대로 따른다 — 특히
+# Zenyth/tools/build_engine_android.sh 의 구조를 그대로 따른다 — 특히
 # "빌드가 됐다"와 "엔진이 맞다"를 가르는 [5/6] 검증 게이트가 같은 이유로 여기 있다.
 #
 # pipefail 은 일부러 빼 둔다. 이 스크립트에는 `… | head -1` 과 `… | grep -q` 가
@@ -17,10 +17,10 @@
 # 잡고 싶은 것(명령 자체의 실패)은 set -e 가 이미 잡는다.
 set -eu
 
-# 앱(RapfiDroid)에 실린 것과 **같은 소스**에서 출발한다. 그래야 웹과 폰의
+# 앱(Zenyth)에 실린 것과 **같은 소스**에서 출발한다. 그래야 웹과 폰의
 # 탐색 결과가 같다고 주장할 근거가 생긴다.
 #
-# ⚠ 처음에는 RapfiDroid/app/src/main/jniLibs/ENGINE_VERSION.txt 의
+# ⚠ 처음에는 Zenyth/app/src/main/jniLibs/ENGINE_VERSION.txt 의
 #   `upstream : 8d16fc2c…` 를 그대로 썼는데 그 커밋은 dhbloo/rapfi 에 없다(HTTP 422).
 #   build_engine_android.sh 가 CMakeLists 를 패치하고 **로컬 커밋을 만든 뒤**
 #   `rev-parse HEAD` 를 기록하기 때문이다 — 그래서 그 필드는 upstream 커밋이 아니라
@@ -118,7 +118,7 @@ git fetch -q --all --tags
 # 보고는 얕은 클론 문제인지 커밋이 없는 건지 알 수 없다. 먼저 확인하고 말해 준다.
 if ! git cat-file -e "${RAPFI_COMMIT}^{commit}" 2> /dev/null; then
   echo "  X 커밋 $RAPFI_COMMIT 가 dhbloo/rapfi 에 없습니다."
-  echo "    (RapfiDroid 의 ENGINE_VERSION.txt 'upstream' 필드는 패치된 로컬 커밋입니다 — 그 부모를 쓰세요)"
+  echo "    (Zenyth 의 ENGINE_VERSION.txt 'upstream' 필드는 패치된 로컬 커밋입니다 — 그 부모를 쓰세요)"
   exit 1
 fi
 git checkout -q "$RAPFI_COMMIT"

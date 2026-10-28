@@ -13,7 +13,7 @@ shown inside the app under **Settings ▸ About**.
 | **Rapfi engine** (WebAssembly build) | `public/engine/*.js`, `public/engine/*.wasm` | [dhbloo/rapfi](https://github.com/dhbloo/rapfi) | GPL-3.0-or-later |
 | **Rapfi networks** (`rapfi.data`, renju weights) | release asset, served at `/engine/rapfi.data` | [dhbloo/rapfi-networks](https://github.com/dhbloo/rapfi-networks) | CC0 1.0 |
 | **Yixin-Board** (ported logic: engine protocol, position keys, opening frame keys, desktop settings layout, review classifier) | `src/core/**` | [accreator/Yixin-Board](https://github.com/accreator/Yixin-Board) → [dhbloo/Yixin-Board](https://github.com/dhbloo/Yixin-Board) | BSD 2-Clause, © 2009–2017 Kai Sun |
-| **RapfiDroid** (ported Kotlin logic) | `src/core/**` | [lowqen/RapfiDroid](https://github.com/lowqen/RapfiDroid) | BSD 2-Clause, © 2026 lowqen |
+| **Zenyth** (ported Kotlin logic) | `src/core/**` | [lowqen/Zenyth](https://github.com/lowqen/Zenyth) | BSD 2-Clause, © 2026 lowqen |
 | React, React DOM | npm | [facebook/react](https://github.com/facebook/react) | MIT |
 | React Router | npm | [remix-run/react-router](https://github.com/remix-run/react-router) | MIT |
 | Zustand | npm | [pmndrs/zustand](https://github.com/pmndrs/zustand) | MIT |

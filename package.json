@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "RapfiDroid 웹 이식 — 오목/렌주 분석반",
+  "description": "Zenyth 웹 이식 — 오목/렌주 분석반",
   "license": "GPL-3.0-or-later",
   "packageManager": "pnpm@9.12.3",
   "engines": {
